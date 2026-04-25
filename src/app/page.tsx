@@ -29,8 +29,20 @@ export default function HomePage() {
       await loadData();
       const state = useAppStore.getState();
       if (!state.initialized) {
-        await saveCategories(defaultCategories);
-        await saveCards(defaultCards);
+        // MERGE defaults with existing data instead of overwriting.
+        // User may already have categories/cards from a previous session
+        // (e.g. browser storage wasn't fully cleared), so we only ADD
+        // missing items, never delete what's already there.
+        const existingCatIds = new Set(state.categories.map((c) => c.id));
+        const existingCardIds = new Set(state.cards.map((c) => c.id));
+        const newCats = defaultCategories.filter((c) => !existingCatIds.has(c.id));
+        const newCards = defaultCards.filter((c) => !existingCardIds.has(c.id));
+        if (newCats.length > 0) {
+          await saveCategories([...state.categories, ...newCats]);
+        }
+        if (newCards.length > 0) {
+          await saveCards([...state.cards, ...newCards]);
+        }
         await setInitialized();
         await loadData();
       }

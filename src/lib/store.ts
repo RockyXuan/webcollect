@@ -114,6 +114,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       superCategories = defaultSuperCategories;
       await saveSuperCategories(superCategories);
     }
+
+    // Recovery: if categories are empty but initialized, merge defaults back
+    if (init && categories.length === 0) {
+      await saveCategories(defaultCategories);
+      await saveCards([...defaultCards, ...cards.filter((c) => !defaultCards.some((d) => d.id === c.id))]);
+    }
+
     // Migration: ensure categories have superCategoryId
     const needsSuperCatMigration = categories.some(
       (c) => !c.superCategoryId && c.id !== "cat-inbox"
@@ -124,17 +131,19 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (!c.superCategoryId) {
           // Find matching default category to get its superCategoryId
           const defaultCat = defaultCategories.find((d) => d.id === c.id);
-          return { ...c, superCategoryId: defaultCat?.superCategoryId || "sc-other" };
+          return { ...c, superCategoryId: defaultCat?.superCategoryId || "" };
         }
         return c;
       });
       await saveCategories(updated);
-      set({ categories: updated });
     }
 
+    // Reload after recovery/migration
+    const [finalCards, finalCategories] = await Promise.all([getCards(), getCategories()]);
+
     set({
-      cards,
-      categories,
+      cards: finalCards,
+      categories: finalCategories,
       hiddenSites: cleanedHidden,
       pinnedCategoryIds: pinnedIds,
       superCategories,
@@ -143,11 +152,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
 
     // Migration: fill missing imageUrl with Google Favicon API
-    const needsMigration = cards.some(
+    const needsMigration = finalCards.some(
       (c) => (!c.imageUrl || c.imageUrl === "") && c.url
     );
     if (needsMigration) {
-      const updated = cards.map((c) => {
+      const updated = finalCards.map((c) => {
         if ((!c.imageUrl || c.imageUrl === "") && c.url) {
           try {
             const hostname = new URL(c.url).hostname;
@@ -166,7 +175,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     // Migration: ensure inbox category exists
-    const inboxExists = categories.some((c) => c.id === "cat-inbox");
+    const inboxExists = finalCategories.some((c) => c.id === "cat-inbox");
     if (!inboxExists) {
       const inbox: Category = {
         id: "cat-inbox",
@@ -177,7 +186,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         createdAt: Date.now(),
         superCategoryId: "",
       };
-      const updatedCats = [...categories, inbox];
+      const updatedCats = [...finalCategories, inbox];
       await saveCategories(updatedCats);
       set({ categories: updatedCats });
     }
