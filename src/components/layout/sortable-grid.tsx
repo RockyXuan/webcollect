@@ -280,49 +280,44 @@ function SortableCategoryBlock({
         style={{ backgroundColor: category.color, opacity: 0.7 }}
       />
 
-      {/* Header: drag handle + title + action buttons */}
-      <div className="flex items-center justify-between px-3 pt-2 pb-1.5">
-        <div className="flex items-center gap-2 min-w-0">
-          {/* Drag handle for block - visible in edit mode */}
-          {editMode && (
-            <span
-              {...attributes}
-              {...listeners}
-              className="shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-primary transition-colors"
-            >
-              <GripVertical className="w-4 h-4" />
-            </span>
-          )}
-          <CategoryIcon iconName={category.icon} color={category.color} />
-          <h2 className="text-sm font-serif font-semibold text-foreground tracking-tight truncate">
-            {category.name}
-          </h2>
-          <span className="text-[10px] text-muted-foreground/70 tabular-nums">
-            {cards.length}
+      {/* Header: drag handle + title + inline action buttons */}
+      <div className="flex items-center gap-2 px-3 pt-2 pb-1.5 min-w-0">
+        {/* Drag handle for block - visible in edit mode */}
+        {editMode && (
+          <span
+            {...attributes}
+            {...listeners}
+            className="shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-primary transition-colors"
+          >
+            <GripVertical className="w-4 h-4" />
           </span>
-        </div>
-
-        {/* Action buttons - right side of header */}
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={onToggleEdit}
-            className={cn(
-              "text-[11px] px-1.5 py-0.5 rounded transition-colors",
-              editMode
-                ? "text-primary bg-primary/10"
-                : "text-muted-foreground/60 hover:text-foreground"
-            )}
-          >
-            {editMode ? "完成" : "编辑"}
-          </button>
-          <button
-            onClick={onAdd}
-            className="flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded text-muted-foreground/60 hover:text-primary transition-colors"
-          >
-            <Plus className="w-3 h-3" />
-            添加
-          </button>
-        </div>
+        )}
+        <CategoryIcon iconName={category.icon} color={category.color} />
+        <h2 className="text-sm font-serif font-semibold text-foreground tracking-tight truncate">
+          {category.name}
+        </h2>
+        <span className="text-[10px] text-muted-foreground/70 tabular-nums">
+          {cards.length}
+        </span>
+        {/* Inline action buttons - right after title */}
+        <button
+          onClick={onToggleEdit}
+          className={cn(
+            "text-[11px] px-1.5 py-0.5 rounded transition-colors shrink-0",
+            editMode
+              ? "text-primary bg-primary/10"
+              : "text-muted-foreground/60 hover:text-foreground"
+          )}
+        >
+          {editMode ? "完成" : "编辑"}
+        </button>
+        <button
+          onClick={onAdd}
+          className="flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded text-muted-foreground/60 hover:text-primary transition-colors shrink-0"
+        >
+          <Plus className="w-3 h-3" />
+          添加
+        </button>
       </div>
 
       {/* Card content */}

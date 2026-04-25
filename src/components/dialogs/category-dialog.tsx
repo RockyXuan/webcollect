@@ -6,6 +6,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,9 @@ export function CategoryDialog({ open, onOpenChange, editingCategory }: Category
           <DialogTitle className="font-serif">
             {editingCategory ? "编辑分类" : "新建分类"}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            {editingCategory ? "编辑分类信息" : "创建新的网站分类"}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">

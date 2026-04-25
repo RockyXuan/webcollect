@@ -6,6 +6,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -126,6 +127,9 @@ export function CardDialog({ open, onOpenChange, editingCard, defaultCategoryId 
           <DialogTitle className="font-serif">
             {isEditing ? "编辑卡片" : "添加网站"}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            {isEditing ? "编辑网站卡片信息" : "添加新的网站到收藏墙"}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
