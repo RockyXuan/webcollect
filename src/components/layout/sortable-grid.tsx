@@ -259,11 +259,6 @@ export function SortableGrid({
                 onAddCard={onAddCard}
                 onAddGroup={onAddGroup}
               >
-                {editMode && hoveredParentId === parent.id && (
-                  <div className="rounded-md border-2 border-dashed border-primary bg-primary/10 mb-2 flex items-center justify-center py-2">
-                    <span className="text-[10px] text-primary font-medium">释放以降级到此分类</span>
-                  </div>
-                )}
 
                 <div className="space-y-3">
                   {subGroups.map((sub) => (
@@ -284,11 +279,7 @@ export function SortableGrid({
                   {subGroups.length === 0 && !editMode && (
                     <p className="text-[10px] text-muted-foreground py-1">暂无分组</p>
                   )}
-                  {subGroups.length === 0 && editMode && hoveredParentId !== parent.id && (
-                    <div className="rounded-md border-2 border-dashed border-muted-foreground/20 mb-2 flex items-center justify-center py-1.5">
-                      <span className="text-[10px] text-muted-foreground/40">拖入分组到此分类</span>
-                    </div>
-                  )}
+
                 </div>
               </SortableCategoryBlock>
             );
@@ -384,8 +375,9 @@ function SortableCategoryBlock({
       ref={setNodeRef}
       style={style}
       className={`
-        rounded-lg border bg-card transition-colors
-        ${isHovered ? "border-primary border-2 shadow-md" : "border-border"}
+        rounded-lg border bg-card
+        ${isHovered ? "border-primary/60 shadow-sm bg-primary/[0.03]" : "border-border"}
+        transition-all duration-300 ease-out
       `}
     >
       {/* Category header */}
@@ -410,9 +402,15 @@ function SortableCategoryBlock({
           {category.name}
         </span>
 
-        {/* Drop hint when dragging an ungrouped item */}
+        {/* Smooth drop hint when dragging an ungrouped item over this parent */}
+        {isHovered && isParent && (
+          <span className="text-[10px] text-primary/70 font-medium ml-1 animate-in fade-in duration-300">
+            释放以降级到此分类
+          </span>
+        )}
+        {/* Subtle hint when dragging but not hovering */}
         {isDraggingActive && isParent && !isHovered && (
-          <span className="text-[10px] text-muted-foreground/50 ml-1">
+          <span className="text-[10px] text-muted-foreground/30 ml-1 transition-opacity duration-300">
             拖入分组到此分类
           </span>
         )}
