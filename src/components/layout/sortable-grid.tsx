@@ -215,25 +215,67 @@ export function SortableGrid({ cards, categories, onEdit, onDelete, onAdd, onEdi
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      {/* Category-level SortableContext */}
-      <SortableContext items={categorySortableIds} strategy={rectSortingStrategy}>
-        <div className="flex flex-wrap gap-3">
-          {sortedCategories.map((category) => (
-            <SortableCategoryBlock
-              key={category.id}
-              category={category}
-              cards={cards.filter((c) => c.categoryId === category.id)}
-              editMode={editMode}
-              editingCategoryId={editingCategoryId}
-              setEditingCategoryId={setEditingCategoryId}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onAdd={onAdd}
-              onEditCategory={onEditCategory}
-            />
-          ))}
-        </div>
-      </SortableContext>
+      {/* Group categories by superCategoryId */}
+      {(() => {
+        const superCats = useAppStore.getState().superCategories;
+        // Group categories by superCategoryId
+        const groups: Record<string, Category[]> = {};
+        const ungrouped: Category[] = [];
+        for (const cat of sortedCategories) {
+          if (cat.superCategoryId && cat.superCategoryId !== "none") {
+            if (!groups[cat.superCategoryId]) groups[cat.superCategoryId] = [];
+            groups[cat.superCategoryId].push(cat);
+          } else {
+            ungrouped.push(cat);
+          }
+        }
+        // Render: super-category groups first (ordered), then ungrouped
+        type GroupItem = 
+          | { type: "super"; id: string; name: string; categories: Category[] }
+          | { type: "single"; id: string; name: string; categories: Category[] };
+        const renderedGroups: GroupItem[] = [
+          ...superCats
+            .filter((sc) => groups[sc.id] && groups[sc.id].length > 0)
+            .map((sc) => ({ type: "super" as const, id: sc.id, name: sc.name, categories: groups[sc.id] })),
+          ...ungrouped.map((cat) => ({ type: "single" as const, id: cat.id, name: "", categories: [cat] })),
+        ];
+
+        return (
+          <SortableContext items={categorySortableIds} strategy={rectSortingStrategy}>
+            <div className="space-y-10">
+              {renderedGroups.map((group) => (
+                <div key={group.id}>
+                  {group.type === "super" && (
+                    <div className="mb-5 flex items-center gap-3">
+                      <div className="h-px flex-1 bg-border/40" />
+                      <h2 className="text-sm font-serif font-semibold tracking-widest text-muted-foreground uppercase px-2">
+                        {group.name}
+                      </h2>
+                      <div className="h-px flex-1 bg-border/40" />
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-6">
+                    {group.categories.map((category) => (
+                      <SortableCategoryBlock
+                        key={category.id}
+                        category={category}
+                        cards={cards.filter((c) => c.categoryId === category.id)}
+                        editMode={editMode}
+                        editingCategoryId={editingCategoryId}
+                        setEditingCategoryId={setEditingCategoryId}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                        onAdd={onAdd}
+                        onEditCategory={onEditCategory}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </SortableContext>
+        );
+      })()}
 
       {/* Drag overlay */}
       <DragOverlay dropAnimation={null}>

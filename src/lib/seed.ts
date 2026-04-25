@@ -1,12 +1,19 @@
-import type { WebCard, Category } from "./types";
+import type { WebCard, Category, SuperCategory } from "./types";
+
+export const defaultSuperCategories: SuperCategory[] = [
+  { id: "sc-work", name: "工作", order: 0, createdAt: Date.now() },
+  { id: "sc-ai", name: "AI", order: 1, createdAt: Date.now() },
+  { id: "sc-dev", name: "开发", order: 2, createdAt: Date.now() },
+  { id: "sc-life", name: "生活", order: 3, createdAt: Date.now() },
+];
 
 export const defaultCategories: Category[] = [
-  { id: "cat-1", name: "常用", icon: "star", color: "#B8860B", order: 0, createdAt: Date.now() },
-  { id: "cat-2", name: "AI 工具", icon: "wrench", color: "#4A6FA5", order: 1, createdAt: Date.now() },
-  { id: "cat-3", name: "设计灵感", icon: "palette", color: "#9B7E8E", order: 2, createdAt: Date.now() },
-  { id: "cat-4", name: "开发者", icon: "code", color: "#4A7C59", order: 3, createdAt: Date.now() },
-  { id: "cat-5", name: "阅读", icon: "book-open", color: "#8B6F5C", order: 4, createdAt: Date.now() },
-  { id: "cat-inbox", name: "收集箱", icon: "inbox", color: "#888888", order: 99, createdAt: Date.now() },
+  { id: "cat-1", name: "常用", icon: "star", color: "#B8860B", order: 0, superCategoryId: "sc-work", createdAt: Date.now() },
+  { id: "cat-2", name: "AI 工具", icon: "wrench", color: "#4A6FA5", order: 1, superCategoryId: "sc-ai", createdAt: Date.now() },
+  { id: "cat-3", name: "设计灵感", icon: "palette", color: "#9B7E8E", order: 2, superCategoryId: "sc-work", createdAt: Date.now() },
+  { id: "cat-4", name: "开发者", icon: "code", color: "#4A7C59", order: 3, superCategoryId: "sc-dev", createdAt: Date.now() },
+  { id: "cat-5", name: "阅读", icon: "book-open", color: "#8B6F5C", order: 4, superCategoryId: "sc-life", createdAt: Date.now() },
+  { id: "cat-inbox", name: "收集箱", icon: "inbox", color: "#888888", order: 99, superCategoryId: "", createdAt: Date.now() },
 ];
 
 /* ── Favicon Helper ── */

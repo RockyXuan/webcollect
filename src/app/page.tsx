@@ -72,7 +72,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       <TopNav onAddCard={handleAddCard} onManageCategories={handleAddCategory} />
 
-      <main className="w-full px-3 sm:px-5 lg:px-6 py-4 space-y-4">
+      <main className="w-full max-w-[1400px] mx-auto px-6 sm:px-10 lg:px-16 py-6 space-y-6">
         <ErrorBoundary>
           <SortableGrid
             cards={cards}

@@ -54,6 +54,9 @@ export function CategoryDialog({ open, onOpenChange, editingCategory }: Category
   const [name, setName] = useState("");
   const [icon, setIcon] = useState(PRESET_ICONS[0].value);
   const [color, setColor] = useState(PRESET_COLORS[0].value);
+  const [superCategoryId, setSuperCategoryId] = useState("");
+
+  const superCategories = useAppStore((s) => s.superCategories);
 
   useEffect(() => {
     if (open) {
@@ -61,10 +64,12 @@ export function CategoryDialog({ open, onOpenChange, editingCategory }: Category
         setName(editingCategory.name || "");
         setIcon(editingCategory.icon || PRESET_ICONS[0].value);
         setColor(editingCategory.color || PRESET_COLORS[0].value);
+        setSuperCategoryId(editingCategory.superCategoryId || "");
       } else {
         setName("");
         setIcon(PRESET_ICONS[0].value);
         setColor(PRESET_COLORS[0].value);
+        setSuperCategoryId("");
       }
     }
   }, [open, editingCategory]);
@@ -77,6 +82,7 @@ export function CategoryDialog({ open, onOpenChange, editingCategory }: Category
       name: name.trim(),
       icon,
       color,
+      superCategoryId,
       order: editingCategory?.order ?? 999,
       createdAt: editingCategory?.createdAt ?? Date.now(),
     };

@@ -1,5 +1,5 @@
 import localforage from "localforage";
-import type { WebCard, Category, HiddenSite } from "./types";
+import type { WebCard, Category, SuperCategory, HiddenSite } from "./types";
 
 localforage.config({
   name: "WebCollect",
@@ -8,6 +8,7 @@ localforage.config({
 
 const CARDS_KEY = "cards";
 const CATEGORIES_KEY = "categories";
+const SUPER_CATEGORIES_KEY = "superCategories";
 const INIT_KEY = "initialized";
 const HIDDEN_SITES_KEY = "hiddenSites";
 
@@ -105,4 +106,12 @@ export async function getPinnedCategoryIds(): Promise<string[]> {
 
 export async function savePinnedCategoryIds(ids: string[]): Promise<void> {
   await localforage.setItem(PINNED_CATEGORIES_KEY, ids);
+}
+
+export async function getSuperCategories(): Promise<SuperCategory[]> {
+  return (await localforage.getItem<SuperCategory[]>(SUPER_CATEGORIES_KEY)) || [];
+}
+
+export async function saveSuperCategories(superCats: SuperCategory[]): Promise<void> {
+  await localforage.setItem(SUPER_CATEGORIES_KEY, superCats);
 }
