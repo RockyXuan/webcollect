@@ -62,8 +62,9 @@ export function WebCardItem({
       {/* Drag handle - always visible for direct drag */}
       {dragListeners && (
         <span
-          className="cursor-grab active:cursor-grabbing text-muted-foreground/30 hover:text-foreground transition-colors"
+          className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-foreground transition-colors"
           {...dragListeners}
+          title="拖动排序"
         >
           <GripVertical className="w-3 h-3" />
         </span>

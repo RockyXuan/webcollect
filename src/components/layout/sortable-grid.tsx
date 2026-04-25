@@ -440,6 +440,11 @@ export function SortableGrid({
                     — 拖入上方分类即可降级为分组
                   </span>
                 )}
+                {!editMode && (
+                  <span className="text-[10px] text-muted-foreground/40 ml-1">
+                    — 拖拽分组到上方分类可降级
+                  </span>
+                )}
               </div>
               <div className="p-3 flex flex-wrap gap-3">
                 {standaloneCategories.map((cat) => {
@@ -595,18 +600,19 @@ function SortableCategoryBlock({
       {/* Category header - buttons right next to title */}
       <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border/50 flex-wrap">
         <span
-          className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-foreground"
+          className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground transition-colors"
           {...attributes}
           {...listeners}
+          title="拖动排序"
         >
-          <GripVertical className="w-3.5 h-3.5" />
+          <GripVertical className="w-4 h-4" />
         </span>
         <div
           className="w-2.5 h-2.5 rounded-full flex-shrink-0"
           style={{ backgroundColor: category.color }}
         />
         <span
-          className="text-sm font-semibold text-foreground font-serif cursor-grab active:cursor-grabbing"
+          className="text-sm font-semibold text-foreground font-serif cursor-grab active:cursor-grabbing hover:text-primary/80 transition-colors"
           {...attributes}
           {...listeners}
         >
@@ -697,14 +703,12 @@ function SortableCategoryBlock({
       {/* Category body */}
       <div className="p-3">{children}</div>
 
-      {/* Resize handle - right edge */}
-      {editMode && (
-        <div
-          className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize
-            hover:bg-primary/20 active:bg-primary/30 transition-colors rounded-r-lg"
-          onMouseDown={handleResizeStart}
-        />
-      )}
+      {/* Resize handle - right edge, always available */}
+      <div
+        className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize
+          hover:bg-primary/20 active:bg-primary/30 transition-colors rounded-r-lg"
+        onMouseDown={handleResizeStart}
+      />
     </div>
   );
 }
@@ -783,18 +787,19 @@ function SortableSubGroupBlock({
       {/* Sub-group header - buttons right next to title */}
       <div className="flex items-center gap-1.5 px-2.5 py-1.5 flex-wrap">
         <span
-          className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-foreground"
+          className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground transition-colors"
           {...attributes}
           {...listeners}
+          title="拖动排序"
         >
-          <GripVertical className="w-3 h-3" />
+          <GripVertical className="w-3.5 h-3.5" />
         </span>
         <div
           className="w-1 h-3 rounded-full flex-shrink-0"
           style={{ backgroundColor: category.color }}
         />
         <span
-          className="text-xs font-medium text-foreground cursor-grab active:cursor-grabbing"
+          className="text-xs font-medium text-foreground cursor-grab active:cursor-grabbing hover:text-primary/80 transition-colors"
           {...attributes}
           {...listeners}
         >
@@ -916,18 +921,19 @@ function SortableUngroupedBlock({
       {/* Header - buttons right next to title */}
       <div className="flex items-center gap-1.5 px-2.5 py-1.5 flex-wrap">
         <span
-          className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-foreground"
+          className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground transition-colors"
           {...attributes}
           {...listeners}
+          title="拖动排序"
         >
-          <GripVertical className="w-3 h-3" />
+          <GripVertical className="w-3.5 h-3.5" />
         </span>
         <div
           className="w-1 h-3 rounded-full flex-shrink-0"
           style={{ backgroundColor: category.color }}
         />
         <span
-          className="text-xs font-medium text-foreground cursor-grab active:cursor-grabbing"
+          className="text-xs font-medium text-foreground cursor-grab active:cursor-grabbing hover:text-primary/80 transition-colors"
           {...attributes}
           {...listeners}
         >
