@@ -53,7 +53,7 @@ export function WebCardItem({
       className={`
         group relative flex items-center gap-1.5 px-2 py-1
         rounded border transition-all select-none
-        w-[180px] flex-shrink-0
+        min-w-[140px] flex-1
         ${editMode ? "cursor-default" : "cursor-pointer hover:bg-muted/50"}
         hover:shadow-sm
       `}

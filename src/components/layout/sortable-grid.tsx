@@ -706,6 +706,10 @@ function SortableCategoryBlock({
       <div
         className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize
           hover:bg-primary/20 active:bg-primary/30 transition-colors rounded-r-lg"
+        onPointerDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
         onMouseDown={handleResizeStart}
       />
     </div>
@@ -815,14 +819,16 @@ function SortableSubGroupBlock({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.4 : 1,
-    ...(widthPercent !== null ? { minWidth: `${widthPercent}%` } : {}),
+    ...(widthPercent !== null
+      ? { flex: `0 0 ${widthPercent}%` }
+      : { flex: "1 1 0%" }),
   };
 
   return (
     <div
       ref={setRef}
       style={style}
-      className="relative rounded-md border border-border/40 bg-background overflow-hidden shrink-0"
+      className="relative rounded-md border border-border/40 bg-background overflow-hidden min-w-0"
     >
       {/* Sub-group header - buttons right next to title */}
       <div className="flex items-center gap-1.5 px-2.5 py-1.5 flex-wrap">
@@ -908,6 +914,10 @@ function SortableSubGroupBlock({
       <div
         className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize
           hover:bg-primary/20 active:bg-primary/30 transition-colors rounded-r-md"
+        onPointerDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
         onMouseDown={handleResizeStart}
       />
     </div>
@@ -996,14 +1006,16 @@ function SortableUngroupedBlock({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.4 : 1,
-    ...(widthPercent !== null ? { minWidth: `${widthPercent}%` } : {}),
+    ...(widthPercent !== null
+      ? { flex: `0 0 ${widthPercent}%` }
+      : { flex: "1 1 0%" }),
   };
 
   return (
     <div
       ref={setRef}
       style={style}
-      className="relative rounded-md border border-border/40 bg-background overflow-hidden shrink-0"
+      className="relative rounded-md border border-border/40 bg-background overflow-hidden min-w-0"
     >
       {/* Header - buttons right next to title */}
       <div className="flex items-center gap-1.5 px-2.5 py-1.5 flex-wrap">
@@ -1089,6 +1101,10 @@ function SortableUngroupedBlock({
       <div
         className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize
           hover:bg-primary/20 active:bg-primary/30 transition-colors rounded-r-md"
+        onPointerDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
         onMouseDown={handleResizeStart}
       />
     </div>
