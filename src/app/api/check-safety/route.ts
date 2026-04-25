@@ -157,37 +157,20 @@ async function checkHttpReachable(url: string): Promise<string | null> {
   }
 }
 
-export async function POST(request: Request): Promise<NextResponse> {
-  try {
-    const body = await request.json();
-    const { url } = body as { url?: string };
-
-    if (!url || typeof url !== "string") {
-      return NextResponse.json(
-        { error: "请提供要检查的 URL" },
-        { status: 400 }
-      );
-    }
-
+async function checkSingleUrl(url: string): Promise<CheckResult> {
     const details: string[] = [];
     let status: CheckResult["status"] = "safe";
 
     // 1. 提取域名
     const domain = extractDomain(url);
     if (!domain) {
-      return NextResponse.json({
-        url,
-        status: "danger",
-        details: ["URL 格式无效，无法解析域名"],
-        checkedAt: Date.now(),
-      });
+      return { url, status: "danger", details: ["URL 格式无效，无法解析域名"], checkedAt: Date.now() };
     }
 
     // 2. 白名单快速通过
     const safeResult = checkSafeDomain(domain);
     if (safeResult === "safe") {
       details.push("该域名在已知安全域名白名单中");
-      // 即使在白名单，也检查 HTTPS
       const httpsIssue = checkHttps(url);
       if (httpsIssue) {
         details.push(httpsIssue);
@@ -195,12 +178,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       } else {
         details.push("使用 HTTPS 加密连接");
       }
-      return NextResponse.json({
-        url,
-        status,
-        details,
-        checkedAt: Date.now(),
-      });
+      return { url, status, details, checkedAt: Date.now() };
     }
 
     // 3. HTTPS 检查
@@ -240,17 +218,36 @@ export async function POST(request: Request): Promise<NextResponse> {
       if (status === "safe") status = "warning";
     }
 
-    // 如果所有检查都通过
     if (details.length === 0 || (details.length === 1 && details[0].includes("✓"))) {
       details.push("基础安全检查通过，但仍建议保持警惕");
     }
 
-    return NextResponse.json({
-      url,
-      status,
-      details,
-      checkedAt: Date.now(),
-    });
+    return { url, status, details, checkedAt: Date.now() };
+}
+
+export async function POST(request: Request): Promise<NextResponse> {
+  try {
+    const body = await request.json();
+    const { url, urls } = body as { url?: string; urls?: string[] };
+
+    // Batch mode: { urls: string[] }
+    if (urls && Array.isArray(urls)) {
+      // Limit batch size to avoid timeout
+      const batchUrls = urls.slice(0, 20);
+      const results = await Promise.all(batchUrls.map(checkSingleUrl));
+      return NextResponse.json({ results });
+    }
+
+    // Single mode: { url: string }
+    if (!url || typeof url !== "string") {
+      return NextResponse.json(
+        { error: "请提供要检查的 URL" },
+        { status: 400 }
+      );
+    }
+
+    const result = await checkSingleUrl(url);
+    return NextResponse.json(result);
   } catch (error) {
     console.error("[check-safety] Error:", error);
     return NextResponse.json(

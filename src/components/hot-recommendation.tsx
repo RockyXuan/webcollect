@@ -1,18 +1,17 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { hotSites } from "@/lib/hot-sites";
+import { useMemo, useCallback, useEffect, useRef, useState } from "react";
+import { hotSites, hotSiteCategories } from "@/lib/hot-sites";
 import type { HotSite } from "@/lib/hot-sites";
 import type { SafetyCheckResult } from "@/lib/types";
 import { useAppStore } from "@/lib/store";
 import {
-  ChevronDown,
-  ChevronRight,
   Inbox,
   Shield,
   ShieldCheck,
   ShieldAlert,
   ShieldX,
+  Check,
 } from "lucide-react";
 
 /* ── safety badge ── */
@@ -39,13 +38,12 @@ export function HotRecommendation() {
   const addCard = useAppStore((s) => s.addCard);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
   const [safetyMap, setSafetyMap] = useState<Record<string, SafetyCheckResult>>({});
   const [checking, setChecking] = useState(false);
   const [addedUrls, setAddedUrls] = useState<Set<string>>(new Set());
 
-  /* dedup: filter out sites user already has */
-  const userUrls = useMemo(
+  /* dedup: track which domains user already has */
+  const userDomains = useMemo(
     () =>
       new Set(
         cards.map((c) => {
@@ -59,59 +57,54 @@ export function HotRecommendation() {
     [cards],
   );
 
-  /* group by category and dedup */
-  const groupedSites = useMemo(() => {
-    const filtered = hotSites.filter((site) => {
+  /* check if a site is already in user's collection or just added */
+  const isSiteAdded = useCallback(
+    (site: HotSite) => {
+      if (addedUrls.has(site.url)) return true;
       try {
         const hostname = new URL(site.url).hostname;
-        return !userUrls.has(hostname) && !addedUrls.has(site.url);
+        return userDomains.has(hostname);
       } catch {
-        return !addedUrls.has(site.url);
+        return false;
       }
-    });
+    },
+    [userDomains, addedUrls],
+  );
 
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      return filtered
-        .filter(
+  /* group by category, keeping ALL sites (including already-added ones) */
+  const groupedSites = useMemo(() => {
+    const filtered = searchQuery
+      ? hotSites.filter(
           (s) =>
-            s.title.toLowerCase().includes(q) ||
-            s.shortDesc.toLowerCase().includes(q) ||
-            s.category.toLowerCase().includes(q),
-        );
-    }
+            s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            s.shortDesc.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            s.category.toLowerCase().includes(searchQuery.toLowerCase()),
+        )
+      : hotSites;
 
-    const groups: Record<string, HotSite[]> = {};
+    const groups: [string, HotSite[]][] = [];
+    for (const catName of hotSiteCategories) {
+      const sites = filtered.filter((s) => s.category === catName);
+      if (sites.length > 0) {
+        groups.push([catName, sites]);
+      }
+    }
+    /* add any categories not in hotSiteCategories */
+    const coveredCats = new Set(hotSiteCategories);
+    const extraGroups: Record<string, HotSite[]> = {};
     for (const site of filtered) {
-      if (!groups[site.category]) groups[site.category] = [];
-      groups[site.category].push(site);
+      if (!coveredCats.has(site.category)) {
+        if (!extraGroups[site.category]) extraGroups[site.category] = [];
+        extraGroups[site.category].push(site);
+      }
     }
-    return Object.entries(groups);
-  }, [userUrls, addedUrls, searchQuery]);
-
-  const flatFiltered = useMemo(() => {
-    if (searchQuery) return groupedSites as HotSite[];
-    return (groupedSites as [string, HotSite[]][]).flatMap(([, sites]) => sites);
-  }, [groupedSites, searchQuery]);
-
-  /* expand first category by default */
-  useEffect(() => {
-    if (!searchQuery && expandedCats.size === 0) {
-      const cats = groupedSites as [string, HotSite[]][];
-      if (cats.length > 0) setExpandedCats(new Set([cats[0][0]]));
+    for (const [catName, sites] of Object.entries(extraGroups)) {
+      groups.push([catName, sites]);
     }
-  }, [groupedSites, expandedCats.size, searchQuery]);
+    return groups;
+  }, [searchQuery]);
 
-  const toggleCat = useCallback((cat: string) => {
-    setExpandedCats((prev) => {
-      const next = new Set(prev);
-      if (next.has(cat)) next.delete(cat);
-      else next.add(cat);
-      return next;
-    });
-  }, []);
-
-  /* add to inbox (uncategorized) */
+  /* add to inbox */
   const handleQuickAdd = useCallback(
     (site: HotSite) => {
       const inboxCat = categories.find((c) => c.id === "cat-inbox");
@@ -162,6 +155,8 @@ export function HotRecommendation() {
   );
 
   /* safety check */
+  const flatFiltered = useMemo(() => groupedSites.flatMap(([, sites]) => sites), [groupedSites]);
+
   const checkSafety = useCallback(async () => {
     if (flatFiltered.length === 0) return;
     setChecking(true);
@@ -196,20 +191,24 @@ export function HotRecommendation() {
     }
   }, [flatFiltered.length, checkSafety]);
 
-  /* render a single site card */
+  /* render a single site item */
   const renderSite = (site: HotSite) => {
     const safety = safetyMap[site.url];
-    const isAdded = addedUrls.has(site.url);
+    const added = isSiteAdded(site);
     return (
       <div
         key={site.id}
-        className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-muted/40 hover:bg-muted/70 transition-colors group min-w-0"
+        className={`flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors group min-w-0 ${
+          added
+            ? "bg-muted/20 opacity-60"
+            : "bg-muted/40 hover:bg-muted/70"
+        }`}
       >
         {/* icon */}
         <img
           src={site.imageUrl}
           alt=""
-          className="h-5 w-5 rounded-sm flex-shrink-0"
+          className="h-4 w-4 rounded-sm flex-shrink-0"
           onError={(e) => {
             (e.target as HTMLImageElement).style.display = "none";
           }}
@@ -221,14 +220,17 @@ export function HotRecommendation() {
             <span className="text-xs font-medium truncate">{site.title}</span>
             <SafetyBadge status={safety} />
           </div>
-          <span className="text-[10px] text-muted-foreground truncate block">
+          <span className="text-[10px] text-muted-foreground truncate block leading-tight">
             {site.shortDesc}
           </span>
         </div>
 
-        {/* add button */}
-        {isAdded ? (
-          <span className="text-[10px] text-muted-foreground flex-shrink-0">已添加</span>
+        {/* action */}
+        {added ? (
+          <span className="text-[10px] text-muted-foreground flex items-center gap-0.5 flex-shrink-0">
+            <Check className="h-3 w-3" />
+            已添加
+          </span>
         ) : (
           <div className="flex items-center gap-0.5 flex-shrink-0">
             <button
@@ -290,33 +292,28 @@ export function HotRecommendation() {
         </div>
       </div>
 
-      {/* search results */}
+      {/* search results - flat grid */}
       {searchQuery ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5">
-          {(flatFiltered as HotSite[]).map(renderSite)}
+          {flatFiltered.map(renderSite)}
         </div>
       ) : (
-        /* grouped display */
-        <div className="space-y-1.5">
+        /* grouped display - multi-column layout to fill space */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {(groupedSites as [string, HotSite[]][]).map(([catName, sites]) => (
-            <div key={catName}>
-              <button
-                onClick={() => toggleCat(catName)}
-                className="flex items-center gap-1.5 w-full text-left py-1 px-1 hover:bg-muted/30 rounded transition-colors"
-              >
-                {expandedCats.has(catName) ? (
-                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="h-3 w-3 text-muted-foreground" />
-                )}
-                <span className="text-xs font-medium">{catName}</span>
+            <div
+              key={catName}
+              className="rounded-lg border border-border/40 bg-card/50 p-2.5"
+            >
+              {/* category header - always visible, no collapse */}
+              <div className="flex items-center gap-1.5 mb-2">
+                <span className="text-xs font-semibold">{catName}</span>
                 <span className="text-[10px] text-muted-foreground">({sites.length})</span>
-              </button>
-              {expandedCats.has(catName) && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 mt-1">
-                  {sites.map(renderSite)}
-                </div>
-              )}
+              </div>
+              {/* sites list - always expanded */}
+              <div className="space-y-1">
+                {sites.map(renderSite)}
+              </div>
             </div>
           ))}
         </div>
