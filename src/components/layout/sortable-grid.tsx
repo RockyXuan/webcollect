@@ -169,11 +169,53 @@ export function SortableGrid({
     }
     const aid = String(active.id);
     const oid = String(over.id);
-    if (aid.startsWith("ungrouped:") && oid.startsWith("cat:")) {
-      setHoveredParentId(oid.replace("cat:", ""));
-    } else {
-      setHoveredParentId(null);
-    }
+
+    // Use requestAnimationFrame to batch state update outside render
+    requestAnimationFrame(() => {
+      // Only care about ungrouped/sub items being dragged toward parent categories
+      if (!aid.startsWith("ungrouped:") && !aid.startsWith("sub:")) {
+        setHoveredParentId(null);
+        return;
+      }
+
+      // Direct hit on a parent category
+      if (oid.startsWith("cat:")) {
+        setHoveredParentId(oid.replace("cat:", ""));
+        return;
+      }
+
+      // Hit something inside a parent category (sub-group or card) — find the parent
+      if (oid.startsWith("sub:")) {
+        const subCatId = oid.replace("sub:", "");
+        const subCat = categories.find((c) => c.id === subCatId);
+        if (subCat?.parentId) {
+          // For sub-group drags, only highlight if it's a different parent
+          if (aid.startsWith("sub:")) {
+            const activeSubId = aid.replace("sub:", "");
+            const activeSub = categories.find((c) => c.id === activeSubId);
+            if (activeSub?.parentId === subCat.parentId) {
+              setHoveredParentId(null);
+              return;
+            }
+          }
+          setHoveredParentId(subCat.parentId);
+          return;
+        }
+      }
+
+      if (oid.startsWith("card:")) {
+        const cardData = cards.find((c) => c.id === oid.replace("card:", ""));
+        if (cardData) {
+          const cat = categories.find((c) => c.id === cardData.categoryId);
+          if (cat?.parentId) {
+            setHoveredParentId(cat.parentId);
+            return;
+          }
+        }
+      }
+    });
+
+    setHoveredParentId(null);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -185,12 +227,28 @@ export function SortableGrid({
     const aid = String(active.id);
     const oid = String(over.id);
 
-    // Ungrouped → Parent category: demotion
-    if (aid.startsWith("ungrouped:") && oid.startsWith("cat:")) {
-      const categoryId = aid.replace("ungrouped:", "");
-      const parentId = oid.replace("cat:", "");
-      moveCategoryToParent(categoryId, parentId);
-      return;
+    // Ungrouped → Parent category: demotion (direct hit or hit inside parent)
+    if (aid.startsWith("ungrouped:")) {
+      let targetParentId: string | null = null;
+
+      if (oid.startsWith("cat:")) {
+        targetParentId = oid.replace("cat:", "");
+      } else if (oid.startsWith("sub:")) {
+        const subCat = categories.find((c) => c.id === oid.replace("sub:", ""));
+        if (subCat?.parentId) targetParentId = subCat.parentId;
+      } else if (oid.startsWith("card:")) {
+        const cardData = cards.find((c) => c.id === oid.replace("card:", ""));
+        if (cardData) {
+          const cat = categories.find((c) => c.id === cardData.categoryId);
+          if (cat?.parentId) targetParentId = cat.parentId;
+        }
+      }
+
+      if (targetParentId) {
+        const categoryId = aid.replace("ungrouped:", "");
+        moveCategoryToParent(categoryId, targetParentId);
+        return;
+      }
     }
 
     // Ungrouped → Ungrouped: reorder
@@ -232,8 +290,16 @@ export function SortableGrid({
       const activeSub = categories.find((c) => c.id === activeSubId);
       const overSub = categories.find((c) => c.id === overSubId);
       if (activeSub && overSub) {
-        // If same parent, reorder within parent
-        if (activeSub.parentId === overSub.parentId && activeSub.parentId) {
+        // Cross-parent: move sub-group to different parent
+        if (activeSub.parentId !== overSub.parentId) {
+          const targetParentId = overSub.parentId;
+          if (targetParentId) {
+            moveCategoryToParent(activeSubId, targetParentId);
+          }
+          return;
+        }
+        // Same parent, reorder within parent
+        if (activeSub.parentId && activeSub.parentId === overSub.parentId) {
           const siblings = categories
             .filter((c) => c.parentId === activeSub.parentId)
             .sort((a, b) => a.order - b.order);
@@ -242,13 +308,20 @@ export function SortableGrid({
           if (oldIndex !== -1 && newIndex !== -1) {
             const [moved] = siblings.splice(oldIndex, 1);
             siblings.splice(newIndex, 0, moved);
-            // Update each sibling's order (fire and forget)
             for (let i = 0; i < siblings.length; i++) {
               useAppStore.getState().updateCategory({ ...siblings[i], order: i });
             }
           }
         }
       }
+      return;
+    }
+
+    // Sub-group → Parent category header: move to different parent
+    if (aid.startsWith("sub:") && oid.startsWith("cat:")) {
+      const activeSubId = aid.replace("sub:", "");
+      const targetParentId = oid.replace("cat:", "");
+      moveCategoryToParent(activeSubId, targetParentId);
       return;
     }
 
