@@ -6,9 +6,10 @@ import {
   DndContext,
   type DragEndEvent,
   type DragStartEvent,
+  type DragOverEvent,
   DragOverlay,
   useDroppable,
-  closestCenter,
+  rectIntersection,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -17,33 +18,28 @@ import {
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-  Plus,
-  ChevronUp,
-  ChevronDown,
-  PencilLine,
-} from "lucide-react";
+import { Plus, PencilLine } from "lucide-react";
 import type { WebCard, Category } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { WebCardItem } from "@/components/card/web-card";
 import { getLucideIcon } from "@/lib/icons";
 
-function DynamicIcon({ icon, color }: { icon: ComponentType<{ className?: string; style?: CSSProperties }> | null; color: string }) {
+/* ─── helpers ─── */
+
+function DynamicIcon({
+  icon,
+  color,
+}: {
+  icon: ComponentType<{ className?: string; style?: CSSProperties }> | null;
+  color: string;
+}) {
   if (!icon) return null;
   const Icon = icon;
   return <Icon className="w-4 h-4" style={{ color }} />;
 }
 
-interface SortableGridProps {
-  cards: WebCard[];
-  categories: Category[];
-  onEdit: (card: WebCard) => void;
-  onDelete: (id: string) => void;
-  onAdd: (categoryId: string) => void;
-}
-
-/* ───────────── Category Row Header ───────────── */
+/* ─── Row Header ─── */
 
 interface RowHeaderProps {
   category: Category;
@@ -51,10 +47,6 @@ interface RowHeaderProps {
   editMode: boolean;
   onToggleEdit: () => void;
   onAdd: () => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
-  isFirst: boolean;
-  isLast: boolean;
 }
 
 function RowHeader({
@@ -63,10 +55,6 @@ function RowHeader({
   editMode,
   onToggleEdit,
   onAdd,
-  onMoveUp,
-  onMoveDown,
-  isFirst,
-  isLast,
 }: RowHeaderProps) {
   const { setNodeRef } = useDroppable({
     id: `header-${category.id}`,
@@ -80,7 +68,6 @@ function RowHeader({
       ref={setNodeRef}
       className="flex items-center gap-3 px-1 py-2 select-none"
     >
-      {/* Icon + Name + Count */}
       <div className="flex items-center gap-2">
         <DynamicIcon icon={iconEl} color={category.color} />
         <h2 className="text-base font-serif font-semibold text-foreground tracking-tight">
@@ -91,32 +78,8 @@ function RowHeader({
         </span>
       </div>
 
-      {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Edit mode: reorder buttons */}
-      {editMode && (
-        <div className="flex items-center gap-0.5">
-          <button
-            onClick={onMoveUp}
-            disabled={isFirst}
-            className="p-1 rounded-md hover:bg-secondary disabled:opacity-30 transition-colors"
-            title="上移"
-          >
-            <ChevronUp className="w-4 h-4" />
-          </button>
-          <button
-            onClick={onMoveDown}
-            disabled={isLast}
-            className="p-1 rounded-md hover:bg-secondary disabled:opacity-30 transition-colors"
-            title="下移"
-          >
-            <ChevronDown className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
-      {/* Edit toggle */}
       <button
         onClick={onToggleEdit}
         className={cn(
@@ -130,7 +93,6 @@ function RowHeader({
         <span className="hidden sm:inline">修改</span>
       </button>
 
-      {/* Add */}
       <button
         onClick={onAdd}
         className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-border hover:border-primary/30 hover:bg-primary/5 text-muted-foreground hover:text-primary transition-colors"
@@ -142,51 +104,15 @@ function RowHeader({
   );
 }
 
-/* ───────────── Horizontal Card List ───────────── */
-
-interface CardListProps {
-  cards: WebCard[];
-  categoryId: string;
-  editMode: boolean;
-  onEdit: (card: WebCard) => void;
-  onDelete: (id: string) => void;
-}
-
-function CardList({ cards, categoryId, editMode, onEdit, onDelete }: CardListProps) {
-  const cardIds = useMemo(() => cards.map((c) => c.id), [cards]);
-
-  return (
-    <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-hide px-1">
-      <SortableContext
-        items={cardIds}
-        strategy={horizontalListSortingStrategy}
-      >
-        {cards.map((card) => (
-          <SortableCard
-            key={card.id}
-            card={card}
-            categoryId={categoryId}
-            editMode={editMode}
-            onEdit={onEdit}
-            onDelete={onDelete}
-          />
-        ))}
-      </SortableContext>
-    </div>
-  );
-}
-
-/* ───────────── Sortable Card Wrapper ───────────── */
+/* ─── Sortable Card Wrapper ─── */
 
 function SortableCard({
   card,
-  categoryId,
   editMode,
   onEdit,
   onDelete,
 }: {
   card: WebCard;
-  categoryId: string;
   editMode: boolean;
   onEdit: (card: WebCard) => void;
   onDelete: (id: string) => void;
@@ -200,28 +126,128 @@ function SortableCard({
     isDragging,
   } = useSortable({
     id: card.id,
-    data: { type: "card", categoryId },
+    data: { type: "card", categoryId: card.categoryId },
   });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.4 : 1,
   };
 
+  const dragHandleProps = { ...attributes, ...listeners };
+
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div ref={setNodeRef} style={style}>
       <WebCardItem
         card={card}
         editMode={editMode}
         onEdit={onEdit}
         onDelete={onDelete}
+        isDragging={isDragging}
+        dragHandleProps={dragHandleProps}
       />
     </div>
   );
 }
 
-/* ───────────── Drag Overlay ───────────── */
+/* ─── Card List (horizontal scroll) ─── */
+
+function CardList({
+  cards,
+  categoryId,
+  editMode,
+  onEdit,
+  onDelete,
+}: {
+  cards: WebCard[];
+  categoryId: string;
+  editMode: boolean;
+  onEdit: (card: WebCard) => void;
+  onDelete: (id: string) => void;
+}) {
+  const cardIds = useMemo(() => cards.map((c) => c.id), [cards]);
+
+  return (
+    <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-hide px-1">
+      <SortableContext
+        items={cardIds}
+        strategy={horizontalListSortingStrategy}
+      >
+        {cards.map((card) => (
+          <SortableCard
+            key={card.id}
+            card={card}
+            editMode={editMode}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        ))}
+      </SortableContext>
+    </div>
+  );
+}
+
+/* ─── Category Block ─── */
+
+function CategoryBlock({
+  category,
+  cards,
+  editMode,
+  onToggleEdit,
+  onAdd,
+  onEdit,
+  onDelete,
+  className,
+}: {
+  category: Category;
+  cards: WebCard[];
+  editMode: boolean;
+  onToggleEdit: () => void;
+  onAdd: () => void;
+  onEdit: (card: WebCard) => void;
+  onDelete: (id: string) => void;
+  className?: string;
+}) {
+  return (
+    <section
+      className={cn(
+        "rounded-2xl border bg-card/50 backdrop-blur-sm transition-colors",
+        editMode ? "border-primary/20" : "border-border",
+        className
+      )}
+    >
+      <RowHeader
+        category={category}
+        cardCount={cards.length}
+        editMode={editMode}
+        onToggleEdit={onToggleEdit}
+        onAdd={onAdd}
+      />
+
+      {cards.length > 0 ? (
+        <CardList
+          cards={cards}
+          categoryId={category.id}
+          editMode={editMode}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
+      ) : (
+        <div className="px-1 pb-3">
+          <button
+            onClick={onAdd}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors px-3 py-2 rounded-xl border border-dashed border-border hover:border-primary/30 w-full justify-center"
+          >
+            <Plus className="w-4 h-4" />
+            在此分类添加网站
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ─── Drag Overlay ─── */
 
 function CardOverlay({ card, editMode }: { card: WebCard; editMode: boolean }) {
   return (
@@ -236,7 +262,7 @@ function CardOverlay({ card, editMode }: { card: WebCard; editMode: boolean }) {
   );
 }
 
-/* ───────────── Main Grid ───────────── */
+/* ─── Main Grid ─── */
 
 export function SortableGrid({
   cards,
@@ -244,10 +270,15 @@ export function SortableGrid({
   onEdit,
   onDelete,
   onAdd,
-}: SortableGridProps) {
+}: {
+  cards: WebCard[];
+  categories: Category[];
+  onEdit: (card: WebCard) => void;
+  onDelete: (id: string) => void;
+  onAdd: (categoryId: string) => void;
+}) {
   const editMode = useAppStore((s) => s.editMode);
   const setEditMode = useAppStore((s) => s.setEditMode);
-  const reorderCategories = useAppStore((s) => s.reorderCategories);
   const reorderCards = useAppStore((s) => s.reorderCards);
   const moveCard = useAppStore((s) => s.moveCard);
 
@@ -258,22 +289,44 @@ export function SortableGrid({
     [categories]
   );
 
-  const rows = useMemo(() => {
-    return sortedCategories.map((cat) => ({
+  /* split into "常用" and others */
+  const favoriteCategory = sortedCategories.find((c) => c.name === "常用");
+  const otherCategories = sortedCategories.filter((c) => c.name !== "常用");
+
+  const favoriteCards = useMemo(() => {
+    if (!favoriteCategory) return [];
+    return cards
+      .filter((c) => c.categoryId === favoriteCategory.id)
+      .sort((a, b) => a.order - b.order);
+  }, [favoriteCategory, cards]);
+
+  const otherRows = useMemo(() => {
+    return otherCategories.map((cat) => ({
       category: cat,
       cards: cards
         .filter((c) => c.categoryId === cat.id)
         .sort((a, b) => a.order - b.order),
     }));
-  }, [sortedCategories, cards]);
+  }, [otherCategories, cards]);
 
   const activeCard = useMemo(() => {
     if (!activeId) return null;
     return cards.find((c) => c.id === activeId) || null;
   }, [activeId, cards]);
 
+  /* ─── drag handlers ─── */
+
   function onDragStart(event: DragStartEvent) {
     setActiveId(String(event.active.id));
+  }
+
+  /*
+   * onDragOver is used for visual feedback during drag.
+   * We do NOT mutate store here to avoid re-render tearing.
+   */
+  function onDragOver(event: DragOverEvent) {
+    // No-op: visual feedback handled by DragOverlay
+    // Store mutations happen only in onDragEnd for safety
   }
 
   function onDragEnd(event: DragEndEvent) {
@@ -291,22 +344,26 @@ export function SortableGrid({
 
     if (activeType !== "card") return;
 
-    // Cross-row drop
+    // ── Cross-row drop ──
     if (overType === "header" && overCatId && activeCatId !== overCatId) {
       moveCard(activeIdStr, overCatId, 999);
       return;
     }
 
     if (overType === "card" && overCatId && activeCatId !== overCatId) {
-      const targetCards = rows.find((r) => r.category.id === overCatId)?.cards || [];
+      const targetCards = cards
+        .filter((c) => c.categoryId === overCatId)
+        .sort((a, b) => a.order - b.order);
       const insertIndex = targetCards.findIndex((c) => c.id === overIdStr);
       moveCard(activeIdStr, overCatId, insertIndex >= 0 ? insertIndex : 999);
       return;
     }
 
-    // Same-row reorder
+    // ── Same-row reorder ──
     if (overType === "card" && overCatId && activeCatId === overCatId) {
-      const rowCards = rows.find((r) => r.category.id === activeCatId)?.cards || [];
+      const rowCards = cards
+        .filter((c) => c.categoryId === activeCatId)
+        .sort((a, b) => a.order - b.order);
       const items = rowCards.map((c) => c.id);
       const oldIdx = items.indexOf(activeIdStr);
       const newIdx = items.indexOf(overIdStr);
@@ -316,68 +373,49 @@ export function SortableGrid({
     }
   }
 
-  function handleMoveRow(categoryId: string, direction: -1 | 1) {
-    const idx = sortedCategories.findIndex((c) => c.id === categoryId);
-    const newIdx = idx + direction;
-    if (newIdx < 0 || newIdx >= sortedCategories.length) return;
-    const newIds = arrayMove(sortedCategories.map((c) => c.id), idx, newIdx);
-    reorderCategories(newIds);
-  }
+  /* ─── render ─── */
 
   return (
     <DndContext
-      collisionDetection={closestCenter}
+      collisionDetection={rectIntersection}
       onDragStart={onDragStart}
+      onDragOver={onDragOver}
       onDragEnd={onDragEnd}
     >
-      <div className="space-y-6">
-        {rows.map((row, idx) => (
-          <section
-            key={row.category.id}
-            className={cn(
-              "rounded-2xl border bg-card/50 backdrop-blur-sm transition-colors",
-              editMode ? "border-primary/20" : "border-border"
-            )}
-          >
-            <RowHeader
+      <div className="space-y-5">
+        {/* Favorite row - full width */}
+        {favoriteCategory && (
+          <CategoryBlock
+            category={favoriteCategory}
+            cards={favoriteCards}
+            editMode={editMode}
+            onToggleEdit={() => setEditMode(!editMode)}
+            onAdd={() => onAdd(favoriteCategory.id)}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            className="w-full"
+          />
+        )}
+
+        {/* Other categories - grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {otherRows.map((row) => (
+            <CategoryBlock
+              key={row.category.id}
               category={row.category}
-              cardCount={row.cards.length}
+              cards={row.cards}
               editMode={editMode}
               onToggleEdit={() => setEditMode(!editMode)}
               onAdd={() => onAdd(row.category.id)}
-              onMoveUp={() => handleMoveRow(row.category.id, -1)}
-              onMoveDown={() => handleMoveRow(row.category.id, 1)}
-              isFirst={idx === 0}
-              isLast={idx === rows.length - 1}
+              onEdit={onEdit}
+              onDelete={onDelete}
             />
-
-            {row.cards.length > 0 ? (
-              <CardList
-                cards={row.cards}
-                categoryId={row.category.id}
-                editMode={editMode}
-                onEdit={onEdit}
-                onDelete={onDelete}
-              />
-            ) : (
-              <div className="px-1 pb-3">
-                <button
-                  onClick={() => onAdd(row.category.id)}
-                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors px-3 py-2 rounded-xl border border-dashed border-border hover:border-primary/30 w-full justify-center"
-                >
-                  <Plus className="w-4 h-4" />
-                  在此分类添加网站
-                </button>
-              </div>
-            )}
-          </section>
-        ))}
+          ))}
+        </div>
       </div>
 
       <DragOverlay dropAnimation={null}>
-        {activeCard && (
-          <CardOverlay card={activeCard} editMode={editMode} />
-        )}
+        {activeCard && <CardOverlay card={activeCard} editMode={editMode} />}
       </DragOverlay>
 
       {/* Hide scrollbar utility */}
