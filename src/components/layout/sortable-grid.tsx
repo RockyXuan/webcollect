@@ -578,20 +578,22 @@ function SortableCategoryBlock({
     >
       {/* Category header - buttons right next to title */}
       <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border/50 flex-wrap">
-        {editMode && (
-          <span
-            className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-foreground"
-            {...attributes}
-            {...listeners}
-          >
-            <GripVertical className="w-3.5 h-3.5" />
-          </span>
-        )}
+        <span
+          className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-foreground"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="w-3.5 h-3.5" />
+        </span>
         <div
           className="w-2.5 h-2.5 rounded-full flex-shrink-0"
           style={{ backgroundColor: category.color }}
         />
-        <span className="text-sm font-semibold text-foreground font-serif">
+        <span
+          className="text-sm font-semibold text-foreground font-serif cursor-grab active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+        >
           {category.name}
         </span>
 
@@ -731,20 +733,22 @@ function SortableSubGroupBlock({
     >
       {/* Sub-group header - buttons right next to title */}
       <div className="flex items-center gap-1.5 px-2.5 py-1.5 flex-wrap">
-        {editMode && (
-          <span
-            className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-foreground"
-            {...attributes}
-            {...listeners}
-          >
-            <GripVertical className="w-3 h-3" />
-          </span>
-        )}
+        <span
+          className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-foreground"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="w-3 h-3" />
+        </span>
         <div
           className="w-1 h-3 rounded-full flex-shrink-0"
           style={{ backgroundColor: category.color }}
         />
-        <span className="text-xs font-medium text-foreground">
+        <span
+          className="text-xs font-medium text-foreground cursor-grab active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+        >
           {category.name}
         </span>
         <span className="text-[10px] text-muted-foreground">
@@ -860,20 +864,22 @@ function SortableUngroupedBlock({
     >
       {/* Header - buttons right next to title */}
       <div className="flex items-center gap-1.5 px-2.5 py-1.5 flex-wrap">
-        {editMode && (
-          <span
-            className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-foreground"
-            {...attributes}
-            {...listeners}
-          >
-            <GripVertical className="w-3 h-3" />
-          </span>
-        )}
+        <span
+          className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-foreground"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="w-3 h-3" />
+        </span>
         <div
           className="w-1 h-3 rounded-full flex-shrink-0"
           style={{ backgroundColor: category.color }}
         />
-        <span className="text-xs font-medium text-foreground">
+        <span
+          className="text-xs font-medium text-foreground cursor-grab active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+        >
           {category.name}
         </span>
         <span className="text-[10px] text-muted-foreground">
@@ -968,7 +974,7 @@ function SortableCard({
         editMode={editMode}
         onEdit={onEdit}
         onDelete={onDelete}
-        dragListeners={editMode ? { ...attributes, ...listeners } : null}
+        dragListeners={{ ...attributes, ...listeners }}
       />
     </div>
   );

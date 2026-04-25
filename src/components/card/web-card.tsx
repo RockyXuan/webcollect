@@ -59,11 +59,11 @@ export function WebCardItem({
       style={{ borderLeftWidth: "2px", borderLeftColor: categoryColor }}
       onClick={handleClick}
     >
-      {/* Drag handle in edit mode */}
-      {editMode && (
+      {/* Drag handle - always visible for direct drag */}
+      {dragListeners && (
         <span
-          className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-foreground"
-          {...(dragListeners || {})}
+          className="cursor-grab active:cursor-grabbing text-muted-foreground/30 hover:text-foreground transition-colors"
+          {...dragListeners}
         >
           <GripVertical className="w-3 h-3" />
         </span>
