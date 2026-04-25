@@ -18,7 +18,10 @@ import {
   RefreshCw,
   EyeOff,
   Settings,
+  Pin,
+  FolderPlus,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 /* ── safety badge ── */
 function SafetyBadge({ status }: { status: SafetyCheckResult | undefined }) {
@@ -137,6 +140,8 @@ interface CategoryGroupProps {
   categories: { id: string; name: string }[];
   allAdded: boolean;
   defaultHideDuration: HideDuration;
+  pinnedCategoryIds: string[];
+  onTogglePin: (categoryId: string) => void;
 }
 
 function CategoryGroup({
@@ -152,6 +157,8 @@ function CategoryGroup({
   categories,
   allAdded,
   defaultHideDuration,
+  pinnedCategoryIds,
+  onTogglePin,
 }: CategoryGroupProps) {
   const [showAdded, setShowAdded] = useState(false);
 
@@ -222,6 +229,8 @@ function CategoryGroup({
             onHideSite={onHideSite}
             categories={categories}
             defaultHideDuration={defaultHideDuration}
+            pinnedCategoryIds={pinnedCategoryIds}
+            onTogglePin={onTogglePin}
           />
         ))}
       </div>
@@ -247,6 +256,8 @@ function NewSiteItem({
   onHideSite,
   categories,
   defaultHideDuration,
+  pinnedCategoryIds,
+  onTogglePin,
 }: {
   site: HotSite;
   safety: SafetyCheckResult | undefined;
@@ -255,6 +266,8 @@ function NewSiteItem({
   onHideSite: (siteId: string, siteUrl: string) => void;
   categories: { id: string; name: string }[];
   defaultHideDuration: HideDuration;
+  pinnedCategoryIds: string[];
+  onTogglePin: (categoryId: string) => void;
 }) {
   return (
     <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-muted/40 hover:bg-muted/70 transition-colors group min-w-0">
@@ -283,23 +296,67 @@ function NewSiteItem({
         >
           <Inbox className="h-3.5 w-3.5" />
         </button>
-        <select
-          className="text-[10px] bg-transparent border border-border/50 rounded px-0.5 py-0.5 max-w-[60px] cursor-pointer"
-          value=""
-          onChange={(e) => {
-            if (e.target.value) onAddToCategory(site, e.target.value);
-          }}
-          title="添加到分类"
-        >
-          <option value="">分类</option>
-          {categories
-            .filter((c) => c.id !== "cat-inbox")
-            .map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-        </select>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              title="添加到分类"
+              className="p-1 rounded hover:bg-primary/10 text-primary transition-colors"
+            >
+              <FolderPlus className="h-3.5 w-3.5" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            side="bottom"
+            align="end"
+            className="w-80 p-2 z-50"
+          >
+            <div className="text-[10px] text-muted-foreground mb-1.5 font-medium">选择分类</div>
+            <div className="grid grid-cols-3 gap-1">
+              {[
+                ...categories.filter((c) => c.id !== "cat-inbox" && pinnedCategoryIds.includes(c.id)),
+                ...categories.filter((c) => c.id !== "cat-inbox" && !pinnedCategoryIds.includes(c.id)),
+              ].map((c) => {
+                const isPinned = pinnedCategoryIds.includes(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => onAddToCategory(site, c.id)}
+                    className={`flex items-center gap-1 px-1.5 py-1 text-[11px] rounded transition-colors text-left truncate ${
+                      isPinned
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "hover:bg-muted"
+                    }`}
+                  >
+                    {isPinned && <Pin className="h-2.5 w-2.5 flex-shrink-0" />}
+                    <span className="truncate">{c.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="border-t mt-1.5 pt-1.5">
+              <div className="text-[10px] text-muted-foreground mb-1">置顶分类（点击切换）</div>
+              <div className="flex flex-wrap gap-1">
+                {categories.filter((c) => c.id !== "cat-inbox").map((c) => {
+                  const isPinned = pinnedCategoryIds.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => onTogglePin(c.id)}
+                      className={`flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded transition-colors ${
+                        isPinned
+                          ? "bg-primary/15 text-primary"
+                          : "hover:bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      <Pin className={`h-2 w-2 ${isPinned ? "" : "opacity-40"}`} />
+                      {c.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
         <button
           onClick={() => onHideSite(site.id, site.url)}
           title="可在'热门网站推荐设置'中选择屏蔽时长"
@@ -353,6 +410,8 @@ export function HotRecommendation() {
   const hideSite = useAppStore((s) => s.hideSite);
   const defaultHideDuration = useAppStore((s) => s.defaultHideDuration);
   const setDefaultHideDuration = useAppStore((s) => s.setDefaultHideDuration);
+  const pinnedCategoryIds = useAppStore((s) => s.pinnedCategoryIds);
+  const togglePinCategory = useAppStore((s) => s.togglePinCategory);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [safetyMap, setSafetyMap] = useState<Record<string, SafetyCheckResult>>({});
@@ -675,6 +734,8 @@ export function HotRecommendation() {
                   onHideSite={handleHideSite}
                   categories={categories}
                   defaultHideDuration={defaultHideDuration}
+                  pinnedCategoryIds={pinnedCategoryIds}
+                  onTogglePin={togglePinCategory}
                 />
               );
             })}
@@ -697,6 +758,8 @@ export function HotRecommendation() {
               categories={categories}
               allAdded={group.allAdded}
               defaultHideDuration={defaultHideDuration}
+              pinnedCategoryIds={pinnedCategoryIds}
+              onTogglePin={togglePinCategory}
             />
           ))}
         </div>

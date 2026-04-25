@@ -96,3 +96,13 @@ export async function getHiddenSites(): Promise<HiddenSite[]> {
 export async function saveHiddenSites(sites: HiddenSite[]): Promise<void> {
   await localforage.setItem(HIDDEN_SITES_KEY, sites);
 }
+
+const PINNED_CATEGORIES_KEY = "pinnedCategoryIds";
+
+export async function getPinnedCategoryIds(): Promise<string[]> {
+  return (await localforage.getItem<string[]>(PINNED_CATEGORIES_KEY)) || [];
+}
+
+export async function savePinnedCategoryIds(ids: string[]): Promise<void> {
+  await localforage.setItem(PINNED_CATEGORIES_KEY, ids);
+}

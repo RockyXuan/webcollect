@@ -14,6 +14,8 @@ import {
   isInitialized,
   getHiddenSites,
   saveHiddenSites,
+  getPinnedCategoryIds,
+  savePinnedCategoryIds,
 } from "./db";
 
 interface AppState {
@@ -52,6 +54,11 @@ interface AppState {
   // Settings
   defaultHideDuration: HideDuration;
   setDefaultHideDuration: (duration: HideDuration) => void;
+
+  // Pinned categories
+  pinnedCategoryIds: string[];
+  togglePinCategory: (categoryId: string) => void;
+  isCategoryPinned: (categoryId: string) => boolean;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -64,14 +71,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   initialized: false,
   editMode: false,
   defaultHideDuration: "1w" as HideDuration,
+  pinnedCategoryIds: [] as string[],
 
   loadData: async () => {
     set({ isLoading: true });
-    const [cards, categories, init, hiddenSites] = await Promise.all([
+    const [cards, categories, init, hiddenSites, pinnedIds] = await Promise.all([
       getCards(),
       getCategories(),
       isInitialized(),
       getHiddenSites(),
+      getPinnedCategoryIds(),
     ]);
 
     // Clean up expired hidden sites (non-permanent)
@@ -93,6 +102,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       cards,
       categories,
       hiddenSites: cleanedHidden,
+      pinnedCategoryIds: pinnedIds,
       initialized: init,
       isLoading: false,
     });
@@ -273,5 +283,21 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setDefaultHideDuration: (duration) => {
     set({ defaultHideDuration: duration });
+  },
+
+  togglePinCategory: async (categoryId) => {
+    const pinned = [...get().pinnedCategoryIds];
+    const idx = pinned.indexOf(categoryId);
+    if (idx >= 0) {
+      pinned.splice(idx, 1);
+    } else {
+      pinned.push(categoryId);
+    }
+    await savePinnedCategoryIds(pinned);
+    set({ pinnedCategoryIds: pinned });
+  },
+
+  isCategoryPinned: (categoryId) => {
+    return get().pinnedCategoryIds.includes(categoryId);
   },
 }));
