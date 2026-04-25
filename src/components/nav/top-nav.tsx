@@ -1,16 +1,17 @@
 "use client";
 
 import React, { useCallback } from "react";
-import { Plus, LayoutGrid, Pencil, Check } from "lucide-react";
+import { Plus, FolderPlus, Layers, Pencil, Check } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 interface TopNavProps {
   onAddCard: (categoryId?: string) => void;
-  onManageCategories: () => void;
+  onAddCategory: () => void;
+  onAddSuperCategory: () => void;
 }
 
-export function TopNav({ onAddCard, onManageCategories }: TopNavProps) {
+export function TopNav({ onAddCard, onAddCategory, onAddSuperCategory }: TopNavProps) {
   const { editMode, toggleEditMode, searchQuery, setSearchQuery } = useAppStore();
 
   const handleAdd = useCallback(() => {
@@ -22,7 +23,7 @@ export function TopNav({ onAddCard, onManageCategories }: TopNavProps) {
       <div className="flex items-center gap-3 px-3 sm:px-5 lg:px-6 h-12">
         {/* Logo */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          <LayoutGrid className="w-4 h-4 text-primary" />
+          <Layers className="w-4 h-4 text-primary" />
           <span className="font-serif text-base font-bold tracking-tight">WebCollect</span>
         </div>
 
@@ -40,8 +41,9 @@ export function TopNav({ onAddCard, onManageCategories }: TopNavProps) {
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Actions */}
+        {/* Actions - 3 levels: 网页 < 分组 < 分类 */}
         <div className="flex items-center gap-1.5">
+          {/* 添加网页 (smallest level) */}
           <button
             onClick={handleAdd}
             className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
@@ -50,13 +52,25 @@ export function TopNav({ onAddCard, onManageCategories }: TopNavProps) {
             <span className="hidden sm:inline">添加网页</span>
           </button>
 
+          {/* 添加分组 (medium level) */}
           <button
-            onClick={onManageCategories}
+            onClick={onAddCategory}
             className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-md border border-border/60 hover:bg-muted/50 transition-colors"
           >
+            <Layers className="w-3 h-3" />
+            <span className="hidden sm:inline">添加分组</span>
+          </button>
+
+          {/* 添加分类 (biggest level) */}
+          <button
+            onClick={onAddSuperCategory}
+            className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-md border border-border/60 hover:bg-muted/50 transition-colors"
+          >
+            <FolderPlus className="w-3 h-3" />
             <span className="hidden sm:inline">添加分类</span>
           </button>
 
+          {/* 编辑模式 */}
           <button
             onClick={toggleEditMode}
             className={cn(

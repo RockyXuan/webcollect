@@ -5,20 +5,23 @@ import { TopNav } from "@/components/nav/top-nav";
 import { SortableGrid } from "@/components/layout/sortable-grid";
 import { CardDialog } from "@/components/dialogs/card-dialog";
 import { CategoryDialog } from "@/components/dialogs/category-dialog";
+import { SuperCategoryDialog } from "@/components/dialogs/super-category-dialog";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { HotRecommendation } from "@/components/hot-recommendation";
 import { useAppStore } from "@/lib/store";
 import { saveCards, saveCategories, setInitialized } from "@/lib/db";
 import { defaultCards, defaultCategories } from "@/lib/seed";
-import type { WebCard, Category } from "@/lib/types";
+import type { WebCard, Category, SuperCategory } from "@/lib/types";
 
 export default function HomePage() {
   const { loadData, isLoading, cards, categories, deleteCard } = useAppStore();
 
   const [cardDialogOpen, setCardDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [superCategoryDialogOpen, setSuperCategoryDialogOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<WebCard | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editingSuperCategory, setEditingSuperCategory] = useState<SuperCategory | null>(null);
   const [defaultCategoryId, setDefaultCategoryId] = useState<string>("");
 
   useEffect(() => {
@@ -57,6 +60,19 @@ export default function HomePage() {
     setCategoryDialogOpen(true);
   }, []);
 
+  const handleAddSuperCategory = useCallback(() => {
+    setEditingSuperCategory(null);
+    setSuperCategoryDialogOpen(true);
+  }, []);
+
+  const handleEditSuperCategory = useCallback((id: string) => {
+    const sc = useAppStore.getState().superCategories.find((s) => s.id === id);
+    if (sc) {
+      setEditingSuperCategory(sc);
+      setSuperCategoryDialogOpen(true);
+    }
+  }, []);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -70,7 +86,11 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <TopNav onAddCard={handleAddCard} onManageCategories={handleAddCategory} />
+      <TopNav
+        onAddCard={handleAddCard}
+        onAddCategory={handleAddCategory}
+        onAddSuperCategory={handleAddSuperCategory}
+      />
 
       <main className="w-full max-w-[1400px] mx-auto px-6 sm:px-10 lg:px-16 py-6 space-y-6">
         <ErrorBoundary>
@@ -81,6 +101,7 @@ export default function HomePage() {
             onDelete={deleteCard}
             onAdd={handleAddCard}
             onEditCategory={handleEditCategory}
+            onEditSuperCategory={handleEditSuperCategory}
           />
         </ErrorBoundary>
 
@@ -108,6 +129,13 @@ export default function HomePage() {
           open={categoryDialogOpen}
           onOpenChange={setCategoryDialogOpen}
           editingCategory={editingCategory}
+        />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <SuperCategoryDialog
+          open={superCategoryDialogOpen}
+          onOpenChange={setSuperCategoryDialogOpen}
+          editingSuperCategory={editingSuperCategory}
         />
       </ErrorBoundary>
     </div>

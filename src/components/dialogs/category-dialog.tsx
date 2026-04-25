@@ -100,16 +100,16 @@ export function CategoryDialog({ open, onOpenChange, editingCategory }: Category
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-serif">
-            {editingCategory ? "编辑分类" : "新建分类"}
+            {editingCategory ? "编辑分组" : "新建分组"}
           </DialogTitle>
           <DialogDescription className="sr-only">
-            {editingCategory ? "编辑分类信息" : "创建新的网站分类"}
+            {editingCategory ? "编辑分组信息" : "创建新的网站分组"}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label htmlFor="cat-name">分类名称</Label>
+            <Label htmlFor="cat-name">分组名称</Label>
             <Input
               id="cat-name"
               value={name}
