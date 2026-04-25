@@ -21,6 +21,7 @@ export interface Category {
   order: number;
   createdAt: number;
   parentId?: string; // 父分类ID，有此字段表示是"分组"(子分类)，无此字段表示是"分类"(顶级)
+  isParent?: boolean; // true = 顶级分类（如"开发"、"工作"），false/undefined = 分组（可降级到父分类下）
 }
 
 export interface FetchMetaResult {

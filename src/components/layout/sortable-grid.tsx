@@ -84,15 +84,17 @@ export function SortableGrid({
   );
 
   // Build hierarchy
+  // Parent categories: explicitly marked isParent OR has sub-groups
   const parentCategories = useMemo(() => {
     return categories
-      .filter((c) => !c.parentId && categories.some((sg) => sg.parentId === c.id))
+      .filter((c) => !c.parentId && (c.isParent || categories.some((sg) => sg.parentId === c.id)))
       .sort((a, b) => a.order - b.order);
   }, [categories]);
 
+  // Standalone (ungrouped): no parentId, not a parent, no sub-groups
   const standaloneCategories = useMemo(() => {
     return categories
-      .filter((c) => !c.parentId && !categories.some((sg) => sg.parentId === c.id))
+      .filter((c) => !c.parentId && !c.isParent && !categories.some((sg) => sg.parentId === c.id))
       .sort((a, b) => a.order - b.order);
   }, [categories]);
 

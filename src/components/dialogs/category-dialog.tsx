@@ -47,9 +47,10 @@ interface CategoryDialogProps {
   onOpenChange: (open: boolean) => void;
   editingCategory?: Category | null;
   defaultParentId?: string;
+  isParent?: boolean; // true = 创建顶级分类，false/undefined = 创建分组
 }
 
-export function CategoryDialog({ open, onOpenChange, editingCategory, defaultParentId }: CategoryDialogProps) {
+export function CategoryDialog({ open, onOpenChange, editingCategory, defaultParentId, isParent }: CategoryDialogProps) {
   const { addCategory, updateCategory } = useAppStore();
 
   const [name, setName] = useState("");
@@ -81,6 +82,7 @@ export function CategoryDialog({ open, onOpenChange, editingCategory, defaultPar
       order: editingCategory?.order ?? 999,
       createdAt: editingCategory?.createdAt ?? Date.now(),
       parentId: editingCategory?.parentId ?? defaultParentId ?? undefined,
+      isParent: editingCategory?.isParent ?? isParent ?? undefined,
     };
 
     if (editingCategory) {
@@ -96,21 +98,21 @@ export function CategoryDialog({ open, onOpenChange, editingCategory, defaultPar
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-serif">
-            {editingCategory ? "编辑分类" : "新建分类"}
+            {editingCategory ? "编辑分类" : isParent ? "新建分类" : "新建分组"}
           </DialogTitle>
           <DialogDescription className="sr-only">
-            {editingCategory ? "编辑分类信息" : "创建新的网站分类"}
+            {editingCategory ? "编辑分类信息" : isParent ? "创建新的顶级分类" : "创建新的分组"}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label htmlFor="cat-name">分类名称</Label>
+            <Label htmlFor="cat-name">{isParent ? "分类名称" : "分组名称"}</Label>
             <Input
               id="cat-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="如：常用、设计灵感"
+              placeholder={isParent ? "如：工作、开发、学习" : "如：常用、设计灵感"}
             />
           </div>
 

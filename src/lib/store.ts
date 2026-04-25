@@ -160,9 +160,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     const parentCatExists = categories.some((c) => c.id === "cat-work");
     if (!parentCatExists) {
       const parentCats: Category[] = [
-        { id: "cat-work", name: "工作", icon: "Briefcase", color: "#F59E0B", order: 0, createdAt: Date.now() },
-        { id: "cat-ai", name: "AI", icon: "Brain", color: "#8B5CF6", order: 1, createdAt: Date.now() },
-        { id: "cat-dev", name: "开发", icon: "Terminal", color: "#10B981", order: 2, createdAt: Date.now() },
+        { id: "cat-work", name: "工作", icon: "Briefcase", color: "#F59E0B", order: 0, createdAt: Date.now(), isParent: true },
+        { id: "cat-ai", name: "AI", icon: "Brain", color: "#8B5CF6", order: 1, createdAt: Date.now(), isParent: true },
+        { id: "cat-dev", name: "开发", icon: "Terminal", color: "#10B981", order: 2, createdAt: Date.now(), isParent: true },
       ];
       // Assign parentId to existing sub-categories
       const parentIdMap: Record<string, string> = {
@@ -180,6 +180,24 @@ export const useAppStore = create<AppState>((set, get) => ({
           parentId: parentIdMap[c.id] || c.parentId,
         })),
       ];
+      await saveCategories(categories);
+    }
+
+    // Migration: set isParent for known parent categories that lack it
+    const knownParentIds = ["cat-work", "cat-ai", "cat-dev", "cat-inbox"];
+    const needsIsParentMigration = categories.some(
+      (c) => !c.parentId && !c.isParent && (knownParentIds.includes(c.id) || categories.some((sg) => sg.parentId === c.id))
+    );
+    if (needsIsParentMigration) {
+      categories = categories.map((c) => {
+        if (!c.parentId && !c.isParent) {
+          // Known seed parents or categories that already have sub-groups
+          if (knownParentIds.includes(c.id) || categories.some((sg) => sg.parentId === c.id)) {
+            return { ...c, isParent: true };
+          }
+        }
+        return c;
+      });
       await saveCategories(categories);
     }
   },
@@ -290,6 +308,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const cat = categories.find((c) => c.id === categoryId);
     if (!cat) return;
     cat.parentId = parentId;
+    cat.isParent = false; // Demoted to sub-group
     // Re-order within the parent's sub-groups
     const siblings = categories
       .filter((c) => c.parentId === parentId)
@@ -305,6 +324,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const cat = categories.find((c) => c.id === categoryId);
     if (!cat) return;
     delete cat.parentId;
+    delete cat.isParent; // Goes to ungrouped area, not a parent category
     // Place at the end of top-level categories
     const topLevel = categories
       .filter((c) => !c.parentId)

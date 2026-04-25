@@ -2,10 +2,10 @@ import type { WebCard, Category } from "./types";
 
 /* ── 顶级分类（分类） ── */
 export const defaultCategories: Category[] = [
-  { id: "cat-work", name: "工作", icon: "briefcase", color: "#B8860B", order: 0, createdAt: Date.now() },
-  { id: "cat-ai", name: "AI", icon: "brain", color: "#8B5CF6", order: 1, createdAt: Date.now() },
-  { id: "cat-dev", name: "开发", icon: "terminal", color: "#4A7C59", order: 2, createdAt: Date.now() },
-  { id: "cat-inbox", name: "收集箱", icon: "inbox", color: "#888888", order: 99, createdAt: Date.now() },
+  { id: "cat-work", name: "工作", icon: "briefcase", color: "#B8860B", order: 0, createdAt: Date.now(), isParent: true },
+  { id: "cat-ai", name: "AI", icon: "brain", color: "#8B5CF6", order: 1, createdAt: Date.now(), isParent: true },
+  { id: "cat-dev", name: "开发", icon: "terminal", color: "#4A7C59", order: 2, createdAt: Date.now(), isParent: true },
+  { id: "cat-inbox", name: "收集箱", icon: "inbox", color: "#888888", order: 99, createdAt: Date.now(), isParent: true },
 ];
 
 /* ── 二级分组（子分类） ── */

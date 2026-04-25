@@ -21,6 +21,7 @@ export default function HomePage() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [defaultCategoryId, setDefaultCategoryId] = useState<string>("");
   const [defaultParentId, setDefaultParentId] = useState<string | undefined>();
+  const [isCreatingParent, setIsCreatingParent] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -51,18 +52,21 @@ export default function HomePage() {
   const handleAddCategory = useCallback(() => {
     setEditingCategory(null);
     setDefaultParentId(undefined);
+    setIsCreatingParent(true);
     setCategoryDialogOpen(true);
   }, []);
 
   const handleAddGroup = useCallback((parentId?: string) => {
     setEditingCategory(null);
     setDefaultParentId(parentId);
+    setIsCreatingParent(false);
     setCategoryDialogOpen(true);
   }, []);
 
   const handleEditCategory = useCallback((category: Category) => {
     setEditingCategory(category);
     setDefaultParentId(undefined);
+    setIsCreatingParent(false);
     setCategoryDialogOpen(true);
   }, []);
 
@@ -121,6 +125,7 @@ export default function HomePage() {
           onOpenChange={setCategoryDialogOpen}
           editingCategory={editingCategory}
           defaultParentId={defaultParentId}
+          isParent={isCreatingParent}
         />
       </ErrorBoundary>
     </div>
