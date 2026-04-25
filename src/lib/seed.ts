@@ -1,13 +1,24 @@
 import type { WebCard, Category } from "./types";
 
+/* ── 顶级分类（分类） ── */
 export const defaultCategories: Category[] = [
-  { id: "cat-1", name: "常用", icon: "star", color: "#B8860B", order: 0, createdAt: Date.now() },
-  { id: "cat-2", name: "AI 工具", icon: "wrench", color: "#4A6FA5", order: 1, createdAt: Date.now() },
-  { id: "cat-3", name: "设计灵感", icon: "palette", color: "#9B7E8E", order: 2, createdAt: Date.now() },
-  { id: "cat-4", name: "开发者", icon: "code", color: "#4A7C59", order: 3, createdAt: Date.now() },
-  { id: "cat-5", name: "阅读", icon: "book-open", color: "#8B6F5C", order: 4, createdAt: Date.now() },
+  { id: "cat-work", name: "工作", icon: "briefcase", color: "#B8860B", order: 0, createdAt: Date.now() },
+  { id: "cat-ai", name: "AI", icon: "brain", color: "#8B5CF6", order: 1, createdAt: Date.now() },
+  { id: "cat-dev", name: "开发", icon: "terminal", color: "#4A7C59", order: 2, createdAt: Date.now() },
   { id: "cat-inbox", name: "收集箱", icon: "inbox", color: "#888888", order: 99, createdAt: Date.now() },
 ];
+
+/* ── 二级分组（子分类） ── */
+export const defaultSubGroups: Category[] = [
+  { id: "cat-1", name: "常用", icon: "star", color: "#B8860B", order: 0, createdAt: Date.now(), parentId: "cat-work" },
+  { id: "cat-3", name: "设计灵感", icon: "palette", color: "#9B7E8E", order: 1, createdAt: Date.now(), parentId: "cat-work" },
+  { id: "cat-2", name: "AI工具", icon: "wrench", color: "#4A6FA5", order: 0, createdAt: Date.now(), parentId: "cat-ai" },
+  { id: "cat-4", name: "开发者", icon: "code", color: "#4A7C59", order: 0, createdAt: Date.now(), parentId: "cat-dev" },
+  { id: "cat-5", name: "阅读", icon: "book-open", color: "#8B6F5C", order: 1, createdAt: Date.now(), parentId: "cat-dev" },
+];
+
+/* ── 合并所有分类 ── */
+export const allDefaultCategories: Category[] = [...defaultCategories, ...defaultSubGroups];
 
 /* ── Favicon Helper ── */
 function gFavicon(domain: string): string {
@@ -244,34 +255,6 @@ export const defaultCards: WebCard[] = [
     imageUrl: ddgIcon("juejin.cn"),
     categoryId: "cat-5",
     order: 0,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  },
-  {
-    id: "card-17",
-    url: "https://www.zhihu.com",
-    title: "知乎",
-    shortDesc: "知识问答社区",
-    fullDesc: "中文互联网高质量问答社区和知识分享平台。",
-    note: "深度阅读",
-    abbreviation: "知乎",
-    imageUrl: ddgIcon("zhihu.com"),
-    categoryId: "cat-5",
-    order: 1,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  },
-  {
-    id: "card-18",
-    url: "https://medium.com",
-    title: "Medium",
-    shortDesc: "英文博客平台",
-    fullDesc: "全球知名的英文写作与阅读平台，涵盖科技、设计、商业等领域。",
-    note: "英文技术文",
-    abbreviation: "Medium",
-    imageUrl: ddgIcon("medium.com"),
-    categoryId: "cat-5",
-    order: 2,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   },

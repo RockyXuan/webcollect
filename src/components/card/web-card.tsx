@@ -51,12 +51,12 @@ export function WebCardItem({
   const cardContent = (
     <div
       className={`
-        group relative flex items-center gap-2 px-2.5 py-1.5
-        rounded-lg border transition-all select-none min-w-[180px]
+        group relative flex items-center gap-1.5 px-2 py-1
+        rounded border transition-all select-none
         ${editMode ? "cursor-default" : "cursor-pointer hover:bg-muted/50"}
         hover:shadow-sm
       `}
-      style={{ borderLeftWidth: "3px", borderLeftColor: categoryColor }}
+      style={{ borderLeftWidth: "2px", borderLeftColor: categoryColor }}
       onClick={handleClick}
     >
       {/* Drag handle in edit mode */}
@@ -69,8 +69,8 @@ export function WebCardItem({
         </span>
       )}
 
-      {/* Icon / Abbreviation */}
-      <div className="flex-shrink-0 w-7 h-7 rounded flex items-center justify-center bg-muted/80 text-[10px] font-bold overflow-hidden">
+      {/* Icon / Abbreviation - small 6x6 */}
+      <div className="flex-shrink-0 w-5 h-5 rounded flex items-center justify-center bg-muted/80 text-[8px] font-bold overflow-hidden">
         {displayImageUrl && !imgError ? (
           <img
             src={displayImageUrl}
@@ -84,13 +84,13 @@ export function WebCardItem({
         )}
       </div>
 
-      {/* Text content */}
-      <div className="flex flex-col min-w-0 flex-1">
-        <span className="text-xs font-medium text-foreground leading-tight truncate">
+      {/* Text content - name + short desc on same line */}
+      <div className="flex items-center gap-1 min-w-0 flex-1">
+        <span className="text-[11px] font-medium text-foreground leading-none whitespace-nowrap">
           {card.title}
         </span>
         {card.shortDesc && (
-          <span className="text-[10px] text-muted-foreground leading-tight truncate">
+          <span className="text-[10px] text-muted-foreground leading-none whitespace-nowrap overflow-hidden text-ellipsis">
             {card.shortDesc}
           </span>
         )}
@@ -101,24 +101,24 @@ export function WebCardItem({
         <div className="flex items-center gap-0.5 flex-shrink-0">
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(); }}
-            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
             title="编辑"
           >
-            <Pencil className="w-3 h-3" />
+            <Pencil className="w-2.5 h-2.5" />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+            className="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
             title="删除"
           >
-            <Trash2 className="w-3 h-3" />
+            <Trash2 className="w-2.5 h-2.5" />
           </button>
         </div>
       )}
 
       {/* External link icon on hover (non-edit mode) */}
       {!editMode && (
-        <ExternalLink className="w-3 h-3 text-muted-foreground/0 group-hover:text-muted-foreground/50 transition-colors flex-shrink-0" />
+        <ExternalLink className="w-2.5 h-2.5 text-muted-foreground/0 group-hover:text-muted-foreground/50 transition-colors flex-shrink-0" />
       )}
     </div>
   );

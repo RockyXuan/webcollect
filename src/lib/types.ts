@@ -20,6 +20,7 @@ export interface Category {
   color: string;
   order: number;
   createdAt: number;
+  parentId?: string; // 父分类ID，有此字段表示是"分组"(子分类)，无此字段表示是"分类"(顶级)
 }
 
 export interface FetchMetaResult {

@@ -1,85 +1,81 @@
 "use client";
 
-import React, { useCallback } from "react";
-import { Plus, LayoutGrid, Pencil, Check } from "lucide-react";
 import { useAppStore } from "@/lib/store";
-import { cn } from "@/lib/utils";
+import { Plus, FolderPlus, Layers, Pencil } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface TopNavProps {
-  onAddCard: (categoryId?: string) => void;
-  onManageCategories: () => void;
+  onAddCard?: (categoryId?: string) => void;
+  onAddGroup?: (parentId?: string) => void;
+  onAddCategory?: () => void;
 }
 
-export function TopNav({ onAddCard, onManageCategories }: TopNavProps) {
-  const { editMode, toggleEditMode, searchQuery, setSearchQuery } = useAppStore();
-
-  const handleAdd = useCallback(() => {
-    onAddCard();
-  }, [onAddCard]);
+export function TopNav({ onAddCard, onAddGroup, onAddCategory }: TopNavProps) {
+  const { editMode, toggleEditMode, searchQuery, setSearchQuery } =
+    useAppStore();
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-sm">
-      <div className="flex items-center gap-3 px-3 sm:px-5 lg:px-6 h-12">
-        {/* Logo */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <LayoutGrid className="w-4 h-4 text-primary" />
-          <span className="font-serif text-base font-bold tracking-tight">WebCollect</span>
+    <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur border-b border-border">
+      <div className="flex items-center justify-between px-4 h-12">
+        {/* Left: Logo */}
+        <div className="flex items-center gap-2">
+          <span className="font-serif text-lg font-bold text-foreground">
+            WebCollect
+          </span>
         </div>
 
-        {/* Search */}
-        <div className="flex-1 max-w-xs">
+        {/* Center: Search */}
+        <div className="flex-1 max-w-xs mx-4">
           <input
             type="text"
+            placeholder="搜索网站..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="搜索网站..."
-            className="w-full h-7 px-2.5 text-xs rounded-md border border-border/60 bg-muted/30 placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/40 transition-colors"
+            className="w-full px-3 py-1 text-sm rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
 
-        {/* Spacer */}
-        <div className="flex-1" />
-
-        {/* Actions */}
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={handleAdd}
-            className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+        {/* Right: Add buttons + Edit toggle */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => onAddCard?.()}
+            className="h-7 text-xs gap-1 px-2"
           >
-            <Plus className="w-3 h-3" />
-            <span className="hidden sm:inline">添加</span>
-          </button>
-
-          <button
-            onClick={onManageCategories}
-            className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-md border border-border/60 hover:bg-muted/50 transition-colors"
+            <Plus className="h-3 w-3" />
+            添加网页
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onAddGroup?.()}
+            className="h-7 text-xs gap-1 px-2"
           >
-            <span className="hidden sm:inline">管理分类</span>
-          </button>
-
-          <button
+            <Layers className="h-3 w-3" />
+            添加分组
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onAddCategory?.()}
+            className="h-7 text-xs gap-1 px-2"
+          >
+            <FolderPlus className="h-3 w-3" />
+            添加分类
+          </Button>
+          <div className="w-px h-5 bg-border mx-1" />
+          <Button
+            variant={editMode ? "default" : "outline"}
+            size="sm"
             onClick={toggleEditMode}
-            className={cn(
-              "flex items-center gap-1 text-xs px-2 py-1.5 rounded-md border transition-colors",
-              editMode
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border/60 hover:bg-muted/50"
-            )}
+            className="h-7 text-xs gap-1 px-2"
           >
-            {editMode ? (
-              <>
-                <Check className="w-3 h-3" />
-                <span className="hidden sm:inline">完成</span>
-              </>
-            ) : (
-              <>
-                <Pencil className="w-3 h-3" />
-                <span className="hidden sm:inline">编辑</span>
-              </>
-            )}
-          </button>
+            <Pencil className="h-3 w-3" />
+            编辑
+          </Button>
         </div>
       </div>
-    </header>
+    </nav>
   );
 }

@@ -46,9 +46,10 @@ interface CategoryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editingCategory?: Category | null;
+  defaultParentId?: string;
 }
 
-export function CategoryDialog({ open, onOpenChange, editingCategory }: CategoryDialogProps) {
+export function CategoryDialog({ open, onOpenChange, editingCategory, defaultParentId }: CategoryDialogProps) {
   const { addCategory, updateCategory } = useAppStore();
 
   const [name, setName] = useState("");
@@ -79,6 +80,7 @@ export function CategoryDialog({ open, onOpenChange, editingCategory }: Category
       color,
       order: editingCategory?.order ?? 999,
       createdAt: editingCategory?.createdAt ?? Date.now(),
+      parentId: editingCategory?.parentId ?? defaultParentId ?? undefined,
     };
 
     if (editingCategory) {

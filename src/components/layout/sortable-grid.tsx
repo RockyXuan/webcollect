@@ -1,6 +1,10 @@
 "use client";
 
-import React, { useState, useRef, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback } from "react";
+import { useAppStore } from "@/lib/store";
+import { WebCardItem } from "@/components/card/web-card";
+import { Pencil, Plus, GripVertical } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   DndContext,
   closestCenter,
@@ -8,267 +12,271 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  DragOverlay,
-  type DragStartEvent,
-  type DragEndEvent,
-  type CollisionDetection,
+  DragEndEvent,
 } from "@dnd-kit/core";
 import {
   SortableContext,
-  sortableKeyboardCoordinates,
-  rectSortingStrategy,
   useSortable,
+  verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Plus, Pencil, Check } from "lucide-react";
-import type { WebCard, Category } from "@/lib/types";
-import { WebCardItem } from "@/components/card/web-card";
-import { useAppStore } from "@/lib/store";
+import type { Category, WebCard } from "@/lib/types";
 
-/* ── CategoryIcon: static switch-based rendering ── */
-import {
-  Star, Wrench, Palette, Code, BookOpen, Music, Video,
-  ShoppingBag, GraduationCap, Briefcase, Coffee, Gamepad2, Circle,
-} from "lucide-react";
+// ============ Type-prefixed ID helpers ============
+const catId = (id: string) => `cat:${id}`;
+const cardId = (id: string) => `card:${id}`;
 
-function CategoryIcon({ iconName, className }: { iconName: string; className?: string }) {
-  switch (iconName) {
-    case "star": return <Star className={className} />;
-    case "wrench": return <Wrench className={className} />;
-    case "palette": return <Palette className={className} />;
-    case "code": return <Code className={className} />;
-    case "book-open": return <BookOpen className={className} />;
-    case "music": return <Music className={className} />;
-    case "video": return <Video className={className} />;
-    case "shopping-bag": return <ShoppingBag className={className} />;
-    case "graduation-cap": return <GraduationCap className={className} />;
-    case "briefcase": return <Briefcase className={className} />;
-    case "coffee": return <Coffee className={className} />;
-    case "gamepad-2": return <Gamepad2 className={className} />;
-    default: return <Circle className={className} />;
-  }
-}
-
-/* ── ID helpers ── */
-const CAT_PREFIX = "cat:";
-const CARD_PREFIX = "card:";
-const catId = (id: string) => `${CAT_PREFIX}${id}`;
-const cardId = (id: string) => `${CARD_PREFIX}${id}`;
-const stripPrefix = (id: string) => id.replace(/^(cat:|card:)/, "");
-const isCatId = (id: string) => id.startsWith(CAT_PREFIX);
-const isCardId = (id: string) => id.startsWith(CARD_PREFIX);
-
-/* ── Custom collision detection: cards can drop on cards or category headers ── */
-const typedCollisionDetection: CollisionDetection = (args) => {
-  const { active, droppableContainers } = args;
-  const activeData = active.data.current;
-  const activeType = activeData?.type as string | undefined;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const filtered = droppableContainers.filter((container: any) => {
-    const containerData = container.data.current;
-    const containerType = containerData?.type as string | undefined;
-
-    // Category can only be dropped on another category
-    if (activeType === "category") return containerType === "category";
-    // Card can be dropped on another card or on a category header
-    if (activeType === "card") return containerType === "card" || containerType === "category";
-    return false;
-  });
-
-  if (filtered.length === 0) return [];
-
-  return closestCenter({ ...args, droppableContainers: filtered });
-};
-
-/* ── Types ── */
+// ============ Props ============
 interface SortableGridProps {
-  cards: WebCard[];
-  categories: Category[];
-  onEdit: (card: WebCard) => void;
-  onDelete: (id: string) => void;
-  onAdd: (categoryId?: string) => void;
-  onEditCategory: (category: Category) => void;
+  onAddCard?: (categoryId?: string) => void;
+  onEditCard?: (card: WebCard) => void;
+  onDeleteCard?: (card: WebCard) => void;
+  onEditCategory?: (category: Category) => void;
+  onAddGroup?: (parentId?: string) => void;
 }
 
-/* ── Main Component ── */
-export function SortableGrid({ cards, categories, onEdit, onDelete, onAdd, onEditCategory }: SortableGridProps) {
-  const { editMode, reorderCards, reorderCategories } = useAppStore();
-  const [activeId, setActiveId] = useState<string | null>(null);
+export function SortableGrid({
+  onAddCard,
+  onEditCard,
+  onDeleteCard,
+  onEditCategory,
+  onAddGroup,
+}: SortableGridProps) {
+  const {
+    cards,
+    categories,
+    editMode,
+    searchQuery,
+    moveCard,
+    reorderCards,
+    reorderCategories,
+  } = useAppStore();
+
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor)
   );
 
-  const sortedCategories = useMemo(
-    () => [...categories].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+  // Build hierarchy: parent categories → sub-groups → cards
+  const parentCategories = useMemo(
+    () => categories.filter((c) => !c.parentId).sort((a, b) => a.order - b.order),
     [categories]
   );
 
-  // Build sortable item IDs for categories
-  const categorySortableIds = useMemo(
-    () => sortedCategories.map((c) => catId(c.id)),
-    [sortedCategories]
+  const getSubGroups = useCallback(
+    (parentId: string) =>
+      categories
+        .filter((c) => c.parentId === parentId)
+        .sort((a, b) => a.order - b.order),
+    [categories]
   );
 
-  /* ── Drag handlers ── */
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    setActiveId(String(event.active.id));
-  }, []);
-
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      const { active, over } = event;
-      setActiveId(null);
-
-      if (!over || active.id === over.id) return;
-
-      const activeStr = String(active.id);
-      const overStr = String(over.id);
-      const activeType = active.data.current?.type;
-
-      /* ── Category reordering ── */
-      if (activeType === "category" && isCatId(activeStr) && isCatId(overStr)) {
-        const activeCatId = stripPrefix(activeStr);
-        const overCatId = stripPrefix(overStr);
-        const oldIdx = sortedCategories.findIndex((c) => c.id === activeCatId);
-        const newIdx = sortedCategories.findIndex((c) => c.id === overCatId);
-        if (oldIdx !== -1 && newIdx !== -1 && oldIdx !== newIdx) {
-          const newOrder = sortedCategories.map((c) => c.id);
-          newOrder.splice(oldIdx, 1);
-          newOrder.splice(newIdx, 0, activeCatId);
-          reorderCategories(newOrder);
-        }
-        return;
-      }
-
-      /* ── Card reordering / cross-category move ── */
-      if (activeType === "card" && isCardId(activeStr)) {
-        const activeCardId = stripPrefix(activeStr);
-        const activeCard = cards.find((c) => c.id === activeCardId);
-        if (!activeCard) return;
-
-        // Dropped on a category header → move to that category
-        if (isCatId(overStr)) {
-          const targetCatId = stripPrefix(overStr);
-          const targetCards = cards.filter((c) => c.categoryId === targetCatId);
-          reorderCards(activeCardId, targetCatId, targetCards.length);
-          return;
-        }
-
-        // Dropped on another card → reorder
-        if (isCardId(overStr)) {
-          const overCardId = stripPrefix(overStr);
-          const overCard = cards.find((c) => c.id === overCardId);
-          if (!overCard) return;
-
-          if (activeCard.categoryId !== overCard.categoryId) {
-            // Cross-category move: insert at over card's position
-            reorderCards(activeCardId, overCard.categoryId, overCard.order);
-          } else {
-            // Same-category reorder: just move the card to the over card's position
-            reorderCards(activeCardId, activeCard.categoryId, overCard.order);
-          }
-        }
-      }
+  const getCardsForCategory = useCallback(
+    (categoryId: string) => {
+      const filtered = cards
+        .filter((c) => c.categoryId === categoryId)
+        .sort((a, b) => a.order - b.order);
+      if (!searchQuery) return filtered;
+      const q = searchQuery.toLowerCase();
+      return filtered.filter(
+        (c) =>
+          c.title.toLowerCase().includes(q) ||
+          c.url.toLowerCase().includes(q) ||
+          (c.shortDesc && c.shortDesc.toLowerCase().includes(q))
+      );
     },
-    [cards, sortedCategories, reorderCards, reorderCategories]
+    [cards, searchQuery]
   );
 
-  const handleDragCancel = useCallback(() => {
-    setActiveId(null);
-  }, []);
+  // Also get orphan categories (no parentId, no sub-groups with cards)
+  const standaloneCategories = useMemo(() => {
+    return categories.filter(
+      (c) => !c.parentId && !categories.some((sg) => sg.parentId === c.id)
+    );
+  }, [categories]);
 
-  // Find the active item for the DragOverlay
-  const activeItem = useMemo(() => {
-    if (!activeId) return null;
-    if (isCatId(activeId)) {
-      const id = stripPrefix(activeId);
-      return { type: "category" as const, data: sortedCategories.find((c) => c.id === id) };
+  // All category IDs for sortable (parents + sub-groups + standalone)
+  const allSortableCatIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const parent of parentCategories) {
+      if (categories.some((sg) => sg.parentId === parent.id)) {
+        ids.push(catId(parent.id));
+      }
     }
-    if (isCardId(activeId)) {
-      const id = stripPrefix(activeId);
-      return { type: "card" as const, data: cards.find((c) => c.id === id) };
+    for (const standalone of standaloneCategories) {
+      ids.push(catId(standalone.id));
     }
-    return null;
-  }, [activeId, sortedCategories, cards]);
+    return ids;
+  }, [parentCategories, standaloneCategories, categories]);
+
+  // All card IDs for sortable
+  const allCardIds = useMemo(
+    () => cards.map((c) => cardId(c.id)),
+    [cards]
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const activeId = String(active.id);
+    const overId = String(over.id);
+
+    // Category reorder
+    if (activeId.startsWith("cat:") && overId.startsWith("cat:")) {
+      const activeCatId = activeId.replace("cat:", "");
+      const overCatId = overId.replace("cat:", "");
+      // Find current order of categories
+      const orderedCats = categories
+        .filter((c) => !c.parentId)
+        .sort((a, b) => a.order - b.order);
+      const oldIndex = orderedCats.findIndex((c) => c.id === activeCatId);
+      const newIndex = orderedCats.findIndex((c) => c.id === overCatId);
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newOrdered = [...orderedCats];
+        const [moved] = newOrdered.splice(oldIndex, 1);
+        newOrdered.splice(newIndex, 0, moved);
+        reorderCategories(newOrdered.map((c) => c.id));
+      }
+      return;
+    }
+
+    // Card reorder / cross-category
+    if (activeId.startsWith("card:") && overId.startsWith("card:")) {
+      const activeCardId = activeId.replace("card:", "");
+      const overCardId = overId.replace("card:", "");
+      const overCard = cards.find((c) => c.id === overCardId);
+      if (overCard) {
+        moveCard(activeCardId, overCard.categoryId, overCard.order);
+      }
+      return;
+    }
+
+    // Card dropped on category title
+    if (activeId.startsWith("card:") && overId.startsWith("cat:")) {
+      const activeCardId = activeId.replace("card:", "");
+      const targetCatId = overId.replace("cat:", "");
+      moveCard(activeCardId, targetCatId, 0);
+      return;
+    }
+  };
 
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={typedCollisionDetection}
-      onDragStart={handleDragStart}
+      collisionDetection={closestCenter}
       onDragEnd={handleDragEnd}
-      onDragCancel={handleDragCancel}
     >
-      {/* Category-level SortableContext */}
-      <SortableContext items={categorySortableIds} strategy={rectSortingStrategy}>
-        <div className="flex flex-wrap gap-3">
-          {sortedCategories.map((category) => (
+      <div className="space-y-4 p-4">
+        {/* Parent categories with sub-groups */}
+        {parentCategories.map((parent) => {
+          const subGroups = getSubGroups(parent.id);
+          if (subGroups.length === 0) return null; // Skip empty parents
+
+          return (
             <SortableCategoryBlock
-              key={category.id}
-              category={category}
-              cards={cards.filter((c) => c.categoryId === category.id)}
+              key={parent.id}
+              category={parent}
+              isParent
               editMode={editMode}
               editingCategoryId={editingCategoryId}
-              setEditingCategoryId={setEditingCategoryId}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onAdd={onAdd}
               onEditCategory={onEditCategory}
-            />
-          ))}
-        </div>
-      </SortableContext>
+              onAddCard={onAddCard}
+              onAddGroup={onAddGroup}
+            >
+              <div className="space-y-3">
+                {subGroups.map((sub) => (
+                  <SubGroupBlock
+                    key={sub.id}
+                    category={sub}
+                    cards={getCardsForCategory(sub.id)}
+                    editMode={editMode}
+                    editingCategoryId={editingCategoryId}
+                    onEditCategory={onEditCategory}
+                    onAddCard={onAddCard}
+                    onEditCard={onEditCard}
+                    onDeleteCard={onDeleteCard}
+                    allCardIds={allCardIds}
+                    setEditingCategoryId={setEditingCategoryId}
+                  />
+                ))}
+              </div>
+            </SortableCategoryBlock>
+          );
+        })}
 
-      {/* Drag overlay */}
-      <DragOverlay dropAnimation={null}>
-        {activeItem?.type === "category" && activeItem.data ? (
-          <div className="bg-card/90 rounded-xl border-2 border-primary/50 p-3 shadow-xl opacity-80 max-w-xs">
-            <div className="flex items-center gap-2">
-              <CategoryIcon iconName={activeItem.data.icon} className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-semibold">{activeItem.data.name}</span>
-            </div>
-          </div>
-        ) : activeItem?.type === "card" && activeItem.data ? (
-          <div className="bg-card/90 rounded-lg border border-primary/50 px-2.5 py-1.5 shadow-xl opacity-80">
-            <span className="text-xs font-medium">{activeItem.data.title}</span>
-          </div>
-        ) : null}
-      </DragOverlay>
+        {/* Standalone categories (no parent, no sub-groups) */}
+        {standaloneCategories.map((cat) => {
+          const catCards = getCardsForCategory(cat.id);
+          return (
+            <SortableCategoryBlock
+              key={cat.id}
+              category={cat}
+              editMode={editMode}
+              editingCategoryId={editingCategoryId}
+              onEditCategory={onEditCategory}
+              onAddCard={onAddCard}
+              onAddGroup={onAddGroup}
+            >
+              <SortableContext
+                items={catCards.map((c) => cardId(c.id))}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="flex flex-wrap gap-1.5">
+                  {catCards.map((card) => (
+                    <SortableCard
+                      key={card.id}
+                      card={card}
+                      categoryColor={cat.color}
+                      editMode={editMode}
+                      isEditing={editingCategoryId === cat.id}
+                      onEdit={() => onEditCard?.(card)}
+                      onDelete={() => onDeleteCard?.(card)}
+                      onToggleEdit={() =>
+                        setEditingCategoryId(
+                          editingCategoryId === cat.id ? null : cat.id
+                        )
+                      }
+                    />
+                  ))}
+                  {catCards.length === 0 && (
+                    <p className="text-xs text-muted-foreground py-2">
+                      暂无网站，点击 + 添加
+                    </p>
+                  )}
+                </div>
+              </SortableContext>
+            </SortableCategoryBlock>
+          );
+        })}
+      </div>
     </DndContext>
   );
 }
 
-/* ── Sortable Category Block ── */
+// ============ Sortable Parent Category Block ============
 interface SortableCategoryBlockProps {
   category: Category;
-  cards: WebCard[];
+  isParent?: boolean;
   editMode: boolean;
   editingCategoryId: string | null;
-  setEditingCategoryId: (id: string | null) => void;
-  onEdit: (card: WebCard) => void;
-  onDelete: (id: string) => void;
-  onAdd: (categoryId?: string) => void;
-  onEditCategory: (category: Category) => void;
+  onEditCategory?: (category: Category) => void;
+  onAddCard?: (categoryId?: string) => void;
+  onAddGroup?: (parentId?: string) => void;
+  children: React.ReactNode;
 }
 
 function SortableCategoryBlock({
   category,
-  cards,
+  isParent,
   editMode,
   editingCategoryId,
-  setEditingCategoryId,
-  onEdit,
-  onDelete,
-  onAdd,
   onEditCategory,
+  onAddCard,
+  onAddGroup,
+  children,
 }: SortableCategoryBlockProps) {
   const {
     attributes,
@@ -277,110 +285,11 @@ function SortableCategoryBlock({
     transform,
     transition,
     isDragging,
-  } = useSortable({
-    id: catId(category.id),
-    data: { type: "category" },
-  });
-
-  /* Auto-fit width based on card count:
-     - 0-2 cards → ~50% (small block, fits 2 per row)
-     - 3-5 cards → ~50% (medium block, fits 2 per row)
-     - 6+ cards → ~100% (large block, needs full width)
-     Gap is gap-3 (12px), so two 50% blocks need calc(50% - 6px) each
-     User can still manually resize via handle */
-  const defaultWidth = useMemo(() => {
-    if (cards.length >= 6) return "calc(100% - 0px)";
-    return "calc(50% - 6px)";
-  }, [cards.length]);
-
-  const [widthPercent, setWidthPercent] = useState<number | null>(null);
-  const [maxHeight, setMaxHeight] = useState<number | null>(null);
-  const [isResizingH, setIsResizingH] = useState(false);
-  const [isResizingV, setIsResizingV] = useState(false);
-  const blockRef = useRef<HTMLDivElement>(null);
-  const resizeStartX = useRef(0);
-  const resizeStartWidth = useRef(0);
-  const resizeStartY = useRef(0);
-  const resizeStartHeight = useRef(0);
-
-  /* If user hasn't manually resized, follow auto width */
-  const effectiveWidth: string = widthPercent != null ? `${widthPercent}%` : defaultWidth;
-
-  const sortedCards = useMemo(
-    () => [...cards].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
-    [cards]
-  );
-
-  const cardSortableIds = useMemo(
-    () => sortedCards.map((c) => cardId(c.id)),
-    [sortedCards]
-  );
-
-  /* ── Horizontal resize ── */
-  const handleHResizeStart = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsResizingH(true);
-      resizeStartX.current = e.clientX;
-      /* Use actual rendered width as starting point */
-      resizeStartWidth.current = blockRef.current?.offsetWidth || 0;
-
-      const handleMove = (ev: MouseEvent) => {
-        const containerWidth = blockRef.current?.parentElement?.clientWidth || 1;
-        const delta = ev.clientX - resizeStartX.current;
-        const currentWidth = resizeStartWidth.current + delta;
-        const newPercent = Math.min(100, Math.max(30, (currentWidth / containerWidth) * 100));
-        setWidthPercent(Math.round(newPercent));
-      };
-
-      const handleUp = () => {
-        setIsResizingH(false);
-        document.removeEventListener("mousemove", handleMove);
-        document.removeEventListener("mouseup", handleUp);
-      };
-
-      document.addEventListener("mousemove", handleMove);
-      document.addEventListener("mouseup", handleUp);
-    },
-    []
-  );
-
-  /* ── Vertical resize ── */
-  const handleVResizeStart = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsResizingV(true);
-      resizeStartY.current = e.clientY;
-      resizeStartHeight.current = maxHeight || blockRef.current?.scrollHeight || 300;
-
-      const handleMove = (ev: MouseEvent) => {
-        const delta = ev.clientY - resizeStartY.current;
-        const newHeight = Math.max(120, resizeStartHeight.current + delta);
-        setMaxHeight(Math.round(newHeight));
-      };
-
-      const handleUp = () => {
-        setIsResizingV(false);
-        document.removeEventListener("mousemove", handleMove);
-        document.removeEventListener("mouseup", handleUp);
-      };
-
-      document.addEventListener("mousemove", handleMove);
-      document.addEventListener("mouseup", handleUp);
-    },
-    [maxHeight]
-  );
-
-  const handleResetHeight = useCallback(() => {
-    setMaxHeight(null);
-  }, []);
+  } = useSortable({ id: catId(category.id) });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    width: effectiveWidth,
     opacity: isDragging ? 0.5 : 1,
   };
 
@@ -388,123 +297,194 @@ function SortableCategoryBlock({
     <div
       ref={setNodeRef}
       style={style}
-      className={`
-        relative rounded-xl border bg-card transition-shadow
-        ${editMode ? "border-primary/20" : "border-border/60"}
-        ${isResizingH || isResizingV ? "ring-2 ring-primary/30" : ""}
-        hover:shadow-md
-      `}
+      className="rounded-lg border border-border bg-card"
     >
-      {/* Category color accent */}
-      <div className="h-1 rounded-t-xl" style={{ backgroundColor: category.color }} />
-
-      {/* Header row */}
-      <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5">
-        {/* Grip handle for category drag (edit mode only) */}
+      {/* Category header */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50">
         {editMode && (
-          <button
-            className="cursor-grab active:cursor-grabbing text-muted-foreground/60 hover:text-foreground p-0.5"
+          <span
+            className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-foreground"
             {...attributes}
             {...listeners}
           >
             <GripVertical className="w-3.5 h-3.5" />
-          </button>
+          </span>
         )}
 
-        <CategoryIcon iconName={category.icon} className="w-3.5 h-3.5 text-muted-foreground" />
-        <h3 className="font-serif text-sm font-semibold text-foreground">{category.name}</h3>
-        <span className="text-xs text-muted-foreground/60 tabular-nums">{cards.length}</span>
-
-        {/* Edit toggle + Add (inline after title) */}
-        <div className="flex items-center gap-1 ml-1">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (editingCategoryId === category.id) {
-                setEditingCategoryId(null);
-              } else {
-                setEditingCategoryId(category.id);
-              }
-              onEditCategory(category);
-            }}
-            className={`
-              text-[11px] px-1.5 py-0.5 rounded transition-colors
-              ${editingCategoryId === category.id
-                ? "text-primary bg-primary/10"
-                : "text-muted-foreground/70 hover:text-foreground hover:bg-muted/50"
-              }
-            `}
-          >
-            {editingCategoryId === category.id ? <Check className="w-3 h-3" /> : <Pencil className="w-3 h-3" />}
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onAdd(category.id); }}
-            className="text-[11px] px-1.5 py-0.5 rounded text-muted-foreground/70 hover:text-primary hover:bg-primary/10 transition-colors"
-          >
-            <Plus className="w-3 h-3" />
-          </button>
-        </div>
-      </div>
-
-      {/* Cards - flex-wrap with SortableContext for cross-category drag */}
-      <SortableContext items={cardSortableIds} strategy={rectSortingStrategy}>
+        {/* Color dot */}
         <div
-          className="flex flex-wrap gap-1.5 px-3 pb-3 content-start"
-          style={{
-            maxHeight: maxHeight ? `${maxHeight}px` : undefined,
-            overflowY: maxHeight ? "auto" : undefined,
-          }}
-          onDoubleClick={handleResetHeight}
-        >
-          {sortedCards.map((card) => (
-            <SortableCard
-              key={card.id}
-              card={card}
-              categoryColor={category.color}
-              editMode={editMode || editingCategoryId === category.id}
-              onEdit={onEdit}
-              onDelete={onDelete}
-            />
-          ))}
-          {sortedCards.length === 0 && (
-            <div className="w-full py-4 text-center text-xs text-muted-foreground/50">
-              暂无网站，点击 + 添加
-            </div>
-          )}
-        </div>
-      </SortableContext>
+          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+          style={{ backgroundColor: category.color }}
+        />
 
-      {/* Horizontal resize handle */}
-      <div
-        onMouseDown={handleHResizeStart}
-        className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize group"
-        title="拖拽调整宽度"
-      >
-        <div className="absolute right-0.5 top-1/2 -translate-y-1/2 w-0.5 h-8 bg-border group-hover:bg-primary/60 transition-colors rounded-full" />
+        <span className="text-sm font-semibold text-foreground font-serif">
+          {category.name}
+        </span>
+
+        {/* Action buttons */}
+        {editMode && (
+          <div className="flex items-center gap-1 ml-auto">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0"
+              onClick={() => onEditCategory?.(category)}
+              title="编辑分类"
+            >
+              <Pencil className="w-3 h-3" />
+            </Button>
+            {isParent && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+                onClick={() => onAddGroup?.(category.id)}
+                title="添加分组"
+              >
+                <Plus className="w-3 h-3" />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0"
+              onClick={() => onAddCard?.()}
+              title="添加网页"
+            >
+              <Plus className="w-3 h-3" />
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Vertical resize handle */}
-      <div
-        onMouseDown={handleVResizeStart}
-        className="absolute bottom-0 left-0 right-0 h-1.5 cursor-row-resize group"
-        title="拖拽调整高度（双击内容区重置）"
-      >
-        <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 h-0.5 w-8 bg-border group-hover:bg-primary/60 transition-colors rounded-full" />
-      </div>
+      {/* Category body */}
+      <div className="p-3">{children}</div>
     </div>
   );
 }
 
-/* ── Sortable Card (drag within and across categories) ── */
+// ============ Sub-Group Block ============
+interface SubGroupBlockProps {
+  category: Category;
+  cards: WebCard[];
+  editMode: boolean;
+  editingCategoryId: string | null;
+  onEditCategory?: (category: Category) => void;
+  onAddCard?: (categoryId?: string) => void;
+  onEditCard?: (card: WebCard) => void;
+  onDeleteCard?: (card: WebCard) => void;
+  allCardIds: string[];
+  setEditingCategoryId: (id: string | null) => void;
+}
+
+function SubGroupBlock({
+  category,
+  cards,
+  editMode,
+  editingCategoryId,
+  onEditCategory,
+  onAddCard,
+  onEditCard,
+  onDeleteCard,
+  allCardIds,
+  setEditingCategoryId,
+}: SubGroupBlockProps) {
+  const isEditing = editingCategoryId === category.id;
+
+  return (
+    <div className="rounded-md border border-border/40 bg-background">
+      {/* Sub-group header */}
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5">
+        {/* Color bar at top */}
+        <div
+          className="w-1 h-3 rounded-full flex-shrink-0"
+          style={{ backgroundColor: category.color }}
+        />
+        <span className="text-xs font-medium text-foreground">
+          {category.name}
+        </span>
+        <span className="text-[10px] text-muted-foreground">
+          ({cards.length})
+        </span>
+
+        {editMode && (
+          <div className="flex items-center gap-0.5 ml-auto">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0"
+              onClick={() => {
+                setEditingCategoryId(isEditing ? null : category.id);
+                onEditCategory?.(category);
+              }}
+              title="编辑分组"
+            >
+              <Pencil className="w-2.5 h-2.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0"
+              onClick={() => onAddCard?.(category.id)}
+              title="添加网页"
+            >
+              <Plus className="w-2.5 h-2.5" />
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Cards */}
+      <SortableContext
+        items={cards.map((c) => cardId(c.id))}
+        strategy={verticalListSortingStrategy}
+      >
+        <div className="flex flex-wrap gap-1 px-2.5 pb-2">
+          {cards.map((card) => (
+            <SortableCard
+              key={card.id}
+              card={card}
+              categoryColor={category.color}
+              editMode={editMode}
+              isEditing={isEditing}
+              onEdit={() => onEditCard?.(card)}
+              onDelete={() => onDeleteCard?.(card)}
+              onToggleEdit={() =>
+                setEditingCategoryId(isEditing ? null : category.id)
+              }
+            />
+          ))}
+          {cards.length === 0 && (
+            <p className="text-[10px] text-muted-foreground py-1">
+              暂无网站
+            </p>
+          )}
+        </div>
+      </SortableContext>
+    </div>
+  );
+}
+
+// ============ Sortable Card ============
 interface SortableCardProps {
   card: WebCard;
   categoryColor: string;
   editMode: boolean;
-  onEdit: (card: WebCard) => void;
-  onDelete: (id: string) => void;
+  isEditing: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+  onToggleEdit: () => void;
 }
 
-function SortableCard({ card, categoryColor, editMode, onEdit, onDelete }: SortableCardProps) {
+function SortableCard({
+  card,
+  categoryColor,
+  editMode,
+  isEditing,
+  onEdit,
+  onDelete,
+  onToggleEdit,
+}: SortableCardProps) {
   const {
     attributes,
     listeners,
@@ -512,26 +492,23 @@ function SortableCard({ card, categoryColor, editMode, onEdit, onDelete }: Sorta
     transform,
     transition,
     isDragging,
-  } = useSortable({
-    id: cardId(card.id),
-    data: { type: "card", categoryId: card.categoryId },
-  });
+  } = useSortable({ id: cardId(card.id) });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.4 : 1,
+    opacity: isDragging ? 0.5 : 1,
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes}>
+    <div ref={setNodeRef} style={style}>
       <WebCardItem
         card={card}
         categoryColor={categoryColor}
-        editMode={editMode}
-        onEdit={() => onEdit(card)}
-        onDelete={() => onDelete(card.id)}
-        dragListeners={editMode ? listeners : null}
+        editMode={editMode && isEditing}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        dragListeners={editMode ? { ...attributes, ...listeners } : null}
       />
     </div>
   );

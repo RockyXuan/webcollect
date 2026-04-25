@@ -20,6 +20,7 @@ export default function HomePage() {
   const [editingCard, setEditingCard] = useState<WebCard | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [defaultCategoryId, setDefaultCategoryId] = useState<string>("");
+  const [defaultParentId, setDefaultParentId] = useState<string | undefined>();
 
   useEffect(() => {
     const init = async () => {
@@ -49,11 +50,19 @@ export default function HomePage() {
 
   const handleAddCategory = useCallback(() => {
     setEditingCategory(null);
+    setDefaultParentId(undefined);
+    setCategoryDialogOpen(true);
+  }, []);
+
+  const handleAddGroup = useCallback((parentId?: string) => {
+    setEditingCategory(null);
+    setDefaultParentId(parentId);
     setCategoryDialogOpen(true);
   }, []);
 
   const handleEditCategory = useCallback((category: Category) => {
     setEditingCategory(category);
+    setDefaultParentId(undefined);
     setCategoryDialogOpen(true);
   }, []);
 
@@ -70,17 +79,20 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <TopNav onAddCard={handleAddCard} onManageCategories={handleAddCategory} />
+      <TopNav
+        onAddCard={handleAddCard}
+        onAddGroup={handleAddGroup}
+        onAddCategory={handleAddCategory}
+      />
 
       <main className="w-full px-3 sm:px-5 lg:px-6 py-4 space-y-4">
         <ErrorBoundary>
           <SortableGrid
-            cards={cards}
-            categories={categories}
-            onEdit={handleEditCard}
-            onDelete={deleteCard}
-            onAdd={handleAddCard}
+            onAddCard={handleAddCard}
+            onEditCard={handleEditCard}
+            onDeleteCard={(card) => deleteCard(card.id)}
             onEditCategory={handleEditCategory}
+            onAddGroup={handleAddGroup}
           />
         </ErrorBoundary>
 
@@ -108,6 +120,7 @@ export default function HomePage() {
           open={categoryDialogOpen}
           onOpenChange={setCategoryDialogOpen}
           editingCategory={editingCategory}
+          defaultParentId={defaultParentId}
         />
       </ErrorBoundary>
     </div>

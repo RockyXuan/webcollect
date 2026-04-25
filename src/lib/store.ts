@@ -75,13 +75,14 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   loadData: async () => {
     set({ isLoading: true });
-    const [cards, categories, init, hiddenSites, pinnedIds] = await Promise.all([
+    const [cards, initCategories, init, hiddenSites, pinnedIds] = await Promise.all([
       getCards(),
       getCategories(),
       isInitialized(),
       getHiddenSites(),
       getPinnedCategoryIds(),
     ]);
+    let categories = initCategories;
 
     // Clean up expired hidden sites (non-permanent)
     const now = Date.now();
@@ -141,9 +142,34 @@ export const useAppStore = create<AppState>((set, get) => ({
         order: 99,
         createdAt: Date.now(),
       };
-      const updatedCats = [...categories, inbox];
-      await saveCategories(updatedCats);
-      set({ categories: updatedCats });
+      categories = [...categories, inbox];
+    }
+
+    // Migration: add parent categories for 3-level hierarchy
+    const parentCatExists = categories.some((c) => c.id === "cat-work");
+    if (!parentCatExists) {
+      const parentCats: Category[] = [
+        { id: "cat-work", name: "工作", icon: "Briefcase", color: "#F59E0B", order: 0, createdAt: Date.now() },
+        { id: "cat-ai", name: "AI", icon: "Brain", color: "#8B5CF6", order: 1, createdAt: Date.now() },
+        { id: "cat-dev", name: "开发", icon: "Terminal", color: "#10B981", order: 2, createdAt: Date.now() },
+      ];
+      // Assign parentId to existing sub-categories
+      const parentIdMap: Record<string, string> = {
+        "cat-1": "cat-work",   // 常用 → 工作
+        "cat-3": "cat-work",   // 设计灵感 → 工作
+        "cat-5": "cat-work",   // 阅读 → 工作
+        "cat-2": "cat-ai",     // AI工具 → AI
+        "cat-4": "cat-dev",    // 开发者 → 开发
+        // cat-inbox stays at top level (no parentId)
+      };
+      categories = [
+        ...parentCats,
+        ...categories.map((c) => ({
+          ...c,
+          parentId: parentIdMap[c.id] || c.parentId,
+        })),
+      ];
+      await saveCategories(categories);
     }
   },
 
