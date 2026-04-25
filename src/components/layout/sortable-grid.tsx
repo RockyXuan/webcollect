@@ -88,10 +88,11 @@ interface SortableGridProps {
   onEdit: (card: WebCard) => void;
   onDelete: (id: string) => void;
   onAdd: (categoryId?: string) => void;
+  onEditCategory: (category: Category) => void;
 }
 
 /* ── Main Component ── */
-export function SortableGrid({ cards, categories, onEdit, onDelete, onAdd }: SortableGridProps) {
+export function SortableGrid({ cards, categories, onEdit, onDelete, onAdd, onEditCategory }: SortableGridProps) {
   const { editMode, reorderCards, reorderCategories } = useAppStore();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
@@ -220,6 +221,7 @@ export function SortableGrid({ cards, categories, onEdit, onDelete, onAdd }: Sor
               onEdit={onEdit}
               onDelete={onDelete}
               onAdd={onAdd}
+              onEditCategory={onEditCategory}
             />
           ))}
         </div>
@@ -254,6 +256,7 @@ interface SortableCategoryBlockProps {
   onEdit: (card: WebCard) => void;
   onDelete: (id: string) => void;
   onAdd: (categoryId?: string) => void;
+  onEditCategory: (category: Category) => void;
 }
 
 function SortableCategoryBlock({
@@ -265,6 +268,7 @@ function SortableCategoryBlock({
   onEdit,
   onDelete,
   onAdd,
+  onEditCategory,
 }: SortableCategoryBlockProps) {
   const {
     attributes,
@@ -421,6 +425,7 @@ function SortableCategoryBlock({
               } else {
                 setEditingCategoryId(category.id);
               }
+              onEditCategory(category);
             }}
             className={`
               text-[11px] px-1.5 py-0.5 rounded transition-colors

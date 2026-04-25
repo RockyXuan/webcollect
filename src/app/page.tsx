@@ -52,6 +52,11 @@ export default function HomePage() {
     setCategoryDialogOpen(true);
   }, []);
 
+  const handleEditCategory = useCallback((category: Category) => {
+    setEditingCategory(category);
+    setCategoryDialogOpen(true);
+  }, []);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -75,6 +80,7 @@ export default function HomePage() {
             onEdit={handleEditCard}
             onDelete={deleteCard}
             onAdd={handleAddCard}
+            onEditCategory={handleEditCategory}
           />
         </ErrorBoundary>
 
