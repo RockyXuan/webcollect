@@ -394,8 +394,6 @@ export function SortableGrid({
                           category={sub}
                           cards={subCards}
                           editMode={editMode}
-                          widthPercent={categoryWidths[sub.id]}
-                          defaultWidthPercent={getDefaultWidthPercent(subCards.length)}
                           onEditCategory={onEditCategory}
                           onAddCard={onAddCard}
                           onEditCard={onEditCard}
@@ -438,8 +436,6 @@ export function SortableGrid({
                       category={cat}
                       cards={catCards}
                       editMode={editMode}
-                      widthPercent={categoryWidths[cat.id]}
-                      defaultWidthPercent={getDefaultWidthPercent(catCards.length)}
                       onEditCategory={onEditCategory}
                       onAddCard={onAddCard}
                       onEditCard={onEditCard}
@@ -688,8 +684,6 @@ interface SortableSubGroupBlockProps {
   category: Category;
   cards: WebCard[];
   editMode: boolean;
-  widthPercent?: number;
-  defaultWidthPercent: number;
   onEditCategory?: (category: Category) => void;
   onAddCard?: (categoryId?: string) => void;
   onEditCard?: (card: WebCard) => void;
@@ -701,8 +695,6 @@ function SortableSubGroupBlock({
   category,
   cards,
   editMode,
-  widthPercent: storedWidth,
-  defaultWidthPercent,
   onEditCategory,
   onAddCard,
   onEditCard,
@@ -718,59 +710,18 @@ function SortableSubGroupBlock({
     isDragging,
   } = useSortable({ id: subId(category.id) });
 
-  const { setCategoryWidth } = useAppStore();
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [localWidth, setLocalWidth] = useState<number | null>(null);
-
-  const widthPercent = localWidth ?? storedWidth ?? defaultWidthPercent;
+  const setRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      setNodeRef(node);
+    },
+    [setNodeRef]
+  );
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.4 : 1,
-    width: `calc(${widthPercent}% - 6px)`,
   };
-
-  const handleResizeStart = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const container = containerRef.current;
-      if (!container) return;
-      const parentEl = container.parentElement;
-      if (!parentEl) return;
-      const startX = e.clientX;
-      const startWidth = container.offsetWidth;
-      const parentWidth = parentEl.offsetWidth;
-
-      const handleMouseMove = (ev: MouseEvent) => {
-        const dx = ev.clientX - startX;
-        const newPercent = Math.max(15, Math.min(100, ((startWidth + dx) / parentWidth) * 100));
-        setLocalWidth(newPercent);
-      };
-
-      const handleMouseUp = () => {
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
-        setLocalWidth((prev) => {
-          if (prev !== null) setCategoryWidth(category.id, prev);
-          return prev;
-        });
-      };
-
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-    },
-    [category.id, setCategoryWidth]
-  );
-
-  const setRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      containerRef.current = node;
-      setNodeRef(node);
-    },
-    [setNodeRef]
-  );
 
   return (
     <div
@@ -855,14 +806,6 @@ function SortableSubGroupBlock({
         </div>
       </SortableContext>
 
-      {/* Resize handle - right edge */}
-      {editMode && (
-        <div
-          className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize
-            hover:bg-primary/20 active:bg-primary/30 transition-colors rounded-r-md"
-          onMouseDown={handleResizeStart}
-        />
-      )}
     </div>
   );
 }
@@ -872,8 +815,6 @@ interface SortableUngroupedBlockProps {
   category: Category;
   cards: WebCard[];
   editMode: boolean;
-  widthPercent?: number;
-  defaultWidthPercent: number;
   onEditCategory?: (category: Category) => void;
   onAddCard?: (categoryId?: string) => void;
   onEditCard?: (card: WebCard) => void;
@@ -884,8 +825,6 @@ function SortableUngroupedBlock({
   category,
   cards,
   editMode,
-  widthPercent: storedWidth,
-  defaultWidthPercent,
   onEditCategory,
   onAddCard,
   onEditCard,
@@ -900,15 +839,8 @@ function SortableUngroupedBlock({
     isDragging,
   } = useSortable({ id: ungroupId(category.id) });
 
-  const { setCategoryWidth } = useAppStore();
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [localWidth, setLocalWidth] = useState<number | null>(null);
-
-  const widthPercent = localWidth ?? storedWidth ?? defaultWidthPercent;
-
   const setRef = useCallback(
     (node: HTMLDivElement | null) => {
-      containerRef.current = node;
       setNodeRef(node);
     },
     [setNodeRef]
@@ -918,47 +850,13 @@ function SortableUngroupedBlock({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.4 : 1,
-    width: `calc(${widthPercent}% - 6px)`,
   };
-
-  const handleResizeStart = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const container = containerRef.current;
-      if (!container) return;
-      const parentEl = container.parentElement;
-      if (!parentEl) return;
-      const startX = e.clientX;
-      const startWidth = container.offsetWidth;
-      const parentWidth = parentEl.offsetWidth;
-
-      const handleMouseMove = (ev: MouseEvent) => {
-        const dx = ev.clientX - startX;
-        const newPercent = Math.max(15, Math.min(100, ((startWidth + dx) / parentWidth) * 100));
-        setLocalWidth(newPercent);
-      };
-
-      const handleMouseUp = () => {
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
-        setLocalWidth((prev) => {
-          if (prev !== null) setCategoryWidth(category.id, prev);
-          return prev;
-        });
-      };
-
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-    },
-    [category.id, setCategoryWidth]
-  );
 
   return (
     <div
       ref={setRef}
       style={style}
-      className="relative rounded-md border border-border/40 bg-background"
+      className="rounded-md border border-border/40 bg-background flex-shrink-0"
     >
       {/* Header - buttons right next to title */}
       <div className="flex items-center gap-1.5 px-2.5 py-1.5 flex-wrap">
@@ -1027,15 +925,6 @@ function SortableUngroupedBlock({
           )}
         </div>
       </SortableContext>
-
-      {/* Resize handle - right edge */}
-      {editMode && (
-        <div
-          className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize
-            hover:bg-primary/20 active:bg-primary/30 transition-colors rounded-r-md"
-          onMouseDown={handleResizeStart}
-        />
-      )}
     </div>
   );
 }
