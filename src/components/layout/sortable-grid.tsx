@@ -7,13 +7,16 @@ import { Pencil, Plus, GripVertical, ArrowUpFromLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DndContext,
-  closestCenter,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
   DragEndEvent,
-  useDroppable,
+  DragOverEvent,
+  DragStartEvent,
+  pointerWithin,
+  rectIntersection,
+  CollisionDetection,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -27,7 +30,18 @@ import type { Category, WebCard } from "@/lib/types";
 const catId = (id: string) => `cat:${id}`;
 const cardId = (id: string) => `card:${id}`;
 const ungroupId = (id: string) => `ungrouped:${id}`;
-const dropParentId = (id: string) => `drop-parent:${id}`;
+
+// ============ Custom collision detection ============
+// Use rectIntersection which works across all droppables in the DndContext,
+// not just within a single SortableContext.
+const collisionDetection: CollisionDetection = (args) => {
+  // First try pointerWithin for precise pointer-over detection
+  const pointerCollisions = pointerWithin(args);
+  if (pointerCollisions.length > 0) return pointerCollisions;
+
+  // Fallback to rectIntersection for broader detection
+  return rectIntersection(args);
+};
 
 // ============ Props ============
 interface SortableGridProps {
@@ -56,6 +70,7 @@ export function SortableGrid({
   } = useAppStore();
 
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -102,58 +117,83 @@ export function SortableGrid({
     [cards, searchQuery]
   );
 
-  // Sortable IDs
-  const parentCatIds = useMemo(
-    () => parentCategories.map((c) => catId(c.id)),
-    [parentCategories]
-  );
+  // All top-level sortable IDs: parent categories + ungrouped categories
+  // SINGLE SortableContext so collision detection works across all of them
+  const allTopLevelIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const parent of parentCategories) {
+      ids.push(catId(parent.id));
+    }
+    for (const standalone of standaloneCategories) {
+      ids.push(ungroupId(standalone.id));
+    }
+    return ids;
+  }, [parentCategories, standaloneCategories]);
 
-  const ungroupedCatIds = useMemo(
-    () => standaloneCategories.map((c) => ungroupId(c.id)),
-    [standaloneCategories]
-  );
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(String(event.active.id));
+  };
 
-  const allCardIds = useMemo(
-    () => cards.map((c) => cardId(c.id)),
-    [cards]
-  );
+  // Track which parent category is being hovered over (for visual highlight)
+  const [hoveredParentId, setHoveredParentId] = useState<string | null>(null);
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
+    if (!over) {
+      setHoveredParentId(null);
+      return;
+    }
 
     const activeId = String(active.id);
     const overId = String(over.id);
 
-    // Ungrouped category dropped on parent drop zone → demotion
-    if (activeId.startsWith("ungrouped:") && overId.startsWith("drop-parent:")) {
-      const categoryId = activeId.replace("ungrouped:", "");
-      const parentId = overId.replace("drop-parent:", "");
+    // When an ungrouped item hovers over a parent category, highlight it
+    if (activeId.startsWith("ungrouped:") && overId.startsWith("cat:")) {
+      const parentId = overId.replace("cat:", "");
+      setHoveredParentId(parentId);
+    } else {
+      setHoveredParentId(null);
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+    setHoveredParentId(null);
+
+    if (!over || active.id === over.id) return;
+
+    const activeIdStr = String(active.id);
+    const overIdStr = String(over.id);
+
+    // ===== Ungrouped → Parent category: demotion =====
+    if (activeIdStr.startsWith("ungrouped:") && overIdStr.startsWith("cat:")) {
+      const categoryId = activeIdStr.replace("ungrouped:", "");
+      const parentId = overIdStr.replace("cat:", "");
       moveCategoryToParent(categoryId, parentId);
       return;
     }
 
-    // Ungrouped category reorder within "未分类"
-    if (activeId.startsWith("ungrouped:") && overId.startsWith("ungrouped:")) {
-      const activeCatId = activeId.replace("ungrouped:", "");
-      const overCatId = overId.replace("ungrouped:", "");
+    // ===== Ungrouped → Ungrouped: reorder within "未分类" =====
+    if (activeIdStr.startsWith("ungrouped:") && overIdStr.startsWith("ungrouped:")) {
+      const activeCatId = activeIdStr.replace("ungrouped:", "");
+      const overCatId = overIdStr.replace("ungrouped:", "");
       const ordered = [...standaloneCategories];
       const oldIndex = ordered.findIndex((c) => c.id === activeCatId);
       const newIndex = ordered.findIndex((c) => c.id === overCatId);
       if (oldIndex !== -1 && newIndex !== -1) {
         const [moved] = ordered.splice(oldIndex, 1);
         ordered.splice(newIndex, 0, moved);
-        // Update order
         const { reorderCategories } = useAppStore.getState();
         reorderCategories(ordered.map((c) => c.id));
       }
       return;
     }
 
-    // Parent category reorder
-    if (activeId.startsWith("cat:") && overId.startsWith("cat:")) {
-      const activeCatId = activeId.replace("cat:", "");
-      const overCatId = overId.replace("cat:", "");
+    // ===== Parent → Parent: reorder parent categories =====
+    if (activeIdStr.startsWith("cat:") && overIdStr.startsWith("cat:")) {
+      const activeCatId = activeIdStr.replace("cat:", "");
+      const overCatId = overIdStr.replace("cat:", "");
       const orderedCats = [...parentCategories];
       const oldIndex = orderedCats.findIndex((c) => c.id === activeCatId);
       const newIndex = orderedCats.findIndex((c) => c.id === overCatId);
@@ -166,10 +206,10 @@ export function SortableGrid({
       return;
     }
 
-    // Card reorder / cross-category
-    if (activeId.startsWith("card:") && overId.startsWith("card:")) {
-      const activeCardId = activeId.replace("card:", "");
-      const overCardId = overId.replace("card:", "");
+    // ===== Card → Card: reorder / cross-category =====
+    if (activeIdStr.startsWith("card:") && overIdStr.startsWith("card:")) {
+      const activeCardId = activeIdStr.replace("card:", "");
+      const overCardId = overIdStr.replace("card:", "");
       const overCard = cards.find((c) => c.id === overCardId);
       if (overCard) {
         moveCard(activeCardId, overCard.categoryId, overCard.order);
@@ -177,24 +217,33 @@ export function SortableGrid({
       return;
     }
 
-    // Card dropped on category title (parent or ungrouped)
-    if (activeId.startsWith("card:") && (overId.startsWith("cat:") || overId.startsWith("ungrouped:"))) {
-      const activeCardId = activeId.replace("card:", "");
-      const targetCatId = overId.replace("cat:", "").replace("ungrouped:", "");
+    // ===== Card → Category header (parent or ungrouped) =====
+    if (activeIdStr.startsWith("card:") && (overIdStr.startsWith("cat:") || overIdStr.startsWith("ungrouped:"))) {
+      const activeCardId = activeIdStr.replace("card:", "");
+      const targetCatId = overIdStr.replace("cat:", "").replace("ungrouped:", "");
       moveCard(activeCardId, targetCatId, 0);
       return;
     }
   };
 
+  const handleDragCancel = () => {
+    setActiveId(null);
+    setHoveredParentId(null);
+  };
+
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={collisionDetection}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
     >
-      <div className="space-y-4 p-4">
-        {/* ====== Top section: Parent categories with sub-groups ====== */}
-        <SortableContext items={parentCatIds} strategy={verticalListSortingStrategy}>
+      {/* Single SortableContext for ALL top-level items (parents + ungrouped) */}
+      <SortableContext items={allTopLevelIds} strategy={verticalListSortingStrategy}>
+        <div className="space-y-4 p-4">
+          {/* ====== Top section: Parent categories with sub-groups ====== */}
           {parentCategories.map((parent) => {
             const subGroups = getSubGroups(parent.id);
 
@@ -204,13 +253,17 @@ export function SortableGrid({
                 category={parent}
                 isParent
                 editMode={editMode}
+                isHovered={hoveredParentId === parent.id}
+                isDraggingActive={activeId !== null}
                 onEditCategory={onEditCategory}
                 onAddCard={onAddCard}
                 onAddGroup={onAddGroup}
-                onDetachCategory={detachCategoryFromParent}
               >
-                {/* Droppable zone for demotion */}
-                {editMode && <ParentDropZone parentId={parent.id} />}
+                {editMode && hoveredParentId === parent.id && (
+                  <div className="rounded-md border-2 border-dashed border-primary bg-primary/10 mb-2 flex items-center justify-center py-2">
+                    <span className="text-[10px] text-primary font-medium">释放以降级到此分类</span>
+                  </div>
+                )}
 
                 <div className="space-y-3">
                   {subGroups.map((sub) => (
@@ -231,33 +284,36 @@ export function SortableGrid({
                   {subGroups.length === 0 && !editMode && (
                     <p className="text-[10px] text-muted-foreground py-1">暂无分组</p>
                   )}
+                  {subGroups.length === 0 && editMode && hoveredParentId !== parent.id && (
+                    <div className="rounded-md border-2 border-dashed border-muted-foreground/20 mb-2 flex items-center justify-center py-1.5">
+                      <span className="text-[10px] text-muted-foreground/40">拖入分组到此分类</span>
+                    </div>
+                  )}
                 </div>
               </SortableCategoryBlock>
             );
           })}
-        </SortableContext>
 
-        {/* ====== Bottom section: "未分类" with standalone categories ====== */}
-        {standaloneCategories.length > 0 && (
-          <div className="rounded-lg border border-dashed border-border/60 bg-muted/20">
-            {/* Section header */}
-            <div className="flex items-center gap-2 px-3 py-2 border-b border-border/30">
-              <span className="text-xs font-semibold text-muted-foreground">
-                未分类
-              </span>
-              <span className="text-[10px] text-muted-foreground/60">
-                ({standaloneCategories.length} 个分组)
-              </span>
-              {editMode && (
-                <span className="text-[10px] text-muted-foreground/50 ml-1">
-                  — 拖入上方分类即可降级为分组
+          {/* ====== Bottom section: "未分类" with standalone categories ====== */}
+          {standaloneCategories.length > 0 && (
+            <div className="rounded-lg border border-dashed border-border/60 bg-muted/20">
+              {/* Section header */}
+              <div className="flex items-center gap-2 px-3 py-2 border-b border-border/30">
+                <span className="text-xs font-semibold text-muted-foreground">
+                  未分类
                 </span>
-              )}
-            </div>
+                <span className="text-[10px] text-muted-foreground/60">
+                  ({standaloneCategories.length} 个分组)
+                </span>
+                {editMode && (
+                  <span className="text-[10px] text-muted-foreground/50 ml-1">
+                    — 拖入上方分类即可降级为分组
+                  </span>
+                )}
+              </div>
 
-            {/* Standalone categories as cards */}
-            <div className="p-3 space-y-2">
-              <SortableContext items={ungroupedCatIds} strategy={verticalListSortingStrategy}>
+              {/* Standalone categories */}
+              <div className="p-3 space-y-2">
                 {standaloneCategories.map((cat) => {
                   const catCards = getCardsForCategory(cat.id);
                   return (
@@ -271,40 +327,16 @@ export function SortableGrid({
                       onAddCard={onAddCard}
                       onEditCard={onEditCard}
                       onDeleteCard={onDeleteCard}
-                      allCardIds={allCardIds}
                       setEditingCategoryId={setEditingCategoryId}
                     />
                   );
                 })}
-              </SortableContext>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      </SortableContext>
     </DndContext>
-  );
-}
-
-// ============ Droppable zone for demotion (inside parent category) ============
-function ParentDropZone({ parentId }: { parentId: string }) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: dropParentId(parentId),
-  });
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={`
-        rounded-md border-2 border-dashed transition-colors mb-2
-        flex items-center justify-center py-1.5
-        ${isOver
-          ? "border-primary bg-primary/10 text-primary"
-          : "border-muted-foreground/20 text-muted-foreground/40"
-        }
-      `}
-    >
-      <span className="text-[10px]">拖入分组到此处</span>
-    </div>
   );
 }
 
@@ -313,10 +345,11 @@ interface SortableCategoryBlockProps {
   category: Category;
   isParent?: boolean;
   editMode: boolean;
+  isHovered?: boolean;
+  isDraggingActive?: boolean;
   onEditCategory?: (category: Category) => void;
   onAddCard?: (categoryId?: string) => void;
   onAddGroup?: (parentId?: string) => void;
-  onDetachCategory?: (categoryId: string) => void;
   children: React.ReactNode;
 }
 
@@ -324,6 +357,8 @@ function SortableCategoryBlock({
   category,
   isParent,
   editMode,
+  isHovered,
+  isDraggingActive,
   onEditCategory,
   onAddCard,
   onAddGroup,
@@ -341,14 +376,17 @@ function SortableCategoryBlock({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.4 : 1,
   };
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className="rounded-lg border border-border bg-card"
+      className={`
+        rounded-lg border bg-card transition-colors
+        ${isHovered ? "border-primary border-2 shadow-md" : "border-border"}
+      `}
     >
       {/* Category header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50">
@@ -371,6 +409,13 @@ function SortableCategoryBlock({
         <span className="text-sm font-semibold text-foreground font-serif">
           {category.name}
         </span>
+
+        {/* Drop hint when dragging an ungrouped item */}
+        {isDraggingActive && isParent && !isHovered && (
+          <span className="text-[10px] text-muted-foreground/50 ml-1">
+            拖入分组到此分类
+          </span>
+        )}
 
         {/* Action buttons */}
         {editMode && (
@@ -532,7 +577,6 @@ interface SortableUngroupedBlockProps {
   onAddCard?: (categoryId?: string) => void;
   onEditCard?: (card: WebCard) => void;
   onDeleteCard?: (card: WebCard) => void;
-  allCardIds: string[];
   setEditingCategoryId: (id: string | null) => void;
 }
 
@@ -561,7 +605,7 @@ function SortableUngroupedBlock({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.4 : 1,
   };
 
   return (
@@ -678,7 +722,7 @@ function SortableCard({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.4 : 1,
   };
 
   return (
