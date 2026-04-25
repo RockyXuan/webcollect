@@ -1,4 +1,8 @@
-# 项目上下文
+# WebCollect — 个人网页收藏墙
+
+## 项目概览
+
+WebCollect 是一个美观、可拖拽的网页收藏与导览门户。用户可以把喜欢的网站像便签一样贴在墙上，支持分类管理、跨分类拖拽、自动抓取网页元数据（Open Graph）。
 
 ### 版本技术栈
 
@@ -7,59 +11,117 @@
 - **Language**: TypeScript 5
 - **UI 组件**: shadcn/ui (基于 Radix UI)
 - **Styling**: Tailwind CSS 4
+- **状态管理**: Zustand
+- **拖拽**: @dnd-kit/core + @dnd-kit/sortable
+- **本地存储**: IndexedDB (localforage)
+- **OG 抓取**: cheerio (后端 API)
 
 ## 目录结构
 
 ```
-├── public/                 # 静态资源
-├── scripts/                # 构建与启动脚本
-│   ├── build.sh            # 构建脚本
-│   ├── dev.sh              # 开发环境启动脚本
-│   ├── prepare.sh          # 预处理脚本
-│   └── start.sh            # 生产环境启动脚本
+├── public/                     # 静态资源
+├── scripts/                    # 构建与启动脚本
 ├── src/
-│   ├── app/                # 页面路由与布局
-│   ├── components/ui/      # Shadcn UI 组件库
-│   ├── hooks/              # 自定义 Hooks
-│   ├── lib/                # 工具库
-│   │   └── utils.ts        # 通用工具函数 (cn)
-│   └── server.ts           # 自定义服务端入口
-├── next.config.ts          # Next.js 配置
-├── package.json            # 项目依赖管理
-└── tsconfig.json           # TypeScript 配置
+│   ├── app/
+│   │   ├── api/fetch-meta/     # OG 信息抓取 API
+│   │   ├── layout.tsx          # 根布局 + metadata
+│   │   ├── page.tsx            # 主页面（导航墙）
+│   │   └── globals.css         # 主题变量 + Tailwind
+│   ├── components/
+│   │   ├── ui/                 # shadcn/ui 基础组件
+│   │   ├── card/web-card.tsx   # 网站卡片组件
+│   │   ├── layout/sortable-grid.tsx  # 拖拽网格布局
+│   │   ├── nav/top-nav.tsx     # 顶部导航 + 搜索
+│   │   ├── nav/category-tabs.tsx     # 分类 Tab 栏
+│   │   └── dialogs/            # 添加/编辑弹窗
+│   ├── lib/
+│   │   ├── types.ts            # TypeScript 类型定义
+│   │   ├── db.ts               # IndexedDB 封装
+│   │   ├── store.ts            # Zustand 状态管理
+│   │   ├── seed.ts             # 默认示例数据
+│   │   ├── icons.ts            # Lucide 图标动态获取
+│   │   └── utils.ts            # 通用工具函数 (cn)
+│   └── hooks/                  # 自定义 Hooks
+├── next.config.ts
+├── package.json
+└── tsconfig.json
 ```
 
-- 项目文件（如 app 目录、pages 目录、components 等）默认初始化到 `src/` 目录下。
+## 构建和测试命令
 
-## 包管理规范
+```bash
+# 开发（端口 5000，含 HMR）
+pnpm dev
 
-**仅允许使用 pnpm** 作为包管理器，**严禁使用 npm 或 yarn**。
-**常用命令**：
-- 安装依赖：`pnpm add <package>`
-- 安装开发依赖：`pnpm add -D <package>`
-- 安装所有依赖：`pnpm install`
-- 移除依赖：`pnpm remove <package>`
+# 构建
+pnpm build
 
-## 开发规范
+# 类型检查
+pnpm ts-check
 
-### 编码规范
+# 代码检查
+pnpm lint
+```
 
-- 默认按 TypeScript `strict` 心智写代码；优先复用当前作用域已声明的变量、函数、类型和导入，禁止引用未声明标识符或拼错变量名。
-- 禁止隐式 `any` 和 `as any`；函数参数、返回值、解构项、事件对象、`catch` 错误在使用前应有明确类型或先完成类型收窄，并清理未使用的变量和导入。
+## 核心功能模块
 
-### next.config 配置规范
+| 模块 | 文件 | 说明 |
+|------|------|------|
+| 数据层 | `src/lib/db.ts` | IndexedDB 操作：卡片/分类的 CRUD、导入导出 |
+| 状态管理 | `src/lib/store.ts` | Zustand Store：全局状态、搜索、分类过滤、拖拽重排 |
+| 卡片组件 | `src/components/card/web-card.tsx` | 卡片 UI：图片、名称、简介、Hover 展开详情、操作按钮 |
+| 拖拽布局 | `src/components/layout/sortable-grid.tsx` | @dnd-kit 实现网格拖拽、跨分类移动 |
+| 添加/编辑 | `src/components/dialogs/card-dialog.tsx` | 弹窗表单：URL、自动抓取、手动编辑 |
+| 分类管理 | `src/components/dialogs/category-dialog.tsx` | 分类创建/编辑：名称、图标（12 种）、颜色（8 种） |
+| OG 抓取 | `src/app/api/fetch-meta/route.ts` | POST {url} → 解析 title/description/image/favicon |
 
-- 配置的路径不要写死绝对路径，必须使用 path.resolve(__dirname, ...)、import.meta.dirname 或 process.cwd() 动态拼接。
+## 关键数据类型
 
-### Hydration 问题防范
+```ts
+interface WebCard {
+  id: string;
+  url: string;
+  title: string;
+  shortDesc: string;    // 一句话简介（约 7-8 字）
+  fullDesc: string;     // 详细介绍（Hover 显示）
+  note: string;         // 备注
+  abbreviation: string; // 简写
+  imageUrl: string;
+  categoryId: string;
+  order: number;
+}
 
-1. 严禁在 JSX 渲染逻辑中直接使用 typeof window、Date.now()、Math.random() 等动态数据。**必须使用 'use client' 并配合 useEffect + useState 确保动态内容仅在客户端挂载后渲染**；同时严禁非法 HTML 嵌套（如 <p> 嵌套 <div>）。
-2. **禁止使用 head 标签**，优先使用 metadata，详见文档：https://nextjs.org/docs/app/api-reference/functions/generate-metadata
-   1. 三方 CSS、字体等资源可在 `globals.css` 中顶部通过 `@import` 引入或使用 next/font
-   2. preload, preconnect, dns-prefetch 通过 ReactDOM 的 preload、preconnect、dns-prefetch 方法引入
-   3. json-ld 可阅读 https://nextjs.org/docs/app/guides/json-ld
+interface Category {
+  id: string;
+  name: string;
+  icon: string;   // lucide icon name
+  color: string;  // hex color
+  order: number;
+}
+```
 
-## UI 设计与组件规范 (UI & Styling Standards)
+## 代码风格指南
 
-- 模板默认预装核心组件库 `shadcn/ui`，位于`src/components/ui/`目录下
-- Next.js 项目**必须默认**采用 shadcn/ui 组件、风格和规范，**除非用户指定用其他的组件和规范。**
+- 默认按 TypeScript `strict` 心智写代码
+- 禁止隐式 `any`
+- 组件文件使用 `"use client"` 标记客户端组件
+- 颜色使用 Tailwind 语义化变量（`bg-card`, `text-foreground` 等）
+- 字体使用 `font-serif`（Noto Serif SC）用于标题，`font-sans` 用于正文
+
+## Chrome 插件预留
+
+- 数据操作通过 `store.ts` 抽象，未来可替换底层为 Chrome Storage API
+- 卡片数据格式标准化（UUID、创建时间、标签、URL、元数据）
+- 导入/导出 JSON 功能已就绪，便于插件数据迁移
+- 抓取逻辑通过后端 API 实现，插件版可直接通过 content script 读取 tab 信息
+
+## 常见问题
+
+### 拖拽时卡片闪烁/跳动
+检查 `SortableContext` 的 `items` 是否正确更新，确保 `order` 字段在拖拽后重新排序。
+
+### OG 抓取失败
+部分网站有反爬虫机制或需要特定 User-Agent。已在 `fetch-meta` 中设置浏览器 UA 和 8s 超时。
+
+### 图片跨域不显示
+外部图片通过 `<img>` 标签直接加载，若网站禁止跨域则显示缩写占位。生产环境可配置图床代理。
