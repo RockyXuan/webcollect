@@ -4,6 +4,7 @@ import { useMemo, useCallback, useEffect, useRef, useState } from "react";
 import { hotSites, extraHotSites, hotSiteCategories } from "@/lib/hot-sites";
 import type { HotSite } from "@/lib/hot-sites";
 import type { SafetyCheckResult } from "@/lib/types";
+import { HIDE_DURATION_LABELS, type HideDuration } from "@/lib/types";
 import { useAppStore } from "@/lib/store";
 import {
   Inbox,
@@ -16,9 +17,8 @@ import {
   ChevronRight,
   RefreshCw,
   EyeOff,
-  Eye,
+  Settings,
 } from "lucide-react";
-import { HIDE_DURATION_LABELS, type HideDuration } from "@/lib/types";
 
 /* ── safety badge ── */
 function SafetyBadge({ status }: { status: SafetyCheckResult | undefined }) {
@@ -37,35 +37,121 @@ function SafetyBadge({ status }: { status: SafetyCheckResult | undefined }) {
   );
 }
 
+/* ── Settings panel ── */
+function SettingsPanel({
+  open,
+  onClose,
+  defaultDuration,
+  onDurationChange,
+  totalNew,
+  totalAdded,
+  totalHidden,
+  onSafetyCheck,
+  checking,
+}: {
+  open: boolean;
+  onClose: () => void;
+  defaultDuration: HideDuration;
+  onDurationChange: (d: HideDuration) => void;
+  totalNew: number;
+  totalAdded: number;
+  totalHidden: number;
+  onSafetyCheck: () => void;
+  checking: boolean;
+}) {
+  if (!open) return null;
+
+  return (
+    <div className="absolute right-0 top-8 z-30 bg-popover border border-border rounded-lg shadow-lg py-2 min-w-[180px]">
+      <div className="px-3 py-1 text-xs font-semibold border-b border-border/30 text-foreground">
+        推荐设置
+      </div>
+
+      {/* Statistics */}
+      <div className="px-3 py-2 border-b border-border/20">
+        <div className="text-[10px] text-muted-foreground mb-1">统计</div>
+        <div className="flex gap-3 text-[11px]">
+          <span className="text-emerald-600/80">{totalNew} 可添加</span>
+          <span className="text-muted-foreground">{totalAdded} 已添加</span>
+          <span className="text-muted-foreground/60">{totalHidden} 已隐藏</span>
+        </div>
+      </div>
+
+      {/* Hide duration setting */}
+      <div className="px-3 py-2 border-b border-border/20">
+        <div className="text-[10px] text-muted-foreground mb-1.5">默认屏蔽时长</div>
+        <div className="space-y-1">
+          {(Object.entries(HIDE_DURATION_LABELS) as [HideDuration, string][]).map(
+            ([val, label]) => (
+              <label
+                key={val}
+                className="flex items-center gap-2 text-[11px] cursor-pointer hover:bg-muted/30 px-1 py-0.5 rounded"
+              >
+                <input
+                  type="radio"
+                  name="hideDuration"
+                  checked={defaultDuration === val}
+                  onChange={() => onDurationChange(val)}
+                  className="accent-primary"
+                />
+                {label}
+              </label>
+            ),
+          )}
+        </div>
+      </div>
+
+      {/* Safety scan */}
+      <div className="px-3 py-2">
+        <button
+          onClick={onSafetyCheck}
+          disabled={checking}
+          className="w-full text-[11px] px-2 py-1.5 rounded-md border border-border/50 hover:bg-muted/50 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+        >
+          <Shield className="h-3 w-3" />
+          {checking ? "扫描中..." : "安全扫描"}
+        </button>
+      </div>
+
+      <button
+        onClick={onClose}
+        className="w-full text-[10px] text-muted-foreground hover:text-foreground py-1 transition-colors"
+      >
+        关闭
+      </button>
+    </div>
+  );
+}
+
 /* ── Category group with smart collapse ── */
 interface CategoryGroupProps {
   catName: string;
   newSites: HotSite[];
   addedSites: HotSite[];
+  hiddenCount: number;
   safetyMap: Record<string, SafetyCheckResult>;
   isSiteAdded: (site: HotSite) => boolean;
-  isSiteHidden: (siteId: string) => boolean;
   onQuickAdd: (site: HotSite) => void;
   onAddToCategory: (site: HotSite, categoryId: string) => void;
-  onHideSite: (siteId: string, siteUrl: string, duration: HideDuration) => void;
-  onUnhideSite: (siteId: string) => void;
+  onHideSite: (siteId: string, siteUrl: string) => void;
   categories: { id: string; name: string }[];
   allAdded: boolean;
+  defaultHideDuration: HideDuration;
 }
 
 function CategoryGroup({
   catName,
   newSites,
   addedSites,
+  hiddenCount,
   safetyMap,
   isSiteAdded,
-  isSiteHidden,
   onQuickAdd,
   onAddToCategory,
   onHideSite,
-  onUnhideSite,
   categories,
   allAdded,
+  defaultHideDuration,
 }: CategoryGroupProps) {
   const [showAdded, setShowAdded] = useState(false);
 
@@ -101,7 +187,7 @@ function CategoryGroup({
   return (
     <div className="rounded-lg border border-border/40 bg-card/50 p-2.5">
       {/* header */}
-      <div className="flex items-center gap-1.5 mb-2">
+      <div className="flex items-center gap-1.5 mb-2 flex-wrap">
         <span className="text-xs font-semibold">{catName}</span>
         <span className="text-[10px] text-emerald-600/70">{newSites.length} 可添加</span>
         {addedSites.length > 0 && (
@@ -117,9 +203,14 @@ function CategoryGroup({
             已添加 {addedSites.length}
           </button>
         )}
+        {hiddenCount > 0 && (
+          <span className="text-[10px] text-muted-foreground/50 ml-1">
+            不感兴趣 {hiddenCount}
+          </span>
+        )}
       </div>
 
-      {/* new (unadded) sites */}
+      {/* new (unadded) sites - hidden sites are NOT shown */}
       <div className="space-y-1">
         {newSites.map((site) => (
           <NewSiteItem
@@ -129,9 +220,8 @@ function CategoryGroup({
             onQuickAdd={onQuickAdd}
             onAddToCategory={onAddToCategory}
             onHideSite={onHideSite}
-            onUnhideSite={onUnhideSite}
-            isHidden={isSiteHidden(site.id)}
             categories={categories}
+            defaultHideDuration={defaultHideDuration}
           />
         ))}
       </div>
@@ -148,37 +238,6 @@ function CategoryGroup({
   );
 }
 
-/* ── Duration picker popup ── */
-function HideDurationPicker({
-  onPick,
-  onClose,
-}: {
-  onPick: (d: HideDuration) => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className="absolute right-0 top-7 z-20 bg-popover border border-border rounded-md shadow-md py-1 min-w-[90px]">
-      <div className="text-[10px] text-muted-foreground px-2 py-0.5 border-b border-border/30">
-        屏蔽时长
-      </div>
-      {(Object.entries(HIDE_DURATION_LABELS) as [HideDuration, string][]).map(
-        ([val, label]) => (
-          <button
-            key={val}
-            onClick={() => {
-              onPick(val);
-              onClose();
-            }}
-            className="w-full text-left text-[11px] px-2 py-1 hover:bg-muted/50 transition-colors"
-          >
-            {label}
-          </button>
-        ),
-      )}
-    </div>
-  );
-}
-
 /* ── New (unadded) site item ── */
 function NewSiteItem({
   site,
@@ -186,48 +245,17 @@ function NewSiteItem({
   onQuickAdd,
   onAddToCategory,
   onHideSite,
-  onUnhideSite,
-  isHidden,
   categories,
+  defaultHideDuration,
 }: {
   site: HotSite;
   safety: SafetyCheckResult | undefined;
   onQuickAdd: (site: HotSite) => void;
   onAddToCategory: (site: HotSite, categoryId: string) => void;
-  onHideSite: (siteId: string, siteUrl: string, duration: HideDuration) => void;
-  onUnhideSite: (siteId: string) => void;
-  isHidden: boolean;
+  onHideSite: (siteId: string, siteUrl: string) => void;
   categories: { id: string; name: string }[];
+  defaultHideDuration: HideDuration;
 }) {
-  const [showHidePicker, setShowHidePicker] = useState(false);
-
-  if (isHidden) {
-    return (
-      <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-muted/15 min-w-0 opacity-50">
-        <img
-          src={site.imageUrl}
-          alt=""
-          className="h-4 w-4 rounded-sm flex-shrink-0 grayscale"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = "none";
-          }}
-        />
-        <div className="flex-1 min-w-0">
-          <span className="text-[11px] text-muted-foreground truncate line-through">
-            {site.title}
-          </span>
-        </div>
-        <button
-          onClick={() => onUnhideSite(site.id)}
-          title="取消隐藏"
-          className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <Eye className="h-3 w-3" />
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-muted/40 hover:bg-muted/70 transition-colors group min-w-0">
       <img
@@ -272,21 +300,13 @@ function NewSiteItem({
               </option>
             ))}
         </select>
-        <div className="relative">
-          <button
-            onClick={() => setShowHidePicker(!showHidePicker)}
-            title="不感兴趣"
-            className="p-1 rounded hover:bg-muted/50 text-muted-foreground/60 hover:text-foreground transition-colors"
-          >
-            <EyeOff className="h-3 w-3" />
-          </button>
-          {showHidePicker && (
-            <HideDurationPicker
-              onPick={(duration) => onHideSite(site.id, site.url, duration)}
-              onClose={() => setShowHidePicker(false)}
-            />
-          )}
-        </div>
+        <button
+          onClick={() => onHideSite(site.id, site.url)}
+          title="可在'热门网站推荐设置'中选择屏蔽时长"
+          className="p-1 rounded hover:bg-muted/50 text-muted-foreground/60 hover:text-foreground transition-colors"
+        >
+          <EyeOff className="h-3 w-3" />
+        </button>
       </div>
     </div>
   );
@@ -331,13 +351,15 @@ export function HotRecommendation() {
   const addCard = useAppStore((s) => s.addCard);
   const hiddenSites = useAppStore((s) => s.hiddenSites);
   const hideSite = useAppStore((s) => s.hideSite);
-  const unhideSite = useAppStore((s) => s.unhideSite);
+  const defaultHideDuration = useAppStore((s) => s.defaultHideDuration);
+  const setDefaultHideDuration = useAppStore((s) => s.setDefaultHideDuration);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [safetyMap, setSafetyMap] = useState<Record<string, SafetyCheckResult>>({});
   const [checking, setChecking] = useState(false);
   const [addedUrls, setAddedUrls] = useState<Set<string>>(new Set());
   const [showExtra, setShowExtra] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   /* Combine main + extra sites */
   const allSites = useMemo(
@@ -391,23 +413,15 @@ export function HotRecommendation() {
     [hiddenSites],
   );
 
-  /* hide a site */
+  /* hide a site - uses default duration, no picker */
   const handleHideSite = useCallback(
-    (siteId: string, siteUrl: string, duration: HideDuration) => {
-      hideSite(siteId, siteUrl, duration);
+    (siteId: string, siteUrl: string) => {
+      hideSite(siteId, siteUrl, defaultHideDuration);
     },
-    [hideSite],
+    [hideSite, defaultHideDuration],
   );
 
-  /* unhide a site */
-  const handleUnhideSite = useCallback(
-    (siteId: string) => {
-      unhideSite(siteId);
-    },
-    [unhideSite],
-  );
-
-  /* group by category, split into new/added, sort: partial categories first, all-added last */
+  /* group by category, split into new/added, filter hidden, sort */
   const categorizedGroups = useMemo(() => {
     const filtered = searchQuery
       ? allSites.filter(
@@ -422,6 +436,7 @@ export function HotRecommendation() {
       catName: string;
       newSites: HotSite[];
       addedSites: HotSite[];
+      hiddenCount: number;
       allAdded: boolean;
     }[] = [];
 
@@ -432,11 +447,23 @@ export function HotRecommendation() {
       if (catSites.length === 0) continue;
       seenCats.add(catName);
 
-      const newSites = catSites.filter((s) => !isSiteAdded(s));
+      /* Split into added / hidden / new (visible, not added, not hidden) */
       const addedSites = catSites.filter((s) => isSiteAdded(s));
+      const hiddenSitesInCat = catSites.filter(
+        (s) => !isSiteAdded(s) && isSiteHidden(s.id),
+      );
+      const newSites = catSites.filter(
+        (s) => !isSiteAdded(s) && !isSiteHidden(s.id),
+      );
       const allAdded = newSites.length === 0;
 
-      groups.push({ catName, newSites, addedSites, allAdded });
+      groups.push({
+        catName,
+        newSites,
+        addedSites,
+        hiddenCount: hiddenSitesInCat.length,
+        allAdded,
+      });
     }
 
     /* handle any categories not in hotSiteCategories */
@@ -444,9 +471,20 @@ export function HotRecommendation() {
       if (!seenCats.has(site.category)) {
         seenCats.add(site.category);
         const catSites = filtered.filter((s) => s.category === site.category);
-        const newSites = catSites.filter((s) => !isSiteAdded(s));
         const addedSites = catSites.filter((s) => isSiteAdded(s));
-        groups.push({ catName: site.category, newSites, addedSites, allAdded: newSites.length === 0 });
+        const hiddenSitesInCat = catSites.filter(
+          (s) => !isSiteAdded(s) && isSiteHidden(s.id),
+        );
+        const newSites = catSites.filter(
+          (s) => !isSiteAdded(s) && !isSiteHidden(s.id),
+        );
+        groups.push({
+          catName: site.category,
+          newSites,
+          addedSites,
+          hiddenCount: hiddenSitesInCat.length,
+          allAdded: newSites.length === 0,
+        });
       }
     }
 
@@ -457,7 +495,7 @@ export function HotRecommendation() {
     });
 
     return groups;
-  }, [allSites, isSiteAdded, searchQuery]);
+  }, [allSites, isSiteAdded, isSiteHidden, searchQuery]);
 
   /* add to inbox */
   const handleQuickAdd = useCallback(
@@ -511,8 +549,9 @@ export function HotRecommendation() {
 
   /* safety check */
   const flatFiltered = useMemo(
-    () => allSites.filter((s) => !isSiteAdded(s)),
-    [allSites, isSiteAdded],
+    () =>
+      allSites.filter((s) => !isSiteAdded(s) && !isSiteHidden(s.id)),
+    [allSites, isSiteAdded, isSiteHidden],
   );
 
   const checkSafety = useCallback(async () => {
@@ -549,13 +588,17 @@ export function HotRecommendation() {
     }
   }, [flatFiltered.length, checkSafety]);
 
-  /* count new vs added across all */
+  /* count totals across all */
   const totalNew = useMemo(
     () => categorizedGroups.reduce((sum, g) => sum + g.newSites.length, 0),
     [categorizedGroups],
   );
   const totalAdded = useMemo(
     () => categorizedGroups.reduce((sum, g) => sum + g.addedSites.length, 0),
+    [categorizedGroups],
+  );
+  const totalHidden = useMemo(
+    () => categorizedGroups.reduce((sum, g) => sum + g.hiddenCount, 0),
     [categorizedGroups],
   );
 
@@ -568,9 +611,6 @@ export function HotRecommendation() {
         <h2 className="text-sm font-serif font-semibold flex items-center gap-1.5">
           <Shield className="h-4 w-4 text-primary" />
           热门网站推荐
-          <span className="text-[10px] text-muted-foreground font-normal ml-1">
-            {totalNew} 可添加 / {totalAdded} 已添加
-          </span>
         </h2>
         <div className="flex items-center gap-1.5">
           <input
@@ -588,14 +628,26 @@ export function HotRecommendation() {
             <RefreshCw className={`h-3 w-3 ${showExtra ? "text-primary" : ""}`} />
             {showExtra ? "收起" : "更多"}
           </button>
-          <button
-            onClick={checkSafety}
-            disabled={checking}
-            className="text-[10px] px-2 py-1 rounded-md border border-border/50 hover:bg-muted/50 transition-colors flex items-center gap-1 disabled:opacity-50"
-          >
-            <Shield className="h-3 w-3" />
-            {checking ? "扫描中..." : "安全扫描"}
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className="p-1.5 rounded-md border border-border/50 hover:bg-muted/50 transition-colors"
+              title="推荐设置"
+            >
+              <Settings className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+            <SettingsPanel
+              open={showSettings}
+              onClose={() => setShowSettings(false)}
+              defaultDuration={defaultHideDuration}
+              onDurationChange={setDefaultHideDuration}
+              totalNew={totalNew}
+              totalAdded={totalAdded}
+              totalHidden={totalHidden}
+              onSafetyCheck={checkSafety}
+              checking={checking}
+            />
+          </div>
         </div>
       </div>
 
@@ -608,6 +660,7 @@ export function HotRecommendation() {
                 s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 s.shortDesc.toLowerCase().includes(searchQuery.toLowerCase()),
             )
+            .filter((s) => !isSiteHidden(s.id))
             .map((site) => {
               const added = isSiteAdded(site);
               return added ? (
@@ -620,9 +673,8 @@ export function HotRecommendation() {
                   onQuickAdd={handleQuickAdd}
                   onAddToCategory={handleAddToCategory}
                   onHideSite={handleHideSite}
-                  onUnhideSite={handleUnhideSite}
-                  isHidden={isSiteHidden(site.id)}
                   categories={categories}
+                  defaultHideDuration={defaultHideDuration}
                 />
               );
             })}
@@ -636,15 +688,15 @@ export function HotRecommendation() {
               catName={group.catName}
               newSites={group.newSites}
               addedSites={group.addedSites}
+              hiddenCount={group.hiddenCount}
               safetyMap={safetyMap}
               isSiteAdded={isSiteAdded}
-              isSiteHidden={isSiteHidden}
               onQuickAdd={handleQuickAdd}
               onAddToCategory={handleAddToCategory}
               onHideSite={handleHideSite}
-              onUnhideSite={handleUnhideSite}
               categories={categories}
               allAdded={group.allAdded}
+              defaultHideDuration={defaultHideDuration}
             />
           ))}
         </div>

@@ -48,6 +48,10 @@ interface AppState {
   hideSite: (siteId: string, siteUrl: string, duration: HideDuration) => Promise<void>;
   unhideSite: (siteId: string) => Promise<void>;
   isSiteHidden: (siteId: string) => boolean;
+
+  // Settings
+  defaultHideDuration: HideDuration;
+  setDefaultHideDuration: (duration: HideDuration) => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -59,6 +63,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   isLoading: true,
   initialized: false,
   editMode: false,
+  defaultHideDuration: "1w" as HideDuration,
 
   loadData: async () => {
     set({ isLoading: true });
@@ -264,5 +269,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       "1m": 30 * 24 * 60 * 60 * 1000,
     };
     return now - entry.hiddenAt < (durationMs[entry.duration] || 0);
+  },
+
+  setDefaultHideDuration: (duration) => {
+    set({ defaultHideDuration: duration });
   },
 }));
