@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { TopNav } from "@/components/nav/top-nav";
 import { SortableGrid } from "@/components/layout/sortable-grid";
 import { CardDialog } from "@/components/dialogs/card-dialog";
 import { CategoryDialog } from "@/components/dialogs/category-dialog";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { useAppStore } from "@/lib/store";
 import { saveCards, saveCategories, setInitialized } from "@/lib/db";
 import { defaultCards, defaultCategories } from "@/lib/seed";
@@ -31,23 +32,24 @@ export default function HomePage() {
       }
     };
     init();
-  }, [loadData]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleAddCard = (categoryId?: string) => {
+  const handleAddCard = useCallback((categoryId?: string) => {
     setEditingCard(null);
     setDefaultCategoryId(categoryId || "");
     setCardDialogOpen(true);
-  };
+  }, []);
 
-  const handleEditCard = (card: WebCard) => {
+  const handleEditCard = useCallback((card: WebCard) => {
     setEditingCard(card);
+    setDefaultCategoryId("");
     setCardDialogOpen(true);
-  };
+  }, []);
 
-  const handleAddCategory = () => {
+  const handleAddCategory = useCallback(() => {
     setEditingCategory(null);
     setCategoryDialogOpen(true);
-  };
+  }, []);
 
   if (isLoading) {
     return (
@@ -65,13 +67,15 @@ export default function HomePage() {
       <TopNav onAddCard={handleAddCard} onManageCategories={handleAddCategory} />
 
       <main className="w-full px-3 sm:px-5 lg:px-6 py-4 space-y-4">
-        <SortableGrid
-          cards={cards}
-          categories={categories}
-          onEdit={handleEditCard}
-          onDelete={deleteCard}
-          onAdd={handleAddCard}
-        />
+        <ErrorBoundary>
+          <SortableGrid
+            cards={cards}
+            categories={categories}
+            onEdit={handleEditCard}
+            onDelete={deleteCard}
+            onAdd={handleAddCard}
+          />
+        </ErrorBoundary>
       </main>
 
       <footer className="border-t border-border/40 mt-8 py-4">
@@ -80,17 +84,21 @@ export default function HomePage() {
         </div>
       </footer>
 
-      <CardDialog
-        open={cardDialogOpen}
-        onOpenChange={setCardDialogOpen}
-        editingCard={editingCard}
-        defaultCategoryId={defaultCategoryId}
-      />
-      <CategoryDialog
-        open={categoryDialogOpen}
-        onOpenChange={setCategoryDialogOpen}
-        editingCategory={editingCategory}
-      />
+      <ErrorBoundary>
+        <CardDialog
+          open={cardDialogOpen}
+          onOpenChange={setCardDialogOpen}
+          editingCard={editingCard}
+          defaultCategoryId={defaultCategoryId}
+        />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <CategoryDialog
+          open={categoryDialogOpen}
+          onOpenChange={setCategoryDialogOpen}
+          editingCategory={editingCategory}
+        />
+      </ErrorBoundary>
     </div>
   );
 }

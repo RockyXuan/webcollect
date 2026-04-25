@@ -28,12 +28,13 @@ interface AppState {
   setSearchQuery: (q: string) => void;
   setActiveCategory: (id: string) => void;
   setEditMode: (v: boolean) => void;
+  toggleEditMode: () => void;
 
   addCard: (card: WebCard) => Promise<void>;
   updateCard: (card: WebCard) => Promise<void>;
   deleteCard: (id: string) => Promise<void>;
   moveCard: (cardId: string, targetCategoryId: string, newOrder: number) => Promise<void>;
-  reorderCards: (categoryId: string, orderedIds: string[]) => Promise<void>;
+  reorderCards: (cardId: string, targetCategoryId: string, newOrder: number) => Promise<void>;
 
   addCategory: (cat: Category) => Promise<void>;
   updateCategory: (cat: Category) => Promise<void>;
@@ -68,6 +69,7 @@ export const useAppStore = create<AppState>((set, _get) => ({
   setSearchQuery: (q) => set({ searchQuery: q }),
   setActiveCategory: (id) => set({ activeCategoryId: id }),
   setEditMode: (v) => set({ editMode: v }),
+  toggleEditMode: () => set((s) => ({ editMode: !s.editMode })),
 
   addCard: async (card) => {
     await dbAddCard(card);
@@ -93,30 +95,45 @@ export const useAppStore = create<AppState>((set, _get) => ({
     if (idx < 0) return;
 
     const updated = { ...cards[idx], categoryId: targetCategoryId, order: newOrder };
-    cards[idx] = updated;
 
     // Reorder others in target category
-    const sameCat = cards
-      .filter((c) => c.categoryId === targetCategoryId && c.id !== cardId)
-      .sort((a, b) => a.order - b.order);
+    const others = cards.filter((c) => c.categoryId === targetCategoryId && c.id !== cardId);
+    others.sort((a, b) => a.order - b.order);
 
-    sameCat.forEach((c, i) => {
-      c.order = i >= newOrder ? i + 1 : i;
+    // Insert updated card at newOrder position
+    others.splice(newOrder, 0, updated);
+    others.forEach((c, i) => {
+      c.order = i;
     });
 
-    await saveCards(cards);
+    // Save all
+    const allCards = cards.map((c) => {
+      if (c.id === cardId) return updated;
+      const reordered = others.find((o) => o.id === c.id);
+      return reordered ? { ...c, order: reordered.order, categoryId: reordered.categoryId } : c;
+    });
+
+    await saveCards(allCards);
     set({ cards: await getCards() });
   },
 
-  reorderCards: async (categoryId, orderedIds) => {
+  reorderCards: async (cardId, targetCategoryId, newOrder) => {
     const cards = await getCards();
-    orderedIds.forEach((id, order) => {
-      const card = cards.find((c) => c.id === id);
-      if (card) {
-        card.order = order;
-        card.categoryId = categoryId;
-      }
+    const cardIdx = cards.findIndex((c) => c.id === cardId);
+    if (cardIdx < 0) return;
+
+    // Update the card's category and order
+    cards[cardIdx] = { ...cards[cardIdx], categoryId: targetCategoryId, order: newOrder };
+
+    // Reindex all cards in the target category
+    const targetCards = cards
+      .filter((c) => c.categoryId === targetCategoryId)
+      .sort((a, b) => a.order - b.order);
+
+    targetCards.forEach((c, i) => {
+      c.order = i;
     });
+
     await saveCards(cards);
     set({ cards: await getCards() });
   },

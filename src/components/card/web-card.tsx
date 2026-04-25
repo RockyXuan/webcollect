@@ -1,193 +1,135 @@
 "use client";
 
-import { useState } from "react";
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card";
-import { ExternalLink, Pencil, Trash2, GripVertical } from "lucide-react";
+import React, { useState, useCallback } from "react";
+import { Pencil, Trash2, ExternalLink, GripVertical } from "lucide-react";
 import type { WebCard } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
-interface WebCardProps {
+interface WebCardItemProps {
   card: WebCard;
+  categoryColor: string;
   editMode: boolean;
-  onEdit: (card: WebCard) => void;
-  onDelete: (id: string) => void;
-  isDragging?: boolean;
-  dragHandleProps?: React.HTMLAttributes<HTMLElement>;
-  categoryColor?: string;
-}
-
-function getDomain(url: string): string {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return "";
-  }
-}
-
-function getFaviconUrl(url: string): string {
-  const domain = getDomain(url);
-  if (!domain) return "";
-  return `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+  onEdit: () => void;
+  onDelete: () => void;
+  dragListeners?: React.HTMLAttributes<HTMLElement> | null;
 }
 
 export function WebCardItem({
   card,
+  categoryColor,
   editMode,
   onEdit,
   onDelete,
-  isDragging,
-  dragHandleProps,
-  categoryColor,
-}: WebCardProps) {
-  const [imgFailed, setImgFailed] = useState(false);
-  const faviconUrl = getFaviconUrl(card.url);
-  const showImg = !!card.imageUrl && !imgFailed;
-  const accentColor = categoryColor || "#888";
+  dragListeners,
+}: WebCardItemProps) {
+  const [imgError, setImgError] = useState(false);
 
-  // Non-edit mode: whole card is draggable
-  const cardDragProps = !editMode ? dragHandleProps : {};
-  // Edit mode: only the grip handle is draggable
-  const handleDragProps = editMode ? dragHandleProps : {};
+  const handleClick = useCallback(() => {
+    if (editMode) return;
+    try {
+      window.open(card.url, "_blank", "noopener,noreferrer");
+    } catch {
+      // Fallback
+      window.location.href = card.url;
+    }
+  }, [editMode, card.url]);
 
-  const hasDetail = !!(card.fullDesc || card.note);
+  const displayAbbr = card.abbreviation || card.title?.slice(0, 2) || "?";
 
   const cardContent = (
     <div
-      {...cardDragProps}
-      className={cn(
-        "group relative flex items-center gap-2.5 rounded-lg border bg-card px-2.5 py-2 w-[200px] shrink-0 select-none",
-        "border-l-[3px]",
-        editMode
-          ? "border-t-primary/30 border-r-primary/30 border-b-primary/30 shadow-sm"
-          : "border-t-border border-r-border border-b-border hover:shadow-md",
-        isDragging && "opacity-60 rotate-1 scale-[1.02] shadow-lg ring-2 ring-primary/20",
-        !editMode && "cursor-grab active:cursor-grabbing"
-      )}
-      style={{ borderLeftColor: accentColor }}
+      className={`
+        group relative flex items-center gap-2 px-2.5 py-1.5
+        rounded-lg border transition-all select-none
+        ${editMode ? "cursor-default" : "cursor-pointer hover:bg-muted/50"}
+        hover:shadow-sm
+      `}
+      style={{ borderLeftWidth: "3px", borderLeftColor: categoryColor }}
+      onClick={handleClick}
     >
-      {/* Drag handle - edit mode only */}
+      {/* Drag handle in edit mode */}
       {editMode && (
-        <div
-          {...handleDragProps}
-          className="shrink-0 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-grab active:cursor-grabbing"
+        <span
+          className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-foreground"
+          {...(dragListeners || {})}
         >
           <GripVertical className="w-3 h-3" />
-        </div>
+        </span>
       )}
 
-      {/* Icon / Favicon / Abbreviation */}
-      <div className="shrink-0 w-8 h-8 rounded-md bg-muted/80 flex items-center justify-center overflow-hidden">
-        {showImg ? (
+      {/* Icon / Abbreviation */}
+      <div className="flex-shrink-0 w-7 h-7 rounded flex items-center justify-center bg-muted/80 text-[10px] font-bold overflow-hidden">
+        {card.imageUrl && !imgError ? (
           <img
             src={card.imageUrl}
             alt={card.title}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover rounded"
+            onError={() => setImgError(true)}
             loading="lazy"
-            onError={() => setImgFailed(true)}
-          />
-        ) : faviconUrl && !imgFailed ? (
-          <img
-            src={faviconUrl}
-            alt={card.title}
-            className="w-4.5 h-4.5 object-contain"
-            loading="lazy"
-            onError={() => setImgFailed(true)}
           />
         ) : (
-          <span
-            className="text-[10px] font-serif font-bold select-none"
-            style={{ color: accentColor }}
-          >
-            {card.abbreviation?.slice(0, 2) || card.title.slice(0, 2)}
+          <span className="text-muted-foreground">{displayAbbr}</span>
+        )}
+      </div>
+
+      {/* Text content */}
+      <div className="flex flex-col min-w-0 flex-1">
+        <span className="text-xs font-medium text-foreground leading-tight truncate">
+          {card.title}
+        </span>
+        {card.shortDesc && (
+          <span className="text-[10px] text-muted-foreground leading-tight truncate">
+            {card.shortDesc}
           </span>
         )}
       </div>
 
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        <h3 className="text-sm font-medium text-foreground leading-tight truncate">
-          {card.title}
-        </h3>
-        <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight truncate">
-          {card.shortDesc}
-        </p>
-      </div>
-
-      {/* Actions - only in edit mode */}
+      {/* Action buttons in edit mode */}
       {editMode && (
-        <div className="flex items-center gap-0 shrink-0">
-          <a
-            href={card.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-            title="访问"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <ExternalLink className="w-3 h-3" />
-          </a>
+        <div className="flex items-center gap-0.5 flex-shrink-0">
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit(card);
-            }}
-            className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+            onClick={(e) => { e.stopPropagation(); onEdit(); }}
+            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
             title="编辑"
           >
             <Pencil className="w-3 h-3" />
           </button>
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (confirm("确定要删除这个网站吗？")) {
-                onDelete(card.id);
-              }
-            }}
-            className="p-1 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
             title="删除"
           >
             <Trash2 className="w-3 h-3" />
           </button>
         </div>
       )}
+
+      {/* External link icon on hover (non-edit mode) */}
+      {!editMode && (
+        <ExternalLink className="w-3 h-3 text-muted-foreground/0 group-hover:text-muted-foreground/50 transition-colors flex-shrink-0" />
+      )}
     </div>
   );
 
-  // Wrap with HoverCard for detail tooltip (non-edit, has detail)
-  if (!editMode && hasDetail) {
+  // Only show hover card in non-edit mode and when there's extra info
+  if (!editMode && (card.fullDesc || card.note)) {
     return (
       <HoverCard openDelay={400} closeDelay={100}>
-        <HoverCardTrigger asChild>{cardContent}</HoverCardTrigger>
-        <HoverCardContent
-          side="top"
-          align="start"
-          className="w-64 p-3 text-sm shadow-lg border-border"
-        >
+        <HoverCardTrigger asChild>
+          {cardContent}
+        </HoverCardTrigger>
+        <HoverCardContent side="top" className="w-64 p-3" sideOffset={4}>
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">
-              <div
-                className="w-2 h-2 rounded-full shrink-0"
-                style={{ backgroundColor: accentColor }}
-              />
-              <h4 className="font-serif font-semibold text-foreground">{card.title}</h4>
+              <span className="text-xs font-semibold text-foreground">{card.title}</span>
+              <span className="text-[10px] text-muted-foreground truncate">{card.url}</span>
             </div>
             {card.fullDesc && (
-              <p className="text-muted-foreground text-xs leading-relaxed">
-                {card.fullDesc}
-              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed">{card.fullDesc}</p>
             )}
             {card.note && (
-              <p className="text-xs text-primary/80 italic">
-                备注: {card.note}
-              </p>
+              <p className="text-[11px] text-primary/80 italic">备注: {card.note}</p>
             )}
-            <p className="text-[10px] text-muted-foreground/60 truncate">
-              {card.url}
-            </p>
           </div>
         </HoverCardContent>
       </HoverCard>

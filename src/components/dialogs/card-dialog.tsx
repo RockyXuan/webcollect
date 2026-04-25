@@ -41,22 +41,29 @@ export function CardDialog({ open, onOpenChange, editingCard, defaultCategoryId 
   const [note, setNote] = useState("");
   const [abbreviation, setAbbreviation] = useState("");
   const [imageUrl, setImageUrl] = useState("");
-  const [categoryId, setCategoryId] = useState("");
+  const [categoryId, setCategoryId] = useState<string>("");
   const [fetching, setFetching] = useState(false);
 
   const isEditing = !!editingCard;
 
+  // Derive a safe categoryId: must match an existing category
+  const safeCategoryId = useCallback((): string => {
+    if (categoryId && categories.some((c) => c.id === categoryId)) return categoryId;
+    if (defaultCategoryId && categories.some((c) => c.id === defaultCategoryId)) return defaultCategoryId;
+    return categories[0]?.id || "";
+  }, [categoryId, defaultCategoryId, categories]);
+
   useEffect(() => {
     if (open) {
       if (editingCard) {
-        setUrl(editingCard.url);
-        setTitle(editingCard.title);
-        setShortDesc(editingCard.shortDesc);
-        setFullDesc(editingCard.fullDesc);
-        setNote(editingCard.note);
-        setAbbreviation(editingCard.abbreviation);
-        setImageUrl(editingCard.imageUrl);
-        setCategoryId(editingCard.categoryId);
+        setUrl(editingCard.url || "");
+        setTitle(editingCard.title || "");
+        setShortDesc(editingCard.shortDesc || "");
+        setFullDesc(editingCard.fullDesc || "");
+        setNote(editingCard.note || "");
+        setAbbreviation(editingCard.abbreviation || "");
+        setImageUrl(editingCard.imageUrl || "");
+        setCategoryId(editingCard.categoryId || "");
       } else {
         setUrl("");
         setTitle("");
@@ -79,14 +86,22 @@ export function CardDialog({ open, onOpenChange, editingCard, defaultCategoryId 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: url.trim() }),
       });
+      if (!res.ok) return;
       const data = await res.json();
+      if (data.error) return;
       if (data.title && !title) setTitle(data.title);
       if (data.description && !shortDesc) {
         setShortDesc(data.description.slice(0, 20));
         setFullDesc(data.description);
       }
-      if (data.image && !imageUrl) setImageUrl(data.image);
-      if (data.favicon && !imageUrl) setImageUrl(data.favicon);
+      // Use favicon API URLs as image fallback
+      if (data.image && !imageUrl) {
+        setImageUrl(data.image);
+      } else if (data.faviconApis?.length && !imageUrl) {
+        setImageUrl(data.faviconApis[0]);
+      } else if (data.favicon && !imageUrl) {
+        setImageUrl(data.favicon);
+      }
     } catch {
       // silently fail
     } finally {
@@ -97,6 +112,9 @@ export function CardDialog({ open, onOpenChange, editingCard, defaultCategoryId 
   const handleSubmit = () => {
     if (!url.trim() || !title.trim()) return;
 
+    const finalCategoryId = safeCategoryId();
+    if (!finalCategoryId) return; // No valid category
+
     const payload: WebCard = {
       id: editingCard?.id || `card-${Date.now()}`,
       url: url.trim(),
@@ -106,7 +124,7 @@ export function CardDialog({ open, onOpenChange, editingCard, defaultCategoryId 
       note: note.trim(),
       abbreviation: abbreviation.trim(),
       imageUrl: imageUrl.trim(),
-      categoryId: categoryId || categories[0]?.id || "",
+      categoryId: finalCategoryId,
       order: editingCard?.order ?? 999,
       createdAt: editingCard?.createdAt ?? Date.now(),
       updatedAt: Date.now(),
@@ -120,6 +138,9 @@ export function CardDialog({ open, onOpenChange, editingCard, defaultCategoryId 
     onOpenChange(false);
   };
 
+  // Don't render dialog content until categories are available
+  const currentCategoryId = safeCategoryId();
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
@@ -132,138 +153,141 @@ export function CardDialog({ open, onOpenChange, editingCard, defaultCategoryId 
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
-          {/* URL */}
-          <div className="space-y-2">
-            <Label htmlFor="url">网页链接</Label>
-            <div className="flex gap-2">
+        {categories.length === 0 ? (
+          <div className="py-8 text-center text-muted-foreground text-sm">
+            请先创建一个分类
+          </div>
+        ) : (
+          <div className="space-y-4 py-2">
+            {/* URL */}
+            <div className="space-y-2">
+              <Label htmlFor="url">网页链接</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="url"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="https://example.com"
+                  className="flex-1"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={fetchMeta}
+                  disabled={fetching || !url.trim()}
+                  title="自动抓取信息"
+                >
+                  {fetching ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Link2 className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Category */}
+            <div className="space-y-2">
+              <Label>分类</Label>
+              {currentCategoryId ? (
+                <Select value={currentCategoryId} onValueChange={setCategoryId}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="选择分类" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="text-sm text-muted-foreground">暂无分类</div>
+              )}
+            </div>
+
+            {/* Title */}
+            <div className="space-y-2">
+              <Label htmlFor="title">网站名称</Label>
               <Input
-                id="url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://example.com"
-                className="flex-1"
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="网站名称"
               />
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={fetchMeta}
-                disabled={fetching || !url.trim()}
-                title="自动抓取信息"
-              >
-                {fetching ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Link2 className="w-4 h-4" />
-                )}
-              </Button>
+            </div>
+
+            {/* Short desc */}
+            <div className="space-y-2">
+              <Label htmlFor="shortDesc">一句话简介（7-8字）</Label>
+              <Input
+                id="shortDesc"
+                value={shortDesc}
+                onChange={(e) => setShortDesc(e.target.value)}
+                placeholder="简短描述"
+                maxLength={20}
+              />
+            </div>
+
+            {/* Full desc */}
+            <div className="space-y-2">
+              <Label htmlFor="fullDesc">详细介绍</Label>
+              <Textarea
+                id="fullDesc"
+                value={fullDesc}
+                onChange={(e) => setFullDesc(e.target.value)}
+                placeholder="详细描述（鼠标悬停时显示）"
+                rows={2}
+              />
+            </div>
+
+            {/* Note */}
+            <div className="space-y-2">
+              <Label htmlFor="note">备注</Label>
+              <Input
+                id="note"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="个人备注"
+              />
+            </div>
+
+            {/* Abbreviation */}
+            <div className="space-y-2">
+              <Label htmlFor="abbreviation">简写（用于无图标时显示）</Label>
+              <Input
+                id="abbreviation"
+                value={abbreviation}
+                onChange={(e) => setAbbreviation(e.target.value)}
+                placeholder="如：GPT"
+                maxLength={4}
+              />
+            </div>
+
+            {/* Image URL */}
+            <div className="space-y-2">
+              <Label htmlFor="imageUrl">图标链接（可选，留空自动获取）</Label>
+              <Input
+                id="imageUrl"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="图标 URL"
+              />
             </div>
           </div>
+        )}
 
-          {/* Category */}
-          <div className="space-y-2">
-            <Label>分类</Label>
-            <Select value={categoryId} onValueChange={setCategoryId}>
-              <SelectTrigger>
-                <SelectValue placeholder="选择分类" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Title */}
-          <div className="space-y-2">
-            <Label htmlFor="title">网站名称</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="网站名称"
-            />
-          </div>
-
-          {/* Short desc */}
-          <div className="space-y-2">
-            <Label htmlFor="shortDesc">一句话简介（7-8字）</Label>
-            <Input
-              id="shortDesc"
-              value={shortDesc}
-              onChange={(e) => setShortDesc(e.target.value)}
-              placeholder="简短描述"
-              maxLength={20}
-            />
-          </div>
-
-          {/* Full desc */}
-          <div className="space-y-2">
-            <Label htmlFor="fullDesc">详细介绍</Label>
-            <Textarea
-              id="fullDesc"
-              value={fullDesc}
-              onChange={(e) => setFullDesc(e.target.value)}
-              placeholder="详细介绍（鼠标悬停时显示）"
-              rows={3}
-            />
-          </div>
-
-          {/* Note */}
-          <div className="space-y-2">
-            <Label htmlFor="note">备注</Label>
-            <Input
-              id="note"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="个人备注"
-            />
-          </div>
-
-          {/* Abbreviation */}
-          <div className="space-y-2">
-            <Label htmlFor="abbr">简写 / 缩写</Label>
-            <Input
-              id="abbr"
-              value={abbreviation}
-              onChange={(e) => setAbbreviation(e.target.value)}
-              placeholder="如 GPT、GH"
-            />
-          </div>
-
-          {/* Image URL */}
-          <div className="space-y-2">
-            <Label htmlFor="img">图片链接（自动抓取或手动填写）</Label>
-            <Input
-              id="img"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://..."
-            />
-            {imageUrl && (
-              <img
-                src={imageUrl}
-                alt="preview"
-                className="w-full h-24 object-cover rounded-md border"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = "none";
-                }}
-              />
-            )}
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            取消
-          </Button>
-          <Button onClick={handleSubmit} disabled={!url.trim() || !title.trim()}>
-            {isEditing ? "保存" : "添加"}
-          </Button>
-        </DialogFooter>
+        {categories.length > 0 && (
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              取消
+            </Button>
+            <Button onClick={handleSubmit} disabled={!url.trim() || !title.trim()}>
+              {isEditing ? "保存" : "添加"}
+            </Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -16,7 +16,31 @@ import type { Category } from "@/lib/types";
 import { PRESET_COLORS, PRESET_ICONS } from "@/lib/types";
 import { useAppStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { getLucideIcon } from "@/lib/icons";
+
+/* Static icon rendering - avoid dynamic component creation */
+function IconPreview({ iconName, className }: { iconName: string; className?: string }) {
+  switch (iconName) {
+    case "star": return <Star className={className} />;
+    case "wrench": return <Wrench className={className} />;
+    case "palette": return <Palette className={className} />;
+    case "code": return <Code className={className} />;
+    case "book-open": return <BookOpen className={className} />;
+    case "music": return <Music className={className} />;
+    case "video": return <Video className={className} />;
+    case "shopping-bag": return <ShoppingBag className={className} />;
+    case "graduation-cap": return <GraduationCap className={className} />;
+    case "briefcase": return <Briefcase className={className} />;
+    case "coffee": return <Coffee className={className} />;
+    case "gamepad-2": return <Gamepad2 className={className} />;
+    default: return <Circle className={className} />;
+  }
+}
+
+// Import icons used by IconPreview
+import {
+  Star, Wrench, Palette, Code, BookOpen, Music, Video,
+  ShoppingBag, GraduationCap, Briefcase, Coffee, Gamepad2, Circle,
+} from "lucide-react";
 
 interface CategoryDialogProps {
   open: boolean;
@@ -28,15 +52,15 @@ export function CategoryDialog({ open, onOpenChange, editingCategory }: Category
   const { addCategory, updateCategory } = useAppStore();
 
   const [name, setName] = useState("");
-  const [icon, setIcon] = useState("");
-  const [color, setColor] = useState("");
+  const [icon, setIcon] = useState(PRESET_ICONS[0].value);
+  const [color, setColor] = useState(PRESET_COLORS[0].value);
 
   useEffect(() => {
     if (open) {
       if (editingCategory) {
-        setName(editingCategory.name);
-        setIcon(editingCategory.icon);
-        setColor(editingCategory.color);
+        setName(editingCategory.name || "");
+        setIcon(editingCategory.icon || PRESET_ICONS[0].value);
+        setColor(editingCategory.color || PRESET_COLORS[0].value);
       } else {
         setName("");
         setIcon(PRESET_ICONS[0].value);
@@ -65,8 +89,6 @@ export function CategoryDialog({ open, onOpenChange, editingCategory }: Category
     onOpenChange(false);
   };
 
-  const getIcon = getLucideIcon;
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -93,25 +115,22 @@ export function CategoryDialog({ open, onOpenChange, editingCategory }: Category
           <div className="space-y-2">
             <Label>图标</Label>
             <div className="grid grid-cols-6 gap-2">
-              {PRESET_ICONS.map((ic) => {
-                const IconEl = getIcon(ic.value);
-                return (
-                  <button
-                    key={ic.value}
-                    onClick={() => setIcon(ic.value)}
-                    className={cn(
-                      "flex flex-col items-center gap-1 p-2 rounded-lg border transition-all",
-                      icon === ic.value
-                        ? "border-primary bg-primary/10"
-                        : "border-border hover:border-muted-foreground/50"
-                    )}
-                    title={ic.name}
-                  >
-                    <IconEl className="w-4 h-4" />
-                    <span className="text-[10px] text-muted-foreground">{ic.name}</span>
-                  </button>
-                );
-              })}
+              {PRESET_ICONS.map((ic) => (
+                <button
+                  key={ic.value}
+                  onClick={() => setIcon(ic.value)}
+                  className={cn(
+                    "flex flex-col items-center gap-1 p-2 rounded-lg border transition-all",
+                    icon === ic.value
+                      ? "border-primary bg-primary/10"
+                      : "border-border hover:border-muted-foreground/50"
+                  )}
+                  title={ic.name}
+                >
+                  <IconPreview iconName={ic.value} className="w-4 h-4" />
+                  <span className="text-[10px] text-muted-foreground">{ic.name}</span>
+                </button>
+              ))}
             </div>
           </div>
 
