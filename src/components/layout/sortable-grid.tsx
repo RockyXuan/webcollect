@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useRef, useMemo, useCallback } from "react";
 import {
   DndContext,
   closestCenter,
@@ -89,11 +89,10 @@ interface SortableGridProps {
   onDelete: (id: string) => void;
   onAdd: (categoryId?: string) => void;
   onEditCategory: (category: Category) => void;
-  onEditSuperCategory: (id: string) => void;
 }
 
 /* ── Main Component ── */
-export function SortableGrid({ cards, categories, onEdit, onDelete, onAdd, onEditCategory, onEditSuperCategory }: SortableGridProps) {
+export function SortableGrid({ cards, categories, onEdit, onDelete, onAdd, onEditCategory }: SortableGridProps) {
   const { editMode, reorderCards, reorderCategories } = useAppStore();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
@@ -108,15 +107,7 @@ export function SortableGrid({ cards, categories, onEdit, onDelete, onAdd, onEdi
   );
 
   const sortedCategories = useMemo(
-    () =>
-      [...categories]
-        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-        .sort((a, b) => {
-          // 收集箱永远排最后
-          if (a.id === "cat-inbox") return 1;
-          if (b.id === "cat-inbox") return -1;
-          return 0;
-        }),
+    () => [...categories].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
     [categories]
   );
 
@@ -208,26 +199,6 @@ export function SortableGrid({ cards, categories, onEdit, onDelete, onAdd, onEdi
     return null;
   }, [activeId, sortedCategories, cards]);
 
-  /* ── Group categories by superCategoryId ── */
-  const superCats = useAppStore((s) => s.superCategories);
-
-  const { superGroups, ungrouped } = useMemo(() => {
-    const groups: Record<string, Category[]> = {};
-    const ungroupedCats: Category[] = [];
-    for (const cat of sortedCategories) {
-      if (cat.superCategoryId && cat.superCategoryId !== "none" && cat.superCategoryId !== "") {
-        if (!groups[cat.superCategoryId]) groups[cat.superCategoryId] = [];
-        groups[cat.superCategoryId].push(cat);
-      } else {
-        ungroupedCats.push(cat);
-      }
-    }
-    const orderedSuperGroups = superCats
-      .filter((sc) => groups[sc.id] && groups[sc.id].length > 0)
-      .map((sc) => ({ id: sc.id, name: sc.name, categories: groups[sc.id] }));
-    return { superGroups: orderedSuperGroups, ungrouped: ungroupedCats };
-  }, [sortedCategories, superCats]);
-
   return (
     <DndContext
       sensors={sensors}
@@ -236,73 +207,23 @@ export function SortableGrid({ cards, categories, onEdit, onDelete, onAdd, onEdi
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
+      {/* Category-level SortableContext */}
       <SortableContext items={categorySortableIds} strategy={rectSortingStrategy}>
-        <div className="space-y-8">
-          {/* Super category groups — visible bordered containers */}
-          {superGroups.map((group) => (
-            <div
-              key={group.id}
-              className="rounded-xl border border-border/40 bg-muted/10 px-5 pt-4 pb-5"
-            >
-              {/* Super category header with edit button */}
-              <div className="flex items-center gap-2 mb-4">
-                <h2 className="text-sm font-serif font-bold text-foreground/90 tracking-wide">
-                  {group.name}
-                </h2>
-                <button
-                  onClick={() => onEditSuperCategory(group.id)}
-                  className="text-muted-foreground/40 hover:text-foreground p-0.5 rounded hover:bg-muted/50 transition-colors"
-                  title="编辑分类名称"
-                >
-                  <Pencil className="w-3 h-3" />
-                </button>
-                <div className="h-px flex-1 bg-border/25" />
-              </div>
-
-              {/* Sub-category blocks in 2-column layout */}
-              <div className="flex flex-wrap gap-4">
-                {group.categories.map((category) => {
-                  const catCards = cards.filter((c) => c.categoryId === category.id);
-                  return (
-                    <SortableCategoryBlock
-                      key={category.id}
-                      category={category}
-                      cards={catCards}
-                      editMode={editMode}
-                      editingCategoryId={editingCategoryId}
-                      setEditingCategoryId={setEditingCategoryId}
-                      onEdit={onEdit}
-                      onDelete={onDelete}
-                      onAdd={onAdd}
-                      onEditCategory={onEditCategory}
-                      fullWidth={catCards.length >= 6}
-                    />
-                  );
-                })}
-              </div>
-            </div>
+        <div className="flex flex-wrap gap-3">
+          {sortedCategories.map((category) => (
+            <SortableCategoryBlock
+              key={category.id}
+              category={category}
+              cards={cards.filter((c) => c.categoryId === category.id)}
+              editMode={editMode}
+              editingCategoryId={editingCategoryId}
+              setEditingCategoryId={setEditingCategoryId}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onAdd={onAdd}
+              onEditCategory={onEditCategory}
+            />
           ))}
-
-          {/* Ungrouped categories (e.g. 收集箱) */}
-          {ungrouped.length > 0 && (
-            <div className="flex flex-wrap gap-4">
-              {ungrouped.map((category) => (
-                <SortableCategoryBlock
-                  key={category.id}
-                  category={category}
-                  cards={cards.filter((c) => c.categoryId === category.id)}
-                  editMode={editMode}
-                  editingCategoryId={editingCategoryId}
-                  setEditingCategoryId={setEditingCategoryId}
-                  onEdit={onEdit}
-                  onDelete={onDelete}
-                  onAdd={onAdd}
-                  onEditCategory={onEditCategory}
-                  fullWidth={false}
-                />
-              ))}
-            </div>
-          )}
         </div>
       </SortableContext>
 
@@ -336,7 +257,6 @@ interface SortableCategoryBlockProps {
   onDelete: (id: string) => void;
   onAdd: (categoryId?: string) => void;
   onEditCategory: (category: Category) => void;
-  fullWidth: boolean;
 }
 
 function SortableCategoryBlock({
@@ -349,7 +269,6 @@ function SortableCategoryBlock({
   onDelete,
   onAdd,
   onEditCategory,
-  fullWidth,
 }: SortableCategoryBlockProps) {
   const {
     attributes,
@@ -363,6 +282,30 @@ function SortableCategoryBlock({
     data: { type: "category" },
   });
 
+  /* Auto-fit width based on card count:
+     - 0-2 cards → ~50% (small block, fits 2 per row)
+     - 3-5 cards → ~50% (medium block, fits 2 per row)
+     - 6+ cards → ~100% (large block, needs full width)
+     Gap is gap-3 (12px), so two 50% blocks need calc(50% - 6px) each
+     User can still manually resize via handle */
+  const defaultWidth = useMemo(() => {
+    if (cards.length >= 6) return "calc(100% - 0px)";
+    return "calc(50% - 6px)";
+  }, [cards.length]);
+
+  const [widthPercent, setWidthPercent] = useState<number | null>(null);
+  const [maxHeight, setMaxHeight] = useState<number | null>(null);
+  const [isResizingH, setIsResizingH] = useState(false);
+  const [isResizingV, setIsResizingV] = useState(false);
+  const blockRef = useRef<HTMLDivElement>(null);
+  const resizeStartX = useRef(0);
+  const resizeStartWidth = useRef(0);
+  const resizeStartY = useRef(0);
+  const resizeStartHeight = useRef(0);
+
+  /* If user hasn't manually resized, follow auto width */
+  const effectiveWidth: string = widthPercent != null ? `${widthPercent}%` : defaultWidth;
+
   const sortedCards = useMemo(
     () => [...cards].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
     [cards]
@@ -373,13 +316,71 @@ function SortableCategoryBlock({
     [sortedCards]
   );
 
-  /* Auto width: fullWidth (>=6 cards) → 100%, otherwise ~50% */
-  const blockWidth = fullWidth ? "100%" : "calc(50% - 8px)";
+  /* ── Horizontal resize ── */
+  const handleHResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsResizingH(true);
+      resizeStartX.current = e.clientX;
+      /* Use actual rendered width as starting point */
+      resizeStartWidth.current = blockRef.current?.offsetWidth || 0;
+
+      const handleMove = (ev: MouseEvent) => {
+        const containerWidth = blockRef.current?.parentElement?.clientWidth || 1;
+        const delta = ev.clientX - resizeStartX.current;
+        const currentWidth = resizeStartWidth.current + delta;
+        const newPercent = Math.min(100, Math.max(30, (currentWidth / containerWidth) * 100));
+        setWidthPercent(Math.round(newPercent));
+      };
+
+      const handleUp = () => {
+        setIsResizingH(false);
+        document.removeEventListener("mousemove", handleMove);
+        document.removeEventListener("mouseup", handleUp);
+      };
+
+      document.addEventListener("mousemove", handleMove);
+      document.addEventListener("mouseup", handleUp);
+    },
+    []
+  );
+
+  /* ── Vertical resize ── */
+  const handleVResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsResizingV(true);
+      resizeStartY.current = e.clientY;
+      resizeStartHeight.current = maxHeight || blockRef.current?.scrollHeight || 300;
+
+      const handleMove = (ev: MouseEvent) => {
+        const delta = ev.clientY - resizeStartY.current;
+        const newHeight = Math.max(120, resizeStartHeight.current + delta);
+        setMaxHeight(Math.round(newHeight));
+      };
+
+      const handleUp = () => {
+        setIsResizingV(false);
+        document.removeEventListener("mousemove", handleMove);
+        document.removeEventListener("mouseup", handleUp);
+      };
+
+      document.addEventListener("mousemove", handleMove);
+      document.addEventListener("mouseup", handleUp);
+    },
+    [maxHeight]
+  );
+
+  const handleResetHeight = useCallback(() => {
+    setMaxHeight(null);
+  }, []);
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    width: blockWidth,
+    width: effectiveWidth,
     opacity: isDragging ? 0.5 : 1,
   };
 
@@ -390,6 +391,7 @@ function SortableCategoryBlock({
       className={`
         relative rounded-xl border bg-card transition-shadow
         ${editMode ? "border-primary/20" : "border-border/60"}
+        ${isResizingH || isResizingV ? "ring-2 ring-primary/30" : ""}
         hover:shadow-md
       `}
     >
@@ -446,7 +448,14 @@ function SortableCategoryBlock({
 
       {/* Cards - flex-wrap with SortableContext for cross-category drag */}
       <SortableContext items={cardSortableIds} strategy={rectSortingStrategy}>
-        <div className="flex flex-wrap gap-1.5 px-3 pb-3 content-start">
+        <div
+          className="flex flex-wrap gap-1.5 px-3 pb-3 content-start"
+          style={{
+            maxHeight: maxHeight ? `${maxHeight}px` : undefined,
+            overflowY: maxHeight ? "auto" : undefined,
+          }}
+          onDoubleClick={handleResetHeight}
+        >
           {sortedCards.map((card) => (
             <SortableCard
               key={card.id}
@@ -464,6 +473,24 @@ function SortableCategoryBlock({
           )}
         </div>
       </SortableContext>
+
+      {/* Horizontal resize handle */}
+      <div
+        onMouseDown={handleHResizeStart}
+        className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize group"
+        title="拖拽调整宽度"
+      >
+        <div className="absolute right-0.5 top-1/2 -translate-y-1/2 w-0.5 h-8 bg-border group-hover:bg-primary/60 transition-colors rounded-full" />
+      </div>
+
+      {/* Vertical resize handle */}
+      <div
+        onMouseDown={handleVResizeStart}
+        className="absolute bottom-0 left-0 right-0 h-1.5 cursor-row-resize group"
+        title="拖拽调整高度（双击内容区重置）"
+      >
+        <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 h-0.5 w-8 bg-border group-hover:bg-primary/60 transition-colors rounded-full" />
+      </div>
     </div>
   );
 }

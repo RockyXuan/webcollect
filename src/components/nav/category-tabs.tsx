@@ -19,7 +19,7 @@ export function CategoryTabs({ onAddCategory, onEditCategory }: CategoryTabsProp
 
   const getIcon = getLucideIcon;
 
-  const allCategories = [{ id: "all", name: "全部", icon: "layout-grid", color: "", order: -1, createdAt: 0, superCategoryId: "" }, ...categories];
+  const allCategories = [{ id: "all", name: "全部", icon: "layout-grid", color: "", order: -1, createdAt: 0 }, ...categories];
 
   return (
     <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">

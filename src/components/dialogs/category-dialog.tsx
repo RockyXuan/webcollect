@@ -54,9 +54,6 @@ export function CategoryDialog({ open, onOpenChange, editingCategory }: Category
   const [name, setName] = useState("");
   const [icon, setIcon] = useState(PRESET_ICONS[0].value);
   const [color, setColor] = useState(PRESET_COLORS[0].value);
-  const [superCategoryId, setSuperCategoryId] = useState("");
-
-  const superCategories = useAppStore((s) => s.superCategories);
 
   useEffect(() => {
     if (open) {
@@ -64,12 +61,10 @@ export function CategoryDialog({ open, onOpenChange, editingCategory }: Category
         setName(editingCategory.name || "");
         setIcon(editingCategory.icon || PRESET_ICONS[0].value);
         setColor(editingCategory.color || PRESET_COLORS[0].value);
-        setSuperCategoryId(editingCategory.superCategoryId || "");
       } else {
         setName("");
         setIcon(PRESET_ICONS[0].value);
         setColor(PRESET_COLORS[0].value);
-        setSuperCategoryId("");
       }
     }
   }, [open, editingCategory]);
@@ -82,7 +77,6 @@ export function CategoryDialog({ open, onOpenChange, editingCategory }: Category
       name: name.trim(),
       icon,
       color,
-      superCategoryId,
       order: editingCategory?.order ?? 999,
       createdAt: editingCategory?.createdAt ?? Date.now(),
     };
@@ -100,16 +94,16 @@ export function CategoryDialog({ open, onOpenChange, editingCategory }: Category
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-serif">
-            {editingCategory ? "编辑分组" : "新建分组"}
+            {editingCategory ? "编辑分类" : "新建分类"}
           </DialogTitle>
           <DialogDescription className="sr-only">
-            {editingCategory ? "编辑分组信息" : "创建新的网站分组"}
+            {editingCategory ? "编辑分类信息" : "创建新的网站分类"}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label htmlFor="cat-name">分组名称</Label>
+            <Label htmlFor="cat-name">分类名称</Label>
             <Input
               id="cat-name"
               value={name}

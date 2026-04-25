@@ -220,14 +220,6 @@ interface UserPreferences {
 - 禁止蓝紫色渐变（AI 味太浓）
 - 字体：font-serif（Noto Serif SC）用于标题，font-sans 用于正文
 
-### 8. 数据安全（CRITICAL — 用户反复强调）
-- **严禁覆盖用户已有数据**：初始化时必须 MERGE（合并），绝不能覆盖
-- page.tsx 中的初始化逻辑：只添加缺失的默认分类/卡片，不删除已有内容
-- store.ts 的 loadData：包含恢复机制 — 如果 categories 为空但 initialized=true，自动合并默认数据
-- 用户手动添加/修改的分类、卡片、大分类等，代码更新时绝不丢失
-- 每次修改 seed.ts 时，只能添加新的默认项，不能删除已有的默认分类 ID
-- 如果需要清除浏览器数据重建，用户需手动清除 IndexedDB
-
 ## Chrome 插件预留
 
 - 数据操作通过 `store.ts` 抽象，未来可替换底层为 Chrome Storage API

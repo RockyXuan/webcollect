@@ -1,22 +1,12 @@
-import type { WebCard, Category, SuperCategory } from "./types";
-
-export const defaultSuperCategories: SuperCategory[] = [
-  { id: "sc-work", name: "工作", order: 0, createdAt: Date.now() },
-  { id: "sc-ai", name: "AI", order: 1, createdAt: Date.now() },
-  { id: "sc-dev", name: "开发", order: 2, createdAt: Date.now() },
-  { id: "sc-life", name: "生活", order: 3, createdAt: Date.now() },
-];
+import type { WebCard, Category } from "./types";
 
 export const defaultCategories: Category[] = [
-  { id: "cat-1", name: "常用", icon: "star", color: "#B8860B", order: 0, superCategoryId: "sc-work", createdAt: Date.now() },
-  { id: "cat-2", name: "AI 大模型", icon: "wrench", color: "#4A6FA5", order: 1, superCategoryId: "sc-ai", createdAt: Date.now() },
-  { id: "cat-6", name: "AI 开发", icon: "code", color: "#2F5D62", order: 2, superCategoryId: "sc-ai", createdAt: Date.now() },
-  { id: "cat-7", name: "AI 设计", icon: "palette", color: "#9B7E8E", order: 3, superCategoryId: "sc-ai", createdAt: Date.now() },
-  { id: "cat-8", name: "AI 辅助", icon: "wrench", color: "#A0524D", order: 4, superCategoryId: "sc-ai", createdAt: Date.now() },
-  { id: "cat-3", name: "设计灵感", icon: "palette", color: "#9B7E8E", order: 5, superCategoryId: "sc-work", createdAt: Date.now() },
-  { id: "cat-4", name: "开发者", icon: "code", color: "#4A7C59", order: 6, superCategoryId: "sc-dev", createdAt: Date.now() },
-  { id: "cat-5", name: "阅读", icon: "book-open", color: "#8B6F5C", order: 7, superCategoryId: "sc-life", createdAt: Date.now() },
-  { id: "cat-inbox", name: "收集箱", icon: "inbox", color: "#888888", order: 99, superCategoryId: "", createdAt: Date.now() },
+  { id: "cat-1", name: "常用", icon: "star", color: "#B8860B", order: 0, createdAt: Date.now() },
+  { id: "cat-2", name: "AI 工具", icon: "wrench", color: "#4A6FA5", order: 1, createdAt: Date.now() },
+  { id: "cat-3", name: "设计灵感", icon: "palette", color: "#9B7E8E", order: 2, createdAt: Date.now() },
+  { id: "cat-4", name: "开发者", icon: "code", color: "#4A7C59", order: 3, createdAt: Date.now() },
+  { id: "cat-5", name: "阅读", icon: "book-open", color: "#8B6F5C", order: 4, createdAt: Date.now() },
+  { id: "cat-inbox", name: "收集箱", icon: "inbox", color: "#888888", order: 99, createdAt: Date.now() },
 ];
 
 /* ── Favicon Helper ── */
@@ -70,7 +60,8 @@ export const defaultCards: WebCard[] = [
     order: 2,
     createdAt: Date.now(),
     updatedAt: Date.now(),
-  },  {
+  },
+  {
     id: "card-12",
     url: "https://mail.google.com",
     title: "Gmail",
@@ -84,7 +75,7 @@ export const defaultCards: WebCard[] = [
     createdAt: Date.now(),
     updatedAt: Date.now(),
   },
-  // ── AI 大模型 ──
+  // ── AI 工具 ──
   {
     id: "card-1",
     url: "https://chat.openai.com",
@@ -127,36 +118,6 @@ export const defaultCards: WebCard[] = [
     createdAt: Date.now(),
     updatedAt: Date.now(),
   },
-  // ── AI 开发 ──
-  {
-    id: "card-20",
-    url: "https://cursor.sh",
-    title: "Cursor",
-    shortDesc: "AI 代码编辑器",
-    fullDesc: "基于 VS Code 的 AI 代码编辑器，支持智能补全和自然语言编程。",
-    note: "AI 编程",
-    abbreviation: "Cursor",
-    imageUrl: gFavicon("cursor.sh"),
-    categoryId: "cat-6",
-    order: 0,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  },
-  {
-    id: "card-21",
-    url: "https://github.com/features/copilot",
-    title: "GitHub Copilot",
-    shortDesc: "AI 编程助手",
-    fullDesc: "GitHub 推出的 AI 编程助手，支持代码补全和生成。",
-    note: "代码补全",
-    abbreviation: "Copilot",
-    imageUrl: ddgIcon("github.com"),
-    categoryId: "cat-6",
-    order: 1,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  },
-  // ── AI 设计 ──
   {
     id: "card-14",
     url: "https://www.midjourney.com",
@@ -166,51 +127,8 @@ export const defaultCards: WebCard[] = [
     note: "生成图片",
     abbreviation: "MJ",
     imageUrl: ddgIcon("midjourney.com"),
-    categoryId: "cat-7",
-    order: 0,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  },
-  {
-    id: "card-22",
-    url: "https://openai.com/dall-e-3",
-    title: "DALL·E",
-    shortDesc: "AI 图像生成",
-    fullDesc: "OpenAI 的图像生成模型，支持从文字描述生成高质量图片。",
-    note: "文生图",
-    abbreviation: "DALL·E",
-    imageUrl: ddgIcon("openai.com"),
-    categoryId: "cat-7",
-    order: 1,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  },
-  // ── AI 辅助 ──
-  {
-    id: "card-23",
-    url: "https://www.perplexity.ai",
-    title: "Perplexity",
-    shortDesc: "AI 搜索引擎",
-    fullDesc: "基于 AI 的搜索引擎，提供带有来源引用的智能问答。",
-    note: "AI 搜索",
-    abbreviation: "PPLX",
-    imageUrl: ddgIcon("perplexity.ai"),
-    categoryId: "cat-8",
-    order: 0,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  },
-  {
-    id: "card-24",
-    url: "https://poe.com",
-    title: "Poe",
-    shortDesc: "AI 聊天聚合",
-    fullDesc: "Quora 推出的 AI 聊天聚合平台，可同时使用多个 AI 模型。",
-    note: "多模型切换",
-    abbreviation: "Poe",
-    imageUrl: ddgIcon("poe.com"),
-    categoryId: "cat-8",
-    order: 1,
+    categoryId: "cat-2",
+    order: 3,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   },

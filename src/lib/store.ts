@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { WebCard, Category, HiddenSite, HideDuration, SuperCategory } from "./types";
+import type { WebCard, Category, HiddenSite, HideDuration } from "./types";
 import {
   getCards,
   saveCards,
@@ -16,10 +16,7 @@ import {
   saveHiddenSites,
   getPinnedCategoryIds,
   savePinnedCategoryIds,
-  getSuperCategories,
-  saveSuperCategories,
 } from "./db";
-import { defaultSuperCategories, defaultCategories, defaultCards } from "./seed";
 
 interface AppState {
   cards: WebCard[];
@@ -62,12 +59,6 @@ interface AppState {
   pinnedCategoryIds: string[];
   togglePinCategory: (categoryId: string) => void;
   isCategoryPinned: (categoryId: string) => boolean;
-
-  // Super categories
-  superCategories: SuperCategory[];
-  addSuperCategory: (sc: SuperCategory) => Promise<void>;
-  updateSuperCategory: (sc: SuperCategory) => Promise<void>;
-  deleteSuperCategory: (id: string) => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -80,7 +71,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   initialized: false,
   editMode: false,
   defaultHideDuration: "1w" as HideDuration,
-  superCategories: [],
   pinnedCategoryIds: [] as string[],
 
   loadData: async () => {
@@ -108,55 +98,21 @@ export const useAppStore = create<AppState>((set, get) => ({
       await saveHiddenSites(cleanedHidden);
     }
 
-    // Load super categories
-    let superCategories = await getSuperCategories();
-    if (superCategories.length === 0) {
-      superCategories = defaultSuperCategories;
-      await saveSuperCategories(superCategories);
-    }
-
-    // Recovery: if categories are empty but initialized, merge defaults back
-    if (init && categories.length === 0) {
-      await saveCategories(defaultCategories);
-      await saveCards([...defaultCards, ...cards.filter((c) => !defaultCards.some((d) => d.id === c.id))]);
-    }
-
-    // Migration: ensure categories have superCategoryId
-    const needsSuperCatMigration = categories.some(
-      (c) => !c.superCategoryId && c.id !== "cat-inbox"
-    );
-    if (needsSuperCatMigration) {
-      const updated = categories.map((c) => {
-        if (c.id === "cat-inbox") return c;
-        if (!c.superCategoryId) {
-          // Find matching default category to get its superCategoryId
-          const defaultCat = defaultCategories.find((d) => d.id === c.id);
-          return { ...c, superCategoryId: defaultCat?.superCategoryId || "" };
-        }
-        return c;
-      });
-      await saveCategories(updated);
-    }
-
-    // Reload after recovery/migration
-    const [finalCards, finalCategories] = await Promise.all([getCards(), getCategories()]);
-
     set({
-      cards: finalCards,
-      categories: finalCategories,
+      cards,
+      categories,
       hiddenSites: cleanedHidden,
       pinnedCategoryIds: pinnedIds,
-      superCategories,
       initialized: init,
       isLoading: false,
     });
 
     // Migration: fill missing imageUrl with Google Favicon API
-    const needsMigration = finalCards.some(
+    const needsMigration = cards.some(
       (c) => (!c.imageUrl || c.imageUrl === "") && c.url
     );
     if (needsMigration) {
-      const updated = finalCards.map((c) => {
+      const updated = cards.map((c) => {
         if ((!c.imageUrl || c.imageUrl === "") && c.url) {
           try {
             const hostname = new URL(c.url).hostname;
@@ -175,7 +131,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     // Migration: ensure inbox category exists
-    const inboxExists = finalCategories.some((c) => c.id === "cat-inbox");
+    const inboxExists = categories.some((c) => c.id === "cat-inbox");
     if (!inboxExists) {
       const inbox: Category = {
         id: "cat-inbox",
@@ -184,9 +140,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         color: "#888888",
         order: 99,
         createdAt: Date.now(),
-        superCategoryId: "",
       };
-      const updatedCats = [...finalCategories, inbox];
+      const updatedCats = [...categories, inbox];
       await saveCategories(updatedCats);
       set({ categories: updatedCats });
     }
@@ -344,30 +299,5 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   isCategoryPinned: (categoryId) => {
     return get().pinnedCategoryIds.includes(categoryId);
-  },
-
-  addSuperCategory: async (sup) => {
-    const superCategories = [...get().superCategories, sup];
-    await saveSuperCategories(superCategories);
-    set({ superCategories });
-  },
-
-  updateSuperCategory: async (sup) => {
-    const superCategories = get().superCategories.map((s) =>
-      s.id === sup.id ? sup : s
-    );
-    await saveSuperCategories(superCategories);
-    set({ superCategories });
-  },
-
-  deleteSuperCategory: async (id) => {
-    const superCategories = get().superCategories.filter((s) => s.id !== id);
-    await saveSuperCategories(superCategories);
-    // Also clear superCategoryId from categories that belonged to this group
-    const categories = get().categories.map((c) =>
-      c.superCategoryId === id ? { ...c, superCategoryId: "" } : c
-    );
-    await saveCategories(categories);
-    set({ superCategories, categories });
   },
 }));

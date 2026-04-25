@@ -19,14 +19,6 @@ export interface Category {
   icon: string;
   color: string;
   order: number;
-  superCategoryId: string; // 所属大分类ID，空字符串表示未分组
-  createdAt: number;
-}
-
-export interface SuperCategory {
-  id: string;
-  name: string;
-  order: number;
   createdAt: number;
 }
 
