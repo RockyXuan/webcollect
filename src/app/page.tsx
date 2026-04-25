@@ -64,7 +64,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       <TopNav onAddCard={handleAddCard} onManageCategories={handleAddCategory} />
 
-      <main className="w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <main className="w-full px-3 sm:px-5 lg:px-6 py-4 space-y-4">
         <SortableGrid
           cards={cards}
           categories={categories}
@@ -74,10 +74,9 @@ export default function HomePage() {
         />
       </main>
 
-      <footer className="border-t border-border/60 mt-12 py-6">
-        <div className="container mx-auto px-4 text-center text-xs text-muted-foreground">
+      <footer className="border-t border-border/40 mt-8 py-4">
+        <div className="px-3 sm:px-5 lg:px-6 text-center text-xs text-muted-foreground/60">
           <p className="font-serif">WebCollect — 你的个人网页收藏墙</p>
-          <p className="mt-1">数据仅存储在本地浏览器中</p>
         </div>
       </footer>
 
