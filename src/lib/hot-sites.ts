@@ -1,4 +1,5 @@
 import type { HotSite } from "./types";
+export type { HotSite } from "./types";
 
 /**
  * 热门网站推荐数据

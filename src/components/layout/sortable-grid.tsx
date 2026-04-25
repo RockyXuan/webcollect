@@ -278,7 +278,7 @@ function SortableCategoryBlock({
     data: { type: "category" },
   });
 
-  const [widthPercent, setWidthPercent] = useState(50);
+  const [widthPercent, setWidthPercent] = useState(100);
   const [maxHeight, setMaxHeight] = useState<number | null>(null);
   const [isResizingH, setIsResizingH] = useState(false);
   const [isResizingV, setIsResizingV] = useState(false);

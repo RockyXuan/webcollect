@@ -87,6 +87,22 @@ export const useAppStore = create<AppState>((set, _get) => ({
       await saveCards(updated);
       set({ cards: updated });
     }
+
+    // Migration: ensure inbox category exists
+    const inboxExists = categories.some((c) => c.id === "cat-inbox");
+    if (!inboxExists) {
+      const inbox: Category = {
+        id: "cat-inbox",
+        name: "收集箱",
+        icon: "inbox",
+        color: "#888888",
+        order: 99,
+        createdAt: Date.now(),
+      };
+      const updatedCats = [...categories, inbox];
+      await saveCategories(updatedCats);
+      set({ categories: updatedCats });
+    }
   },
 
   setSearchQuery: (q) => set({ searchQuery: q }),

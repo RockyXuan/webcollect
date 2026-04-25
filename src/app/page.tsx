@@ -6,7 +6,7 @@ import { SortableGrid } from "@/components/layout/sortable-grid";
 import { CardDialog } from "@/components/dialogs/card-dialog";
 import { CategoryDialog } from "@/components/dialogs/category-dialog";
 import { ErrorBoundary } from "@/components/error-boundary";
-import HotRecommendation from "@/components/hot-recommendation";
+import { HotRecommendation } from "@/components/hot-recommendation";
 import { useAppStore } from "@/lib/store";
 import { saveCards, saveCategories, setInitialized } from "@/lib/db";
 import { defaultCards, defaultCategories } from "@/lib/seed";

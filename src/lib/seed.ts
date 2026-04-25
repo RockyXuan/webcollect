@@ -6,6 +6,7 @@ export const defaultCategories: Category[] = [
   { id: "cat-3", name: "设计灵感", icon: "palette", color: "#9B7E8E", order: 2, createdAt: Date.now() },
   { id: "cat-4", name: "开发者", icon: "code", color: "#4A7C59", order: 3, createdAt: Date.now() },
   { id: "cat-5", name: "阅读", icon: "book-open", color: "#8B6F5C", order: 4, createdAt: Date.now() },
+  { id: "cat-inbox", name: "收集箱", icon: "inbox", color: "#888888", order: 99, createdAt: Date.now() },
 ];
 
 /* ── Favicon Helper ── */
