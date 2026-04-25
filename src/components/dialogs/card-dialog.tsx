@@ -97,10 +97,18 @@ export function CardDialog({ open, onOpenChange, editingCard, defaultCategoryId 
       // Use favicon API URLs as image fallback
       if (data.image && !imageUrl) {
         setImageUrl(data.image);
-      } else if (data.faviconApis?.length && !imageUrl) {
-        setImageUrl(data.faviconApis[0]);
       } else if (data.favicon && !imageUrl) {
         setImageUrl(data.favicon);
+      } else if (data.faviconApis?.length && !imageUrl) {
+        setImageUrl(data.faviconApis[0]);
+      } else if (!imageUrl) {
+        // Last fallback: Google Favicon API from the URL domain
+        try {
+          const hostname = new URL(url.trim()).hostname;
+          setImageUrl(`https://www.google.com/s2/favicons?domain=${hostname}&sz=64`);
+        } catch {
+          // ignore
+        }
       }
     } catch {
       // silently fail

@@ -64,6 +64,29 @@ export const useAppStore = create<AppState>((set, _get) => ({
       initialized: init,
       isLoading: false,
     });
+
+    // Migration: fill missing imageUrl with Google Favicon API
+    const needsMigration = cards.some(
+      (c) => (!c.imageUrl || c.imageUrl === "") && c.url
+    );
+    if (needsMigration) {
+      const updated = cards.map((c) => {
+        if ((!c.imageUrl || c.imageUrl === "") && c.url) {
+          try {
+            const hostname = new URL(c.url).hostname;
+            return {
+              ...c,
+              imageUrl: `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`,
+            };
+          } catch {
+            return c;
+          }
+        }
+        return c;
+      });
+      await saveCards(updated);
+      set({ cards: updated });
+    }
   },
 
   setSearchQuery: (q) => set({ searchQuery: q }),

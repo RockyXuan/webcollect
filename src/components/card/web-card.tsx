@@ -24,6 +24,18 @@ export function WebCardItem({
 }: WebCardItemProps) {
   const [imgError, setImgError] = useState(false);
 
+  // Resolve the best image URL: prefer card.imageUrl, fallback to Google Favicon API
+  const faviconUrl = React.useMemo(() => {
+    if (!card.url) return "";
+    try {
+      const hostname = new URL(card.url).hostname;
+      return `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`;
+    } catch {
+      return "";
+    }
+  }, [card.url]);
+  const displayImageUrl = card.imageUrl || faviconUrl;
+
   const handleClick = useCallback(() => {
     if (editMode) return;
     try {
@@ -40,7 +52,7 @@ export function WebCardItem({
     <div
       className={`
         group relative flex items-center gap-2 px-2.5 py-1.5
-        rounded-lg border transition-all select-none
+        rounded-lg border transition-all select-none min-w-[180px]
         ${editMode ? "cursor-default" : "cursor-pointer hover:bg-muted/50"}
         hover:shadow-sm
       `}
@@ -59,9 +71,9 @@ export function WebCardItem({
 
       {/* Icon / Abbreviation */}
       <div className="flex-shrink-0 w-7 h-7 rounded flex items-center justify-center bg-muted/80 text-[10px] font-bold overflow-hidden">
-        {card.imageUrl && !imgError ? (
+        {displayImageUrl && !imgError ? (
           <img
-            src={card.imageUrl}
+            src={displayImageUrl}
             alt={card.title}
             className="w-full h-full object-cover rounded"
             onError={() => setImgError(true)}
