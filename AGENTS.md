@@ -1,5 +1,63 @@
 # WebCollect — 个人网页收藏墙
 
+## ⚠️ 开发第一要义：严禁擅自删除数据 (CRITICAL)
+
+> **这是所有规则中最重要的规则，违反此规则将导致用户数据丢失，必须回滚重做。**
+
+### 核心原则
+1. **绝不删除用户数据**：用户在页面上添加的分类、网站、置顶设置、隐藏记录等，都是用户的财产
+2. **绝不覆盖用户数据**：修改代码时，`seed.ts` 中的默认数据只能增加，不能减少或替换
+3. **绝不擅自修改用户已定好的内容**：分类名称、网站URL、图标颜色等，用户没让你改就不准改
+4. **每次改代码前必须备份**：先读取当前数据，确认不会破坏已有内容后再动手
+
+### 数据保护流程 (MANDATORY)
+```
+1. 读取 seed.ts 当前所有分类和卡片数据
+2. 确认改动范围，标记哪些数据不能动
+3. 只在用户明确要求的位置做修改
+4. 改完后再次确认：原有数据是否完整保留
+5. 如果发现数据丢失，立即恢复
+```
+
+### 当前种子数据快照 (seed.ts)
+
+#### 默认分类
+| ID | 名称 | 图标 | 颜色 | 排序 |
+|----|------|------|------|------|
+| cat-1 | 常用 | Star | #F59E0B | 0 |
+| cat-2 | AI工具 | Wrench | #8B5CF6 | 1 |
+| cat-3 | 设计灵感 | Palette | #EC4899 | 2 |
+| cat-4 | 开发者 | Code2 | #10B981 | 3 |
+| cat-5 | 阅读 | BookOpen | #3B82F6 | 4 |
+| cat-inbox | 收集箱 | Inbox | #6366F1 | 99 |
+
+#### 默认网站卡片
+| 分类 | 名称 | URL |
+|------|------|-----|
+| 常用 | Notion | https://www.notion.so |
+| 常用 | Google | https://www.google.com |
+| 常用 | ChatGPT | https://chat.openai.com |
+| 常用 | Gmail | https://mail.google.com |
+| AI工具 | ChatGPT | https://chat.openai.com |
+| AI工具 | Claude | https://claude.ai |
+| AI工具 | Gemini | https://gemini.google.com |
+| AI工具 | Midjourney | https://www.midjourney.com |
+| 设计灵感 | Figma | https://www.figma.com |
+| 设计灵感 | Dribbble | https://dribbble.com |
+| 设计灵感 | Are.na | https://www.are.na |
+| 设计灵感 | Behance | https://www.behance.net |
+| 开发者 | GitHub | https://github.com |
+| 开发者 | Stack Overflow | https://stackoverflow.com |
+| 开发者 | Vercel | https://vercel.com |
+| 开发者 | npm | https://www.npmjs.com |
+| 阅读 | 掘金 | https://juejin.cn |
+| 阅读 | 知乎 | https://www.zhihu.com |
+| 阅读 | Medium | https://medium.com |
+
+> ⚠️ 用户可能在页面上额外添加了分类（如"AI设计"、"AI开发"、"搜索"、"墙内"、"影音"等），这些存储在 IndexedDB 中，代码层面绝不能清除。
+
+---
+
 ## 项目概览
 
 WebCollect 是一个美观、可拖拽的网页收藏与导览门户。用户可以把喜欢的网站像便签一样贴在墙上，支持分类管理、跨分类拖拽、自动抓取网页元数据（Open Graph）。
@@ -40,7 +98,7 @@ WebCollect 是一个美观、可拖拽的网页收藏与导览门户。用户可
 │   │   └── error-boundary.tsx  # 错误边界组件
 │   ├── lib/
 │   │   ├── types.ts            # TypeScript 类型定义
-│   │   ├── db.ts               # IndexedDB 封装（卡片/分类/隐藏网站）
+│   │   ├── db.ts               # IndexedDB 封装（卡片/分类/隐藏网站/置顶分类）
 │   │   ├── store.ts            # Zustand 状态管理
 │   │   ├── seed.ts             # 默认示例数据
 │   │   ├── hot-sites.ts        # 热门推荐网站数据（主列表 + 补充列表）
@@ -72,13 +130,13 @@ pnpm lint
 
 | 模块 | 文件 | 说明 |
 |------|------|------|
-| 数据层 | `src/lib/db.ts` | IndexedDB 操作：卡片/分类/隐藏网站的 CRUD、导入导出 |
-| 状态管理 | `src/lib/store.ts` | Zustand Store：全局状态、搜索、编辑模式、拖拽重排、分类重排、隐藏网站管理 |
+| 数据层 | `src/lib/db.ts` | IndexedDB 操作：卡片/分类/隐藏网站/置顶分类的 CRUD、导入导出 |
+| 状态管理 | `src/lib/store.ts` | Zustand Store：全局状态、搜索、编辑模式、拖拽重排、分类重排、隐藏网站管理、置顶分类、默认屏蔽时长 |
 | 卡片组件 | `src/components/card/web-card.tsx` | 条状卡片：8x8 图标/缩写 + 名称 + 简介 + 左边框分类色彩标记 + HoverCard |
 | 拖拽布局 | `src/components/layout/sortable-grid.tsx` | flex-wrap 块状布局：自动双列 + resize + 编辑模式拖拽 |
 | 添加/编辑 | `src/components/dialogs/card-dialog.tsx` | 弹窗表单：URL、自动抓取、手动编辑 |
 | 分类管理 | `src/components/dialogs/category-dialog.tsx` | 分类创建/编辑：12 种图标 + 8 种颜色 |
-| 热门推荐 | `src/components/hot-recommendation.tsx` | 热门网站推荐：查重、收集箱快捷添加、隐藏/不感兴趣、安全扫描 |
+| 热门推荐 | `src/components/hot-recommendation.tsx` | 热门网站推荐：查重、收集箱快捷添加、隐藏/不感兴趣、安全扫描、设置面板 |
 | OG 抓取 | `src/app/api/fetch-meta/route.ts` | POST {url} → 解析 title/description/image/favicon |
 | 安全检查 | `src/app/api/check-safety/route.ts` | POST {urls} → 批量安全检查（白名单/HTTPS/TLD/URL模式） |
 
@@ -118,10 +176,17 @@ pnpm lint
 
 ### 隐藏/不感兴趣机制
 - 每个推荐网站有 EyeOff（不感兴趣）按钮
-- 点击后弹出时长选择：一周(1w)、两周(2w)、一个月(1m)、永久(permanent)
-- 隐藏的网站显示为灰色 + 删除线 + Eye 图标（可取消隐藏）
+- 点击后直接屏蔽（默认1周），不再弹出时长选择器
+- 被屏蔽的网站从列表中消失，不再灰色展示
+- 屏蔽时长可在设置中修改：一周(1w)、两周(2w)、一个月(1m)、永久(permanent)
+- EyeOff 图标 hover 提示："可在'热门网站推荐设置'中选择屏蔽时长"
 - 数据存储在 IndexedDB 的 `hiddenSites` 中（per-user 设计，未来按 userId 隔离）
 - 页面加载时自动清理过期的隐藏记录（非 permanent 的到期自动恢复显示）
+
+### 设置面板
+- 热门推荐右上角齿轮图标，点击打开
+- 包含：统计信息（可添加/已添加/已隐藏）、默认屏蔽时长、安全扫描
+- 原"多少可添加/已添加"文字已收纳进设置面板
 
 ### 智能排序与折叠
 - 有未添加网站的分类排在前面
@@ -132,6 +197,12 @@ pnpm lint
 - 批量 API: POST {urls: string[]} → {results: SafetyCheckResult[]}
 - 多层检查：白名单(100+域名) + HTTPS + 可疑TLD + URL模式 + HTTP可达性
 - 页面加载时自动扫描前 20 个未添加网站
+
+### 分类选择与置顶
+- 分类选择使用 Popover + 3列网格布局（320px 宽）
+- 每个分类项 hover 时右上角出现 Pin 图标，点击置顶/取消
+- 已置顶分类排在前面，Pin 图标始终显示+蓝色高亮
+- 置顶数据保存到 IndexedDB，刷新不丢失
 
 ## 关键数据类型
 
@@ -171,6 +242,8 @@ interface HiddenSite {
 
 interface UserPreferences {
   hiddenSites: HiddenSite[];
+  pinnedCategoryIds: string[];
+  defaultHideDuration: HideDuration;
 }
 ```
 
@@ -178,42 +251,49 @@ interface UserPreferences {
 
 > 以下规则来自用户反复强调的要求，每次修改代码前必须遵守。
 
-### 1. 不改没让改的地方
+### 1. ⚠️ 严禁擅自删除数据（最高优先级）
+- **绝不删除用户数据**：分类、网站、置顶设置、隐藏记录等
+- **绝不覆盖用户数据**：seed.ts 默认数据只能增加，不能减少
+- **绝不擅自修改用户已定好的内容**：分类名称、网站URL等
+- **每次改代码前必须备份**：先读取当前数据，确认不会破坏已有内容
+
+### 2. 不改没让改的地方
 - 用户没有明确要求修改的内容，绝对不要动
 - 特别是上方卡片墙的分类、网站数据，不要随意增删改
 - 每次只改用户要求的功能，不要"顺手"改其他地方
 
-### 2. 布局不能有大面积留白
+### 3. 布局不能有大面积留白
 - 页面右侧不能有大面积空白
 - 分类块默认两列并排自动排列（卡片数 < 6 占 50%，>= 6 占 100%）
 - 热门推荐区域用多列网格填满
 - 卡片内容用 flex-wrap 自动换行，拉宽时自然填充
 
-### 3. 图标/图片必须持久化
+### 4. 图标/图片必须持久化
 - favicon 一旦获取就保存到 IndexedDB，代码更新不能丢失
 - seed 数据中的 imageUrl 使用可靠的 Google Favicon API
 - 三层回退：card.imageUrl → Google Favicon API → 缩写占位
 - 数据迁移：loadData 时自动为空 imageUrl 的卡片补充 favicon URL
 
-### 4. 每个功能必须可用
+### 5. 每个功能必须可用
 - 做完功能后必须自测：点击每个按钮，确认不崩溃
 - 弹窗必须有 DialogDescription（Radix UI accessibility 要求）
 - 关键组件包裹 ErrorBoundary，防止单点崩溃拖死整页
 - store 中所有被调用的函数必须存在（如 toggleEditMode）
 
-### 5. 分类块可编辑
+### 6. 分类块可编辑
 - 点击分类标题旁的铅笔图标，同时打开分类编辑弹窗和卡片编辑模式
 - 可修改分类名称、图标、颜色
 
-### 6. 热门推荐的行为规范
+### 7. 热门推荐的行为规范
 - 已添加的网站不隐藏，而是灰色标记 "✓ 已添加"
 - 全部已添加的分类折叠到底部
 - 所有分类默认展开（不用手风琴折叠）
-- "不感兴趣"的网站可隐藏，有4种时长可选
+- "不感兴趣"的网站点击 EyeOff 直接屏蔽（默认1周）
+- 屏蔽时长可在设置中修改
 - 推荐网站要尽量多、尽量全，涵盖国内外主流网站
 - 只有验证过的知名网站才能进入推荐列表
 
-### 7. 代码质量
+### 8. 代码质量
 - 禁止隐式 `any`
 - Lucide 图标使用静态映射，不要动态创建组件
 - 颜色使用 Tailwind 语义化变量（bg-card, text-foreground 等）
