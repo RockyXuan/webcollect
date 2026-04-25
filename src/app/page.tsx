@@ -6,6 +6,7 @@ import { SortableGrid } from "@/components/layout/sortable-grid";
 import { CardDialog } from "@/components/dialogs/card-dialog";
 import { CategoryDialog } from "@/components/dialogs/category-dialog";
 import { ErrorBoundary } from "@/components/error-boundary";
+import HotRecommendation from "@/components/hot-recommendation";
 import { useAppStore } from "@/lib/store";
 import { saveCards, saveCategories, setInitialized } from "@/lib/db";
 import { defaultCards, defaultCategories } from "@/lib/seed";
@@ -76,9 +77,13 @@ export default function HomePage() {
             onAdd={handleAddCard}
           />
         </ErrorBoundary>
+
+        <ErrorBoundary>
+          <HotRecommendation />
+        </ErrorBoundary>
       </main>
 
-      <footer className="border-t border-border/40 mt-8 py-4">
+      <footer className="border-t border-border/40 mt-4 py-4">
         <div className="px-3 sm:px-5 lg:px-6 text-center text-xs text-muted-foreground/60">
           <p className="font-serif">WebCollect — 你的个人网页收藏墙</p>
         </div>

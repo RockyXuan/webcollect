@@ -29,6 +29,24 @@ export interface FetchMetaResult {
   favicon: string;
 }
 
+export interface HotSite {
+  id: string;
+  url: string;
+  title: string;
+  shortDesc: string;
+  imageUrl: string;
+  category: string;
+}
+
+export type SafetyStatus = "safe" | "warning" | "danger" | "unknown";
+
+export interface SafetyCheckResult {
+  url: string;
+  status: SafetyStatus;
+  details: string[];
+  checkedAt: number;
+}
+
 export const PRESET_COLORS = [
   { name: "暖棕", value: "#8B6F5C", label: "warm-brown" },
   { name: "雾灰", value: "#6B7280", label: "fog-grey" },
