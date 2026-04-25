@@ -318,42 +318,31 @@ function NewSiteItem({
               ].map((c) => {
                 const isPinned = pinnedCategoryIds.includes(c.id);
                 return (
-                  <button
-                    key={c.id}
-                    onClick={() => onAddToCategory(site, c.id)}
-                    className={`flex items-center gap-1 px-1.5 py-1 text-[11px] rounded transition-colors text-left truncate ${
-                      isPinned
-                        ? "bg-primary/10 text-primary font-medium"
-                        : "hover:bg-muted"
-                    }`}
-                  >
-                    {isPinned && <Pin className="h-2.5 w-2.5 flex-shrink-0" />}
-                    <span className="truncate">{c.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="border-t mt-1.5 pt-1.5">
-              <div className="text-[10px] text-muted-foreground mb-1">置顶分类（点击切换）</div>
-              <div className="flex flex-wrap gap-1">
-                {categories.filter((c) => c.id !== "cat-inbox").map((c) => {
-                  const isPinned = pinnedCategoryIds.includes(c.id);
-                  return (
+                  <div key={c.id} className="group relative">
                     <button
-                      key={c.id}
-                      onClick={() => onTogglePin(c.id)}
-                      className={`flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded transition-colors ${
+                      onClick={() => onAddToCategory(site, c.id)}
+                      className={`w-full flex items-center gap-1 px-1.5 py-1 text-[11px] rounded transition-colors text-left truncate ${
                         isPinned
-                          ? "bg-primary/15 text-primary"
-                          : "hover:bg-muted text-muted-foreground"
+                          ? "bg-primary/10 text-primary font-medium"
+                          : "hover:bg-muted"
                       }`}
                     >
-                      <Pin className={`h-2 w-2 ${isPinned ? "" : "opacity-40"}`} />
-                      {c.name}
+                      <span className="truncate">{c.name}</span>
                     </button>
-                  );
-                })}
-              </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onTogglePin(c.id); }}
+                      className={`absolute -top-0.5 -right-0.5 p-0.5 rounded-full transition-opacity ${
+                        isPinned
+                          ? "opacity-100 text-primary bg-primary/10"
+                          : "opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary bg-background shadow-sm"
+                      }`}
+                      title={isPinned ? "取消置顶" : "置顶"}
+                    >
+                      <Pin className="h-2.5 w-2.5" />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </PopoverContent>
         </Popover>
