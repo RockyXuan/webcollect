@@ -1,53 +1,98 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { ComponentType, CSSProperties } from "react";
+import { useMemo, useRef, useState, useCallback, useEffect } from "react";
 import {
   DndContext,
-  type DragEndEvent,
-  type DragStartEvent,
-  type DragOverEvent,
   DragOverlay,
-  useDroppable,
+  DragStartEvent,
+  DragOverEvent,
+  DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
   rectIntersection,
 } from "@dnd-kit/core";
 import {
   SortableContext,
+  horizontalListSortingStrategy,
   useSortable,
   arrayMove,
-  horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Plus, PencilLine } from "lucide-react";
-import type { WebCard, Category } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import {
+  GripVertical,
+  Plus,
+  Pencil,
+  Trash2,
+  ExternalLink,
+  ChevronLeft,
+  ChevronRight,
+  Maximize2,
+} from "lucide-react";
+import { WebCard, Category } from "@/lib/types";
 import { useAppStore } from "@/lib/store";
-import { WebCardItem } from "@/components/card/web-card";
 import { getLucideIcon } from "@/lib/icons";
+import { cn } from "@/lib/utils";
+import {
+  WebCardItem,
+} from "@/components/card/web-card";
 
-/* ─── helpers ─── */
+/* ─── Scroll arrows for horizontal overflow ─── */
 
-function DynamicIcon({
-  icon,
-  color,
-}: {
-  icon: ComponentType<{ className?: string; style?: CSSProperties }> | null;
-  color: string;
-}) {
-  if (!icon) return null;
-  const Icon = icon;
-  return <Icon className="w-4 h-4" style={{ color }} />;
+function ScrollButtons({ scrollRef }: { scrollRef: React.RefObject<HTMLDivElement | null> }) {
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const check = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 0);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+  }, [scrollRef]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    check();
+    el.addEventListener("scroll", check, { passive: true });
+    window.addEventListener("resize", check);
+    const id = setInterval(check, 500);
+    return () => {
+      el.removeEventListener("scroll", check);
+      window.removeEventListener("resize", check);
+      clearInterval(id);
+    };
+  }, [scrollRef, check]);
+
+  const scroll = (dir: number) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * 200, behavior: "smooth" });
+  };
+
+  return (
+    <>
+      {canScrollLeft && (
+        <button
+          onClick={() => scroll(-1)}
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-background/90 border shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+      )}
+      {canScrollRight && (
+        <button
+          onClick={() => scroll(1)}
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-background/90 border shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      )}
+    </>
+  );
 }
 
 /* ─── Row Header ─── */
-
-interface RowHeaderProps {
-  category: Category;
-  cardCount: number;
-  editMode: boolean;
-  onToggleEdit: () => void;
-  onAdd: () => void;
-}
 
 function RowHeader({
   category,
@@ -55,51 +100,54 @@ function RowHeader({
   editMode,
   onToggleEdit,
   onAdd,
-}: RowHeaderProps) {
-  const { setNodeRef } = useDroppable({
-    id: `header-${category.id}`,
-    data: { type: "header", categoryId: category.id },
-  });
-
-  const iconEl = getLucideIcon(category.icon);
+}: {
+  category: Category;
+  cardCount: number;
+  editMode: boolean;
+  onToggleEdit: () => void;
+  onAdd: () => void;
+}) {
+  // eslint-disable-next-line react-hooks/static-components
+  const IconComponent = getLucideIcon(category.icon);
 
   return (
-    <div
-      ref={setNodeRef}
-      className="flex items-center gap-3 px-1 py-2 select-none"
-    >
+    <div className="flex items-center justify-between px-3 pt-3 pb-2">
       <div className="flex items-center gap-2">
-        <DynamicIcon icon={iconEl} color={category.color} />
+        {IconComponent && (
+          // eslint-disable-next-line react-hooks/static-components
+          <IconComponent
+            className="w-4 h-4 shrink-0"
+            style={{ color: category.color }}
+          />
+        )}
         <h2 className="text-base font-serif font-semibold text-foreground tracking-tight">
           {category.name}
         </h2>
-        <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md min-w-[1.5rem] text-center">
+        <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
           {cardCount}
         </span>
       </div>
 
-      <div className="flex-1" />
-
-      <button
-        onClick={onToggleEdit}
-        className={cn(
-          "flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border transition-colors",
-          editMode
-            ? "border-primary/40 bg-primary/5 text-primary"
-            : "border-border hover:border-primary/30 hover:bg-primary/5 text-muted-foreground"
-        )}
-      >
-        <PencilLine className="w-3.5 h-3.5" />
-        <span className="hidden sm:inline">修改</span>
-      </button>
-
-      <button
-        onClick={onAdd}
-        className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-border hover:border-primary/30 hover:bg-primary/5 text-muted-foreground hover:text-primary transition-colors"
-      >
-        <Plus className="w-3.5 h-3.5" />
-        <span className="hidden sm:inline">添加</span>
-      </button>
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={onToggleEdit}
+          className={cn(
+            "text-xs px-2 py-1 rounded-md border transition-colors",
+            editMode
+              ? "bg-primary/10 text-primary border-primary/20"
+              : "text-muted-foreground border-border hover:border-primary/30 hover:text-foreground"
+          )}
+        >
+          {editMode ? "完成" : "编辑"}
+        </button>
+        <button
+          onClick={onAdd}
+          className="flex items-center gap-1 text-xs px-2 py-1 rounded-md border border-border hover:border-primary/30 hover:text-primary transition-colors text-muted-foreground"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">添加</span>
+        </button>
+      </div>
     </div>
   );
 }
@@ -150,44 +198,50 @@ function SortableCard({
   );
 }
 
-/* ─── Card List (horizontal scroll) ─── */
+/* ─── Card List with scroll buttons ─── */
 
 function CardList({
   cards,
-  categoryId,
   editMode,
   onEdit,
   onDelete,
 }: {
   cards: WebCard[];
-  categoryId: string;
   editMode: boolean;
   onEdit: (card: WebCard) => void;
   onDelete: (id: string) => void;
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
   const cardIds = useMemo(() => cards.map((c) => c.id), [cards]);
 
   return (
-    <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-hide px-1">
-      <SortableContext
-        items={cardIds}
-        strategy={horizontalListSortingStrategy}
+    <div className="relative">
+      <ScrollButtons scrollRef={scrollRef} />
+      <div
+        ref={scrollRef}
+        className="flex gap-2.5 overflow-x-auto pb-2 px-1 scroll-smooth"
+        style={{ scrollbarWidth: "thin" }}
       >
-        {cards.map((card) => (
-          <SortableCard
-            key={card.id}
-            card={card}
-            editMode={editMode}
-            onEdit={onEdit}
-            onDelete={onDelete}
-          />
-        ))}
-      </SortableContext>
+        <SortableContext
+          items={cardIds}
+          strategy={horizontalListSortingStrategy}
+        >
+          {cards.map((card) => (
+            <SortableCard
+              key={card.id}
+              card={card}
+              editMode={editMode}
+              onEdit={onEdit}
+              onDelete={onDelete}
+            />
+          ))}
+        </SortableContext>
+      </div>
     </div>
   );
 }
 
-/* ─── Category Block ─── */
+/* ─── Category Block with resize handle ─── */
 
 function CategoryBlock({
   category,
@@ -197,7 +251,7 @@ function CategoryBlock({
   onAdd,
   onEdit,
   onDelete,
-  className,
+  defaultWidth = 520,
 }: {
   category: Category;
   cards: WebCard[];
@@ -206,15 +260,43 @@ function CategoryBlock({
   onAdd: () => void;
   onEdit: (card: WebCard) => void;
   onDelete: (id: string) => void;
-  className?: string;
+  defaultWidth?: number;
 }) {
+  const [width, setWidth] = useState(defaultWidth);
+  const blockRef = useRef<HTMLDivElement>(null);
+
+  const startResize = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const startX = e.clientX;
+      const startW = width;
+
+      const onMove = (ev: MouseEvent) => {
+        const delta = ev.clientX - startX;
+        const newW = Math.max(320, Math.min(1400, startW + delta));
+        setWidth(newW);
+      };
+
+      const onUp = () => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+      };
+
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    },
+    [width]
+  );
+
   return (
     <section
+      ref={blockRef}
       className={cn(
-        "rounded-2xl border bg-card/50 backdrop-blur-sm transition-colors",
-        editMode ? "border-primary/20" : "border-border",
-        className
+        "relative rounded-2xl border bg-card/50 backdrop-blur-sm transition-colors flex-shrink-0",
+        editMode ? "border-primary/20" : "border-border"
       )}
+      style={{ width, maxWidth: "100%" }}
     >
       <RowHeader
         category={category}
@@ -227,7 +309,6 @@ function CategoryBlock({
       {cards.length > 0 ? (
         <CardList
           cards={cards}
-          categoryId={category.id}
           editMode={editMode}
           onEdit={onEdit}
           onDelete={onDelete}
@@ -243,6 +324,15 @@ function CategoryBlock({
           </button>
         </div>
       )}
+
+      {/* Resize handle */}
+      <div
+        className="absolute bottom-1 right-1 w-5 h-5 cursor-se-resize flex items-center justify-center rounded hover:bg-muted transition-colors"
+        onMouseDown={startResize}
+        title="拖动调整宽度"
+      >
+        <Maximize2 className="w-3 h-3 text-muted-foreground/40" />
+      </div>
     </section>
   );
 }
@@ -284,6 +374,12 @@ export function SortableGrid({
 
   const [activeId, setActiveId] = useState<string | null>(null);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 5 },
+    })
+  );
+
   const sortedCategories = useMemo(
     () => [...categories].sort((a, b) => a.order - b.order),
     [categories]
@@ -320,13 +416,8 @@ export function SortableGrid({
     setActiveId(String(event.active.id));
   }
 
-  /*
-   * onDragOver is used for visual feedback during drag.
-   * We do NOT mutate store here to avoid re-render tearing.
-   */
   function onDragOver(event: DragOverEvent) {
     // No-op: visual feedback handled by DragOverlay
-    // Store mutations happen only in onDragEnd for safety
   }
 
   function onDragEnd(event: DragEndEvent) {
@@ -377,6 +468,7 @@ export function SortableGrid({
 
   return (
     <DndContext
+      sensors={sensors}
       collisionDetection={rectIntersection}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
@@ -393,12 +485,12 @@ export function SortableGrid({
             onAdd={() => onAdd(favoriteCategory.id)}
             onEdit={onEdit}
             onDelete={onDelete}
-            className="w-full"
+            defaultWidth={1200}
           />
         )}
 
-        {/* Other categories - grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Other categories - flex wrap, resizable blocks */}
+        <div className="flex flex-wrap gap-4">
           {otherRows.map((row) => (
             <CategoryBlock
               key={row.category.id}
@@ -409,6 +501,7 @@ export function SortableGrid({
               onAdd={() => onAdd(row.category.id)}
               onEdit={onEdit}
               onDelete={onDelete}
+              defaultWidth={520}
             />
           ))}
         </div>
@@ -417,17 +510,6 @@ export function SortableGrid({
       <DragOverlay dropAnimation={null}>
         {activeCard && <CardOverlay card={activeCard} editMode={editMode} />}
       </DragOverlay>
-
-      {/* Hide scrollbar utility */}
-      <style jsx global>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
     </DndContext>
   );
 }
