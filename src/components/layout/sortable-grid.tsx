@@ -592,7 +592,7 @@ function SortableCategoryBlock({
       ref={setRef}
       style={style}
       className={`
-        relative rounded-lg border bg-card
+        relative rounded-lg border bg-card overflow-hidden
         ${isHovered ? "border-primary/60 shadow-sm bg-primary/[0.03]" : "border-border"}
         transition-[border-color,background-color,box-shadow,min-height] duration-300 ease-out
       `}
@@ -765,8 +765,49 @@ function SortableSubGroupBlock({
     isDragging,
   } = useSortable({ id: subId(category.id) });
 
+  const categoryWidths = useAppStore((s) => s.categoryWidths);
+  const setCategoryWidth = useAppStore((s) => s.setCategoryWidth);
+  const [localWidth, setLocalWidth] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const widthPercent = localWidth ?? categoryWidths[category.id] ?? null;
+
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const container = containerRef.current;
+      if (!container) return;
+      const parentEl = container.parentElement;
+      if (!parentEl) return;
+      const startX = e.clientX;
+      const startWidth = container.offsetWidth;
+      const parentWidth = parentEl.offsetWidth;
+
+      const handleMouseMove = (ev: MouseEvent) => {
+        const dx = ev.clientX - startX;
+        const newPercent = Math.max(15, Math.min(100, ((startWidth + dx) / parentWidth) * 100));
+        setLocalWidth(newPercent);
+      };
+
+      const handleMouseUp = () => {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+        setLocalWidth((prev) => {
+          if (prev !== null) setCategoryWidth(category.id, prev);
+          return prev;
+        });
+      };
+
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    },
+    [category.id, setCategoryWidth]
+  );
+
   const setRef = useCallback(
     (node: HTMLDivElement | null) => {
+      containerRef.current = node;
       setNodeRef(node);
     },
     [setNodeRef]
@@ -776,13 +817,14 @@ function SortableSubGroupBlock({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.4 : 1,
+    ...(widthPercent !== null ? { width: `${widthPercent}%` } : {}),
   };
 
   return (
     <div
       ref={setRef}
       style={style}
-      className="relative rounded-md border border-border/40 bg-background"
+      className="relative rounded-md border border-border/40 bg-background overflow-hidden"
     >
       {/* Sub-group header - buttons right next to title */}
       <div className="flex items-center gap-1.5 px-2.5 py-1.5 flex-wrap">
@@ -864,6 +906,12 @@ function SortableSubGroupBlock({
         </div>
       </SortableContext>
 
+      {/* Resize handle - right edge, always available */}
+      <div
+        className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize
+          hover:bg-primary/20 active:bg-primary/30 transition-colors rounded-r-md"
+        onMouseDown={handleResizeStart}
+      />
     </div>
   );
 }
@@ -899,8 +947,49 @@ function SortableUngroupedBlock({
     isDragging,
   } = useSortable({ id: ungroupId(category.id) });
 
+  const categoryWidths = useAppStore((s) => s.categoryWidths);
+  const setCategoryWidth = useAppStore((s) => s.setCategoryWidth);
+  const [localWidth, setLocalWidth] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const widthPercent = localWidth ?? categoryWidths[category.id] ?? null;
+
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const container = containerRef.current;
+      if (!container) return;
+      const parentEl = container.parentElement;
+      if (!parentEl) return;
+      const startX = e.clientX;
+      const startWidth = container.offsetWidth;
+      const parentWidth = parentEl.offsetWidth;
+
+      const handleMouseMove = (ev: MouseEvent) => {
+        const dx = ev.clientX - startX;
+        const newPercent = Math.max(15, Math.min(100, ((startWidth + dx) / parentWidth) * 100));
+        setLocalWidth(newPercent);
+      };
+
+      const handleMouseUp = () => {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+        setLocalWidth((prev) => {
+          if (prev !== null) setCategoryWidth(category.id, prev);
+          return prev;
+        });
+      };
+
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    },
+    [category.id, setCategoryWidth]
+  );
+
   const setRef = useCallback(
     (node: HTMLDivElement | null) => {
+      containerRef.current = node;
       setNodeRef(node);
     },
     [setNodeRef]
@@ -910,13 +999,14 @@ function SortableUngroupedBlock({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.4 : 1,
+    ...(widthPercent !== null ? { width: `${widthPercent}%` } : {}),
   };
 
   return (
     <div
       ref={setRef}
       style={style}
-      className="rounded-md border border-border/40 bg-background flex-shrink-0"
+      className="relative rounded-md border border-border/40 bg-background flex-shrink-0 overflow-hidden"
     >
       {/* Header - buttons right next to title */}
       <div className="flex items-center gap-1.5 px-2.5 py-1.5 flex-wrap">
@@ -997,6 +1087,13 @@ function SortableUngroupedBlock({
           )}
         </div>
       </SortableContext>
+
+      {/* Resize handle - right edge, always available */}
+      <div
+        className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize
+          hover:bg-primary/20 active:bg-primary/30 transition-colors rounded-r-md"
+        onMouseDown={handleResizeStart}
+      />
     </div>
   );
 }
