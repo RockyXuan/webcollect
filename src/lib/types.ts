@@ -47,6 +47,29 @@ export interface SafetyCheckResult {
   checkedAt: number;
 }
 
+/** Duration for hiding a recommended site */
+export type HideDuration = "1w" | "2w" | "1m" | "permanent";
+
+/** A site hidden by the user from recommendations */
+export interface HiddenSite {
+  siteId: string;
+  siteUrl: string;
+  hiddenAt: number;       // timestamp when hidden
+  duration: HideDuration; // how long to hide
+}
+
+/** Per-user preferences (future: keyed by userId) */
+export interface UserPreferences {
+  hiddenSites: HiddenSite[];
+}
+
+export const HIDE_DURATION_LABELS: Record<HideDuration, string> = {
+  "1w": "一周",
+  "2w": "两周",
+  "1m": "一个月",
+  permanent: "永久",
+};
+
 export const PRESET_COLORS = [
   { name: "暖棕", value: "#8B6F5C", label: "warm-brown" },
   { name: "雾灰", value: "#6B7280", label: "fog-grey" },

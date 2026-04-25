@@ -1,5 +1,5 @@
 import localforage from "localforage";
-import type { WebCard, Category } from "./types";
+import type { WebCard, Category, HiddenSite } from "./types";
 
 localforage.config({
   name: "WebCollect",
@@ -9,6 +9,7 @@ localforage.config({
 const CARDS_KEY = "cards";
 const CATEGORIES_KEY = "categories";
 const INIT_KEY = "initialized";
+const HIDDEN_SITES_KEY = "hiddenSites";
 
 export async function getCards(): Promise<WebCard[]> {
   const cards = (await localforage.getItem<WebCard[]>(CARDS_KEY)) || [];
@@ -86,4 +87,12 @@ export async function exportData(): Promise<{ cards: WebCard[]; categories: Cate
 export async function importData(data: { cards: WebCard[]; categories: Category[] }): Promise<void> {
   await saveCards(data.cards);
   await saveCategories(data.categories);
+}
+
+export async function getHiddenSites(): Promise<HiddenSite[]> {
+  return (await localforage.getItem<HiddenSite[]>(HIDDEN_SITES_KEY)) || [];
+}
+
+export async function saveHiddenSites(sites: HiddenSite[]): Promise<void> {
+  await localforage.setItem(HIDDEN_SITES_KEY, sites);
 }

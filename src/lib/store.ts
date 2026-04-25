@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { WebCard, Category } from "./types";
+import type { WebCard, Category, HiddenSite, HideDuration } from "./types";
 import {
   getCards,
   saveCards,
@@ -12,11 +12,14 @@ import {
   updateCategory as dbUpdateCategory,
   deleteCategory as dbDeleteCategory,
   isInitialized,
+  getHiddenSites,
+  saveHiddenSites,
 } from "./db";
 
 interface AppState {
   cards: WebCard[];
   categories: Category[];
+  hiddenSites: HiddenSite[];
   searchQuery: string;
   activeCategoryId: string;
   isLoading: boolean;
@@ -40,11 +43,17 @@ interface AppState {
   updateCategory: (cat: Category) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
   reorderCategories: (orderedIds: string[]) => Promise<void>;
+
+  // Hidden sites
+  hideSite: (siteId: string, siteUrl: string, duration: HideDuration) => Promise<void>;
+  unhideSite: (siteId: string) => Promise<void>;
+  isSiteHidden: (siteId: string) => boolean;
 }
 
-export const useAppStore = create<AppState>((set, _get) => ({
+export const useAppStore = create<AppState>((set, get) => ({
   cards: [],
   categories: [],
+  hiddenSites: [],
   searchQuery: "",
   activeCategoryId: "all",
   isLoading: true,
@@ -53,14 +62,32 @@ export const useAppStore = create<AppState>((set, _get) => ({
 
   loadData: async () => {
     set({ isLoading: true });
-    const [cards, categories, init] = await Promise.all([
+    const [cards, categories, init, hiddenSites] = await Promise.all([
       getCards(),
       getCategories(),
       isInitialized(),
+      getHiddenSites(),
     ]);
+
+    // Clean up expired hidden sites (non-permanent)
+    const now = Date.now();
+    const cleanedHidden = hiddenSites.filter((h) => {
+      if (h.duration === "permanent") return true;
+      const durationMs: Record<string, number> = {
+        "1w": 7 * 24 * 60 * 60 * 1000,
+        "2w": 14 * 24 * 60 * 60 * 1000,
+        "1m": 30 * 24 * 60 * 60 * 1000,
+      };
+      return now - h.hiddenAt < (durationMs[h.duration] || 0);
+    });
+    if (cleanedHidden.length !== hiddenSites.length) {
+      await saveHiddenSites(cleanedHidden);
+    }
+
     set({
       cards,
       categories,
+      hiddenSites: cleanedHidden,
       initialized: init,
       isLoading: false,
     });
@@ -203,5 +230,39 @@ export const useAppStore = create<AppState>((set, _get) => ({
     });
     await saveCategories(categories);
     set({ categories: await getCategories() });
+  },
+
+  // Hidden sites management (per-user preferences)
+  hideSite: async (siteId, siteUrl, duration) => {
+    const hiddenSites = [...get().hiddenSites];
+    // Remove existing entry for same siteId if present
+    const idx = hiddenSites.findIndex((h) => h.siteId === siteId);
+    if (idx >= 0) {
+      hiddenSites[idx] = { siteId, siteUrl, hiddenAt: Date.now(), duration };
+    } else {
+      hiddenSites.push({ siteId, siteUrl, hiddenAt: Date.now(), duration });
+    }
+    await saveHiddenSites(hiddenSites);
+    set({ hiddenSites });
+  },
+
+  unhideSite: async (siteId) => {
+    const hiddenSites = get().hiddenSites.filter((h) => h.siteId !== siteId);
+    await saveHiddenSites(hiddenSites);
+    set({ hiddenSites });
+  },
+
+  isSiteHidden: (siteId) => {
+    const hiddenSites = get().hiddenSites;
+    const entry = hiddenSites.find((h) => h.siteId === siteId);
+    if (!entry) return false;
+    if (entry.duration === "permanent") return true;
+    const now = Date.now();
+    const durationMs: Record<string, number> = {
+      "1w": 7 * 24 * 60 * 60 * 1000,
+      "2w": 14 * 24 * 60 * 60 * 1000,
+      "1m": 30 * 24 * 60 * 60 * 1000,
+    };
+    return now - entry.hiddenAt < (durationMs[entry.duration] || 0);
   },
 }));

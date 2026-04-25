@@ -15,7 +15,10 @@ import {
   ChevronDown,
   ChevronRight,
   RefreshCw,
+  EyeOff,
+  Eye,
 } from "lucide-react";
+import { HIDE_DURATION_LABELS, type HideDuration } from "@/lib/types";
 
 /* ── safety badge ── */
 function SafetyBadge({ status }: { status: SafetyCheckResult | undefined }) {
@@ -41,8 +44,11 @@ interface CategoryGroupProps {
   addedSites: HotSite[];
   safetyMap: Record<string, SafetyCheckResult>;
   isSiteAdded: (site: HotSite) => boolean;
+  isSiteHidden: (siteId: string) => boolean;
   onQuickAdd: (site: HotSite) => void;
   onAddToCategory: (site: HotSite, categoryId: string) => void;
+  onHideSite: (siteId: string, siteUrl: string, duration: HideDuration) => void;
+  onUnhideSite: (siteId: string) => void;
   categories: { id: string; name: string }[];
   allAdded: boolean;
 }
@@ -52,8 +58,12 @@ function CategoryGroup({
   newSites,
   addedSites,
   safetyMap,
+  isSiteAdded,
+  isSiteHidden,
   onQuickAdd,
   onAddToCategory,
+  onHideSite,
+  onUnhideSite,
   categories,
   allAdded,
 }: CategoryGroupProps) {
@@ -118,6 +128,9 @@ function CategoryGroup({
             safety={safetyMap[site.url]}
             onQuickAdd={onQuickAdd}
             onAddToCategory={onAddToCategory}
+            onHideSite={onHideSite}
+            onUnhideSite={onUnhideSite}
+            isHidden={isSiteHidden(site.id)}
             categories={categories}
           />
         ))}
@@ -135,20 +148,86 @@ function CategoryGroup({
   );
 }
 
+/* ── Duration picker popup ── */
+function HideDurationPicker({
+  onPick,
+  onClose,
+}: {
+  onPick: (d: HideDuration) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="absolute right-0 top-7 z-20 bg-popover border border-border rounded-md shadow-md py-1 min-w-[90px]">
+      <div className="text-[10px] text-muted-foreground px-2 py-0.5 border-b border-border/30">
+        屏蔽时长
+      </div>
+      {(Object.entries(HIDE_DURATION_LABELS) as [HideDuration, string][]).map(
+        ([val, label]) => (
+          <button
+            key={val}
+            onClick={() => {
+              onPick(val);
+              onClose();
+            }}
+            className="w-full text-left text-[11px] px-2 py-1 hover:bg-muted/50 transition-colors"
+          >
+            {label}
+          </button>
+        ),
+      )}
+    </div>
+  );
+}
+
 /* ── New (unadded) site item ── */
 function NewSiteItem({
   site,
   safety,
   onQuickAdd,
   onAddToCategory,
+  onHideSite,
+  onUnhideSite,
+  isHidden,
   categories,
 }: {
   site: HotSite;
   safety: SafetyCheckResult | undefined;
   onQuickAdd: (site: HotSite) => void;
   onAddToCategory: (site: HotSite, categoryId: string) => void;
+  onHideSite: (siteId: string, siteUrl: string, duration: HideDuration) => void;
+  onUnhideSite: (siteId: string) => void;
+  isHidden: boolean;
   categories: { id: string; name: string }[];
 }) {
+  const [showHidePicker, setShowHidePicker] = useState(false);
+
+  if (isHidden) {
+    return (
+      <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-muted/15 min-w-0 opacity-50">
+        <img
+          src={site.imageUrl}
+          alt=""
+          className="h-4 w-4 rounded-sm flex-shrink-0 grayscale"
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = "none";
+          }}
+        />
+        <div className="flex-1 min-w-0">
+          <span className="text-[11px] text-muted-foreground truncate line-through">
+            {site.title}
+          </span>
+        </div>
+        <button
+          onClick={() => onUnhideSite(site.id)}
+          title="取消隐藏"
+          className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Eye className="h-3 w-3" />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-muted/40 hover:bg-muted/70 transition-colors group min-w-0">
       <img
@@ -193,6 +272,21 @@ function NewSiteItem({
               </option>
             ))}
         </select>
+        <div className="relative">
+          <button
+            onClick={() => setShowHidePicker(!showHidePicker)}
+            title="不感兴趣"
+            className="p-1 rounded hover:bg-muted/50 text-muted-foreground/60 hover:text-foreground transition-colors"
+          >
+            <EyeOff className="h-3 w-3" />
+          </button>
+          {showHidePicker && (
+            <HideDurationPicker
+              onPick={(duration) => onHideSite(site.id, site.url, duration)}
+              onClose={() => setShowHidePicker(false)}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
@@ -235,6 +329,9 @@ export function HotRecommendation() {
   const cards = useAppStore((s) => s.cards);
   const categories = useAppStore((s) => s.categories);
   const addCard = useAppStore((s) => s.addCard);
+  const hiddenSites = useAppStore((s) => s.hiddenSites);
+  const hideSite = useAppStore((s) => s.hideSite);
+  const unhideSite = useAppStore((s) => s.unhideSite);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [safetyMap, setSafetyMap] = useState<Record<string, SafetyCheckResult>>({});
@@ -275,6 +372,39 @@ export function HotRecommendation() {
       }
     },
     [userDomains, addedUrls],
+  );
+
+  /* check if a site is hidden */
+  const isSiteHidden = useCallback(
+    (siteId: string) => {
+      const entry = hiddenSites.find((h) => h.siteId === siteId);
+      if (!entry) return false;
+      if (entry.duration === "permanent") return true;
+      const now = Date.now();
+      const durationMs: Record<string, number> = {
+        "1w": 7 * 24 * 60 * 60 * 1000,
+        "2w": 14 * 24 * 60 * 60 * 1000,
+        "1m": 30 * 24 * 60 * 60 * 1000,
+      };
+      return now - entry.hiddenAt < (durationMs[entry.duration] || 0);
+    },
+    [hiddenSites],
+  );
+
+  /* hide a site */
+  const handleHideSite = useCallback(
+    (siteId: string, siteUrl: string, duration: HideDuration) => {
+      hideSite(siteId, siteUrl, duration);
+    },
+    [hideSite],
+  );
+
+  /* unhide a site */
+  const handleUnhideSite = useCallback(
+    (siteId: string) => {
+      unhideSite(siteId);
+    },
+    [unhideSite],
   );
 
   /* group by category, split into new/added, sort: partial categories first, all-added last */
@@ -489,6 +619,9 @@ export function HotRecommendation() {
                   safety={safetyMap[site.url]}
                   onQuickAdd={handleQuickAdd}
                   onAddToCategory={handleAddToCategory}
+                  onHideSite={handleHideSite}
+                  onUnhideSite={handleUnhideSite}
+                  isHidden={isSiteHidden(site.id)}
                   categories={categories}
                 />
               );
@@ -505,8 +638,11 @@ export function HotRecommendation() {
               addedSites={group.addedSites}
               safetyMap={safetyMap}
               isSiteAdded={isSiteAdded}
+              isSiteHidden={isSiteHidden}
               onQuickAdd={handleQuickAdd}
               onAddToCategory={handleAddToCategory}
+              onHideSite={handleHideSite}
+              onUnhideSite={handleUnhideSite}
               categories={categories}
               allAdded={group.allAdded}
             />
