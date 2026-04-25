@@ -106,3 +106,13 @@ export async function getPinnedCategoryIds(): Promise<string[]> {
 export async function savePinnedCategoryIds(ids: string[]): Promise<void> {
   await localforage.setItem(PINNED_CATEGORIES_KEY, ids);
 }
+
+const CATEGORY_WIDTHS_KEY = "categoryWidths";
+
+export async function getCategoryWidths(): Promise<Record<string, number>> {
+  return (await localforage.getItem<Record<string, number>>(CATEGORY_WIDTHS_KEY)) || {};
+}
+
+export async function saveCategoryWidths(widths: Record<string, number>): Promise<void> {
+  await localforage.setItem(CATEGORY_WIDTHS_KEY, widths);
+}

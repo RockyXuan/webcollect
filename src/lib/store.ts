@@ -16,6 +16,8 @@ import {
   saveHiddenSites,
   getPinnedCategoryIds,
   savePinnedCategoryIds,
+  getCategoryWidths,
+  saveCategoryWidths,
 } from "./db";
 
 interface AppState {
@@ -61,6 +63,10 @@ interface AppState {
   pinnedCategoryIds: string[];
   togglePinCategory: (categoryId: string) => void;
   isCategoryPinned: (categoryId: string) => boolean;
+
+  // Category widths
+  categoryWidths: Record<string, number>;
+  setCategoryWidth: (categoryId: string, widthPercent: number) => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -74,15 +80,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   editMode: false,
   defaultHideDuration: "1w" as HideDuration,
   pinnedCategoryIds: [] as string[],
+  categoryWidths: {} as Record<string, number>,
 
   loadData: async () => {
     set({ isLoading: true });
-    const [cards, initCategories, init, hiddenSites, pinnedIds] = await Promise.all([
+    const [cards, initCategories, init, hiddenSites, pinnedIds, widths] = await Promise.all([
       getCards(),
       getCategories(),
       isInitialized(),
       getHiddenSites(),
       getPinnedCategoryIds(),
+      getCategoryWidths(),
     ]);
     let categories = initCategories;
 
@@ -106,6 +114,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       categories,
       hiddenSites: cleanedHidden,
       pinnedCategoryIds: pinnedIds,
+      categoryWidths: widths,
       initialized: init,
       isLoading: false,
     });
@@ -357,5 +366,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   isCategoryPinned: (categoryId) => {
     return get().pinnedCategoryIds.includes(categoryId);
+  },
+
+  setCategoryWidth: (categoryId, widthPercent) => {
+    const widths = { ...get().categoryWidths, [categoryId]: widthPercent };
+    saveCategoryWidths(widths);
+    set({ categoryWidths: widths });
   },
 }));
