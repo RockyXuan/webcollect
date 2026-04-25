@@ -27,9 +27,10 @@ interface CardDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editingCard?: WebCard | null;
+  defaultCategoryId?: string;
 }
 
-export function CardDialog({ open, onOpenChange, editingCard }: CardDialogProps) {
+export function CardDialog({ open, onOpenChange, editingCard, defaultCategoryId }: CardDialogProps) {
   const { categories, addCard, updateCard } = useAppStore();
 
   const [url, setUrl] = useState("");
@@ -63,10 +64,10 @@ export function CardDialog({ open, onOpenChange, editingCard }: CardDialogProps)
         setNote("");
         setAbbreviation("");
         setImageUrl("");
-        setCategoryId(categories[0]?.id || "");
+        setCategoryId(defaultCategoryId || categories[0]?.id || "");
       }
     }
-  }, [open, editingCard, categories]);
+  }, [open, editingCard, categories, defaultCategoryId]);
 
   const fetchMeta = useCallback(async () => {
     if (!url.trim()) return;

@@ -9,7 +9,6 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
-  type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import {
@@ -17,6 +16,7 @@ import {
   sortableKeyboardCoordinates,
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
+import { Plus } from "lucide-react";
 import { WebCardItem } from "@/components/card/web-card";
 import { useAppStore } from "@/lib/store";
 import type { WebCard, Category } from "@/lib/types";
@@ -25,9 +25,10 @@ import { getLucideIcon } from "@/lib/icons";
 
 interface SortableGridProps {
   onEditCard: (card: WebCard) => void;
+  onAddCard: (categoryId?: string) => void;
 }
 
-export function SortableGrid({ onEditCard }: SortableGridProps) {
+export function SortableGrid({ onEditCard, onAddCard }: SortableGridProps) {
   const { cards, categories, activeCategoryId, searchQuery, deleteCard, reorderCards } = useAppStore();
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -62,7 +63,6 @@ export function SortableGrid({ onEditCard }: SortableGridProps) {
         .sort((a, b) => a.order - b.order);
       groups.push({ category: cat, cards: catCards });
     });
-    // uncategorized
     const uncategorized = searchFilteredCards.filter(
       (c) => !categories.find((cat) => cat.id === c.categoryId)
     );
@@ -74,18 +74,6 @@ export function SortableGrid({ onEditCard }: SortableGridProps) {
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id as string);
-  }, []);
-
-  const handleDragOver = useCallback((event: DragOverEvent) => {
-    const { active, over } = event;
-    if (!over) return;
-
-    const activeCardId = active.id as string;
-    const overId = over.id as string;
-
-    // Find which category the overId belongs to
-    // overId could be a card or a category container
-    // We don't change category on drag over to avoid jitter, only on drag end
   }, []);
 
   const handleDragEnd = useCallback(
@@ -100,18 +88,15 @@ export function SortableGrid({ onEditCard }: SortableGridProps) {
       const activeCard = cards.find((c) => c.id === activeCardId);
       if (!activeCard) return;
 
-      // Determine target category and new order
       let targetCategoryId = activeCard.categoryId;
       let newOrder = activeCard.order;
 
-      // Check if dropped over a category container
       const overCategory = categories.find((c) => c.id === overId);
       if (overCategory) {
         targetCategoryId = overCategory.id;
         const catCards = cards.filter((c) => c.categoryId === targetCategoryId);
         newOrder = catCards.length;
       } else {
-        // Dropped over another card
         const overCard = cards.find((c) => c.id === overId);
         if (overCard) {
           targetCategoryId = overCard.categoryId;
@@ -138,53 +123,70 @@ export function SortableGrid({ onEditCard }: SortableGridProps) {
     [cards, categories, reorderCards]
   );
 
-  const getIcon = getLucideIcon;
-
   return (
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
       onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <div className="space-y-8">
+      <div className="space-y-6">
         {grouped.map((group) => {
           const catId = group.category?.id || "uncategorized";
           const catCards = group.cards;
-          const IconEl = group.category ? getIcon(group.category.icon) : null;
+          const IconEl = group.category ? getLucideIcon(group.category.icon) : null;
+          const isAllView = activeCategoryId === "all";
 
           return (
-            <section key={catId} className="space-y-3">
+            <section
+              key={catId}
+              className={cn(
+                "rounded-xl border border-border/60 bg-card/30 overflow-hidden",
+                isAllView && "bg-card/50"
+              )}
+            >
               {/* Category header */}
-              {activeCategoryId === "all" && (
-                <div className="flex items-center gap-2 pb-2 border-b border-border/60">
-                  {group.category && IconEl && (
-                    <div
-                      className="w-7 h-7 rounded-md flex items-center justify-center"
-                      style={{ backgroundColor: group.category.color + "20" }}
-                    >
-                      <IconEl
-                        className="w-4 h-4"
-                        style={{ color: group.category.color }}
-                      />
-                    </div>
-                  )}
-                  <h2 className="font-serif text-lg font-semibold text-foreground">
-                    {group.category?.name || "未分类"}
-                  </h2>
-                  <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                    {catCards.length}
-                  </span>
+              {isAllView && (
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+                  <div className="flex items-center gap-2.5">
+                    {group.category && IconEl && (
+                      <div
+                        className="w-6 h-6 rounded flex items-center justify-center"
+                        style={{ backgroundColor: group.category.color + "20" }}
+                      >
+                        <IconEl
+                          className="w-3.5 h-3.5"
+                          style={{ color: group.category.color }}
+                        />
+                      </div>
+                    )}
+                    <h2 className="font-serif text-base font-semibold text-foreground">
+                      {group.category?.name || "未分类"}
+                    </h2>
+                    <span className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+                      {catCards.length}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() => onAddCard(group.category?.id)}
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted px-2 py-1 rounded-md transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    添加
+                  </button>
                 </div>
               )}
 
-              {/* Cards grid */}
+              {/* Cards grid - compact */}
               <SortableContext
                 items={catCards.map((c) => c.id)}
                 strategy={rectSortingStrategy}
               >
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                <div className={cn(
+                  "grid gap-2 p-3",
+                  "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
+                )}>
                   {catCards.map((card) => (
                     <WebCardItem
                       key={card.id}
@@ -197,12 +199,26 @@ export function SortableGrid({ onEditCard }: SortableGridProps) {
                       }}
                     />
                   ))}
+
+                  {/* Inline add button at end of grid */}
+                  <button
+                    onClick={() => onAddCard(group.category?.id)}
+                    className={cn(
+                      "flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-border/80",
+                      "text-muted-foreground hover:text-foreground hover:border-muted-foreground/40 hover:bg-muted/50",
+                      "transition-all duration-200 min-h-[48px]",
+                      !isAllView && "py-2.5"
+                    )}
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span className="text-xs">添加</span>
+                  </button>
                 </div>
               </SortableContext>
 
               {catCards.length === 0 && (
-                <div className="py-12 text-center text-muted-foreground text-sm">
-                  该分类暂无网站，点击右上角「添加」开始收集
+                <div className="py-8 text-center text-xs text-muted-foreground">
+                  该分类暂无网站，点击上方「添加」开始收集
                 </div>
               )}
             </section>

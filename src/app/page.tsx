@@ -18,6 +18,7 @@ export default function HomePage() {
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<WebCard | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [defaultCategoryId, setDefaultCategoryId] = useState<string>("");
 
   useEffect(() => {
     const init = async () => {
@@ -33,8 +34,9 @@ export default function HomePage() {
     init();
   }, [loadData]);
 
-  const handleAddCard = () => {
+  const handleAddCard = (categoryId?: string) => {
     setEditingCard(null);
+    setDefaultCategoryId(categoryId || "");
     setCardDialogOpen(true);
   };
 
@@ -73,7 +75,7 @@ export default function HomePage() {
           onAddCategory={handleAddCategory}
           onEditCategory={handleEditCategory}
         />
-        <SortableGrid onEditCard={handleEditCard} />
+        <SortableGrid onEditCard={handleEditCard} onAddCard={handleAddCard} />
       </main>
 
       <footer className="border-t border-border/60 mt-12 py-6">
@@ -87,6 +89,7 @@ export default function HomePage() {
         open={cardDialogOpen}
         onOpenChange={setCardDialogOpen}
         editingCard={editingCard}
+        defaultCategoryId={defaultCategoryId}
       />
       <CategoryDialog
         open={categoryDialogOpen}
