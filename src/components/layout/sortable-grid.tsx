@@ -10,7 +10,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  rectIntersection,
+  closestCenter,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -21,8 +21,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   Plus,
-  ArrowUp,
-  ArrowDown,
+  GripVertical,
   Star,
   Wrench,
   Palette,
@@ -60,86 +59,6 @@ function CategoryIcon({ iconName, color }: { iconName: string; color: string }) 
     case "gamepad-2": return <Gamepad2 className="w-4 h-4 shrink-0" style={{ color }} />;
     default: return <Circle className="w-4 h-4 shrink-0" style={{ color }} />;
   }
-}
-
-/* ─── Row Header ─── */
-
-function RowHeader({
-  category,
-  cardCount,
-  editMode,
-  onToggleEdit,
-  onAdd,
-  onMoveUp,
-  onMoveDown,
-  canMoveUp,
-  canMoveDown,
-}: {
-  category: Category;
-  cardCount: number;
-  editMode: boolean;
-  onToggleEdit: () => void;
-  onAdd: () => void;
-  onMoveUp?: () => void;
-  onMoveDown?: () => void;
-  canMoveUp?: boolean;
-  canMoveDown?: boolean;
-}) {
-
-  return (
-    <div className="flex items-center justify-between px-3 pt-3 pb-2">
-      <div className="flex items-center gap-2">
-        <CategoryIcon iconName={category.icon} color={category.color} />
-        <h2 className="text-base font-serif font-semibold text-foreground tracking-tight">
-          {category.name}
-        </h2>
-        <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
-          {cardCount}
-        </span>
-      </div>
-
-      <div className="flex items-center gap-1.5">
-        {editMode && onMoveUp && (
-          <button
-            onClick={onMoveUp}
-            disabled={!canMoveUp}
-            className="p-1 rounded-md border border-border hover:border-primary/30 hover:text-primary transition-colors text-muted-foreground disabled:opacity-30 disabled:cursor-not-allowed"
-            title="上移"
-          >
-            <ArrowUp className="w-3.5 h-3.5" />
-          </button>
-        )}
-        {editMode && onMoveDown && (
-          <button
-            onClick={onMoveDown}
-            disabled={!canMoveDown}
-            className="p-1 rounded-md border border-border hover:border-primary/30 hover:text-primary transition-colors text-muted-foreground disabled:opacity-30 disabled:cursor-not-allowed"
-            title="下移"
-          >
-            <ArrowDown className="w-3.5 h-3.5" />
-          </button>
-        )}
-        <button
-          onClick={onToggleEdit}
-          className={cn(
-            "text-xs px-2 py-1 rounded-md border transition-colors",
-            editMode
-              ? "bg-primary/10 text-primary border-primary/20"
-              : "text-muted-foreground border-border hover:border-primary/30 hover:text-foreground"
-          )}
-        >
-          {editMode ? "完成" : "编辑"}
-        </button>
-        <button
-          onClick={onAdd}
-          className="flex items-center gap-1 text-xs px-2 py-1 rounded-md border border-border hover:border-primary/30 hover:text-primary transition-colors text-muted-foreground"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">添加</span>
-        </button>
-      </div>
-    </div>
-  );
 }
 
 /* ─── Sortable Card Wrapper ─── */
@@ -235,9 +154,9 @@ function CardList({
   );
 }
 
-/* ─── Category Block with dual resize handles ─── */
+/* ─── Sortable Category Block ─── */
 
-function CategoryBlock({
+function SortableCategoryBlock({
   category,
   cards,
   editMode,
@@ -245,10 +164,6 @@ function CategoryBlock({
   onAdd,
   onEdit,
   onDelete,
-  onMoveUp,
-  onMoveDown,
-  canMoveUp,
-  canMoveDown,
   fullWidth = false,
 }: {
   category: Category;
@@ -258,19 +173,33 @@ function CategoryBlock({
   onAdd: () => void;
   onEdit: (card: WebCard) => void;
   onDelete: (id: string) => void;
-  onMoveUp?: () => void;
-  onMoveDown?: () => void;
-  canMoveUp?: boolean;
-  canMoveDown?: boolean;
   fullWidth?: boolean;
 }) {
-  const blockRef = useRef<HTMLDivElement>(null);
+  const blockRef = useRef<HTMLElement | null>(null);
 
-  // Width state: percentage-based for fill behavior
+  // Width state: percentage-based
   const [widthPct, setWidthPct] = useState(fullWidth ? 100 : 50);
-  // Height state: null = auto, number = fixed max-height for vertical scroll
+  // Height state: null = auto, number = fixed max-height
   const [maxHeight, setMaxHeight] = useState<number | null>(null);
   const [isResizing, setIsResizing] = useState<"h" | "v" | null>(null);
+
+  const {
+    setNodeRef,
+    attributes,
+    listeners,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: category.id,
+    data: { type: "category" },
+  });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    ...(fullWidth ? {} : { width: `${widthPct}%`, minWidth: 320, maxWidth: "100%" }),
+  };
 
   /* ─── Horizontal resize (right edge) ─── */
   const startHResize = useCallback(
@@ -324,34 +253,79 @@ function CategoryBlock({
     [maxHeight]
   );
 
-  /* ─── Double-click to reset height ─── */
   const resetHeight = useCallback(() => {
     setMaxHeight(null);
   }, []);
 
   return (
     <section
-      ref={blockRef}
+      ref={(node) => {
+        setNodeRef(node);
+        blockRef.current = node;
+      }}
+      style={style}
       className={cn(
-        "relative rounded-2xl border bg-card/60 backdrop-blur-sm transition-colors",
+        "relative rounded-xl border bg-card/60 backdrop-blur-sm transition-shadow",
         fullWidth ? "w-full" : "shrink-0",
-        editMode ? "border-primary/20" : "border-border",
-        isResizing && "select-none"
+        editMode && !isDragging && "border-primary/15",
+        !editMode && "border-border/70",
+        isDragging && "opacity-60 shadow-xl ring-2 ring-primary/20",
+        isResizing && "select-none",
+        !isDragging && !isResizing && "hover:shadow-sm"
       )}
-      style={fullWidth ? undefined : { width: `${widthPct}%`, minWidth: 320, maxWidth: "100%" }}
     >
-      <RowHeader
-        category={category}
-        cardCount={cards.length}
-        editMode={editMode}
-        onToggleEdit={onToggleEdit}
-        onAdd={onAdd}
-        onMoveUp={onMoveUp}
-        onMoveDown={onMoveDown}
-        canMoveUp={canMoveUp}
-        canMoveDown={canMoveDown}
+      {/* Top accent bar - category color */}
+      <div
+        className="h-1 rounded-t-xl"
+        style={{ backgroundColor: category.color, opacity: 0.7 }}
       />
 
+      {/* Header: drag handle + title + action buttons */}
+      <div className="flex items-center justify-between px-3 pt-2 pb-1.5">
+        <div className="flex items-center gap-2 min-w-0">
+          {/* Drag handle for block - visible in edit mode */}
+          {editMode && (
+            <span
+              {...attributes}
+              {...listeners}
+              className="shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-primary transition-colors"
+            >
+              <GripVertical className="w-4 h-4" />
+            </span>
+          )}
+          <CategoryIcon iconName={category.icon} color={category.color} />
+          <h2 className="text-sm font-serif font-semibold text-foreground tracking-tight truncate">
+            {category.name}
+          </h2>
+          <span className="text-[10px] text-muted-foreground/70 tabular-nums">
+            {cards.length}
+          </span>
+        </div>
+
+        {/* Action buttons - right side of header */}
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={onToggleEdit}
+            className={cn(
+              "text-[11px] px-1.5 py-0.5 rounded transition-colors",
+              editMode
+                ? "text-primary bg-primary/10"
+                : "text-muted-foreground/60 hover:text-foreground"
+            )}
+          >
+            {editMode ? "完成" : "编辑"}
+          </button>
+          <button
+            onClick={onAdd}
+            className="flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded text-muted-foreground/60 hover:text-primary transition-colors"
+          >
+            <Plus className="w-3 h-3" />
+            添加
+          </button>
+        </div>
+      </div>
+
+      {/* Card content */}
       {cards.length > 0 ? (
         <CardList
           cards={cards}
@@ -365,7 +339,7 @@ function CategoryBlock({
         <div className="px-3 pb-3">
           <button
             onClick={onAdd}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors px-3 py-2 rounded-xl border border-dashed border-border hover:border-primary/30 w-full justify-center"
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors px-3 py-2 rounded-lg border border-dashed border-border hover:border-primary/30 w-full justify-center"
           >
             <Plus className="w-4 h-4" />
             在此分类添加网站
@@ -373,14 +347,14 @@ function CategoryBlock({
         </div>
       )}
 
-      {/* Right resize handle - always visible */}
+      {/* Right resize handle */}
       {!fullWidth && (
         <div
-          className="absolute top-0 right-0 w-2 h-full cursor-e-resize group flex items-center justify-end pr-0.5"
+          className="absolute top-4 right-0 w-2 h-[calc(100%-2rem)] cursor-e-resize group flex items-center justify-end pr-0.5"
           onMouseDown={startHResize}
           title="拖动调整宽度"
         >
-          <div className="w-0.5 h-8 rounded-full bg-muted-foreground/20 group-hover:bg-primary/50 transition-colors" />
+          <div className="w-0.5 h-6 rounded-full bg-muted-foreground/15 group-hover:bg-primary/40 transition-colors" />
         </div>
       )}
 
@@ -391,18 +365,18 @@ function CategoryBlock({
         onDoubleClick={resetHeight}
         title="拖动调整高度，双击重置"
       >
-        <div className="w-8 h-0.5 rounded-full bg-muted-foreground/20 group-hover:bg-primary/50 transition-colors" />
+        <div className="w-6 h-0.5 rounded-full bg-muted-foreground/15 group-hover:bg-primary/40 transition-colors" />
       </div>
 
-      {/* Resize indicator when actively resizing */}
+      {/* Resize indicator */}
       {isResizing && (
-        <div className="absolute inset-0 rounded-2xl ring-2 ring-primary/20 pointer-events-none" />
+        <div className="absolute inset-0 rounded-xl ring-2 ring-primary/15 pointer-events-none" />
       )}
     </section>
   );
 }
 
-/* ─── Drag Overlay ─── */
+/* ─── Drag Overlays ─── */
 
 function CardOverlay({ card, editMode, categoryColor }: { card: WebCard; editMode: boolean; categoryColor: string }) {
   return (
@@ -414,6 +388,21 @@ function CardOverlay({ card, editMode, categoryColor }: { card: WebCard; editMod
         onDelete={() => {}}
         categoryColor={categoryColor}
       />
+    </div>
+  );
+}
+
+function CategoryBlockOverlay({ category, cardCount }: { category: Category; cardCount: number }) {
+  return (
+    <div className="w-64 rounded-xl border bg-card/80 backdrop-blur-sm shadow-xl opacity-80 rotate-1">
+      <div className="h-1 rounded-t-xl" style={{ backgroundColor: category.color, opacity: 0.7 }} />
+      <div className="flex items-center gap-2 px-3 pt-2 pb-1.5">
+        <CategoryIcon iconName={category.icon} color={category.color} />
+        <h2 className="text-sm font-serif font-semibold text-foreground tracking-tight">
+          {category.name}
+        </h2>
+        <span className="text-[10px] text-muted-foreground/70 tabular-nums">{cardCount}</span>
+      </div>
     </div>
   );
 }
@@ -440,10 +429,11 @@ export function SortableGrid({
   const reorderCategories = useAppStore((s) => s.reorderCategories);
 
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeType, setActiveType] = useState<"card" | "category" | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 },
+      activationConstraint: { distance: 8 },
     })
   );
 
@@ -452,58 +442,17 @@ export function SortableGrid({
     [categories]
   );
 
-  /* split into "常用" and others */
-  const favoriteCategory = sortedCategories.find((c) => c.name === "常用");
-  const otherCategories = sortedCategories.filter((c) => c.name !== "常用");
-
-  const favoriteCards = useMemo(() => {
-    if (!favoriteCategory) return [];
-    return cards
-      .filter((c) => c.categoryId === favoriteCategory.id)
-      .sort((a, b) => a.order - b.order);
-  }, [favoriteCategory, cards]);
-
-  const otherRows = useMemo(() => {
-    return otherCategories.map((cat) => ({
-      category: cat,
-      cards: cards
-        .filter((c) => c.categoryId === cat.id)
-        .sort((a, b) => a.order - b.order),
-    }));
-  }, [otherCategories, cards]);
-
-  const activeCard = useMemo(() => {
-    if (!activeId) return null;
-    return cards.find((c) => c.id === activeId) || null;
-  }, [activeId, cards]);
-
-  /* ─── Block reorder helpers ─── */
-  const moveCategoryUp = useCallback(
-    (catId: string) => {
-      const ids = sortedCategories.map((c) => c.id);
-      const idx = ids.indexOf(catId);
-      if (idx > 0) {
-        reorderCategories(arrayMove(ids, idx, idx - 1));
-      }
-    },
-    [sortedCategories, reorderCategories]
-  );
-
-  const moveCategoryDown = useCallback(
-    (catId: string) => {
-      const ids = sortedCategories.map((c) => c.id);
-      const idx = ids.indexOf(catId);
-      if (idx < ids.length - 1) {
-        reorderCategories(arrayMove(ids, idx, idx + 1));
-      }
-    },
-    [sortedCategories, reorderCategories]
+  const categoryIds = useMemo(
+    () => sortedCategories.map((c) => c.id),
+    [sortedCategories]
   );
 
   /* ─── drag handlers ─── */
 
   function onDragStart(event: DragStartEvent) {
-    setActiveId(String(event.active.id));
+    const id = String(event.active.id);
+    setActiveId(id);
+    setActiveType(event.active.data.current?.type as "card" | "category");
   }
 
   function onDragOver(_event: DragOverEvent) {
@@ -513,25 +462,41 @@ export function SortableGrid({
   function onDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     setActiveId(null);
+    setActiveType(null);
     if (!over) return;
 
     const activeIdStr = String(active.id);
     const overIdStr = String(over.id);
+    const aType = active.data.current?.type as string;
+    const oType = over.data.current?.type as string;
 
-    const activeType = active.data.current?.type as string;
-    const overType = over.data.current?.type as string;
-    const activeCatId = active.data.current?.categoryId as string;
-    const overCatId = over.data.current?.categoryId as string;
-
-    if (activeType !== "card") return;
-
-    // ── Cross-row drop ──
-    if (overType === "header" && overCatId && activeCatId !== overCatId) {
-      moveCard(activeIdStr, overCatId, 999);
+    // ── Category block drag: reorder categories ──
+    if (aType === "category") {
+      if (oType === "category" && activeIdStr !== overIdStr) {
+        const ids = sortedCategories.map((c) => c.id);
+        const oldIdx = ids.indexOf(activeIdStr);
+        const newIdx = ids.indexOf(overIdStr);
+        if (oldIdx !== -1 && newIdx !== -1) {
+          reorderCategories(arrayMove(ids, oldIdx, newIdx));
+        }
+      }
       return;
     }
 
-    if (overType === "card" && overCatId && activeCatId !== overCatId) {
+    // ── Card drag ──
+    if (aType !== "card") return;
+
+    const activeCatId = active.data.current?.categoryId as string;
+    const overCatId = over.data.current?.categoryId as string;
+
+    // Drop on category header → move to that category
+    if (oType === "category" && activeCatId !== overIdStr) {
+      moveCard(activeIdStr, overIdStr, 999);
+      return;
+    }
+
+    // Cross-category drop on a card
+    if (oType === "card" && overCatId && activeCatId !== overCatId) {
       const targetCards = cards
         .filter((c) => c.categoryId === overCatId)
         .sort((a, b) => a.order - b.order);
@@ -540,8 +505,8 @@ export function SortableGrid({
       return;
     }
 
-    // ── Same-row reorder ──
-    if (overType === "card" && overCatId && activeCatId === overCatId) {
+    // Same-category reorder
+    if (oType === "card" && overCatId && activeCatId === overCatId) {
       const rowCards = cards
         .filter((c) => c.categoryId === activeCatId)
         .sort((a, b) => a.order - b.order);
@@ -556,53 +521,45 @@ export function SortableGrid({
 
   /* ─── render ─── */
 
+  const activeCard = activeId && activeType === "card"
+    ? cards.find((c) => c.id === activeId)
+    : null;
+
+  const activeCategory = activeId && activeType === "category"
+    ? categories.find((c) => c.id === activeId)
+    : null;
+
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={rectIntersection}
+      collisionDetection={closestCenter}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDragEnd={onDragEnd}
     >
-      <div className="space-y-4">
-        {/* Favorite row - full width */}
-        {favoriteCategory && (
-          <CategoryBlock
-            category={favoriteCategory}
-            cards={favoriteCards}
-            editMode={editMode}
-            onToggleEdit={() => setEditMode(!editMode)}
-            onAdd={() => onAdd(favoriteCategory.id)}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onMoveUp={() => moveCategoryUp(favoriteCategory.id)}
-            onMoveDown={() => moveCategoryDown(favoriteCategory.id)}
-            canMoveUp={sortedCategories.indexOf(favoriteCategory) > 0}
-            canMoveDown={sortedCategories.indexOf(favoriteCategory) < sortedCategories.length - 1}
-            fullWidth
-          />
-        )}
+      <SortableContext items={categoryIds} strategy={rectSortingStrategy}>
+        <div className="flex flex-wrap gap-3">
+          {sortedCategories.map((cat) => {
+            const catCards = cards
+              .filter((c) => c.categoryId === cat.id)
+              .sort((a, b) => a.order - b.order);
 
-        {/* Other categories - flex wrap blocks that fill rows */}
-        <div className="flex flex-wrap gap-4">
-          {otherRows.map((row) => (
-            <CategoryBlock
-              key={row.category.id}
-              category={row.category}
-              cards={row.cards}
-              editMode={editMode}
-              onToggleEdit={() => setEditMode(!editMode)}
-              onAdd={() => onAdd(row.category.id)}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onMoveUp={() => moveCategoryUp(row.category.id)}
-              onMoveDown={() => moveCategoryDown(row.category.id)}
-              canMoveUp={sortedCategories.indexOf(row.category) > 0}
-              canMoveDown={sortedCategories.indexOf(row.category) < sortedCategories.length - 1}
-            />
-          ))}
+            return (
+              <SortableCategoryBlock
+                key={cat.id}
+                category={cat}
+                cards={catCards}
+                editMode={editMode}
+                onToggleEdit={() => setEditMode(!editMode)}
+                onAdd={() => onAdd(cat.id)}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                fullWidth={cat.name === "常用"}
+              />
+            );
+          })}
         </div>
-      </div>
+      </SortableContext>
 
       <DragOverlay dropAnimation={null}>
         {activeCard && (
@@ -612,6 +569,12 @@ export function SortableGrid({
             categoryColor={
               categories.find((c) => c.id === activeCard.categoryId)?.color || "#888"
             }
+          />
+        )}
+        {activeCategory && (
+          <CategoryBlockOverlay
+            category={activeCategory}
+            cardCount={cards.filter((c) => c.categoryId === activeCategory.id).length}
           />
         )}
       </DragOverlay>

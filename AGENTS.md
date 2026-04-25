@@ -70,7 +70,7 @@ pnpm lint
 | 数据层 | `src/lib/db.ts` | IndexedDB 操作：卡片/分类的 CRUD、导入导出 |
 | 状态管理 | `src/lib/store.ts` | Zustand Store：全局状态、搜索、编辑模式、拖拽重排、分类重排 |
 | 卡片组件 | `src/components/card/web-card.tsx` | 条状卡片：8x8 图标/缩写 + 名称 + 简介 + 左边框分类色彩标记 + HoverCard 显示 fullDesc/note + 编辑模式操作按钮 |
-| 拖拽布局 | `src/components/layout/sortable-grid.tsx` | 常用栏置顶全宽 + 下方分类 flex-wrap 块状布局：每块可横向/纵向拖拽 resize、内容 flex-wrap 自动换行、编辑模式上下移动分类、@dnd-kit 跨分类拖拽 |
+| 拖拽布局 | `src/components/layout/sortable-grid.tsx` | 所有分类块 flex-wrap 块状布局：每块可横向/纵向拖拽 resize、内容 flex-wrap 自动换行、编辑模式下拖拽手柄自由重排分类块、@dnd-kit 跨分类拖拽卡片 |
 | 添加/编辑 | `src/components/dialogs/card-dialog.tsx` | 弹窗表单：URL、自动抓取、手动编辑，支持预选分类 |
 | 分类管理 | `src/components/dialogs/category-dialog.tsx` | 分类创建/编辑：12 种图标 + 8 种颜色 |
 | OG 抓取 | `src/app/api/fetch-meta/route.ts` | POST {url} → 解析 title/description/image/favicon |
@@ -78,11 +78,15 @@ pnpm lint
 ## 布局系统设计
 
 ### 核心布局模型
-- **常用栏**: 全宽置顶，卡片 flex-wrap 自动换行
-- **分类块**: flex-wrap 布局排列，默认各占 50% 宽度
+- **所有分类块平等排列**: flex-wrap 布局，默认各占 50% 宽度（常用块也默认 50%，可手动拉到 100%）
 - **卡片流**: 每个分类块内部使用 `flex flex-wrap`，拉宽块时卡片自动换行到多行
 - **双向 resize**: 右边缘拖拽调宽度，底边缘拖拽调高度（双击重置高度）
-- **分类重排**: 编辑模式下可通过上下箭头移动分类顺序
+- **自由拖拽重排**: 编辑模式下每个分类块左侧出现 GripVertical 拖拽手柄，可自由拖拽到任意位置
+
+### 分类块拖拽
+- 编辑模式下，每个分类块标题栏左侧出现 `GripVertical` 拖拽手柄
+- 拖拽分类块可在所有块之间自由重排（使用 `closestCenter` 碰撞检测 + `SortableContext`）
+- 拖拽时有半透明 overlay 提示当前拖拽位置
 
 ### Resize 交互
 - **横向 resize**: 拖拽块右侧边缘的竖线手柄，宽度以百分比存储（最小 30%，最大 100%）
