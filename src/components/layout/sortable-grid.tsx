@@ -278,7 +278,18 @@ function SortableCategoryBlock({
     data: { type: "category" },
   });
 
-  const [widthPercent, setWidthPercent] = useState(100);
+  /* Auto-fit width based on card count:
+     - 0-2 cards → ~50% (small block, fits 2 per row)
+     - 3-5 cards → ~50% (medium block, fits 2 per row)
+     - 6+ cards → ~100% (large block, needs full width)
+     Gap is gap-3 (12px), so two 50% blocks need calc(50% - 6px) each
+     User can still manually resize via handle */
+  const defaultWidth = useMemo(() => {
+    if (cards.length >= 6) return "calc(100% - 0px)";
+    return "calc(50% - 6px)";
+  }, [cards.length]);
+
+  const [widthPercent, setWidthPercent] = useState<number | null>(null);
   const [maxHeight, setMaxHeight] = useState<number | null>(null);
   const [isResizingH, setIsResizingH] = useState(false);
   const [isResizingV, setIsResizingV] = useState(false);
@@ -287,6 +298,9 @@ function SortableCategoryBlock({
   const resizeStartWidth = useRef(0);
   const resizeStartY = useRef(0);
   const resizeStartHeight = useRef(0);
+
+  /* If user hasn't manually resized, follow auto width */
+  const effectiveWidth: string = widthPercent != null ? `${widthPercent}%` : defaultWidth;
 
   const sortedCards = useMemo(
     () => [...cards].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
@@ -305,14 +319,15 @@ function SortableCategoryBlock({
       e.stopPropagation();
       setIsResizingH(true);
       resizeStartX.current = e.clientX;
-      resizeStartWidth.current = widthPercent;
+      /* Use actual rendered width as starting point */
+      resizeStartWidth.current = blockRef.current?.offsetWidth || 0;
 
       const handleMove = (ev: MouseEvent) => {
         const containerWidth = blockRef.current?.parentElement?.clientWidth || 1;
         const delta = ev.clientX - resizeStartX.current;
-        const deltaPercent = (delta / containerWidth) * 100;
-        const newWidth = Math.min(100, Math.max(30, resizeStartWidth.current + deltaPercent));
-        setWidthPercent(Math.round(newWidth));
+        const currentWidth = resizeStartWidth.current + delta;
+        const newPercent = Math.min(100, Math.max(30, (currentWidth / containerWidth) * 100));
+        setWidthPercent(Math.round(newPercent));
       };
 
       const handleUp = () => {
@@ -324,7 +339,7 @@ function SortableCategoryBlock({
       document.addEventListener("mousemove", handleMove);
       document.addEventListener("mouseup", handleUp);
     },
-    [widthPercent]
+    []
   );
 
   /* ── Vertical resize ── */
@@ -361,7 +376,7 @@ function SortableCategoryBlock({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    width: `${widthPercent}%`,
+    width: effectiveWidth,
     opacity: isDragging ? 0.5 : 1,
   };
 
