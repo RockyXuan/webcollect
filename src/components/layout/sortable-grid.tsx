@@ -815,14 +815,14 @@ function SortableSubGroupBlock({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.4 : 1,
-    ...(widthPercent !== null ? { flex: `0 0 ${widthPercent}%` } : {}),
+    ...(widthPercent !== null ? { minWidth: `${widthPercent}%` } : {}),
   };
 
   return (
     <div
       ref={setRef}
       style={style}
-      className="relative rounded-md border border-border/40 bg-background overflow-hidden"
+      className="relative rounded-md border border-border/40 bg-background overflow-hidden shrink-0"
     >
       {/* Sub-group header - buttons right next to title */}
       <div className="flex items-center gap-1.5 px-2.5 py-1.5 flex-wrap">
@@ -996,14 +996,14 @@ function SortableUngroupedBlock({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.4 : 1,
-    ...(widthPercent !== null ? { flex: `0 0 ${widthPercent}%` } : {}),
+    ...(widthPercent !== null ? { minWidth: `${widthPercent}%` } : {}),
   };
 
   return (
     <div
       ref={setRef}
       style={style}
-      className="relative rounded-md border border-border/40 bg-background overflow-hidden"
+      className="relative rounded-md border border-border/40 bg-background overflow-hidden shrink-0"
     >
       {/* Header - buttons right next to title */}
       <div className="flex items-center gap-1.5 px-2.5 py-1.5 flex-wrap">
