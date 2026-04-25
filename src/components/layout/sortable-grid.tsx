@@ -107,7 +107,15 @@ export function SortableGrid({ cards, categories, onEdit, onDelete, onAdd, onEdi
   );
 
   const sortedCategories = useMemo(
-    () => [...categories].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+    () =>
+      [...categories]
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+        .sort((a, b) => {
+          // 收集箱永远排最后
+          if (a.id === "cat-inbox") return 1;
+          if (b.id === "cat-inbox") return -1;
+          return 0;
+        }),
     [categories]
   );
 

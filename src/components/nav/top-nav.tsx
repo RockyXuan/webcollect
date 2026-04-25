@@ -47,14 +47,14 @@ export function TopNav({ onAddCard, onManageCategories }: TopNavProps) {
             className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             <Plus className="w-3 h-3" />
-            <span className="hidden sm:inline">添加</span>
+            <span className="hidden sm:inline">添加网页</span>
           </button>
 
           <button
             onClick={onManageCategories}
             className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-md border border-border/60 hover:bg-muted/50 transition-colors"
           >
-            <span className="hidden sm:inline">管理分类</span>
+            <span className="hidden sm:inline">添加分类</span>
           </button>
 
           <button
