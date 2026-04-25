@@ -552,15 +552,14 @@ function SortableCategoryBlock({
       e.stopPropagation();
       const container = containerRef.current;
       if (!container) return;
-      const parentEl = container.parentElement;
-      if (!parentEl) return;
       const startX = e.clientX;
       const startWidth = container.offsetWidth;
-      const parentWidth = parentEl.offsetWidth;
+      const parentWidth = container.parentElement?.offsetWidth ?? 1;
 
       const handleMouseMove = (ev: MouseEvent) => {
         const dx = ev.clientX - startX;
-        const newPercent = Math.max(15, Math.min(100, ((startWidth + dx) / parentWidth) * 100));
+        const newWidth = Math.max(120, startWidth + dx);
+        const newPercent = Math.max(15, Math.min(100, (newWidth / parentWidth) * 100));
         setLocalWidth(newPercent);
       };
 
@@ -778,15 +777,14 @@ function SortableSubGroupBlock({
       e.stopPropagation();
       const container = containerRef.current;
       if (!container) return;
-      const parentEl = container.parentElement;
-      if (!parentEl) return;
       const startX = e.clientX;
       const startWidth = container.offsetWidth;
-      const parentWidth = parentEl.offsetWidth;
+      const parentWidth = container.parentElement?.offsetWidth ?? 1;
 
       const handleMouseMove = (ev: MouseEvent) => {
         const dx = ev.clientX - startX;
-        const newPercent = Math.max(15, Math.min(100, ((startWidth + dx) / parentWidth) * 100));
+        const newWidth = Math.max(120, startWidth + dx);
+        const newPercent = Math.max(15, Math.min(100, (newWidth / parentWidth) * 100));
         setLocalWidth(newPercent);
       };
 
@@ -817,7 +815,7 @@ function SortableSubGroupBlock({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.4 : 1,
-    ...(widthPercent !== null ? { width: `${widthPercent}%` } : {}),
+    ...(widthPercent !== null ? { flex: `0 0 ${widthPercent}%` } : {}),
   };
 
   return (
@@ -960,15 +958,14 @@ function SortableUngroupedBlock({
       e.stopPropagation();
       const container = containerRef.current;
       if (!container) return;
-      const parentEl = container.parentElement;
-      if (!parentEl) return;
       const startX = e.clientX;
       const startWidth = container.offsetWidth;
-      const parentWidth = parentEl.offsetWidth;
+      const parentWidth = container.parentElement?.offsetWidth ?? 1;
 
       const handleMouseMove = (ev: MouseEvent) => {
         const dx = ev.clientX - startX;
-        const newPercent = Math.max(15, Math.min(100, ((startWidth + dx) / parentWidth) * 100));
+        const newWidth = Math.max(120, startWidth + dx);
+        const newPercent = Math.max(15, Math.min(100, (newWidth / parentWidth) * 100));
         setLocalWidth(newPercent);
       };
 
@@ -999,14 +996,14 @@ function SortableUngroupedBlock({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.4 : 1,
-    ...(widthPercent !== null ? { width: `${widthPercent}%` } : {}),
+    ...(widthPercent !== null ? { flex: `0 0 ${widthPercent}%` } : {}),
   };
 
   return (
     <div
       ref={setRef}
       style={style}
-      className="relative rounded-md border border-border/40 bg-background flex-shrink-0 overflow-hidden"
+      className="relative rounded-md border border-border/40 bg-background overflow-hidden"
     >
       {/* Header - buttons right next to title */}
       <div className="flex items-center gap-1.5 px-2.5 py-1.5 flex-wrap">
