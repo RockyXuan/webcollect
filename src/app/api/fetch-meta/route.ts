@@ -46,7 +46,15 @@ export async function POST(request: Request) {
       }
     }
 
-    // Fallback favicon
+    // Extract domain for favicon APIs
+    let domain = "";
+    try {
+      domain = new URL(url).hostname;
+    } catch {
+      domain = "";
+    }
+
+    // Fallback favicon from HTML
     let favicon = "";
     const faviconRel =
       $('link[rel="icon"]').attr("href") || $('link[rel="shortcut icon"]').attr("href");
@@ -59,11 +67,21 @@ export async function POST(request: Request) {
       }
     }
 
+    // Favicon API fallbacks (no CORS for img tags)
+    const faviconApis = domain
+      ? [
+          `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+          `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+        ]
+      : [];
+
     return NextResponse.json({
       title: title.trim() || "未命名网页",
       description: description.trim() || "",
       image,
       favicon,
+      domain,
+      faviconApis,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

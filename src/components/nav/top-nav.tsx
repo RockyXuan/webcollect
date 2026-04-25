@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Plus, Download, Upload } from "lucide-react";
+import { Search, Plus, Download, Upload, FolderCog } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAppStore } from "@/lib/store";
@@ -8,9 +8,10 @@ import { exportData, importData } from "@/lib/db";
 
 interface TopNavProps {
   onAddCard: () => void;
+  onManageCategories?: () => void;
 }
 
-export function TopNav({ onAddCard }: TopNavProps) {
+export function TopNav({ onAddCard, onManageCategories }: TopNavProps) {
   const { searchQuery, setSearchQuery } = useAppStore();
 
   const handleExport = async () => {
@@ -73,6 +74,11 @@ export function TopNav({ onAddCard }: TopNavProps) {
           <Button variant="ghost" size="icon" onClick={handleExport} title="导出数据">
             <Download className="w-4 h-4" />
           </Button>
+          {onManageCategories && (
+            <Button variant="ghost" size="icon" onClick={onManageCategories} title="管理分类">
+              <FolderCog className="w-4 h-4" />
+            </Button>
+          )}
           <Button onClick={onAddCard} className="gap-1">
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">添加</span>

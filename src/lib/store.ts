@@ -12,7 +12,6 @@ import {
   updateCategory as dbUpdateCategory,
   deleteCategory as dbDeleteCategory,
   isInitialized,
-  setInitialized,
 } from "./db";
 
 interface AppState {
@@ -22,11 +21,13 @@ interface AppState {
   activeCategoryId: string;
   isLoading: boolean;
   initialized: boolean;
+  editMode: boolean;
 
   // Actions
   loadData: () => Promise<void>;
   setSearchQuery: (q: string) => void;
   setActiveCategory: (id: string) => void;
+  setEditMode: (v: boolean) => void;
 
   addCard: (card: WebCard) => Promise<void>;
   updateCard: (card: WebCard) => Promise<void>;
@@ -37,15 +38,17 @@ interface AppState {
   addCategory: (cat: Category) => Promise<void>;
   updateCategory: (cat: Category) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
+  reorderCategories: (orderedIds: string[]) => Promise<void>;
 }
 
-export const useAppStore = create<AppState>((set, get) => ({
+export const useAppStore = create<AppState>((set, _get) => ({
   cards: [],
   categories: [],
   searchQuery: "",
   activeCategoryId: "all",
   isLoading: true,
   initialized: false,
+  editMode: false,
 
   loadData: async () => {
     set({ isLoading: true });
@@ -64,6 +67,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setSearchQuery: (q) => set({ searchQuery: q }),
   setActiveCategory: (id) => set({ activeCategoryId: id }),
+  setEditMode: (v) => set({ editMode: v }),
 
   addCard: async (card) => {
     await dbAddCard(card);
@@ -133,5 +137,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     await dbDeleteCategory(id);
     const [cards, categories] = await Promise.all([getCards(), getCategories()]);
     set({ cards, categories });
+  },
+
+  reorderCategories: async (orderedIds) => {
+    const categories = await getCategories();
+    orderedIds.forEach((id, order) => {
+      const cat = categories.find((c) => c.id === id);
+      if (cat) cat.order = order;
+    });
+    await saveCategories(categories);
+    set({ categories: await getCategories() });
   },
 }));

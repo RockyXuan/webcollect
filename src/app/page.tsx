@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { TopNav } from "@/components/nav/top-nav";
-import { CategoryTabs } from "@/components/nav/category-tabs";
 import { SortableGrid } from "@/components/layout/sortable-grid";
 import { CardDialog } from "@/components/dialogs/card-dialog";
 import { CategoryDialog } from "@/components/dialogs/category-dialog";
@@ -12,7 +11,7 @@ import { defaultCards, defaultCategories } from "@/lib/seed";
 import type { WebCard, Category } from "@/lib/types";
 
 export default function HomePage() {
-  const { loadData, initialized, isLoading } = useAppStore();
+  const { loadData, isLoading, cards, categories, deleteCard } = useAppStore();
 
   const [cardDialogOpen, setCardDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -50,11 +49,6 @@ export default function HomePage() {
     setCategoryDialogOpen(true);
   };
 
-  const handleEditCategory = (cat: Category) => {
-    setEditingCategory(cat);
-    setCategoryDialogOpen(true);
-  };
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -68,14 +62,16 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <TopNav onAddCard={handleAddCard} />
+      <TopNav onAddCard={handleAddCard} onManageCategories={handleAddCategory} />
 
       <main className="container mx-auto px-4 py-6 space-y-6">
-        <CategoryTabs
-          onAddCategory={handleAddCategory}
-          onEditCategory={handleEditCategory}
+        <SortableGrid
+          cards={cards}
+          categories={categories}
+          onEdit={handleEditCard}
+          onDelete={deleteCard}
+          onAdd={handleAddCard}
         />
-        <SortableGrid onEditCard={handleEditCard} onAddCard={handleAddCard} />
       </main>
 
       <footer className="border-t border-border/60 mt-12 py-6">

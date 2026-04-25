@@ -68,9 +68,9 @@ pnpm lint
 | 模块 | 文件 | 说明 |
 |------|------|------|
 | 数据层 | `src/lib/db.ts` | IndexedDB 操作：卡片/分类的 CRUD、导入导出 |
-| 状态管理 | `src/lib/store.ts` | Zustand Store：全局状态、搜索、分类过滤、拖拽重排 |
-| 卡片组件 | `src/components/card/web-card.tsx` | 紧凑条状卡片：小图标/缩写 + 名称 + 简介 + Hover 操作 + 详情浮层 |
-| 拖拽布局 | `src/components/layout/sortable-grid.tsx` | 分类大区块布局，每栏独立添加按钮，@dnd-kit 跨分类拖拽 |
+| 状态管理 | `src/lib/store.ts` | Zustand Store：全局状态、搜索、编辑模式、拖拽重排 |
+| 卡片组件 | `src/components/card/web-card.tsx` | 横向条状卡片：32x32 图标/缩写 + 完整名称 + 简介 + 编辑模式显隐操作按钮 + Hover 详情浮层 |
+| 拖拽布局 | `src/components/layout/sortable-grid.tsx` | 分类横向滚动行布局：每行独立添加按钮 + 编辑开关，@dnd-kit 跨分类拖拽 + 行排序 |
 | 添加/编辑 | `src/components/dialogs/card-dialog.tsx` | 弹窗表单：URL、自动抓取、手动编辑，支持预选分类 |
 | 分类管理 | `src/components/dialogs/category-dialog.tsx` | 分类创建/编辑：名称、图标（12 种）、颜色（8 种） |
 | OG 抓取 | `src/app/api/fetch-meta/route.ts` | POST {url} → 解析 title/description/image/favicon |

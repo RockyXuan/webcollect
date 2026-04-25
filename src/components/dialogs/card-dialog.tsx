@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2, Link2 } from "lucide-react";
-import type { WebCard, Category } from "@/lib/types";
+import type { WebCard } from "@/lib/types";
 import { useAppStore } from "@/lib/store";
 
 interface CardDialogProps {
