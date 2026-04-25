@@ -21,18 +21,25 @@
 
 ### 当前种子数据快照 (seed.ts)
 
-#### 默认分类
+#### 父分类（顶级分类）
 | ID | 名称 | 图标 | 颜色 | 排序 |
 |----|------|------|------|------|
-| cat-1 | 常用 | Star | #F59E0B | 0 |
-| cat-2 | AI工具 | Wrench | #8B5CF6 | 1 |
-| cat-3 | 设计灵感 | Palette | #EC4899 | 2 |
-| cat-4 | 开发者 | Code2 | #10B981 | 3 |
-| cat-5 | 阅读 | BookOpen | #3B82F6 | 4 |
-| cat-inbox | 收集箱 | Inbox | #6366F1 | 99 |
+| cat-work | 工作 | Briefcase | #B8860B | 0 |
+| cat-ai | AI | Brain | #8B5CF6 | 1 |
+| cat-dev | 开发 | Terminal | #4A7C59 | 2 |
+| cat-inbox | 收集箱 | Inbox | #888888 | 99 |
+
+#### 子分组（二级分组）
+| ID | 名称 | 图标 | 颜色 | 父分类 | 排序 |
+|----|------|------|------|--------|------|
+| cat-1 | 常用 | Star | #B8860B | cat-work | 0 |
+| cat-3 | 设计灵感 | Palette | #9B7E8E | cat-work | 1 |
+| cat-2 | AI工具 | Wrench | #4A6FA5 | cat-ai | 0 |
+| cat-4 | 开发者 | Code2 | #4A7C59 | cat-dev | 0 |
+| cat-5 | 阅读 | BookOpen | #8B6F5C | cat-dev | 1 |
 
 #### 默认网站卡片
-| 分类 | 名称 | URL |
+| 分组 | 名称 | URL |
 |------|------|-----|
 | 常用 | Notion | https://www.notion.so |
 | 常用 | Google | https://www.google.com |
@@ -131,9 +138,9 @@ pnpm lint
 | 模块 | 文件 | 说明 |
 |------|------|------|
 | 数据层 | `src/lib/db.ts` | IndexedDB 操作：卡片/分类/隐藏网站/置顶分类的 CRUD、导入导出 |
-| 状态管理 | `src/lib/store.ts` | Zustand Store：全局状态、搜索、编辑模式、拖拽重排、分类重排、隐藏网站管理、置顶分类、默认屏蔽时长 |
-| 卡片组件 | `src/components/card/web-card.tsx` | 条状卡片：8x8 图标/缩写 + 名称 + 简介 + 左边框分类色彩标记 + HoverCard |
-| 拖拽布局 | `src/components/layout/sortable-grid.tsx` | flex-wrap 块状布局：自动双列 + resize + 编辑模式拖拽 |
+| 状态管理 | `src/lib/store.ts` | Zustand Store：全局状态、搜索、编辑模式、拖拽重排、分类降级/升级、隐藏网站管理、置顶分类、默认屏蔽时长 |
+| 卡片组件 | `src/components/card/web-card.tsx` | 两行卡片：favicon + 名称(行1) + 简介(行2) + 左边框分类色彩标记 + HoverCard |
+| 拖拽布局 | `src/components/layout/sortable-grid.tsx` | 三级层级布局：分类→分组→网页 + 降级/升级拖拽 + 编辑模式 |
 | 添加/编辑 | `src/components/dialogs/card-dialog.tsx` | 弹窗表单：URL、自动抓取、手动编辑 |
 | 分类管理 | `src/components/dialogs/category-dialog.tsx` | 分类创建/编辑：12 种图标 + 8 种颜色 |
 | 热门推荐 | `src/components/hot-recommendation.tsx` | 热门网站推荐：查重、收集箱快捷添加、隐藏/不感兴趣、安全扫描、设置面板 |
@@ -142,21 +149,28 @@ pnpm lint
 
 ## 布局系统设计
 
+### 三级层级结构
+- **分类（Parent Category）**: 顶级容器，如"工作"、"AI"、"开发"，包含一个或多个分组
+- **分组（Sub-Group）**: 二级容器，有 `parentId` 指向父分类，如"常用"、"AI工具"、"开发者"
+- **网页（WebCard）**: 最小单元，属于某个分组
+
+### 降级模式（编辑模式）
+- **未分类区域**: 页面底部显示"未分类"区域，包含所有没有 `parentId` 且没有子分组的分类
+- **拖拽降级**: 编辑模式下，"未分类"区域的分组可以拖拽到父分类头部区域，自动设置 `parentId`
+- **升级为分类**: 父分类内的分组有"升级"按钮（ArrowUpFromLine 图标），点击后移回"未分类"
+- **拖拽ID前缀**: 父分类 `cat:xxx`，未分类分组 `ungrouped:xxx`，父分类放置区 `drop-parent:xxx`
+- **Store 方法**: `moveCategoryToParent(categoryId, parentId)` 和 `detachCategoryFromParent(categoryId)`
+
 ### 核心布局模型
 - **分类块自动双列**: 卡片数 < 6 的分类块默认 `calc(50% - 6px)`，两两并排；卡片数 >= 6 的大分类默认占满整行
 - **用户手动调整优先**: 用户拖拽调整宽度后保存 `widthPercent`，覆盖自动宽度
 - **卡片流**: 每个分类块内部使用 `flex flex-wrap`，拉宽块时卡片自动换行到多行
-- **双向 resize**: 右边缘拖拽调宽度，底边缘拖拽调高度（双击重置高度）
 - **自由拖拽重排**: 编辑模式下每个分类块左侧出现 GripVertical 拖拽手柄，可自由拖拽到任意位置
 
 ### 拖拽系统
-- **类型前缀 ID**: 分类 `cat:xxx`，卡片 `card:xxx`，碰撞检测只匹配同类型
-- **三种拖拽场景**: 分类重排、卡片拖到分类标题（跨分类）、卡片拖到另一卡片
+- **类型前缀 ID**: 父分类 `cat:xxx`，未分类分组 `ungrouped:xxx`，卡片 `card:xxx`，父分类放置区 `drop-parent:xxx`
+- **拖拽场景**: 父分类重排、未分类分组重排、分组降级到父分类、卡片跨分组拖拽
 - **编辑模式双层控制**: 全局 editMode + 分类 editingCategoryId
-
-### Resize 交互
-- **横向 resize**: 拖拽块右侧边缘的竖线手柄，宽度以百分比存储（最小 30%，最大 100%）
-- **纵向 resize**: 拖拽块底部边缘的横线手柄，设置 max-height 后内容可滚动（双击重置为 auto）
 
 ## 热门推荐系统
 
@@ -229,6 +243,7 @@ interface Category {
   color: string;  // hex color
   order: number;
   createdAt: number;
+  parentId?: string; // 父分类ID，有此字段表示是"分组"(子分类)，无此字段表示是"分类"(顶级)
 }
 
 type HideDuration = "1w" | "2w" | "1m" | "permanent";

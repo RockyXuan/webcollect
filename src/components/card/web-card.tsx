@@ -84,15 +84,15 @@ export function WebCardItem({
         )}
       </div>
 
-      {/* Text content - name + short desc on same line */}
-      <div className="flex items-center gap-1 min-w-0 flex-1">
-        <span className="text-[11px] font-medium text-foreground leading-none whitespace-nowrap">
+      {/* Text content - two-line: name on line 1, shortDesc on line 2 */}
+      <div className="min-w-0 flex-1">
+        <div className="text-[11px] font-medium text-foreground leading-tight truncate">
           {card.title}
-        </span>
+        </div>
         {card.shortDesc && (
-          <span className="text-[10px] text-muted-foreground leading-none whitespace-nowrap overflow-hidden text-ellipsis">
+          <div className="text-[10px] text-muted-foreground leading-tight truncate">
             {card.shortDesc}
-          </span>
+          </div>
         )}
       </div>
 

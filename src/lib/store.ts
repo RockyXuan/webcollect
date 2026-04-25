@@ -45,6 +45,8 @@ interface AppState {
   updateCategory: (cat: Category) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
   reorderCategories: (orderedIds: string[]) => Promise<void>;
+  moveCategoryToParent: (categoryId: string, parentId: string) => Promise<void>;
+  detachCategoryFromParent: (categoryId: string) => Promise<void>;
 
   // Hidden sites
   hideSite: (siteId: string, siteUrl: string, duration: HideDuration) => Promise<void>;
@@ -269,6 +271,36 @@ export const useAppStore = create<AppState>((set, get) => ({
       const cat = categories.find((c) => c.id === id);
       if (cat) cat.order = order;
     });
+    await saveCategories(categories);
+    set({ categories: await getCategories() });
+  },
+
+  // Move a standalone category into a parent (demotion: 分类 → 分组)
+  moveCategoryToParent: async (categoryId: string, parentId: string) => {
+    const categories = await getCategories();
+    const cat = categories.find((c) => c.id === categoryId);
+    if (!cat) return;
+    cat.parentId = parentId;
+    // Re-order within the parent's sub-groups
+    const siblings = categories
+      .filter((c) => c.parentId === parentId)
+      .sort((a, b) => a.order - b.order);
+    cat.order = siblings.length > 0 ? Math.max(...siblings.map((s) => s.order)) + 1 : 0;
+    await saveCategories(categories);
+    set({ categories: await getCategories() });
+  },
+
+  // Remove a sub-group from its parent (promotion: 分组 → 分类)
+  detachCategoryFromParent: async (categoryId: string) => {
+    const categories = await getCategories();
+    const cat = categories.find((c) => c.id === categoryId);
+    if (!cat) return;
+    delete cat.parentId;
+    // Place at the end of top-level categories
+    const topLevel = categories
+      .filter((c) => !c.parentId)
+      .sort((a, b) => a.order - b.order);
+    cat.order = topLevel.length > 0 ? Math.max(...topLevel.map((t) => t.order)) + 1 : 0;
     await saveCategories(categories);
     set({ categories: await getCategories() });
   },
