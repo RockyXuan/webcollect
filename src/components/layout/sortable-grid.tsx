@@ -3,8 +3,19 @@
 import React, { useState, useMemo, useCallback, useRef } from "react";
 import { useAppStore } from "@/lib/store";
 import { WebCardItem } from "@/components/card/web-card";
-import { Pencil, Plus, GripVertical, ArrowUpFromLine } from "lucide-react";
+import { Pencil, Plus, GripVertical, ArrowUpFromLine, ArrowDownFromLine, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   DndContext,
   KeyboardSensor,
@@ -72,6 +83,7 @@ export function SortableGrid({
     moveCard,
     moveCategoryToParent,
     detachCategoryFromParent,
+    promoteToParent,
     categoryWidths,
   } = useAppStore();
 
@@ -442,6 +454,7 @@ export function SortableGrid({
                       onAddCard={onAddCard}
                       onEditCard={onEditCard}
                       onDeleteCard={onDeleteCard}
+                      onPromoteToParent={promoteToParent}
                     />
                   );
                 })}
@@ -452,7 +465,7 @@ export function SortableGrid({
       </SortableContext>
 
       {/* ====== Drag Overlay: compact badge ====== */}
-      <DragOverlay dropAnimation={{ duration: 200, easing: "ease" }}>
+      <DragOverlay dropAnimation={{ duration: 250, easing: "cubic-bezier(0.2, 0, 0, 1)" }}>
         {activeId ? (
           (() => {
             const info = getOverlayLabel(activeId);
@@ -514,7 +527,7 @@ function SortableCategoryBlock({
     isDragging,
   } = useSortable({ id: catId(category.id) });
 
-  const { setCategoryWidth } = useAppStore();
+  const { setCategoryWidth, demoteParentCategory } = useAppStore();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [localWidth, setLocalWidth] = useState<number | null>(null);
 
@@ -522,9 +535,10 @@ function SortableCategoryBlock({
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
+    transition: isDragging ? transition : `${transition}, min-height 0.3s ease-out`,
     opacity: isDragging ? 0.4 : 1,
     width: `${widthPercent}%`,
+    minHeight: isDraggingActive ? '60px' : undefined,
   };
 
   const handleResizeStart = useCallback(
@@ -575,7 +589,7 @@ function SortableCategoryBlock({
       className={`
         relative rounded-lg border bg-card
         ${isHovered ? "border-primary/60 shadow-sm bg-primary/[0.03]" : "border-border"}
-        transition-[border-color,background-color,box-shadow] duration-300 ease-out
+        transition-[border-color,background-color,box-shadow,min-height] duration-300 ease-out
       `}
     >
       {/* Category header - buttons right next to title */}
@@ -631,7 +645,7 @@ function SortableCategoryBlock({
                 onClick={() => onAddGroup?.(category.id)}
                 title="添加分组"
               >
-                <Plus className="w-2.5 h-2.5" />
+                <Layers className="w-2.5 h-2.5" />
               </Button>
             )}
             <Button
@@ -643,6 +657,39 @@ function SortableCategoryBlock({
             >
               <Plus className="w-2.5 h-2.5" />
             </Button>
+            {isParent && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
+                    title="降级为分组"
+                  >
+                    <ArrowDownFromLine className="w-2.5 h-2.5" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="font-serif">确认降级「{category.name}」</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      降级后，此分类将变为分组移入「未分类」区域，
+                      其下属的所有分组也会被拆散为独立分组。
+                      此操作不会删除任何网站数据。
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>取消</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      onClick={() => demoteParentCategory(category.id)}
+                    >
+                      确认降级
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </>
         )}
       </div>
@@ -782,7 +829,7 @@ function SortableSubGroupBlock({
               size="sm"
               className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
               onClick={onDetach}
-              title="升级为分类（移到未分类）"
+              title="升级为分类"
             >
               <ArrowUpFromLine className="w-2.5 h-2.5" />
             </Button>
@@ -825,6 +872,7 @@ interface SortableUngroupedBlockProps {
   onAddCard?: (categoryId?: string) => void;
   onEditCard?: (card: WebCard) => void;
   onDeleteCard?: (card: WebCard) => void;
+  onPromoteToParent?: (categoryId: string) => void;
 }
 
 function SortableUngroupedBlock({
@@ -835,6 +883,7 @@ function SortableUngroupedBlock({
   onAddCard,
   onEditCard,
   onDeleteCard,
+  onPromoteToParent,
 }: SortableUngroupedBlockProps) {
   const {
     attributes,
@@ -907,6 +956,15 @@ function SortableUngroupedBlock({
               title="添加网页"
             >
               <Plus className="w-2.5 h-2.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
+              onClick={() => onPromoteToParent?.(category.id)}
+              title="升级为分类"
+            >
+              <ArrowUpFromLine className="w-2.5 h-2.5" />
             </Button>
           </>
         )}

@@ -49,6 +49,8 @@ interface AppState {
   reorderCategories: (orderedIds: string[]) => Promise<void>;
   moveCategoryToParent: (categoryId: string, parentId: string) => Promise<void>;
   detachCategoryFromParent: (categoryId: string) => Promise<void>;
+  promoteToParent: (categoryId: string) => Promise<void>;
+  demoteParentCategory: (categoryId: string) => Promise<void>;
 
   // Hidden sites
   hideSite: (siteId: string, siteUrl: string, duration: HideDuration) => Promise<void>;
@@ -318,18 +320,45 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ categories: await getCategories() });
   },
 
-  // Remove a sub-group from its parent (promotion: 分组 → 分类)
+  // Remove a sub-group from its parent (promotion: 分组 → 顶级分类)
   detachCategoryFromParent: async (categoryId: string) => {
     const categories = await getCategories();
     const cat = categories.find((c) => c.id === categoryId);
     if (!cat) return;
     delete cat.parentId;
-    delete cat.isParent; // Goes to ungrouped area, not a parent category
+    cat.isParent = true; // Promote to parent category
     // Place at the end of top-level categories
     const topLevel = categories
       .filter((c) => !c.parentId)
       .sort((a, b) => a.order - b.order);
     cat.order = topLevel.length > 0 ? Math.max(...topLevel.map((t) => t.order)) + 1 : 0;
+    await saveCategories(categories);
+    set({ categories: await getCategories() });
+  },
+
+  // Promote an ungrouped item to a parent category
+  promoteToParent: async (categoryId: string) => {
+    const categories = await getCategories();
+    const cat = categories.find((c) => c.id === categoryId);
+    if (!cat) return;
+    cat.isParent = true;
+    await saveCategories(categories);
+    set({ categories: await getCategories() });
+  },
+
+  // Demote a parent category: remove isParent, detach all sub-groups
+  demoteParentCategory: async (categoryId: string) => {
+    const categories = await getCategories();
+    const cat = categories.find((c) => c.id === categoryId);
+    if (!cat) return;
+    cat.isParent = false;
+    // Detach all sub-groups: remove their parentId
+    for (const sub of categories) {
+      if (sub.parentId === categoryId) {
+        delete sub.parentId;
+        delete sub.isParent;
+      }
+    }
     await saveCategories(categories);
     set({ categories: await getCategories() });
   },
