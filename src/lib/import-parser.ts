@@ -8,7 +8,7 @@
  * 映射策略:
  *   - DROPDOWN-ONLY / MIXED 分组 → 父分类 (isParent=true) + 子分组 + 卡片
  *   - DIRECT-ONLY 分组 → 子分组（无父分类）+ 卡片
- *   - 过滤无效链接（空 URL、chrome:// 内部链接）
+ *   - 过滤无效链接（空 URL、chrome-extension:// 链接），保留 chrome:// 内部链接
  */
 
 import type { WarehouseCard, WarehouseCategory } from "./db-warehouse";
@@ -41,6 +41,19 @@ interface HomelyData {
 
 /* ── 解析结果 ── */
 
+/* ── 跳过项记录 ── */
+
+export interface SkippedItem {
+  groupTitle: string;
+  itemTitle: string;
+  url: string;
+  reason: "empty-url" | "invalid-url" | "chrome-extension";
+  /** 是否可以被重新识别（chrome-extension 类型可以尝试在浏览器中打开） */
+  retryable: boolean;
+}
+
+/* ── 解析结果 ── */
+
 export interface ImportPreview {
   source: string;
   fileName: string;
@@ -48,7 +61,7 @@ export interface ImportPreview {
   parentCategories: number;  // 将映射为父分类的分组数
   subGroups: number;         // 将映射为子分组的数量
   totalCards: number;        // 有效卡片总数
-  invalidUrls: number;       // 被过滤的无效链接数
+  skippedItems: SkippedItem[]; // 未识别的条目及原因
   groups: ImportedGroupPreview[];
 }
 
@@ -65,13 +78,17 @@ export interface ParseResult {
   categories: WarehouseCategory[];
   cards: WarehouseCard[];
   preview: ImportPreview;
+  skippedItems: SkippedItem[];
 }
 
 /* ── 工具函数 ── */
 
 function isValidUrl(url: string): boolean {
   if (!url || url.trim() === "") return false;
-  if (url.startsWith("chrome://") || url.startsWith("chrome-extension://")) return false;
+  // chrome:// 内部链接是有效的 Chrome 快捷方式，允许导入
+  if (url.startsWith("chrome://")) return true;
+  // chrome-extension:// 链接依赖特定扩展，标记为跳过
+  if (url.startsWith("chrome-extension://")) return false;
   try {
     const parsed = new URL(url);
     return parsed.protocol === "http:" || parsed.protocol === "https:";
@@ -188,7 +205,7 @@ export function parseHomelyJSON(
   const categories: WarehouseCategory[] = [];
   const cards: WarehouseCard[] = [];
   const groups: ImportedGroupPreview[] = [];
-  let invalidUrls = 0;
+  const skippedItems: SkippedItem[] = [];
   let catIndex = 0;
   let cardIndex = 0;
 
@@ -202,24 +219,50 @@ export function parseHomelyJSON(
 
     const hasDropdowns = menuButtons.length > 0;
 
-    // Count valid links
+    // Count valid links and track skipped
     const validDirectLinks = directButtons.filter((b) => b.url && isValidUrl(b.url));
     const invalidDirectLinks = directButtons.filter((b) => b.url && !isValidUrl(b.url));
-    invalidUrls += invalidDirectLinks.length;
+    // Also track buttons with no URL at all (that aren't menu buttons)
+    const noUrlDirectLinks = directButtons.filter((b) => !b.url || b.url.trim() === "");
+    for (const btn of invalidDirectLinks) {
+      const isChromeExt = btn.url?.startsWith("chrome-extension://");
+      skippedItems.push({
+        groupTitle: groupTitle,
+        itemTitle: btn.title || "未命名",
+        url: btn.url || "",
+        reason: isChromeExt ? "chrome-extension" : "invalid-url",
+        retryable: !!isChromeExt,
+      });
+    }
+    for (const btn of noUrlDirectLinks) {
+      skippedItems.push({
+        groupTitle: groupTitle,
+        itemTitle: btn.title || "未命名",
+        url: "",
+        reason: "empty-url",
+        retryable: false,
+      });
+    }
 
     // Count menu items
     let validMenuItems = 0;
-    let invalidMenuItems = 0;
     for (const btn of menuButtons) {
       for (const item of btn.menu || []) {
         if (isValidUrl(item.url)) {
           validMenuItems++;
         } else {
-          invalidMenuItems++;
+          const isChromeExt = item.url?.startsWith("chrome-extension://");
+          const isEmpty = !item.url || item.url.trim() === "";
+          skippedItems.push({
+            groupTitle: groupTitle,
+            itemTitle: item.title || "未命名",
+            url: item.url || "",
+            reason: isChromeExt ? "chrome-extension" : (isEmpty ? "empty-url" : "invalid-url"),
+            retryable: !!isChromeExt,
+          });
         }
       }
     }
-    invalidUrls += invalidMenuItems;
 
     if (hasDropdowns) {
       // This group becomes a PARENT CATEGORY with SUB-GROUPS
@@ -370,9 +413,10 @@ export function parseHomelyJSON(
       parentCategories: groups.filter((g) => g.type === "parent-category").length,
       subGroups: groups.filter((g) => g.type === "sub-group").length,
       totalCards: cards.length,
-      invalidUrls,
+      skippedItems,
       groups,
     },
+    skippedItems,
   };
 }
 

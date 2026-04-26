@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Upload, FileText, AlertTriangle, CheckCircle, Package, Plus, RefreshCw } from "lucide-react";
-import { parseImportJSON, detectJsonFormat, type ImportPreview, type ParseResult } from "@/lib/import-parser";
+import { parseImportJSON, detectJsonFormat, type ImportPreview, type ParseResult, type SkippedItem } from "@/lib/import-parser";
 import type { ImportBatch, WarehouseCategory, WarehouseCard } from "@/lib/db-warehouse";
 import { useWarehouseStore } from "@/lib/store-warehouse";
 
@@ -195,10 +195,36 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
               </div>
             </div>
 
-            {preview.invalidUrls > 0 && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <AlertTriangle className="h-3 w-3" />
-                过滤了 {preview.invalidUrls} 个无效链接（空 URL、chrome:// 内部链接等）
+            {preview.skippedItems.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <AlertTriangle className="h-3 w-3" />
+                  有 {preview.skippedItems.length} 个条目未被导入
+                </div>
+                <details className="group">
+                  <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+                    查看未识别条目详情 →
+                  </summary>
+                  <div className="mt-2 space-y-1.5 max-h-[200px] overflow-y-auto">
+                    {preview.skippedItems.map((item: SkippedItem, idx: number) => (
+                      <div key={idx} className="flex items-start gap-2 p-2 rounded bg-muted/30 text-xs">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-foreground truncate">{item.itemTitle}</div>
+                          <div className="text-muted-foreground truncate">{item.url || "(空 URL)"}</div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-muted-foreground">
+                              {item.reason === "chrome-extension" ? "依赖浏览器扩展" :
+                               item.reason === "empty-url" ? "无有效链接" : "无效链接"}
+                            </span>
+                            {item.retryable && (
+                              <span className="text-primary">可重试</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
               </div>
             )}
 
