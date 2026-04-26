@@ -5,6 +5,9 @@
  * - OG metadata fetching (bypasses CORS via extension context)
  * - Safety checks for URLs
  * - Message passing between newtab page and extension APIs
+ * 
+ * NOTE: This file must be pure JavaScript (no TypeScript syntax).
+ * Chrome Service Workers do not support TS type annotations.
  */
 
 // Listen for messages from the newtab page
@@ -58,7 +61,7 @@ async function handleFetchMeta(url) {
     const favicon = extractFavicon(html, url) || '';
 
     return { title, description, image, favicon };
-  } catch {
+  } catch (e) {
     return { title: '', description: '', image: '', favicon: '' };
   }
 }
@@ -109,8 +112,8 @@ async function handleCheckSafety(urls) {
       // Check suspicious TLD
       const hasSuspiciousTld = SUSPICIOUS_TLDS.some(tld => domain.endsWith(tld));
 
-      // Determine safety level
-      let level: 'safe' | 'caution' | 'danger';
+      // Determine safety level (no TS type annotation)
+      let level;
       if (isWhitelisted && isHttps) {
         level = 'safe';
       } else if (hasSuspiciousTld || !isHttps) {
@@ -120,8 +123,8 @@ async function handleCheckSafety(urls) {
       }
 
       return { url, level, isHttps, isWhitelisted, hasSuspiciousTld };
-    } catch {
-      return { url, level: 'danger' as const, isHttps: false, isWhitelisted: false, hasSuspiciousTld: true };
+    } catch (e) {
+      return { url, level: 'danger', isHttps: false, isWhitelisted: false, hasSuspiciousTld: true };
     }
   });
 
@@ -132,12 +135,12 @@ async function handleCheckSafety(urls) {
 
 function extractMeta(html, property) {
   // Try og: prefix
-  const ogRegex = new RegExp(`<meta[^>]*property=["']${escapeRegex(property)}["'][^>]*content=["']([^"']*)["']`, 'i');
+  const ogRegex = new RegExp('<meta[^>]*property=["\']' + escapeRegex(property) + '["\'][^>]*content=["\']([^"\']*)["\']', 'i');
   const ogMatch = html.match(ogRegex);
   if (ogMatch) return ogMatch[1];
 
   // Try name attribute (for description etc.)
-  const nameRegex = new RegExp(`<meta[^>]*name=["']${escapeRegex(property)}["'][^>]*content=["']([^"']*)["']`, 'i');
+  const nameRegex = new RegExp('<meta[^>]*name=["\']' + escapeRegex(property) + '["\'][^>]*content=["\']([^"\']*)["\']', 'i');
   const nameMatch = html.match(nameRegex);
   if (nameMatch) return nameMatch[1];
 
@@ -163,7 +166,7 @@ function extractFavicon(html, baseUrl) {
   // Fallback to /favicon.ico
   try {
     return new URL(baseUrl).origin + '/favicon.ico';
-  } catch {
+  } catch (e) {
     return '';
   }
 }
