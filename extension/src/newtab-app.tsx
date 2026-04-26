@@ -9,6 +9,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useAppStore } from "@/lib/store";
+import { useAuthStore } from "@/lib/auth-store";
 import { useWarehouseStore } from "@/lib/store-warehouse";
 import { saveCards, saveCategories, setInitialized } from "@/lib/db";
 import { defaultCards, defaultCategories } from "@/lib/seed";
@@ -47,6 +48,9 @@ export function NewTabApp() {
   // ── Load data on mount ──
   useEffect(() => {
     const init = async () => {
+      // Initialize auth store first (restores session, triggers sync if logged in)
+      await useAuthStore.getState().initialize();
+
       await loadData();
       const state = useAppStore.getState();
       if (!state.initialized) {

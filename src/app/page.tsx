@@ -9,6 +9,7 @@ import { RecycleBinDialog } from "@/components/dialogs/recycle-bin-dialog";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { HotRecommendation } from "@/components/hot-recommendation";
 import { useAppStore } from "@/lib/store";
+import { useAuthStore } from "@/lib/auth-store";
 import { saveCards, saveCategories, setInitialized } from "@/lib/db";
 import { defaultCards, defaultCategories } from "@/lib/seed";
 import type { WebCard, Category } from "@/lib/types";
@@ -27,6 +28,9 @@ export default function HomePage() {
 
   useEffect(() => {
     const init = async () => {
+      // Initialize auth store first (restores session, triggers sync if logged in)
+      await useAuthStore.getState().initialize();
+
       await loadData();
       const state = useAppStore.getState();
       if (!state.initialized) {

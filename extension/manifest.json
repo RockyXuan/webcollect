@@ -5,7 +5,8 @@
   "description": "个人网页收藏墙 - 每次打开新标签页，快速访问你的常用网站",
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "identity"
   ],
   "host_permissions": [
     "<all_urls>"

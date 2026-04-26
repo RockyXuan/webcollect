@@ -4,6 +4,7 @@ import { useAppStore } from "@/lib/store";
 import { Plus, FolderPlus, Layers, Package, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PlatformLink } from "@/components/ui/platform-link";
+import { UserMenu } from "@/components/auth/user-menu";
 
 interface TopNavProps {
   onAddCard?: (categoryId?: string) => void;
@@ -104,6 +105,8 @@ export function TopNav({ onAddCard, onAddGroup, onAddCategory, onRecycleBin, onW
               </Button>
             </PlatformLink>
           )}
+          <div className="w-px h-5 bg-border mx-1" />
+          <UserMenu />
         </div>
       </div>
     </nav>
