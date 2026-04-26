@@ -4,14 +4,47 @@ import React, { useMemo } from "react";
 import { useWarehouseStore } from "@/lib/store-warehouse";
 import type { WarehouseCard, WarehouseCategory } from "@/lib/db-warehouse";
 import { WarehouseCardItem } from "@/components/card/warehouse-card";
-import { Package, Trash2, Send, ChevronRight, ChevronDown } from "lucide-react";
+import {
+  Package,
+  Trash2,
+  Send,
+  ChevronRight,
+  ChevronDown,
+  ArrowUpFromLine,
+  ArrowDownFromLine,
+  Pencil,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ShipToMainDialog } from "@/components/dialogs/ship-to-main-dialog";
+import {
+  ShipToMainDialog,
+  ShipToMainSubGroupDialog,
+} from "@/components/dialogs/ship-to-main-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 /* ── Warehouse Grid ── */
 export function WarehouseGrid() {
-  const { cards, categories, batches, selectedBatchId, deleteWarehouseCategory, setSelectedBatch } = useWarehouseStore();
+  const { cards, categories, batches, selectedBatchId, setSelectedBatch } =
+    useWarehouseStore();
 
   // Filter by selected batch
   const filteredCategories = useMemo(() => {
@@ -75,20 +108,14 @@ export function WarehouseGrid() {
           subGroups={getSubGroups(parent.id)}
           getCardsForCategory={getCardsForCategory}
           allCards={filteredCards}
-          onDeleteCategory={deleteWarehouseCategory}
         />
       ))}
 
-      {/* Standalone categories */}
+      {/* Standalone categories (ungrouped sub-groups) */}
       {standaloneCategories.length > 0 && (
         <div className="flex flex-wrap gap-3">
           {standaloneCategories.map((cat) => (
-            <StandaloneCategoryBlock
-              key={cat.id}
-              category={cat}
-              cards={getCardsForCategory(cat.id)}
-              onDeleteCategory={deleteWarehouseCategory}
-            />
+            <StandaloneCategoryBlock key={cat.id} category={cat} cards={getCardsForCategory(cat.id)} />
           ))}
         </div>
       )}
@@ -102,23 +129,30 @@ function ParentCategoryBlock({
   subGroups,
   getCardsForCategory,
   allCards,
-  onDeleteCategory,
 }: {
   category: WarehouseCategory;
   subGroups: WarehouseCategory[];
   getCardsForCategory: (id: string) => WarehouseCard[];
   allCards: WarehouseCard[];
-  onDeleteCategory: (id: string) => void;
 }) {
   const [collapsed, setCollapsed] = React.useState(false);
   const [shipDialogOpen, setShipDialogOpen] = React.useState(false);
+  const [demoteDialogOpen, setDemoteDialogOpen] = React.useState(false);
+  const [editDialogOpen, setEditDialogOpen] = React.useState(false);
+  const [editName, setEditName] = React.useState(category.name);
+  const { deleteWarehouseCategory, demoteWarehouseCategory, updateWarehouseCategory } = useWarehouseStore();
+
   const totalCards = subGroups.reduce((sum, sg) => sum + getCardsForCategory(sg.id).length, 0);
 
+  const handleEditSave = async () => {
+    if (editName.trim()) {
+      await updateWarehouseCategory({ ...category, name: editName.trim() });
+      setEditDialogOpen(false);
+    }
+  };
+
   return (
-    <div
-      className="w-full rounded-lg border border-border bg-card overflow-hidden"
-      style={{ width: "100%" }}
-    >
+    <div className="w-full rounded-lg border border-border bg-card overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 border-b border-border">
         <button onClick={() => setCollapsed(!collapsed)} className="text-muted-foreground hover:text-foreground">
@@ -130,15 +164,87 @@ function ParentCategoryBlock({
           {totalCards} 个网站
         </Badge>
         <div className="flex-1" />
-        <ShipToMainButton warehouseCategory={category} onOpenDialog={() => setShipDialogOpen(true)} />
+
+        {/* Edit button */}
         <Button
           variant="ghost"
           size="sm"
-          className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-          onClick={() => onDeleteCategory(category.id)}
+          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+          onClick={() => { setEditName(category.name); setEditDialogOpen(true); }}
+          title="编辑分类"
         >
-          <Trash2 className="h-3.5 w-3.5" />
+          <Pencil className="h-3 w-3" />
         </Button>
+
+        {/* Demote button */}
+        <AlertDialog open={demoteDialogOpen} onOpenChange={setDemoteDialogOpen}>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+              title="降级为分组"
+            >
+              <ArrowDownFromLine className="h-3 w-3" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>确认降级</AlertDialogTitle>
+              <AlertDialogDescription>
+                将分类&ldquo;{category.name}&rdquo;降级为分组后，其下所有子分组将脱离成为独立分组。此操作不可撤销。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>取消</AlertDialogCancel>
+              <AlertDialogAction onClick={() => demoteWarehouseCategory(category.id)}>
+                确认降级
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Send to main page */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-6 text-[10px] gap-1 px-2"
+          onClick={() => setShipDialogOpen(true)}
+        >
+          <Send className="h-3 w-3" />
+          发货到主页
+        </Button>
+
+        {/* Delete */}
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+              title="删除分类"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>确认删除</AlertDialogTitle>
+              <AlertDialogDescription>
+                将删除分类&ldquo;{category.name}&rdquo;及其所有子分组和 {totalCards} 个书签，此操作不可撤销。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>取消</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteWarehouseCategory(category.id)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                确认删除
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       {/* Sub-groups */}
@@ -147,27 +253,17 @@ function ParentCategoryBlock({
           {subGroups.map((sg) => {
             const sgCards = getCardsForCategory(sg.id);
             return (
-              <div
+              <SubGroupBlock
                 key={sg.id}
-                className="rounded-md border border-border/60 bg-background p-2"
-                style={{ flex: sgCards.length <= 4 ? "1 1 0%" : "0 0 100%" }}
-              >
-                <div className="flex items-center gap-1.5 mb-2">
-                  <div className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: sg.color }} />
-                  <span className="text-sm font-medium text-foreground">{sg.name}</span>
-                  <span className="text-[10px] text-muted-foreground">{sgCards.length}</span>
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {sgCards.map((card) => (
-                    <WarehouseCardItem key={card.id} card={card} categoryColor={sg.color} />
-                  ))}
-                </div>
-              </div>
+                category={sg}
+                cards={sgCards}
+              />
             );
           })}
         </div>
       )}
 
+      {/* Ship dialog */}
       <ShipToMainDialog
         open={shipDialogOpen}
         onOpenChange={setShipDialogOpen}
@@ -175,22 +271,185 @@ function ParentCategoryBlock({
         subGroups={subGroups}
         allCards={allCards}
       />
+
+      {/* Edit dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[360px]">
+          <DialogHeader>
+            <DialogTitle className="font-serif">编辑分类</DialogTitle>
+            <DialogDescription>修改分类名称</DialogDescription>
+          </DialogHeader>
+          <Input
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            placeholder="分类名称"
+            onKeyDown={(e) => { if (e.key === "Enter") handleEditSave(); }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>取消</Button>
+            <Button onClick={handleEditSave}>保存</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-/* ── Standalone Category Block ── */
-function StandaloneCategoryBlock({
+/* ── Sub-Group Block (inside parent category) ── */
+function SubGroupBlock({
   category,
   cards,
-  onDeleteCategory,
 }: {
   category: WarehouseCategory;
   cards: WarehouseCard[];
-  onDeleteCategory: (id: string) => void;
 }) {
   const [shipDialogOpen, setShipDialogOpen] = React.useState(false);
+  const [editDialogOpen, setEditDialogOpen] = React.useState(false);
+  const [editName, setEditName] = React.useState(category.name);
+  const { deleteWarehouseCategory, promoteWarehouseCategory, updateWarehouseCategory } = useWarehouseStore();
+
+  const handleEditSave = async () => {
+    if (editName.trim()) {
+      await updateWarehouseCategory({ ...category, name: editName.trim() });
+      setEditDialogOpen(false);
+    }
+  };
+
+  return (
+    <div
+      className="rounded-md border border-border/60 bg-background p-2"
+      style={{ flex: cards.length <= 4 ? "1 1 0%" : "0 0 100%" }}
+    >
+      {/* Sub-group header */}
+      <div className="flex items-center gap-1.5 mb-2">
+        <div className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: category.color }} />
+        <span className="text-sm font-medium text-foreground">{category.name}</span>
+        <span className="text-[10px] text-muted-foreground">{cards.length}</span>
+        <div className="flex-1" />
+
+        {/* Edit */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
+          onClick={() => { setEditName(category.name); setEditDialogOpen(true); }}
+          title="编辑分组"
+        >
+          <Pencil className="h-2.5 w-2.5" />
+        </Button>
+
+        {/* Promote (upgrade to parent) */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
+          onClick={() => promoteWarehouseCategory(category.id)}
+          title="升级为顶级分类"
+        >
+          <ArrowUpFromLine className="h-2.5 w-2.5" />
+        </Button>
+
+        {/* Send to main */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-5 text-[9px] gap-0.5 px-1.5"
+          onClick={() => setShipDialogOpen(true)}
+        >
+          <Send className="h-2.5 w-2.5" />
+          发送
+        </Button>
+
+        {/* Delete */}
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
+              title="删除分组"
+            >
+              <Trash2 className="h-2.5 w-2.5" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>确认删除</AlertDialogTitle>
+              <AlertDialogDescription>
+                将删除分组&ldquo;{category.name}&rdquo;及其 {cards.length} 个书签，此操作不可撤销。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>取消</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteWarehouseCategory(category.id)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                确认删除
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+
+      {/* Cards */}
+      <div className="flex flex-wrap gap-1">
+        {cards.map((card) => (
+          <WarehouseCardItem key={card.id} card={card} categoryColor={category.color} />
+        ))}
+      </div>
+
+      {/* Ship sub-group dialog */}
+      <ShipToMainSubGroupDialog
+        open={shipDialogOpen}
+        onOpenChange={setShipDialogOpen}
+        warehouseSubGroup={category}
+        cards={cards}
+      />
+
+      {/* Edit dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[360px]">
+          <DialogHeader>
+            <DialogTitle className="font-serif">编辑分组</DialogTitle>
+            <DialogDescription>修改分组名称</DialogDescription>
+          </DialogHeader>
+          <Input
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            placeholder="分组名称"
+            onKeyDown={(e) => { if (e.key === "Enter") handleEditSave(); }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>取消</Button>
+            <Button onClick={handleEditSave}>保存</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/* ── Standalone Category Block (ungrouped sub-groups) ── */
+function StandaloneCategoryBlock({
+  category,
+  cards,
+}: {
+  category: WarehouseCategory;
+  cards: WarehouseCard[];
+}) {
+  const [shipDialogOpen, setShipDialogOpen] = React.useState(false);
+  const [editDialogOpen, setEditDialogOpen] = React.useState(false);
+  const [editName, setEditName] = React.useState(category.name);
+  const { deleteWarehouseCategory, promoteWarehouseCategory, updateWarehouseCategory } = useWarehouseStore();
   const widthPercent = cards.length <= 4 ? 50 : 100;
+
+  const handleEditSave = async () => {
+    if (editName.trim()) {
+      await updateWarehouseCategory({ ...category, name: editName.trim() });
+      setEditDialogOpen(false);
+    }
+  };
 
   return (
     <div
@@ -205,15 +464,70 @@ function StandaloneCategoryBlock({
           {cards.length} 个网站
         </Badge>
         <div className="flex-1" />
-        <ShipToMainButton warehouseCategory={category} onOpenDialog={() => setShipDialogOpen(true)} />
+
+        {/* Edit */}
         <Button
           variant="ghost"
           size="sm"
-          className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-          onClick={() => onDeleteCategory(category.id)}
+          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+          onClick={() => { setEditName(category.name); setEditDialogOpen(true); }}
+          title="编辑分组"
         >
-          <Trash2 className="h-3.5 w-3.5" />
+          <Pencil className="h-3 w-3" />
         </Button>
+
+        {/* Promote */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+          onClick={() => promoteWarehouseCategory(category.id)}
+          title="升级为顶级分类"
+        >
+          <ArrowUpFromLine className="h-3 w-3" />
+        </Button>
+
+        {/* Send */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-6 text-[10px] gap-1 px-2"
+          onClick={() => setShipDialogOpen(true)}
+        >
+          <Send className="h-3 w-3" />
+          发货到主页
+        </Button>
+
+        {/* Delete */}
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+              title="删除分组"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>确认删除</AlertDialogTitle>
+              <AlertDialogDescription>
+                将删除分组&ldquo;{category.name}&rdquo;及其 {cards.length} 个书签，此操作不可撤销。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>取消</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteWarehouseCategory(category.id)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                确认删除
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       {/* Cards */}
@@ -223,6 +537,7 @@ function StandaloneCategoryBlock({
         ))}
       </div>
 
+      {/* Ship dialog */}
       <ShipToMainDialog
         open={shipDialogOpen}
         onOpenChange={setShipDialogOpen}
@@ -230,26 +545,26 @@ function StandaloneCategoryBlock({
         subGroups={[]}
         allCards={cards}
       />
-    </div>
-  );
-}
 
-/* ── Ship To Main Button ── */
-function ShipToMainButton({
-  onOpenDialog,
-}: {
-  warehouseCategory: WarehouseCategory;
-  onOpenDialog: () => void;
-}) {
-  return (
-    <Button
-      variant="outline"
-      size="sm"
-      className="h-6 text-[10px] gap-1 px-2"
-      onClick={onOpenDialog}
-    >
-      <Send className="h-3 w-3" />
-      发货到主页
-    </Button>
+      {/* Edit dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[360px]">
+          <DialogHeader>
+            <DialogTitle className="font-serif">编辑分组</DialogTitle>
+            <DialogDescription>修改分组名称</DialogDescription>
+          </DialogHeader>
+          <Input
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            placeholder="分组名称"
+            onKeyDown={(e) => { if (e.key === "Enter") handleEditSave(); }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>取消</Button>
+            <Button onClick={handleEditSave}>保存</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

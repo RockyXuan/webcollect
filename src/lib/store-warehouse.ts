@@ -20,6 +20,12 @@ import {
   clearWarehouse,
   overwriteWarehouse,
   deleteWarehouseCategory,
+  deleteWarehouseCard,
+  shipCardToMain as dbShipCardToMain,
+  shipSubGroupToMain as dbShipSubGroupToMain,
+  updateWarehouseCategory,
+  promoteWarehouseCategory as dbPromoteWarehouseCategory,
+  demoteWarehouseCategory as dbDemoteWarehouseCategory,
 } from "./db-warehouse";
 
 interface WarehouseState {
@@ -53,6 +59,22 @@ interface WarehouseState {
     warehouseCategoryId: string,
     mainTargetCategoryId: string
   ) => Promise<{ categories: Category[]; cards: WebCard[] }>;
+
+  shipCardToMain: (
+    warehouseCardId: string,
+    mainTargetCategoryId: string
+  ) => Promise<WebCard>;
+
+  shipSubGroupToMain: (
+    warehouseSubGroupId: string,
+    mainTargetCategoryId: string
+  ) => Promise<{ category: Category; cards: WebCard[] }>;
+
+  // Edit actions
+  promoteWarehouseCategory: (categoryId: string) => Promise<void>;
+  demoteWarehouseCategory: (categoryId: string) => Promise<void>;
+  updateWarehouseCategory: (updated: WarehouseCategory) => Promise<void>;
+  deleteWarehouseCard: (cardId: string) => Promise<void>;
 }
 
 export const useWarehouseStore = create<WarehouseState>((set) => ({
@@ -132,5 +154,63 @@ export const useWarehouseStore = create<WarehouseState>((set) => ({
     ]);
     set({ cards, categories, batches });
     return result;
+  },
+
+  shipCardToMain: async (warehouseCardId, mainTargetCategoryId) => {
+    const mainCard = await dbShipCardToMain(warehouseCardId, mainTargetCategoryId);
+    const [cards, categories, batches] = await Promise.all([
+      getWarehouseCards(),
+      getWarehouseCategories(),
+      getImportBatches(),
+    ]);
+    set({ cards, categories, batches });
+    return mainCard;
+  },
+
+  shipSubGroupToMain: async (warehouseSubGroupId, mainTargetCategoryId) => {
+    const result = await dbShipSubGroupToMain(warehouseSubGroupId, mainTargetCategoryId);
+    const [cards, categories, batches] = await Promise.all([
+      getWarehouseCards(),
+      getWarehouseCategories(),
+      getImportBatches(),
+    ]);
+    set({ cards, categories, batches });
+    return result;
+  },
+
+  promoteWarehouseCategory: async (categoryId) => {
+    await dbPromoteWarehouseCategory(categoryId);
+    const [cards, categories, batches] = await Promise.all([
+      getWarehouseCards(),
+      getWarehouseCategories(),
+      getImportBatches(),
+    ]);
+    set({ cards, categories, batches });
+  },
+
+  demoteWarehouseCategory: async (categoryId) => {
+    await dbDemoteWarehouseCategory(categoryId);
+    const [cards, categories, batches] = await Promise.all([
+      getWarehouseCards(),
+      getWarehouseCategories(),
+      getImportBatches(),
+    ]);
+    set({ cards, categories, batches });
+  },
+
+  updateWarehouseCategory: async (updated) => {
+    await updateWarehouseCategory(updated);
+    const categories = await getWarehouseCategories();
+    set({ categories });
+  },
+
+  deleteWarehouseCard: async (cardId) => {
+    await deleteWarehouseCard(cardId);
+    const [cards, categories, batches] = await Promise.all([
+      getWarehouseCards(),
+      getWarehouseCategories(),
+      getImportBatches(),
+    ]);
+    set({ cards, categories, batches });
   },
 }));

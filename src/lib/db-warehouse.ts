@@ -231,3 +231,113 @@ export async function getBatchStats(batchId: string): Promise<{
     parentCategoryCount: batchCats.filter((c) => !c.parentId || c.isParent).length,
   };
 }
+
+/** Ship a single card from warehouse to main page */
+export async function shipCardToMain(
+  warehouseCardId: string,
+  mainTargetCategoryId: string
+): Promise<WebCard> {
+  const whCards = await getWarehouseCards();
+  const whCard = whCards.find((c) => c.id === warehouseCardId);
+  if (!whCard) throw new Error(`Warehouse card ${warehouseCardId} not found`);
+
+  // Convert to main card format
+  const mainCard: WebCard = {
+    ...whCard,
+    categoryId: mainTargetCategoryId,
+    importBatchId: undefined,
+  } as WebCard;
+
+  // Remove from warehouse
+  const remainingCards = whCards.filter((c) => c.id !== warehouseCardId);
+  await saveWarehouseCards(remainingCards);
+
+  // Update batch count
+  const batches = await getImportBatches();
+  const batch = batches.find((b) => b.id === whCard.importBatchId);
+  if (batch) {
+    batch.cardCount = remainingCards.filter((c) => c.importBatchId === batch.id).length;
+    await saveImportBatches(batches);
+  }
+
+  return mainCard;
+}
+
+/** Ship a sub-group (and its cards) from warehouse to main page under a parent category */
+export async function shipSubGroupToMain(
+  warehouseSubGroupId: string,
+  mainTargetCategoryId: string
+): Promise<{ category: Category; cards: WebCard[] }> {
+  const whCats = await getWarehouseCategories();
+  const whCards = await getWarehouseCards();
+
+  const whSubCat = whCats.find((c) => c.id === warehouseSubGroupId);
+  if (!whSubCat) throw new Error(`Warehouse sub-group ${warehouseSubGroupId} not found`);
+
+  const subCards = whCards.filter((c) => c.categoryId === warehouseSubGroupId);
+
+  // Create main sub-category under the target parent
+  const mainSubCat: Category = {
+    ...whSubCat,
+    parentId: mainTargetCategoryId,
+    importBatchId: undefined,
+  } as Category;
+
+  const mainCards: WebCard[] = subCards.map((c) => ({
+    ...c,
+    categoryId: mainSubCat.id,
+    importBatchId: undefined,
+  })) as WebCard[];
+
+  // Remove shipped items from warehouse
+  const remainingCats = whCats.filter((c) => c.id !== warehouseSubGroupId);
+  const remainingCards = whCards.filter((c) => c.categoryId !== warehouseSubGroupId);
+  await saveWarehouseCategories(remainingCats);
+  await saveWarehouseCards(remainingCards);
+
+  // Update batch count
+  const batches = await getImportBatches();
+  const batch = batches.find((b) => b.id === whSubCat.importBatchId);
+  if (batch) {
+    batch.categoryCount = remainingCats.filter((c) => c.importBatchId === batch.id).length;
+    batch.cardCount = remainingCards.filter((c) => c.importBatchId === batch.id).length;
+    await saveImportBatches(batches);
+  }
+
+  return { category: mainSubCat, cards: mainCards };
+}
+
+/** Update a warehouse category's fields (for edit mode) */
+export async function updateWarehouseCategory(updated: WarehouseCategory): Promise<void> {
+  const cats = await getWarehouseCategories();
+  const idx = cats.findIndex((c) => c.id === updated.id);
+  if (idx >= 0) {
+    cats[idx] = updated;
+    await saveWarehouseCategories(cats);
+  }
+}
+
+/** Promote a warehouse sub-group to parent category */
+export async function promoteWarehouseCategory(categoryId: string): Promise<void> {
+  const cats = await getWarehouseCategories();
+  const cat = cats.find((c) => c.id === categoryId);
+  if (!cat) return;
+  cat.isParent = true;
+  cat.parentId = undefined;
+  await saveWarehouseCategories(cats);
+}
+
+/** Demote a warehouse parent category to sub-group */
+export async function demoteWarehouseCategory(categoryId: string): Promise<void> {
+  const cats = await getWarehouseCategories();
+  const cat = cats.find((c) => c.id === categoryId);
+  if (!cat) return;
+  cat.isParent = false;
+  // Detach all sub-groups
+  for (const c of cats) {
+    if (c.parentId === categoryId) {
+      c.parentId = undefined;
+    }
+  }
+  await saveWarehouseCategories(cats);
+}
