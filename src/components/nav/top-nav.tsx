@@ -10,9 +10,10 @@ interface TopNavProps {
   onAddGroup?: (parentId?: string) => void;
   onAddCategory?: () => void;
   onRecycleBin?: () => void;
+  onWarehouse?: () => void;
 }
 
-export function TopNav({ onAddCard, onAddGroup, onAddCategory, onRecycleBin }: TopNavProps) {
+export function TopNav({ onAddCard, onAddGroup, onAddCategory, onRecycleBin, onWarehouse }: TopNavProps) {
   const { searchQuery, setSearchQuery } = useAppStore();
   const recycleBinCount = useAppStore((s) => s.recycleBin.length);
 
@@ -81,16 +82,28 @@ export function TopNav({ onAddCard, onAddGroup, onAddCategory, onRecycleBin }: T
               </span>
             )}
           </Button>
-          <PlatformLink href="/warehouse">
+          {onWarehouse ? (
             <Button
               variant="outline"
               size="sm"
               className="h-7 text-xs gap-1 px-2"
+              onClick={() => onWarehouse()}
             >
               <Package className="h-3 w-3" />
               仓库
             </Button>
-          </PlatformLink>
+          ) : (
+            <PlatformLink href="/warehouse">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1 px-2"
+              >
+                <Package className="h-3 w-3" />
+                仓库
+              </Button>
+            </PlatformLink>
+          )}
         </div>
       </div>
     </nav>

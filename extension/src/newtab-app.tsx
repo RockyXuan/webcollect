@@ -116,6 +116,7 @@ export function NewTabApp() {
             onAddGroup={handleAddGroup}
             onAddCategory={handleAddCategory}
             onRecycleBin={() => setRecycleBinOpen(true)}
+            onWarehouse={() => setView("warehouse")}
           />
 
           <main className="w-full px-3 sm:px-5 lg:px-6 py-4 space-y-4">
