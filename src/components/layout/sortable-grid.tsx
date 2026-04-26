@@ -5,7 +5,6 @@ import { useAppStore } from "@/lib/store";
 import { WebCardItem } from "@/components/card/web-card";
 import { Pencil, Plus, GripVertical, ArrowUpFromLine, ArrowDownFromLine, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { EditableText } from "@/components/ui/editable-text";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -533,7 +532,7 @@ function SortableCategoryBlock({
     isDragging,
   } = useSortable({ id: catId(category.id) });
 
-  const { setCategoryWidth, demoteParentCategory, toggleEditMode, updateCategory } = useAppStore();
+  const { setCategoryWidth, demoteParentCategory } = useAppStore();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [localWidth, setLocalWidth] = useState<number | null>(null);
 
@@ -598,7 +597,7 @@ function SortableCategoryBlock({
       `}
     >
       {/* Category header - buttons right next to title */}
-      <div className="group flex items-center gap-1.5 px-3 py-2 border-b border-border/50 flex-wrap">
+      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border/50 flex-wrap">
         <span
           className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground transition-colors"
           {...attributes}
@@ -611,12 +610,13 @@ function SortableCategoryBlock({
           className="w-2.5 h-2.5 rounded-full flex-shrink-0"
           style={{ backgroundColor: category.color }}
         />
-        <EditableText
-          value={category.name}
-          onChange={(newName) => updateCategory({ ...category, name: newName })}
-          className="text-sm font-semibold text-foreground font-serif"
-          editable={editMode}
-        />
+        <span
+          className="text-sm font-semibold text-foreground font-serif cursor-grab active:cursor-grabbing hover:text-primary/80 transition-colors"
+          {...attributes}
+          {...listeners}
+        >
+          {category.name}
+        </span>
 
         {/* Smooth drop hint */}
         {isHovered && isParent && (
@@ -628,19 +628,6 @@ function SortableCategoryBlock({
           <span className="text-[10px] text-muted-foreground/30 transition-opacity duration-300">
             拖入分组到此分类
           </span>
-        )}
-
-        {/* Hover edit button to enter edit mode */}
-        {!editMode && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-5 w-5 p-0 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={toggleEditMode}
-            title="进入编辑模式"
-          >
-            <Pencil className="w-2.5 h-2.5" />
-          </Button>
         )}
 
         {/* Action buttons - right next to title */}
@@ -780,9 +767,6 @@ function SortableSubGroupBlock({
 
   const categoryWidths = useAppStore((s) => s.categoryWidths);
   const setCategoryWidth = useAppStore((s) => s.setCategoryWidth);
-  const toggleEditMode = useAppStore((s) => s.toggleEditMode);
-  const updateCategory = useAppStore((s) => s.updateCategory);
-  const updateCard = useAppStore((s) => s.updateCard);
   const [localWidth, setLocalWidth] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -844,7 +828,7 @@ function SortableSubGroupBlock({
       className="relative rounded-md border border-border/40 bg-background overflow-hidden min-w-0"
     >
       {/* Sub-group header - buttons right next to title */}
-      <div className="group flex items-center gap-1.5 px-2.5 py-1.5 flex-wrap">
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 flex-wrap">
         <span
           className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground transition-colors"
           {...attributes}
@@ -857,28 +841,16 @@ function SortableSubGroupBlock({
           className="w-1 h-3 rounded-full flex-shrink-0"
           style={{ backgroundColor: category.color }}
         />
-        <EditableText
-          value={category.name}
-          onChange={(newName) => updateCategory({ ...category, name: newName })}
-          className="text-xs font-medium text-foreground"
-          editable={editMode}
-        />
+        <span
+          className="text-xs font-medium text-foreground cursor-grab active:cursor-grabbing hover:text-primary/80 transition-colors"
+          {...attributes}
+          {...listeners}
+        >
+          {category.name}
+        </span>
         <span className="text-[10px] text-muted-foreground">
           ({cards.length})
         </span>
-
-        {/* Hover edit button to enter edit mode */}
-        {!editMode && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-5 w-5 p-0 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={toggleEditMode}
-            title="进入编辑模式"
-          >
-            <Pencil className="w-2.5 h-2.5" />
-          </Button>
-        )}
 
         {editMode && (
           <>
@@ -927,7 +899,6 @@ function SortableSubGroupBlock({
               editMode={editMode}
               onEdit={() => onEditCard?.(card)}
               onDelete={() => onDeleteCard?.(card)}
-              onUpdateCard={updateCard}
             />
           ))}
           {cards.length === 0 && (
@@ -980,9 +951,6 @@ function SortableUngroupedBlock({
 
   const categoryWidths = useAppStore((s) => s.categoryWidths);
   const setCategoryWidth = useAppStore((s) => s.setCategoryWidth);
-  const toggleEditMode = useAppStore((s) => s.toggleEditMode);
-  const updateCategory = useAppStore((s) => s.updateCategory);
-  const updateCard = useAppStore((s) => s.updateCard);
   const [localWidth, setLocalWidth] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -1044,7 +1012,7 @@ function SortableUngroupedBlock({
       className="relative rounded-md border border-border/40 bg-background overflow-hidden min-w-0"
     >
       {/* Header - buttons right next to title */}
-      <div className="group flex items-center gap-1.5 px-2.5 py-1.5 flex-wrap">
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 flex-wrap">
         <span
           className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground transition-colors"
           {...attributes}
@@ -1057,28 +1025,16 @@ function SortableUngroupedBlock({
           className="w-1 h-3 rounded-full flex-shrink-0"
           style={{ backgroundColor: category.color }}
         />
-        <EditableText
-          value={category.name}
-          onChange={(newName) => updateCategory({ ...category, name: newName })}
-          className="text-xs font-medium text-foreground"
-          editable={editMode}
-        />
+        <span
+          className="text-xs font-medium text-foreground cursor-grab active:cursor-grabbing hover:text-primary/80 transition-colors"
+          {...attributes}
+          {...listeners}
+        >
+          {category.name}
+        </span>
         <span className="text-[10px] text-muted-foreground">
           ({cards.length})
         </span>
-
-        {/* Hover edit button to enter edit mode */}
-        {!editMode && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-5 w-5 p-0 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={toggleEditMode}
-            title="进入编辑模式"
-          >
-            <Pencil className="w-2.5 h-2.5" />
-          </Button>
-        )}
 
         {editMode && (
           <>
@@ -1127,7 +1083,6 @@ function SortableUngroupedBlock({
               editMode={editMode}
               onEdit={() => onEditCard?.(card)}
               onDelete={() => onDeleteCard?.(card)}
-              onUpdateCard={updateCard}
             />
           ))}
           {cards.length === 0 && (
@@ -1154,7 +1109,6 @@ interface SortableCardProps {
   editMode: boolean;
   onEdit: () => void;
   onDelete: () => void;
-  onUpdateCard: (card: WebCard) => void;
 }
 
 function SortableCard({
@@ -1163,7 +1117,6 @@ function SortableCard({
   editMode,
   onEdit,
   onDelete,
-  onUpdateCard,
 }: SortableCardProps) {
   const {
     attributes,
@@ -1188,7 +1141,6 @@ function SortableCard({
         editMode={editMode}
         onEdit={onEdit}
         onDelete={onDelete}
-        onUpdateCard={onUpdateCard}
         dragListeners={{ ...attributes, ...listeners }}
       />
     </div>

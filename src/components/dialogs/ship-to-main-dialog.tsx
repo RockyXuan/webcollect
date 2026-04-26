@@ -10,71 +10,135 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Send, Inbox, Layers, CheckCircle } from "lucide-react";
+import { Send, Plus, CheckCircle } from "lucide-react";
 import { useWarehouseStore } from "@/lib/store-warehouse";
 import { useAppStore } from "@/lib/store";
 import type { WarehouseCategory, WarehouseCard } from "@/lib/db-warehouse";
 import { addCard as dbAddCard, addCategory as dbAddCategory } from "@/lib/db";
 
-/* ── Shared logic: get main page parent categories ── */
+/* ── Shared target selector logic ── */
 
-function useMainParentCategories() {
+function useMainCategories() {
   const mainCategories = useAppStore((s) => s.categories);
   const parentMainCats = useMemo(
-    () =>
-      mainCategories.filter(
-        (c) => !c.parentId && (c.isParent || mainCategories.some((sg) => sg.parentId === c.id))
-      ),
+    () => mainCategories.filter((c) => !c.parentId && (c.isParent || mainCategories.some((sg) => sg.parentId === c.id))),
     [mainCategories]
   );
-  return { parentMainCats, mainCategories };
+  const allMainCats = useMemo(
+    () => mainCategories.filter((c) => !c.isParent),
+    [mainCategories]
+  );
+  return { parentMainCats, allMainCats, mainCategories };
 }
 
-/* ── Step 2: Select parent category (only shown when targetMode=existing) ── */
-
-function ParentCategorySelector({
-  parentMainCats,
+function TargetSelector({
+  targetMode,
+  setTargetMode,
   selectedMainCatId,
   setSelectedMainCatId,
+  parentMainCats,
+  allMainCats,
+  allowExistingSubGroup,
 }: {
-  parentMainCats: ReturnType<typeof useMainParentCategories>["parentMainCats"];
+  targetMode: "new" | "existing" | "existing_sub";
+  setTargetMode: (m: "new" | "existing" | "existing_sub") => void;
   selectedMainCatId: string;
   setSelectedMainCatId: (id: string) => void;
+  parentMainCats: ReturnType<typeof useMainCategories>["parentMainCats"];
+  allMainCats: ReturnType<typeof useMainCategories>["allMainCats"];
+  allowExistingSubGroup?: boolean;
 }) {
   return (
-    <div className="space-y-1 pl-2 mt-2 max-h-48 overflow-y-auto">
-      {parentMainCats.map((cat) => (
+    <div className="space-y-2">
+      <div className="text-sm font-medium text-foreground">发送到</div>
+      <div className="space-y-2">
         <button
-          key={cat.id}
-          className={`w-full flex items-center gap-2 p-2 rounded-md text-left text-sm transition-colors ${
-            selectedMainCatId === cat.id ? "bg-primary/10 text-primary" : "hover:bg-muted/50"
+          className={`w-full p-3 rounded-md border text-left transition-colors ${
+            targetMode === "new" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
           }`}
-          onClick={() => setSelectedMainCatId(cat.id)}
+          onClick={() => setTargetMode("new")}
         >
-          <div className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: cat.color }} />
-          {cat.name}
+          <div className="flex items-center gap-2 mb-1">
+            <Plus className="h-4 w-4" />
+            <span className="text-sm font-medium">新建分组</span>
+          </div>
+          <p className="text-[11px] text-muted-foreground">在主页创建一个新的分组</p>
         </button>
-      ))}
+
+        {parentMainCats.length > 0 && (
+          <button
+            className={`w-full p-3 rounded-md border text-left transition-colors ${
+              targetMode === "existing" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+            }`}
+            onClick={() => setTargetMode("existing")}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <Send className="h-4 w-4" />
+              <span className="text-sm font-medium">合并到已有分类下</span>
+            </div>
+            <p className="text-[11px] text-muted-foreground">将书签合并到主页已有分类中作为子分组</p>
+          </button>
+        )}
+
+        {allowExistingSubGroup && allMainCats.length > 0 && (
+          <button
+            className={`w-full p-3 rounded-md border text-left transition-colors ${
+              targetMode === "existing_sub" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+            }`}
+            onClick={() => setTargetMode("existing_sub")}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <Send className="h-4 w-4" />
+              <span className="text-sm font-medium">放入已有分组</span>
+            </div>
+            <p className="text-[11px] text-muted-foreground">将书签直接添加到主页已有分组中</p>
+          </button>
+        )}
+      </div>
+
+      {targetMode === "existing" && (
+        <div className="space-y-1 pl-2">
+          {parentMainCats.map((cat) => (
+            <button
+              key={cat.id}
+              className={`w-full flex items-center gap-2 p-2 rounded-md text-left text-sm transition-colors ${
+                selectedMainCatId === cat.id ? "bg-primary/10 text-primary" : "hover:bg-muted/50"
+              }`}
+              onClick={() => setSelectedMainCatId(cat.id)}
+            >
+              <div className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: cat.color }} />
+              {cat.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {targetMode === "existing_sub" && (
+        <div className="space-y-1 pl-2 max-h-48 overflow-y-auto">
+          {allMainCats.map((cat) => (
+            <button
+              key={cat.id}
+              className={`w-full flex items-center gap-2 p-2 rounded-md text-left text-sm transition-colors ${
+                selectedMainCatId === cat.id ? "bg-primary/10 text-primary" : "hover:bg-muted/50"
+              }`}
+              onClick={() => setSelectedMainCatId(cat.id)}
+            >
+              <div className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: cat.color }} />
+              {cat.parentId ? (
+                <span className="text-muted-foreground text-[10px]">
+                  {parentMainCats.find((p) => p.id === cat.parentId)?.name}/
+                </span>
+              ) : null}
+              {cat.name}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-/* ── Step indicator ── */
-
-function StepIndicator({ step, label }: { step: number; label: string }) {
-  return (
-    <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-      <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-primary/10 text-primary text-[10px] font-medium">
-        {step}
-      </span>
-      {label}
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════
-   Ship Parent Category Dialog
-   ══════════════════════════════════════════════════════ */
+/* ── Ship Parent Category Dialog (existing) ── */
 
 interface ShipToMainDialogProps {
   open: boolean;
@@ -93,11 +157,11 @@ export function ShipToMainDialog({
 }: ShipToMainDialogProps) {
   const { shipToMain } = useWarehouseStore();
   const { loadData: loadMainData } = useAppStore();
-  const { parentMainCats } = useMainParentCategories();
+  const { parentMainCats, mainCategories } = useMainCategories();
 
   const [shipping, setShipping] = useState(false);
   const [shipped, setShipped] = useState(false);
-  const [targetMode, setTargetMode] = useState<"inbox" | "existing">("inbox");
+  const [targetMode, setTargetMode] = useState<"new" | "existing" | "existing_sub">("new");
   const [selectedMainCatId, setSelectedMainCatId] = useState<string>("");
 
   const cardCount = useMemo(() => {
@@ -111,17 +175,26 @@ export function ShipToMainDialog({
       let mainCatId: string;
 
       if (targetMode === "existing" && selectedMainCatId) {
-        // Merge into existing parent category
         mainCatId = selectedMainCatId;
       } else {
-        // Send to inbox: create same-name sub-group under inbox (cat-inbox)
-        const inboxId = "cat-inbox";
-        mainCatId = inboxId;
+        const newCatId = `cat-${Date.now()}`;
+        const newCat = {
+          id: newCatId,
+          name: warehouseCategory.name,
+          icon: warehouseCategory.icon,
+          color: warehouseCategory.color,
+          order: mainCategories.length,
+          createdAt: Date.now(),
+          isParent: true,
+        };
+        await dbAddCategory(newCat);
+        mainCatId = newCatId;
       }
 
       const result = await shipToMain(warehouseCategory.id, mainCatId);
 
       for (const cat of result.categories) {
+        if (cat.id === mainCatId) continue;
         await dbAddCategory(cat);
       }
       for (const card of result.cards) {
@@ -135,14 +208,14 @@ export function ShipToMainDialog({
     } finally {
       setShipping(false);
     }
-  }, [targetMode, selectedMainCatId, warehouseCategory, shipToMain, loadMainData]);
+  }, [targetMode, selectedMainCatId, warehouseCategory, mainCategories, shipToMain, loadMainData]);
 
   const handleClose = useCallback(
     (open: boolean) => {
       if (!open) {
         setShipped(false);
         setShipping(false);
-        setTargetMode("inbox");
+        setTargetMode("new");
         setSelectedMainCatId("");
       }
       onOpenChange(open);
@@ -158,71 +231,36 @@ export function ShipToMainDialog({
             <Send className="h-5 w-5" />
             发货到主页
           </DialogTitle>
-          <DialogDescription>
-            将「{warehouseCategory.name}」及其 {subGroups.length} 个分组、{cardCount} 个书签发送到主页
-          </DialogDescription>
+          <DialogDescription>将仓库中的分类及其所有书签发送到主页</DialogDescription>
         </DialogHeader>
 
         {!shipped ? (
           <div className="space-y-4 py-4">
-            <StepIndicator step={1} label="选择发送方式" />
-
-            {/* Option A: Send to inbox */}
-            <button
-              className={`w-full p-3 rounded-md border text-left transition-colors ${
-                targetMode === "inbox" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
-              }`}
-              onClick={() => setTargetMode("inbox")}
-            >
+            <div className="p-3 rounded-md bg-muted/30">
               <div className="flex items-center gap-2 mb-1">
-                <Inbox className="h-4 w-4" />
-                <span className="text-sm font-medium">发送到收集箱</span>
+                <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: warehouseCategory.color }} />
+                <span className="font-medium text-foreground">{warehouseCategory.name}</span>
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                在主页「收集箱」分类下新建同名分组「{warehouseCategory.name}」
-              </p>
-            </button>
+              <div className="text-xs text-muted-foreground">
+                包含 {subGroups.length} 个分组，{cardCount} 个书签
+              </div>
+            </div>
 
-            {/* Option B: Merge into existing parent category */}
-            {parentMainCats.length > 0 && (
-              <button
-                className={`w-full p-3 rounded-md border text-left transition-colors ${
-                  targetMode === "existing"
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-primary/50"
-                }`}
-                onClick={() => setTargetMode("existing")}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <Layers className="h-4 w-4" />
-                  <span className="text-sm font-medium">合并到已有分类</span>
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  将所有分组合并到主页某个已有分类下，作为其子分组
-                </p>
-              </button>
-            )}
-
-            {targetMode === "existing" && (
-              <>
-                <StepIndicator step={2} label="选择目标分类" />
-                <ParentCategorySelector
-                  parentMainCats={parentMainCats}
-                  selectedMainCatId={selectedMainCatId}
-                  setSelectedMainCatId={setSelectedMainCatId}
-                />
-              </>
-            )}
+            <TargetSelector
+              targetMode={targetMode}
+              setTargetMode={setTargetMode}
+              selectedMainCatId={selectedMainCatId}
+              setSelectedMainCatId={setSelectedMainCatId}
+              parentMainCats={parentMainCats}
+              allMainCats={[]}
+            />
           </div>
         ) : (
           <div className="space-y-4 py-8 text-center">
             <CheckCircle className="h-12 w-12 mx-auto text-green-500" />
             <div>
               <p className="text-lg font-serif font-semibold text-foreground">发货成功</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {cardCount} 个书签已发送到主页
-                {targetMode === "inbox" ? "收集箱" : ""}
-              </p>
+              <p className="text-sm text-muted-foreground mt-1">{cardCount} 个书签已发送到主页</p>
             </div>
           </div>
         )}
@@ -259,9 +297,7 @@ export function ShipToMainDialog({
   );
 }
 
-/* ══════════════════════════════════════════════════════
-   Ship Sub-Group Dialog
-   ══════════════════════════════════════════════════════ */
+/* ── Ship Sub-Group Dialog ── */
 
 interface ShipToMainSubGroupDialogProps {
   open: boolean;
@@ -278,29 +314,42 @@ export function ShipToMainSubGroupDialog({
 }: ShipToMainSubGroupDialogProps) {
   const { shipSubGroupToMain } = useWarehouseStore();
   const { loadData: loadMainData } = useAppStore();
-  const { parentMainCats } = useMainParentCategories();
+  const { parentMainCats, mainCategories } = useMainCategories();
 
   const [shipping, setShipping] = useState(false);
   const [shipped, setShipped] = useState(false);
-  const [targetMode, setTargetMode] = useState<"inbox" | "existing">("inbox");
+  const [targetMode, setTargetMode] = useState<"new" | "existing" | "existing_sub">("new");
   const [selectedMainCatId, setSelectedMainCatId] = useState<string>("");
 
   const handleShip = useCallback(async () => {
     setShipping(true);
     try {
-      let parentId: string;
-
       if (targetMode === "existing" && selectedMainCatId) {
-        parentId = selectedMainCatId;
+        // Ship as sub-group under existing parent category
+        const result = await shipSubGroupToMain(warehouseSubGroup.id, selectedMainCatId);
+        await dbAddCategory(result.category);
+        for (const card of result.cards) {
+          await dbAddCard(card);
+        }
       } else {
-        // Send to inbox
-        parentId = "cat-inbox";
-      }
+        // Create a new parent category on main page
+        const newParentId = `cat-${Date.now()}`;
+        const newParent = {
+          id: newParentId,
+          name: warehouseSubGroup.name,
+          icon: warehouseSubGroup.icon,
+          color: warehouseSubGroup.color,
+          order: mainCategories.length,
+          createdAt: Date.now(),
+          isParent: true,
+        };
+        await dbAddCategory(newParent);
 
-      const result = await shipSubGroupToMain(warehouseSubGroup.id, parentId);
-      await dbAddCategory(result.category);
-      for (const card of result.cards) {
-        await dbAddCard(card);
+        const result = await shipSubGroupToMain(warehouseSubGroup.id, newParentId);
+        await dbAddCategory(result.category);
+        for (const card of result.cards) {
+          await dbAddCard(card);
+        }
       }
 
       await loadMainData();
@@ -310,14 +359,14 @@ export function ShipToMainSubGroupDialog({
     } finally {
       setShipping(false);
     }
-  }, [targetMode, selectedMainCatId, warehouseSubGroup, shipSubGroupToMain, loadMainData]);
+  }, [targetMode, selectedMainCatId, warehouseSubGroup, mainCategories, shipSubGroupToMain, loadMainData]);
 
   const handleClose = useCallback(
     (open: boolean) => {
       if (!open) {
         setShipped(false);
         setShipping(false);
-        setTargetMode("inbox");
+        setTargetMode("new");
         setSelectedMainCatId("");
       }
       onOpenChange(open);
@@ -333,71 +382,34 @@ export function ShipToMainSubGroupDialog({
             <Send className="h-5 w-5" />
             发送分组到主页
           </DialogTitle>
-          <DialogDescription>
-            将「{warehouseSubGroup.name}」及其 {cards.length} 个书签发送到主页
-          </DialogDescription>
+          <DialogDescription>将仓库中的分组及其 {cards.length} 个书签发送到主页</DialogDescription>
         </DialogHeader>
 
         {!shipped ? (
           <div className="space-y-4 py-4">
-            <StepIndicator step={1} label="选择发送方式" />
-
-            {/* Option A: Send to inbox */}
-            <button
-              className={`w-full p-3 rounded-md border text-left transition-colors ${
-                targetMode === "inbox" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
-              }`}
-              onClick={() => setTargetMode("inbox")}
-            >
+            <div className="p-3 rounded-md bg-muted/30">
               <div className="flex items-center gap-2 mb-1">
-                <Inbox className="h-4 w-4" />
-                <span className="text-sm font-medium">发送到收集箱</span>
+                <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: warehouseSubGroup.color }} />
+                <span className="font-medium text-foreground">{warehouseSubGroup.name}</span>
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                在主页「收集箱」分类下新建同名分组「{warehouseSubGroup.name}」
-              </p>
-            </button>
+              <div className="text-xs text-muted-foreground">{cards.length} 个书签</div>
+            </div>
 
-            {/* Option B: Merge into existing parent category */}
-            {parentMainCats.length > 0 && (
-              <button
-                className={`w-full p-3 rounded-md border text-left transition-colors ${
-                  targetMode === "existing"
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-primary/50"
-                }`}
-                onClick={() => setTargetMode("existing")}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <Layers className="h-4 w-4" />
-                  <span className="text-sm font-medium">合并到已有分类</span>
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  将此分组合并到主页某个已有分类下，作为其子分组
-                </p>
-              </button>
-            )}
-
-            {targetMode === "existing" && (
-              <>
-                <StepIndicator step={2} label="选择目标分类" />
-                <ParentCategorySelector
-                  parentMainCats={parentMainCats}
-                  selectedMainCatId={selectedMainCatId}
-                  setSelectedMainCatId={setSelectedMainCatId}
-                />
-              </>
-            )}
+            <TargetSelector
+              targetMode={targetMode}
+              setTargetMode={setTargetMode}
+              selectedMainCatId={selectedMainCatId}
+              setSelectedMainCatId={setSelectedMainCatId}
+              parentMainCats={parentMainCats}
+              allMainCats={[]}
+            />
           </div>
         ) : (
           <div className="space-y-4 py-8 text-center">
             <CheckCircle className="h-12 w-12 mx-auto text-green-500" />
             <div>
               <p className="text-lg font-serif font-semibold text-foreground">发送成功</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {cards.length} 个书签已发送到主页
-                {targetMode === "inbox" ? "收集箱" : ""}
-              </p>
+              <p className="text-sm text-muted-foreground mt-1">{cards.length} 个书签已发送到主页</p>
             </div>
           </div>
         )}
@@ -434,9 +446,7 @@ export function ShipToMainSubGroupDialog({
   );
 }
 
-/* ══════════════════════════════════════════════════════
-   Ship Single Card Dialog
-   ══════════════════════════════════════════════════════ */
+/* ── Ship Single Card Dialog ── */
 
 interface ShipToMainCardDialogProps {
   open: boolean;
@@ -451,57 +461,48 @@ export function ShipToMainCardDialog({
 }: ShipToMainCardDialogProps) {
   const { shipCardToMain } = useWarehouseStore();
   const { loadData: loadMainData } = useAppStore();
-  const { parentMainCats, mainCategories } = useMainParentCategories();
+  const { parentMainCats, allMainCats, mainCategories } = useMainCategories();
 
   const [shipping, setShipping] = useState(false);
   const [shipped, setShipped] = useState(false);
-  const [targetMode, setTargetMode] = useState<"inbox" | "existing">("inbox");
-
-  // When merging into existing category, we need to pick a sub-group within that category
-  const [selectedParentId, setSelectedParentId] = useState<string>("");
-  const [selectedSubGroupId, setSelectedSubGroupId] = useState<string>("");
-
-  const subGroupsOfSelectedParent = useMemo(() => {
-    if (!selectedParentId) return [];
-    return mainCategories.filter((c) => c.parentId === selectedParentId);
-  }, [selectedParentId, mainCategories]);
+  const [targetMode, setTargetMode] = useState<"new" | "existing" | "existing_sub">("existing_sub");
+  const [selectedMainCatId, setSelectedMainCatId] = useState<string>("");
 
   const handleShip = useCallback(async () => {
     setShipping(true);
     try {
-      if (targetMode === "existing" && selectedSubGroupId) {
-        // Add card to an existing sub-group
-        const mainCard = await shipCardToMain(warehouseCard.id, selectedSubGroupId);
+      if (targetMode === "existing_sub" && selectedMainCatId) {
+        // Add card to existing sub-group
+        const mainCard = await shipCardToMain(warehouseCard.id, selectedMainCatId);
         await dbAddCard(mainCard);
-      } else if (targetMode === "existing" && selectedParentId) {
-        // Add card to the parent category directly (as ungrouped card)
-        const mainCard = await shipCardToMain(warehouseCard.id, selectedParentId);
+      } else if (targetMode === "existing" && selectedMainCatId) {
+        // Create new sub-group under existing parent, then add card
+        const newSubId = `cat-${Date.now()}`;
+        const newSub = {
+          id: newSubId,
+          name: warehouseCard.title,
+          icon: "BookMarked",
+          color: "#888888",
+          order: mainCategories.filter((c) => c.parentId === selectedMainCatId).length,
+          createdAt: Date.now(),
+          parentId: selectedMainCatId,
+        };
+        await dbAddCategory(newSub);
+        const mainCard = await shipCardToMain(warehouseCard.id, newSubId);
         await dbAddCard(mainCard);
       } else {
-        // Send to inbox: create a new same-name sub-group under inbox
-        const inboxId = "cat-inbox";
-        // Find or create a sub-group with the card title in inbox
-        const existingInboxSub = mainCategories.find(
-          (c) => c.parentId === inboxId && c.name === warehouseCard.title
-        );
-        let targetCatId: string;
-        if (existingInboxSub) {
-          targetCatId = existingInboxSub.id;
-        } else {
-          // Create new sub-group in inbox
-          targetCatId = `cat-${Date.now()}`;
-          const newSub = {
-            id: targetCatId,
-            name: warehouseCard.title,
-            icon: "BookMarked",
-            color: "#888888",
-            order: mainCategories.filter((c) => c.parentId === inboxId).length,
-            createdAt: Date.now(),
-            parentId: inboxId,
-          };
-          await dbAddCategory(newSub);
-        }
-        const mainCard = await shipCardToMain(warehouseCard.id, targetCatId);
+        // New standalone category
+        const newCatId = `cat-${Date.now()}`;
+        const newCat = {
+          id: newCatId,
+          name: warehouseCard.title,
+          icon: "BookMarked",
+          color: "#888888",
+          order: mainCategories.length,
+          createdAt: Date.now(),
+        };
+        await dbAddCategory(newCat);
+        const mainCard = await shipCardToMain(warehouseCard.id, newCatId);
         await dbAddCard(mainCard);
       }
 
@@ -512,24 +513,15 @@ export function ShipToMainCardDialog({
     } finally {
       setShipping(false);
     }
-  }, [
-    targetMode,
-    selectedSubGroupId,
-    selectedParentId,
-    warehouseCard,
-    mainCategories,
-    shipCardToMain,
-    loadMainData,
-  ]);
+  }, [targetMode, selectedMainCatId, warehouseCard, mainCategories, shipCardToMain, loadMainData]);
 
   const handleClose = useCallback(
     (open: boolean) => {
       if (!open) {
         setShipped(false);
         setShipping(false);
-        setTargetMode("inbox");
-        setSelectedParentId("");
-        setSelectedSubGroupId("");
+        setTargetMode("existing_sub");
+        setSelectedMainCatId("");
       }
       onOpenChange(open);
     },
@@ -544,95 +536,20 @@ export function ShipToMainCardDialog({
             <Send className="h-5 w-5" />
             发送书签到主页
           </DialogTitle>
-          <DialogDescription>将「{warehouseCard.title}」发送到主页</DialogDescription>
+          <DialogDescription>将&ldquo;{warehouseCard.title}&rdquo;发送到主页</DialogDescription>
         </DialogHeader>
 
         {!shipped ? (
           <div className="space-y-4 py-4">
-            <StepIndicator step={1} label="选择发送方式" />
-
-            {/* Option A: Send to inbox */}
-            <button
-              className={`w-full p-3 rounded-md border text-left transition-colors ${
-                targetMode === "inbox" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
-              }`}
-              onClick={() => {
-                setTargetMode("inbox");
-                setSelectedParentId("");
-                setSelectedSubGroupId("");
-              }}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <Inbox className="h-4 w-4" />
-                <span className="text-sm font-medium">发送到收集箱</span>
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                在主页「收集箱」分类下新建同名分组「{warehouseCard.title}」
-              </p>
-            </button>
-
-            {/* Option B: Merge into existing category */}
-            {parentMainCats.length > 0 && (
-              <button
-                className={`w-full p-3 rounded-md border text-left transition-colors ${
-                  targetMode === "existing"
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-primary/50"
-                }`}
-                onClick={() => {
-                  setTargetMode("existing");
-                }}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <Layers className="h-4 w-4" />
-                  <span className="text-sm font-medium">合并到已有分类</span>
-                </div>
-                <p className="text-[11px] text-muted-foreground">选择主页已有分类下的分组，直接添加进去</p>
-              </button>
-            )}
-
-            {targetMode === "existing" && (
-              <>
-                <StepIndicator step={2} label="选择分类" />
-                <div className="space-y-1 pl-2 max-h-36 overflow-y-auto">
-                  {parentMainCats.map((cat) => (
-                    <button
-                      key={cat.id}
-                      className={`w-full flex items-center gap-2 p-2 rounded-md text-left text-sm transition-colors ${
-                        selectedParentId === cat.id ? "bg-primary/10 text-primary" : "hover:bg-muted/50"
-                      }`}
-                      onClick={() => {
-                        setSelectedParentId(cat.id);
-                        setSelectedSubGroupId("");
-                      }}
-                    >
-                      <div className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: cat.color }} />
-                      {cat.name}
-                    </button>
-                  ))}
-                </div>
-
-                {selectedParentId && subGroupsOfSelectedParent.length > 0 && (
-                  <>
-                    <StepIndicator step={3} label="选择分组" />
-                    <div className="space-y-1 pl-4 max-h-36 overflow-y-auto">
-                      {subGroupsOfSelectedParent.map((sg) => (
-                        <button
-                          key={sg.id}
-                          className={`w-full flex items-center gap-2 p-2 rounded-md text-left text-sm transition-colors ${
-                            selectedSubGroupId === sg.id ? "bg-primary/10 text-primary" : "hover:bg-muted/50"
-                          }`}
-                          onClick={() => setSelectedSubGroupId(sg.id)}
-                        >
-                          <div className="h-2 w-2 rounded-sm" style={{ backgroundColor: sg.color }} />
-                          {sg.name}
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </>
-            )}
+            <TargetSelector
+              targetMode={targetMode}
+              setTargetMode={setTargetMode}
+              selectedMainCatId={selectedMainCatId}
+              setSelectedMainCatId={setSelectedMainCatId}
+              parentMainCats={parentMainCats}
+              allMainCats={allMainCats}
+              allowExistingSubGroup
+            />
           </div>
         ) : (
           <div className="space-y-4 py-8 text-center">
@@ -640,8 +557,7 @@ export function ShipToMainCardDialog({
             <div>
               <p className="text-lg font-serif font-semibold text-foreground">发送成功</p>
               <p className="text-sm text-muted-foreground mt-1">
-                「{warehouseCard.title}」已发送到主页
-                {targetMode === "inbox" ? "收集箱" : ""}
+                &ldquo;{warehouseCard.title}&rdquo;已发送到主页
               </p>
             </div>
           </div>
@@ -657,11 +573,8 @@ export function ShipToMainCardDialog({
                 onClick={handleShip}
                 disabled={
                   shipping ||
-                  (targetMode === "existing" && !selectedParentId) ||
-                  (targetMode === "existing" &&
-                    !!selectedParentId &&
-                    subGroupsOfSelectedParent.length > 0 &&
-                    !selectedSubGroupId)
+                  (targetMode === "existing" && !selectedMainCatId) ||
+                  (targetMode === "existing_sub" && !selectedMainCatId)
                 }
               >
                 {shipping ? (
