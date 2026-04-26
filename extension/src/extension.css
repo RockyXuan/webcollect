@@ -3,6 +3,12 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+/* Tell Tailwind to scan the shared source files for utility classes */
+@source '../../../src/components';
+@source '../../../src/lib';
+@source '../../../src/hooks';
+@source '../../src';
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
