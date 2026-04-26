@@ -160,6 +160,11 @@ export async function overwriteWarehouse(
 }
 
 /** Ship a category (and its cards) from warehouse to main page */
+/** Generate a unique ID to avoid conflicts with warehouse or existing main page data */
+function genId(prefix: string = "ship"): string {
+  return `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+}
+
 export async function shipCategoryToMain(
   warehouseCategoryId: string,
   mainCategoryId: string
@@ -177,20 +182,27 @@ export async function shipCategoryToMain(
   const catIds = [warehouseCategoryId, ...subCats.map((c) => c.id)];
   const catCards = whCards.filter((c) => catIds.includes(c.categoryId));
 
-  // Convert warehouse data to main page format (strip importBatchId)
-  const mainCats: Category[] = [
-    { ...whCat, id: mainCategoryId, importBatchId: undefined } as Category,
-    ...subCats.map((sc) => ({
-      ...sc,
-      parentId: mainCategoryId,
-      importBatchId: undefined,
-    })) as Category[],
-  ];
+  // Build ID mapping: warehouse ID → new main ID (to avoid conflicts)
+  const idMap = new Map<string, string>();
+  subCats.forEach((sc) => {
+    idMap.set(sc.id, genId("cat"));
+  });
+
+  // Convert sub-categories with new IDs (skip parent — it already exists as mainCategoryId)
+  const mainCats: Category[] = subCats.map((sc) => ({
+    ...sc,
+    id: idMap.get(sc.id)!,
+    parentId: mainCategoryId,
+    importBatchId: undefined,
+  })) as Category[];
+
+  // Convert cards with remapped categoryIds
   const mainCards: WebCard[] = catCards.map((c) => ({
     ...c,
-    categoryId: catIds.indexOf(c.categoryId) === 0
+    id: genId("card"),
+    categoryId: c.categoryId === warehouseCategoryId
       ? mainCategoryId
-      : mainCats.find((mc) => mc.name === whCats.find((wc) => wc.id === c.categoryId)?.name)?.id || c.categoryId,
+      : idMap.get(c.categoryId) || c.categoryId,
     importBatchId: undefined,
   })) as WebCard[];
 
@@ -241,9 +253,10 @@ export async function shipCardToMain(
   const whCard = whCards.find((c) => c.id === warehouseCardId);
   if (!whCard) throw new Error(`Warehouse card ${warehouseCardId} not found`);
 
-  // Convert to main card format
+  // Convert to main card format — generate new ID to avoid conflicts
   const mainCard: WebCard = {
     ...whCard,
+    id: genId("card"),
     categoryId: mainTargetCategoryId,
     importBatchId: undefined,
   } as WebCard;
@@ -276,16 +289,19 @@ export async function shipSubGroupToMain(
 
   const subCards = whCards.filter((c) => c.categoryId === warehouseSubGroupId);
 
-  // Create main sub-category under the target parent
+  // Create main sub-category with new ID under the target parent
+  const newSubCatId = genId("cat");
   const mainSubCat: Category = {
     ...whSubCat,
+    id: newSubCatId,
     parentId: mainTargetCategoryId,
     importBatchId: undefined,
   } as Category;
 
   const mainCards: WebCard[] = subCards.map((c) => ({
     ...c,
-    categoryId: mainSubCat.id,
+    id: genId("card"),
+    categoryId: newSubCatId,
     importBatchId: undefined,
   })) as WebCard[];
 

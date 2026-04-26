@@ -22,7 +22,12 @@ export async function saveCards(cards: WebCard[]): Promise<void> {
 
 export async function addCard(card: WebCard): Promise<void> {
   const cards = await getCards();
-  cards.push(card);
+  const idx = cards.findIndex((c) => c.id === card.id);
+  if (idx >= 0) {
+    cards[idx] = card;
+  } else {
+    cards.push(card);
+  }
   await saveCards(cards);
 }
 
@@ -51,7 +56,13 @@ export async function saveCategories(categories: Category[]): Promise<void> {
 
 export async function addCategory(category: Category): Promise<void> {
   const cats = await getCategories();
-  cats.push(category);
+  const existingIdx = cats.findIndex((c) => c.id === category.id);
+  if (existingIdx >= 0) {
+    // ID已存在，更新而非添加（防止重复）
+    cats[existingIdx] = category;
+  } else {
+    cats.push(category);
+  }
   await saveCategories(cats);
 }
 
