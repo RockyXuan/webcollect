@@ -4,7 +4,7 @@ import React, { useState, useMemo, useCallback, useRef } from "react";
 import { useAppStore } from "@/lib/store";
 import { InlineEditableText } from "@/components/ui/inline-editable-text";
 import { WebCardItem } from "@/components/card/web-card";
-import { Pencil, Plus, GripVertical, ArrowUpFromLine, ArrowDownFromLine, Layers } from "lucide-react";
+import { Pencil, PencilOff, Plus, GripVertical, ArrowUpFromLine, ArrowDownFromLine, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -88,6 +88,7 @@ export function SortableGrid({
     detachCategoryFromParent,
     promoteToParent,
     categoryWidths,
+    toggleEditMode,
   } = useAppStore();
 
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -367,7 +368,25 @@ export function SortableGrid({
     setHoveredParentId(null);
   };
 
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    // Only exit edit on double-click of empty/background areas
+    const target = e.target as HTMLElement;
+    if (
+      target.tagName === 'BUTTON' ||
+      target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.tagName === 'A' ||
+      target.closest('button, a, input, textarea, [contenteditable="true"], [data-card], [data-drag-handle]')
+    ) {
+      return;
+    }
+    if (editMode) {
+      toggleEditMode();
+    }
+  };
+
   return (
+    <div onDoubleClick={handleDoubleClick}>
     <DndContext
       sensors={sensors}
       collisionDetection={collisionDetection}
@@ -497,6 +516,7 @@ export function SortableGrid({
         ) : null}
       </DragOverlay>
     </DndContext>
+    </div>
   );
 }
 
@@ -626,8 +646,8 @@ function SortableCategoryBlock({
           editMode={editMode}
           onSave={(newName) => updateCategory({ ...category, name: newName })}
         />
-        {/* Edit mode toggle - always visible when header is hovered and not in edit mode */}
-        {!globalEditMode && isHeaderHovered && (
+        {/* Edit mode toggle - show "编辑" when not in edit mode, "退出编辑" when in edit mode */}
+        {isHeaderHovered && !globalEditMode && (
           <Button
             variant="ghost"
             size="sm"
@@ -637,6 +657,18 @@ function SortableCategoryBlock({
           >
             <Pencil className="w-2.5 h-2.5" />
             编辑
+          </Button>
+        )}
+        {globalEditMode && isHeaderHovered && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 text-[11px] gap-0.5 px-1.5 text-muted-foreground hover:text-destructive animate-in fade-in duration-200"
+            onClick={(e) => { e.stopPropagation(); toggleEditMode(); }}
+            title="退出编辑模式"
+          >
+            <PencilOff className="w-2.5 h-2.5" />
+            退出编辑
           </Button>
         )}
 
