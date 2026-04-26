@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import { Pencil, Trash2, ExternalLink, GripVertical } from "lucide-react";
 import type { WebCard } from "@/lib/types";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -12,6 +12,7 @@ interface WebCardItemProps {
   onEdit: () => void;
   onDelete: () => void;
   dragListeners?: React.HTMLAttributes<HTMLElement> | null;
+  onUpdateCard?: (card: WebCard) => void;
 }
 
 export function WebCardItem({
@@ -21,8 +22,12 @@ export function WebCardItem({
   onEdit,
   onDelete,
   dragListeners,
+  onUpdateCard,
 }: WebCardItemProps) {
   const [imgError, setImgError] = useState(false);
+  const [editingField, setEditingField] = useState<"title" | "shortDesc" | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Resolve the best image URL: prefer card.imageUrl, fallback to Google Favicon API
   const faviconUrl = React.useMemo(() => {
@@ -47,6 +52,53 @@ export function WebCardItem({
   }, [editMode, card.url]);
 
   const displayAbbr = card.abbreviation || card.title?.slice(0, 2) || "?";
+
+  // Start inline editing
+  const startEdit = useCallback((field: "title" | "shortDesc", e: React.MouseEvent) => {
+    if (!editMode || !onUpdateCard) return;
+    e.stopPropagation();
+    setEditingField(field);
+    setEditValue(field === "title" ? card.title : (card.shortDesc || ""));
+  }, [editMode, onUpdateCard, card.title, card.shortDesc]);
+
+  // Save the edit
+  const saveEdit = useCallback(() => {
+    if (!editingField || !onUpdateCard) return;
+    const trimmed = editValue.trim();
+    if (editingField === "title" && trimmed && trimmed !== card.title) {
+      onUpdateCard({ ...card, title: trimmed, updatedAt: Date.now() });
+    } else if (editingField === "shortDesc" && trimmed !== (card.shortDesc || "")) {
+      onUpdateCard({ ...card, shortDesc: trimmed, updatedAt: Date.now() });
+    }
+    setEditingField(null);
+    setEditValue("");
+  }, [editingField, editValue, card, onUpdateCard]);
+
+  // Cancel the edit
+  const cancelEdit = useCallback(() => {
+    setEditingField(null);
+    setEditValue("");
+  }, []);
+
+  // Auto-focus input when editing starts
+  useEffect(() => {
+    if (editingField && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editingField]);
+
+  // Handle key events in the inline input
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      saveEdit();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancelEdit();
+    }
+    e.stopPropagation(); // Prevent dnd-kit from capturing
+  }, [saveEdit, cancelEdit]);
 
   const cardContent = (
     <div
@@ -88,12 +140,44 @@ export function WebCardItem({
 
       {/* Text content - two-line: name on line 1, shortDesc on line 2 */}
       <div className="min-w-0 flex-1">
-        <div className="text-[11px] font-medium text-foreground leading-tight truncate">
-          {card.title}
-        </div>
-        {card.shortDesc && (
-          <div className="text-[10px] text-muted-foreground leading-tight truncate">
-            {card.shortDesc}
+        {editingField === "title" ? (
+          <input
+            ref={inputRef}
+            type="text"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={saveEdit}
+            onKeyDown={handleKeyDown}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="text-[11px] font-medium text-foreground leading-tight w-full bg-transparent border-b border-primary outline-none px-0 py-0"
+          />
+        ) : (
+          <div
+            className={`text-[11px] font-medium text-foreground leading-tight truncate ${editMode && onUpdateCard ? "cursor-text hover:bg-muted/30 rounded px-0.5 -mx-0.5" : ""}`}
+            onClick={editMode && onUpdateCard ? (e) => startEdit("title", e) : undefined}
+            title={editMode && onUpdateCard ? "点击编辑名称" : undefined}
+          >
+            {card.title}
+          </div>
+        )}
+        {editingField === "shortDesc" ? (
+          <input
+            ref={inputRef}
+            type="text"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={saveEdit}
+            onKeyDown={handleKeyDown}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="text-[10px] text-muted-foreground leading-tight w-full bg-transparent border-b border-primary outline-none px-0 py-0"
+          />
+        ) : (
+          <div
+            className={`text-[10px] text-muted-foreground leading-tight truncate ${editMode && onUpdateCard ? "cursor-text hover:bg-muted/30 rounded px-0.5 -mx-0.5" : ""}`}
+            onClick={editMode && onUpdateCard ? (e) => startEdit("shortDesc", e) : undefined}
+            title={editMode && onUpdateCard ? "点击编辑简介" : undefined}
+          >
+            {card.shortDesc || (editMode && onUpdateCard ? <span className="text-muted-foreground/40 italic">添加简介...</span> : null)}
           </div>
         )}
       </div>
@@ -104,7 +188,7 @@ export function WebCardItem({
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(); }}
             className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-            title="编辑"
+            title="编辑详情"
           >
             <Pencil className="w-2.5 h-2.5" />
           </button>

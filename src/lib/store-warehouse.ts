@@ -24,6 +24,7 @@ import {
   shipCardToMain as dbShipCardToMain,
   shipSubGroupToMain as dbShipSubGroupToMain,
   updateWarehouseCategory,
+  updateWarehouseCard as dbUpdateWarehouseCard,
   promoteWarehouseCategory as dbPromoteWarehouseCategory,
   demoteWarehouseCategory as dbDemoteWarehouseCategory,
 } from "./db-warehouse";
@@ -74,6 +75,7 @@ interface WarehouseState {
   promoteWarehouseCategory: (categoryId: string) => Promise<void>;
   demoteWarehouseCategory: (categoryId: string) => Promise<void>;
   updateWarehouseCategory: (updated: WarehouseCategory) => Promise<void>;
+  updateWarehouseCard: (updated: WarehouseCard) => Promise<void>;
   deleteWarehouseCard: (cardId: string) => Promise<void>;
 }
 
@@ -202,6 +204,12 @@ export const useWarehouseStore = create<WarehouseState>((set) => ({
     await updateWarehouseCategory(updated);
     const categories = await getWarehouseCategories();
     set({ categories });
+  },
+
+  updateWarehouseCard: async (updated) => {
+    await dbUpdateWarehouseCard(updated);
+    const cards = await getWarehouseCards();
+    set({ cards });
   },
 
   deleteWarehouseCard: async (cardId) => {

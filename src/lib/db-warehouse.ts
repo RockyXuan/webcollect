@@ -317,6 +317,16 @@ export async function updateWarehouseCategory(updated: WarehouseCategory): Promi
   }
 }
 
+/** Update a warehouse card */
+export async function updateWarehouseCard(updated: WarehouseCard): Promise<void> {
+  const cards = await getWarehouseCards();
+  const idx = cards.findIndex((c) => c.id === updated.id);
+  if (idx >= 0) {
+    cards[idx] = updated;
+    await saveWarehouseCards(cards);
+  }
+}
+
 /** Promote a warehouse sub-group to parent category */
 export async function promoteWarehouseCategory(categoryId: string): Promise<void> {
   const cats = await getWarehouseCategories();

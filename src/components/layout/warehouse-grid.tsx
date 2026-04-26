@@ -45,6 +45,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { InlineEditableText } from "@/components/ui/inline-editable-text";
 
 /* ── Warehouse Grid ── */
 export function WarehouseGrid() {
@@ -164,7 +165,12 @@ function ParentCategoryBlock({
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </button>
         <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: category.color }} />
-        <span className="font-serif font-semibold text-foreground">{category.name}</span>
+        <InlineEditableText
+          value={category.name}
+          onSave={(v) => updateWarehouseCategory({ ...category, name: v })}
+          editMode={true}
+          className="font-serif font-semibold text-foreground"
+        />
         <Badge variant="secondary" className="text-[10px] h-4 px-1">
           {totalCards} 个网站
         </Badge>
@@ -326,7 +332,11 @@ function SubGroupBlock({
   const [shipDialogOpen, setShipDialogOpen] = React.useState(false);
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
   const [editName, setEditName] = React.useState(category.name);
-  const { deleteWarehouseCategory, promoteWarehouseCategory, updateWarehouseCategory } = useWarehouseStore();
+  const { deleteWarehouseCategory, promoteWarehouseCategory, updateWarehouseCategory, updateWarehouseCard } = useWarehouseStore();
+
+  const handleUpdateCard = async (updatedCard: WarehouseCard) => {
+    await updateWarehouseCard(updatedCard);
+  };
 
   const handleEditSave = async () => {
     if (editName.trim()) {
@@ -343,7 +353,12 @@ function SubGroupBlock({
       {/* Sub-group header */}
       <div className="flex items-center gap-1.5 mb-2">
         <div className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: category.color }} />
-        <span className="text-sm font-medium text-foreground">{category.name}</span>
+        <InlineEditableText
+          value={category.name}
+          onSave={(v) => updateWarehouseCategory({ ...category, name: v })}
+          editMode={true}
+          className="text-sm font-medium text-foreground"
+        />
         <span className="text-[10px] text-muted-foreground">{cards.length}</span>
 
         {/* Action buttons */}
@@ -427,7 +442,7 @@ function SubGroupBlock({
       {/* Cards */}
       <div className="flex flex-wrap gap-1">
         {cards.map((card) => (
-          <WarehouseCardItem key={card.id} card={card} categoryColor={category.color} />
+          <WarehouseCardItem key={card.id} card={card} categoryColor={category.color} onUpdateCard={handleUpdateCard} />
         ))}
       </div>
 
@@ -473,8 +488,12 @@ function StandaloneCategoryBlock({
   const [shipDialogOpen, setShipDialogOpen] = React.useState(false);
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
   const [editName, setEditName] = React.useState(category.name);
-  const { deleteWarehouseCategory, promoteWarehouseCategory, updateWarehouseCategory } = useWarehouseStore();
+  const { deleteWarehouseCategory, promoteWarehouseCategory, updateWarehouseCategory, updateWarehouseCard } = useWarehouseStore();
   const widthPercent = cards.length <= 4 ? 50 : 100;
+
+  const handleUpdateCard = async (updatedCard: WarehouseCard) => {
+    await updateWarehouseCard(updatedCard);
+  };
 
   const handleEditSave = async () => {
     if (editName.trim()) {
@@ -491,7 +510,12 @@ function StandaloneCategoryBlock({
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 border-b border-border">
         <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: category.color }} />
-        <span className="font-serif font-semibold text-foreground">{category.name}</span>
+        <InlineEditableText
+          value={category.name}
+          onSave={(v) => updateWarehouseCategory({ ...category, name: v })}
+          editMode={true}
+          className="font-serif font-semibold text-foreground"
+        />
         <Badge variant="secondary" className="text-[10px] h-4 px-1">
           {cards.length} 个网站
         </Badge>
@@ -577,7 +601,7 @@ function StandaloneCategoryBlock({
       {/* Cards */}
       <div className="flex flex-wrap gap-1 p-3">
         {cards.map((card) => (
-          <WarehouseCardItem key={card.id} card={card} categoryColor={category.color} />
+          <WarehouseCardItem key={card.id} card={card} categoryColor={category.color} onUpdateCard={handleUpdateCard} />
         ))}
       </div>
 

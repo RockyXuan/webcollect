@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { ExternalLink, Send, Trash2 } from "lucide-react";
 import type { WarehouseCard } from "@/lib/db-warehouse";
 import { useWarehouseStore } from "@/lib/store-warehouse";
@@ -26,12 +26,18 @@ import { ShipToMainCardDialog } from "@/components/dialogs/ship-to-main-dialog";
 interface WarehouseCardItemProps {
   card: WarehouseCard;
   categoryColor: string;
+  onUpdateCard?: (card: WarehouseCard) => void;
 }
 
-export function WarehouseCardItem({ card, categoryColor }: WarehouseCardItemProps) {
+export function WarehouseCardItem({ card, categoryColor, onUpdateCard }: WarehouseCardItemProps) {
   const [imgError, setImgError] = useState(false);
   const [shipDialogOpen, setShipDialogOpen] = useState(false);
   const { deleteWarehouseCard } = useWarehouseStore();
+
+  // Inline editing state
+  const [editingField, setEditingField] = useState<"title" | "shortDesc" | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const faviconUrl = React.useMemo(() => {
     if (!card.url) return "";
@@ -46,10 +52,53 @@ export function WarehouseCardItem({ card, categoryColor }: WarehouseCardItemProp
   const displayImageUrl = card.imageUrl || faviconUrl;
   const displayAbbr = card.abbreviation || card.title?.slice(0, 2) || "?";
 
+  // Inline editing handlers
+  const startEdit = useCallback((field: "title" | "shortDesc", e: React.MouseEvent) => {
+    if (!onUpdateCard) return;
+    e.stopPropagation();
+    setEditingField(field);
+    setEditValue(field === "title" ? card.title : (card.shortDesc || ""));
+  }, [onUpdateCard, card.title, card.shortDesc]);
+
+  const saveEdit = useCallback(() => {
+    if (!editingField || !onUpdateCard) return;
+    const trimmed = editValue.trim();
+    if (editingField === "title" && trimmed && trimmed !== card.title) {
+      onUpdateCard({ ...card, title: trimmed, updatedAt: Date.now() });
+    } else if (editingField === "shortDesc" && trimmed !== (card.shortDesc || "")) {
+      onUpdateCard({ ...card, shortDesc: trimmed, updatedAt: Date.now() });
+    }
+    setEditingField(null);
+    setEditValue("");
+  }, [editingField, editValue, card, onUpdateCard]);
+
+  const cancelEdit = useCallback(() => {
+    setEditingField(null);
+    setEditValue("");
+  }, []);
+
+  useEffect(() => {
+    if (editingField && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editingField]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      saveEdit();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancelEdit();
+    }
+    e.stopPropagation();
+  }, [saveEdit, cancelEdit]);
+
   const handleClick = (e: React.MouseEvent) => {
-    // Don't open link if clicking action buttons
+    // Don't open link if clicking action buttons or editing
     const target = e.target as HTMLElement;
-    if (target.closest("[data-action]")) return;
+    if (target.closest("[data-action]") || editingField) return;
 
     try {
       window.open(card.url, "_blank", "noopener,noreferrer");
@@ -82,12 +131,44 @@ export function WarehouseCardItem({ card, categoryColor }: WarehouseCardItemProp
 
       {/* Text */}
       <div className="flex-1 min-w-0">
-        <div className="text-xs font-medium text-foreground truncate leading-tight">
-          {card.title}
-        </div>
-        {card.shortDesc && (
-          <div className="text-[10px] text-muted-foreground truncate leading-tight">
-            {card.shortDesc}
+        {editingField === "title" ? (
+          <input
+            ref={inputRef}
+            type="text"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={saveEdit}
+            onKeyDown={handleKeyDown}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="text-xs font-medium text-foreground leading-tight w-full bg-transparent border-b border-primary outline-none px-0 py-0"
+          />
+        ) : (
+          <div
+            className={`text-xs font-medium text-foreground truncate leading-tight ${onUpdateCard ? "cursor-text hover:bg-muted/30 rounded px-0.5 -mx-0.5" : ""}`}
+            onClick={onUpdateCard ? (e) => startEdit("title", e) : undefined}
+            title={onUpdateCard ? "点击编辑名称" : undefined}
+          >
+            {card.title}
+          </div>
+        )}
+        {editingField === "shortDesc" ? (
+          <input
+            ref={inputRef}
+            type="text"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={saveEdit}
+            onKeyDown={handleKeyDown}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="text-[10px] text-muted-foreground leading-tight w-full bg-transparent border-b border-primary outline-none px-0 py-0"
+          />
+        ) : (
+          <div
+            className={`text-[10px] text-muted-foreground truncate leading-tight ${onUpdateCard ? "cursor-text hover:bg-muted/30 rounded px-0.5 -mx-0.5" : ""}`}
+            onClick={onUpdateCard && card.shortDesc ? (e) => startEdit("shortDesc", e) : undefined}
+            title={onUpdateCard && card.shortDesc ? "点击编辑简介" : undefined}
+          >
+            {card.shortDesc || (onUpdateCard ? <span className="text-muted-foreground/40 italic">添加简介...</span> : null)}
           </div>
         )}
       </div>

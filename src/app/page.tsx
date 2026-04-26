@@ -13,7 +13,7 @@ import { defaultCards, defaultCategories } from "@/lib/seed";
 import type { WebCard, Category } from "@/lib/types";
 
 export default function HomePage() {
-  const { loadData, isLoading, cards, categories, deleteCard } = useAppStore();
+  const { loadData, isLoading, cards, categories, deleteCard, updateCard } = useAppStore();
 
   const [cardDialogOpen, setCardDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -97,6 +97,7 @@ export default function HomePage() {
             onDeleteCard={(card) => deleteCard(card.id)}
             onEditCategory={handleEditCategory}
             onAddGroup={handleAddGroup}
+            onUpdateCard={updateCard}
           />
         </ErrorBoundary>
 
