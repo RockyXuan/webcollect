@@ -1,8 +1,9 @@
 "use client";
 
 import { useAppStore } from "@/lib/store";
-import { Plus, FolderPlus, Layers, Pencil } from "lucide-react";
+import { Plus, FolderPlus, Layers, Pencil, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 interface TopNavProps {
   onAddCard?: (categoryId?: string) => void;
@@ -74,6 +75,16 @@ export function TopNav({ onAddCard, onAddGroup, onAddCategory }: TopNavProps) {
             <Pencil className="h-3 w-3" />
             编辑
           </Button>
+          <Link href="/warehouse">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1 px-2"
+            >
+              <Package className="h-3 w-3" />
+              仓库
+            </Button>
+          </Link>
         </div>
       </div>
     </nav>

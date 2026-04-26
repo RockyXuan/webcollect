@@ -92,21 +92,33 @@ WebCollect 是一个美观、可拖拽的网页收藏与导览门户。用户可
 │   │   ├── api/
 │   │   │   ├── fetch-meta/     # OG 信息抓取 API
 │   │   │   └── check-safety/   # 网站安全检查 API
+│   │   ├── warehouse/            # 仓库（导入）页面
 │   │   ├── layout.tsx          # 根布局 + metadata
 │   │   ├── page.tsx            # 主页面（导航墙）
 │   │   └── globals.css         # 主题变量 + Tailwind
 │   ├── components/
 │   │   ├── ui/                 # shadcn/ui 基础组件
-│   │   ├── card/web-card.tsx   # 网站卡片组件
-│   │   ├── layout/sortable-grid.tsx  # 拖拽网格布局
+│   │   ├── card/
+│   │   │   ├── web-card.tsx          # 主页网站卡片
+│   │   │   └── warehouse-card.tsx    # 仓库网站卡片
+│   │   ├── layout/
+│   │   │   ├── sortable-grid.tsx     # 主页拖拽网格布局
+│   │   │   └── warehouse-grid.tsx    # 仓库网格布局
 │   │   ├── nav/top-nav.tsx     # 顶部导航
 │   │   ├── hot-recommendation.tsx  # 热门网站推荐区
-│   │   ├── dialogs/            # 添加/编辑弹窗
+│   │   ├── dialogs/
+│   │   │   ├── card-dialog.tsx       # 添加/编辑网页卡片
+│   │   │   ├── category-dialog.tsx   # 分类创建/编辑
+│   │   │   ├── import-dialog.tsx     # 仓库导入弹窗
+│   │   │   └── ship-to-main-dialog.tsx # 仓库发货到主页弹窗
 │   │   └── error-boundary.tsx  # 错误边界组件
 │   ├── lib/
 │   │   ├── types.ts            # TypeScript 类型定义
-│   │   ├── db.ts               # IndexedDB 封装（卡片/分类/隐藏网站/置顶分类）
-│   │   ├── store.ts            # Zustand 状态管理
+│   │   ├── db.ts               # IndexedDB 封装（主页卡片/分类/隐藏网站/置顶分类）
+│   │   ├── db-warehouse.ts     # 仓库 IndexedDB 封装（独立命名空间）
+│   │   ├── store.ts            # 主页 Zustand 状态管理
+│   │   ├── store-warehouse.ts  # 仓库 Zustand 状态管理
+│   │   ├── import-parser.ts    # Homely JSON 解析器
 │   │   ├── seed.ts             # 默认示例数据
 │   │   ├── hot-sites.ts        # 热门推荐网站数据（主列表 + 补充列表）
 │   │   ├── icons.ts            # Lucide 图标静态映射
@@ -146,6 +158,14 @@ pnpm lint
 | 热门推荐 | `src/components/hot-recommendation.tsx` | 热门网站推荐：查重、收集箱快捷添加、隐藏/不感兴趣、安全扫描、设置面板 |
 | OG 抓取 | `src/app/api/fetch-meta/route.ts` | POST {url} → 解析 title/description/image/favicon |
 | 安全检查 | `src/app/api/check-safety/route.ts` | POST {urls} → 批量安全检查（白名单/HTTPS/TLD/URL模式） |
+| 仓库数据层 | `src/lib/db-warehouse.ts` | 仓库独立 IndexedDB：卡片/分类/导入批次的 CRUD，与主页数据隔离 |
+| 仓库状态 | `src/lib/store-warehouse.ts` | 仓库 Zustand Store：仓库数据加载、导入、删除、发货到主页 |
+| 导入解析 | `src/lib/import-parser.ts` | Homely JSON 解析器：识别分组类型、映射到三级模型、过滤无效链接 |
+| 仓库页面 | `src/app/warehouse/page.tsx` | 独立仓库页面：导入预览、批次管理、一键删除/覆盖、发货到主页 |
+| 仓库网格 | `src/components/layout/warehouse-grid.tsx` | 仓库专用网格布局（只读展示，无拖拽编辑） |
+| 仓库卡片 | `src/components/card/warehouse-card.tsx` | 仓库专用卡片（精简样式，显示批次标签） |
+| 导入弹窗 | `src/components/dialogs/import-dialog.tsx` | JSON 上传 → 解析预览 → 确认导入 |
+| 发货弹窗 | `src/components/dialogs/ship-to-main-dialog.tsx` | 选择分组/分类 → 选择主页目标 → 一键发货 |
 
 ## 布局系统设计
 
