@@ -60,6 +60,18 @@ export interface HiddenSite {
   duration: HideDuration; // how long to hide
 }
 
+/** An item in the recycle bin (deleted category, group, or card) */
+export interface RecycleBinItem {
+  id: string;           // unique bin entry ID
+  type: "category" | "group" | "card";
+  name: string;         // display name for the recycle bin UI
+  deletedAt: number;    // timestamp when deleted
+  /** The categories that were deleted (for category: includes parent + children; for group: just the group) */
+  categories: Category[];
+  /** The cards that were deleted together */
+  cards: WebCard[];
+}
+
 /** Per-user preferences (future: keyed by userId) */
 export interface UserPreferences {
   hiddenSites: HiddenSite[];

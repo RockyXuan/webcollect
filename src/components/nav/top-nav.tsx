@@ -1,7 +1,7 @@
 "use client";
 
 import { useAppStore } from "@/lib/store";
-import { Plus, FolderPlus, Layers, Package } from "lucide-react";
+import { Plus, FolderPlus, Layers, Package, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
@@ -9,10 +9,12 @@ interface TopNavProps {
   onAddCard?: (categoryId?: string) => void;
   onAddGroup?: (parentId?: string) => void;
   onAddCategory?: () => void;
+  onRecycleBin?: () => void;
 }
 
-export function TopNav({ onAddCard, onAddGroup, onAddCategory }: TopNavProps) {
+export function TopNav({ onAddCard, onAddGroup, onAddCategory, onRecycleBin }: TopNavProps) {
   const { searchQuery, setSearchQuery } = useAppStore();
+  const recycleBinCount = useAppStore((s) => s.recycleBin.length);
 
   return (
     <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur border-b border-border">
@@ -65,6 +67,20 @@ export function TopNav({ onAddCard, onAddGroup, onAddCategory }: TopNavProps) {
             添加分类
           </Button>
           <div className="w-px h-5 bg-border mx-1" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs gap-1 px-2 relative"
+            onClick={() => onRecycleBin?.()}
+          >
+            <Trash2 className="h-3 w-3" />
+            回收站
+            {recycleBinCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-destructive text-destructive-foreground text-[9px] flex items-center justify-center rounded-full">
+                {recycleBinCount}
+              </span>
+            )}
+          </Button>
           <Link href="/warehouse">
             <Button
               variant="outline"

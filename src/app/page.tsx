@@ -5,6 +5,7 @@ import { TopNav } from "@/components/nav/top-nav";
 import { SortableGrid } from "@/components/layout/sortable-grid";
 import { CardDialog } from "@/components/dialogs/card-dialog";
 import { CategoryDialog } from "@/components/dialogs/category-dialog";
+import { RecycleBinDialog } from "@/components/dialogs/recycle-bin-dialog";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { HotRecommendation } from "@/components/hot-recommendation";
 import { useAppStore } from "@/lib/store";
@@ -13,10 +14,11 @@ import { defaultCards, defaultCategories } from "@/lib/seed";
 import type { WebCard, Category } from "@/lib/types";
 
 export default function HomePage() {
-  const { loadData, isLoading, cards, categories, deleteCard, updateCard } = useAppStore();
+  const { loadData, isLoading, cards, categories, deleteCard, softDeleteCard, updateCard } = useAppStore();
 
   const [cardDialogOpen, setCardDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [recycleBinOpen, setRecycleBinOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<WebCard | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [defaultCategoryId, setDefaultCategoryId] = useState<string>("");
@@ -87,6 +89,7 @@ export default function HomePage() {
         onAddCard={handleAddCard}
         onAddGroup={handleAddGroup}
         onAddCategory={handleAddCategory}
+        onRecycleBin={() => setRecycleBinOpen(true)}
       />
 
       <main className="w-full px-3 sm:px-5 lg:px-6 py-4 space-y-4">
@@ -94,7 +97,7 @@ export default function HomePage() {
           <SortableGrid
             onAddCard={handleAddCard}
             onEditCard={handleEditCard}
-            onDeleteCard={(card) => deleteCard(card.id)}
+            onDeleteCard={(card) => softDeleteCard(card.id)}
             onEditCategory={handleEditCategory}
             onAddGroup={handleAddGroup}
             onUpdateCard={updateCard}
@@ -127,6 +130,12 @@ export default function HomePage() {
           editingCategory={editingCategory}
           defaultParentId={defaultParentId}
           isParent={isCreatingParent}
+        />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <RecycleBinDialog
+          open={recycleBinOpen}
+          onOpenChange={setRecycleBinOpen}
         />
       </ErrorBoundary>
     </div>

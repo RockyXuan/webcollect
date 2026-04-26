@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { WebCard, Category, HiddenSite, HideDuration } from "./types";
+import type { WebCard, Category, HiddenSite, HideDuration, RecycleBinItem } from "./types";
 import {
   getCards,
   saveCards,
@@ -18,6 +18,11 @@ import {
   savePinnedCategoryIds,
   getCategoryWidths,
   saveCategoryWidths,
+  getRecycleBin,
+  getRecycleBinItem,
+  addToRecycleBin,
+  removeFromRecycleBin,
+  clearRecycleBin,
 } from "./db";
 
 interface AppState {
@@ -69,6 +74,16 @@ interface AppState {
   // Category widths
   categoryWidths: Record<string, number>;
   setCategoryWidth: (categoryId: string, widthPercent: number) => void;
+
+  // Recycle bin
+  recycleBin: RecycleBinItem[];
+  softDeleteCategory: (id: string) => Promise<void>;
+  softDeleteSubGroup: (id: string) => Promise<void>;
+  softDeleteCard: (id: string) => Promise<void>;
+  restoreFromBin: (id: string) => Promise<void>;
+  permanentDelete: (id: string) => Promise<void>;
+  emptyBin: () => Promise<void>;
+  loadRecycleBin: () => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -120,6 +135,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       initialized: init,
       isLoading: false,
     });
+
+    // Load recycle bin in background (non-blocking)
+    void get().loadRecycleBin();
 
     // Migration: fill missing imageUrl with Google Favicon API
     const needsMigration = cards.some(
@@ -421,5 +439,129 @@ export const useAppStore = create<AppState>((set, get) => ({
     const widths = { ...get().categoryWidths, [categoryId]: widthPercent };
     saveCategoryWidths(widths);
     set({ categoryWidths: widths });
+  },
+
+  // Recycle bin methods
+  recycleBin: [],
+
+  loadRecycleBin: async () => {
+    const items = await getRecycleBin();
+    set({ recycleBin: items });
+  },
+
+  softDeleteCategory: async (id) => {
+    const { categories, cards } = get();
+    const category = categories.find(c => c.id === id);
+    if (!category) return;
+
+    // Find all child categories and their cards
+    const childCategories = categories.filter(c => c.parentId === id);
+    const categoryIds = [id, ...childCategories.map(c => c.id)];
+    const affectedCards = cards.filter(c => categoryIds.includes(c.categoryId));
+
+    // Create recycle bin entry
+    const binItem: RecycleBinItem = {
+      id: `bin-${Date.now()}-${id}`,
+      type: category.isParent ? 'category' : 'group',
+      name: category.name,
+      deletedAt: Date.now(),
+      categories: [category, ...childCategories],
+      cards: affectedCards,
+    };
+
+    await addToRecycleBin([binItem]);
+
+    // Remove from main data
+    const newCategories = categories.filter(c => !categoryIds.includes(c.id));
+    const newCards = cards.filter(c => !categoryIds.includes(c.categoryId));
+    set({ categories: newCategories, cards: newCards });
+    await saveCategories(newCategories);
+    await saveCards(newCards);
+    await get().loadRecycleBin();
+  },
+
+  softDeleteSubGroup: async (id) => {
+    const { categories, cards } = get();
+    const category = categories.find(c => c.id === id);
+    if (!category) return;
+
+    // Find all cards in this sub-group
+    const affectedCards = cards.filter(c => c.categoryId === id);
+
+    const binItem: RecycleBinItem = {
+      id: `bin-${Date.now()}-${id}`,
+      type: 'group',
+      name: category.name,
+      deletedAt: Date.now(),
+      categories: [category],
+      cards: affectedCards,
+    };
+
+    await addToRecycleBin([binItem]);
+
+    const newCategories = categories.filter(c => c.id !== id);
+    const newCards = cards.filter(c => c.categoryId !== id);
+    set({ categories: newCategories, cards: newCards });
+    await saveCategories(newCategories);
+    await saveCards(newCards);
+    await get().loadRecycleBin();
+  },
+
+  softDeleteCard: async (id) => {
+    const { cards } = get();
+    const card = cards.find(c => c.id === id);
+    if (!card) return;
+
+    const binItem: RecycleBinItem = {
+      id: `bin-${Date.now()}-${id}`,
+      type: 'card',
+      name: card.title || card.url,
+      deletedAt: Date.now(),
+      categories: [],
+      cards: [card],
+    };
+
+    await addToRecycleBin([binItem]);
+
+    const newCards = cards.filter(c => c.id !== id);
+    set({ cards: newCards });
+    await saveCards(newCards);
+    await get().loadRecycleBin();
+  },
+
+  restoreFromBin: async (id) => {
+    const item = await getRecycleBinItem(id);
+    if (!item) return;
+
+    const { categories, cards } = get();
+
+    // Restore categories (avoid duplicates)
+    const existingCatIds = new Set(categories.map(c => c.id));
+    const restoredCategories = item.categories.filter(c => !existingCatIds.has(c.id));
+
+    // Restore cards (avoid duplicates)
+    const existingCardIds = new Set(cards.map(c => c.id));
+    const restoredCards = item.cards.filter(c => !existingCardIds.has(c.id));
+
+    const newCategories = [...categories, ...restoredCategories];
+    const newCards = [...cards, ...restoredCards];
+
+    set({ categories: newCategories, cards: newCards });
+    await saveCategories(newCategories);
+    await saveCards(newCards);
+
+    // Remove from bin
+    await removeFromRecycleBin([id]);
+    await get().loadRecycleBin();
+  },
+
+  permanentDelete: async (id) => {
+    await removeFromRecycleBin([id]);
+    await get().loadRecycleBin();
+  },
+
+  emptyBin: async () => {
+    await clearRecycleBin();
+    set({ recycleBin: [] });
   },
 }));

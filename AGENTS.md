@@ -110,11 +110,12 @@ WebCollect 是一个美观、可拖拽的网页收藏与导览门户。用户可
 │   │   │   ├── card-dialog.tsx       # 添加/编辑网页卡片
 │   │   │   ├── category-dialog.tsx   # 分类创建/编辑
 │   │   │   ├── import-dialog.tsx     # 仓库导入弹窗
-│   │   │   └── ship-to-main-dialog.tsx # 仓库发货到主页弹窗
+│   │   │   ├── ship-to-main-dialog.tsx # 仓库发货到主页弹窗
+│   │   │   └── recycle-bin-dialog.tsx # 回收站弹窗（恢复/永久删除）
 │   │   └── error-boundary.tsx  # 错误边界组件
 │   ├── lib/
 │   │   ├── types.ts            # TypeScript 类型定义
-│   │   ├── db.ts               # IndexedDB 封装（主页卡片/分类/隐藏网站/置顶分类）
+│   │   ├── db.ts               # IndexedDB 封装（主页卡片/分类/隐藏网站/置顶分类/回收站）
 │   │   ├── db-warehouse.ts     # 仓库 IndexedDB 封装（独立命名空间）
 │   │   ├── store.ts            # 主页 Zustand 状态管理
 │   │   ├── store-warehouse.ts  # 仓库 Zustand 状态管理
@@ -166,6 +167,9 @@ pnpm lint
 | 仓库卡片 | `src/components/card/warehouse-card.tsx` | 仓库专用卡片（精简样式，显示批次标签） |
 | 导入弹窗 | `src/components/dialogs/import-dialog.tsx` | JSON 上传 → 解析预览 → 确认导入 |
 | 发货弹窗 | `src/components/dialogs/ship-to-main-dialog.tsx` | 选择分组/分类 → 选择主页目标 → 一键发货 |
+| 回收站 | `src/components/dialogs/recycle-bin-dialog.tsx` | 查看/恢复/永久删除回收站条目 |
+| 软删除 | `src/lib/store.ts` (softDelete*) | 分类/分组/卡片删除 → 移入回收站 → 可恢复 |
+| 回收站数据层 | `src/lib/db.ts` (recycleBin*) | IndexedDB 存储回收站条目的 CRUD |
 
 ## 布局系统设计
 
@@ -280,6 +284,15 @@ interface UserPreferences {
   hiddenSites: HiddenSite[];
   pinnedCategoryIds: string[];
   defaultHideDuration: HideDuration;
+}
+
+interface RecycleBinItem {
+  id: string;           // unique bin entry ID
+  type: "category" | "group" | "card";
+  name: string;         // display name for the recycle bin UI
+  deletedAt: number;    // timestamp when deleted
+  categories: Category[];  // affected categories (for category: parent + children)
+  cards: WebCard[];     // affected cards
 }
 ```
 

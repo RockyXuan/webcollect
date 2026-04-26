@@ -1,5 +1,5 @@
 import localforage from "localforage";
-import type { WebCard, Category, HiddenSite } from "./types";
+import type { WebCard, Category, HiddenSite, RecycleBinItem } from "./types";
 
 localforage.config({
   name: "WebCollect",
@@ -115,4 +115,35 @@ export async function getCategoryWidths(): Promise<Record<string, number>> {
 
 export async function saveCategoryWidths(widths: Record<string, number>): Promise<void> {
   await localforage.setItem(CATEGORY_WIDTHS_KEY, widths);
+}
+
+// ============ Recycle Bin ============
+
+const RECYCLE_BIN_KEY = "recycleBin";
+
+export async function getRecycleBin(): Promise<RecycleBinItem[]> {
+  return (await localforage.getItem<RecycleBinItem[]>(RECYCLE_BIN_KEY)) || [];
+}
+
+export async function saveRecycleBin(items: RecycleBinItem[]): Promise<void> {
+  await localforage.setItem(RECYCLE_BIN_KEY, items);
+}
+
+export async function getRecycleBinItem(id: string): Promise<RecycleBinItem | null> {
+  const items = await getRecycleBin();
+  return items.find((item) => item.id === id) || null;
+}
+
+export async function addToRecycleBin(items: RecycleBinItem[]): Promise<void> {
+  const existing = await getRecycleBin();
+  await saveRecycleBin([...existing, ...items]);
+}
+
+export async function removeFromRecycleBin(ids: string[]): Promise<void> {
+  const existing = await getRecycleBin();
+  await saveRecycleBin(existing.filter((item) => !ids.includes(item.id)));
+}
+
+export async function clearRecycleBin(): Promise<void> {
+  await saveRecycleBin([]);
 }
