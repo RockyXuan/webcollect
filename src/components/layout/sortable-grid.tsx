@@ -15,7 +15,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   DndContext,
@@ -561,6 +560,8 @@ function SortableCategoryBlock({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [localWidth, setLocalWidth] = useState<number | null>(null);
   const [isHeaderHovered, setIsHeaderHovered] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [confirmDemoteOpen, setConfirmDemoteOpen] = useState(false);
 
   const widthPercent = localWidth ?? storedWidth ?? defaultWidthPercent;
 
@@ -717,68 +718,25 @@ function SortableCategoryBlock({
               <Plus className="w-2.5 h-2.5" />
             </Button>
             {/* Delete category */}
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
-                  title="删除分类"
-                >
-                  <Trash2 className="w-2.5 h-2.5" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="font-serif">确认删除「{category.name}」</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    删除后，此分类及其下属所有分组和网页将移入回收站。
-                    你可以随时从回收站恢复。
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>取消</AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    onClick={() => softDeleteCategory(category.id)}
-                  >
-                    确认删除
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
+              title="删除分类"
+              onClick={() => setConfirmDeleteOpen(true)}
+            >
+              <Trash2 className="w-2.5 h-2.5" />
+            </Button>
             {isParent && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
-                    title="降级为分组"
-                  >
-                    <ArrowDownFromLine className="w-2.5 h-2.5" />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle className="font-serif">确认降级「{category.name}」</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      降级后，此分类将变为分组移入「未分类」区域，
-                      其下属的所有分组也会被拆散为独立分组。
-                      此操作不会删除任何网站数据。
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>取消</AlertDialogCancel>
-                    <AlertDialogAction
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      onClick={() => demoteParentCategory(category.id)}
-                    >
-                      确认降级
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
+                title="降级为分组"
+                onClick={() => setConfirmDemoteOpen(true)}
+              >
+                <ArrowDownFromLine className="w-2.5 h-2.5" />
+              </Button>
             )}
           </>
         )}
@@ -794,6 +752,53 @@ function SortableCategoryBlock({
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={handleResizeStart}
       />
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-serif">确认删除「{category.name}」</AlertDialogTitle>
+            <AlertDialogDescription>
+              删除后，此分类及其下属所有分组和网页将移入回收站。
+              你可以随时从回收站恢复。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { softDeleteCategory(category.id); setConfirmDeleteOpen(false); }}
+            >
+              确认删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Demote confirmation dialog */}
+      {isParent && (
+        <AlertDialog open={confirmDemoteOpen} onOpenChange={setConfirmDemoteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="font-serif">确认降级「{category.name}」</AlertDialogTitle>
+              <AlertDialogDescription>
+                降级后，此分类将变为分组移入「未分类」区域，
+                其下属的所有分组也会被拆散为独立分组。
+                此操作不会删除任何网站数据。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>取消</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => { demoteParentCategory(category.id); setConfirmDemoteOpen(false); }}
+              >
+                确认降级
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }
@@ -857,6 +862,7 @@ function SortableSubGroupBlock({
   const updateCategory = useAppStore((s) => s.updateCategory);
   const [localWidth, setLocalWidth] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const widthPercent = localWidth ?? categoryWidths[category.id] ?? null;
 
@@ -968,35 +974,15 @@ function SortableSubGroupBlock({
             >
               <ArrowUpFromLine className="w-2.5 h-2.5" />
             </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
-                  title="删除分组"
-                >
-                  <Trash2 className="w-2.5 h-2.5" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>删除分组「{category.name}」？</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    该分组下的 {cards.length} 个网页将一起移入回收站，可随时恢复。
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>取消</AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    onClick={() => useAppStore.getState().softDeleteSubGroup(category.id)}
-                  >
-                    删除
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
+              title="删除分组"
+              onClick={() => setConfirmDeleteOpen(true)}
+            >
+              <Trash2 className="w-2.5 h-2.5" />
+            </Button>
           </>
         )}
       </div>
@@ -1031,6 +1017,27 @@ function SortableSubGroupBlock({
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={handleResizeStart}
       />
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除分组「{category.name}」？</AlertDialogTitle>
+            <AlertDialogDescription>
+              该分组下的 {cards.length} 个网页将一起移入回收站，可随时恢复。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { useAppStore.getState().softDeleteSubGroup(category.id); setConfirmDeleteOpen(false); }}
+            >
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -1073,6 +1080,7 @@ function SortableUngroupedBlock({
   const updateCategory = useAppStore((s) => s.updateCategory);
   const [localWidth, setLocalWidth] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const widthPercent = localWidth ?? categoryWidths[category.id] ?? null;
 
@@ -1184,35 +1192,15 @@ function SortableUngroupedBlock({
             >
               <ArrowUpFromLine className="w-2.5 h-2.5" />
             </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
-                  title="删除分组"
-                >
-                  <Trash2 className="w-2.5 h-2.5" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>删除分组「{category.name}」？</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    该分组下的 {cards.length} 个网页将一起移入回收站，可随时恢复。
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>取消</AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    onClick={() => useAppStore.getState().softDeleteSubGroup(category.id)}
-                  >
-                    删除
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
+              title="删除分组"
+              onClick={() => setConfirmDeleteOpen(true)}
+            >
+              <Trash2 className="w-2.5 h-2.5" />
+            </Button>
           </>
         )}
       </div>
@@ -1247,6 +1235,27 @@ function SortableUngroupedBlock({
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={handleResizeStart}
       />
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除分组「{category.name}」？</AlertDialogTitle>
+            <AlertDialogDescription>
+              该分组下的 {cards.length} 个网页将一起移入回收站，可随时恢复。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { useAppStore.getState().softDeleteSubGroup(category.id); setConfirmDeleteOpen(false); }}
+            >
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
