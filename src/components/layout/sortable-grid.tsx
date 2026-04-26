@@ -537,9 +537,10 @@ function SortableCategoryBlock({
     isDragging,
   } = useSortable({ id: catId(category.id) });
 
-  const { setCategoryWidth, demoteParentCategory, updateCategory } = useAppStore();
+  const { setCategoryWidth, demoteParentCategory, updateCategory, editMode: globalEditMode, toggleEditMode } = useAppStore();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [localWidth, setLocalWidth] = useState<number | null>(null);
+  const [isHeaderHovered, setIsHeaderHovered] = useState(false);
 
   const widthPercent = localWidth ?? storedWidth ?? defaultWidthPercent;
 
@@ -602,7 +603,11 @@ function SortableCategoryBlock({
       `}
     >
       {/* Category header - buttons right next to title */}
-      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border/50 flex-wrap">
+      <div
+        className="flex items-center gap-1.5 px-3 py-2 border-b border-border/50 flex-wrap"
+        onMouseEnter={() => setIsHeaderHovered(true)}
+        onMouseLeave={() => setIsHeaderHovered(false)}
+      >
         <span
           className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground transition-colors"
           {...attributes}
@@ -621,6 +626,19 @@ function SortableCategoryBlock({
           editMode={editMode}
           onSave={(newName) => updateCategory({ ...category, name: newName })}
         />
+        {/* Edit mode toggle - always visible when header is hovered and not in edit mode */}
+        {!globalEditMode && isHeaderHovered && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 text-[11px] gap-0.5 px-1.5 text-muted-foreground hover:text-primary animate-in fade-in duration-200"
+            onClick={(e) => { e.stopPropagation(); toggleEditMode(); }}
+            title="进入编辑模式"
+          >
+            <Pencil className="w-2.5 h-2.5" />
+            编辑
+          </Button>
+        )}
 
         {/* Smooth drop hint */}
         {isHovered && isParent && (

@@ -5,21 +5,21 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 interface InlineEditableTextProps {
   value: string;
   className?: string;
-  editMode: boolean;
+  editMode?: boolean;
   onSave: (newValue: string) => void;
   placeholder?: string;
 }
 
 /**
- * A text span that becomes an inline editable input in edit mode.
- * - Hover cursor: text (I-beam) in edit mode, default otherwise
- * - Click to start editing, Enter/Blur to save, Escape to cancel
+ * A text span that becomes an inline editable input on click.
+ * - Click to start editing (always available), Enter/Blur to save, Escape to cancel
+ * - editMode controls visual hints only (cursor style, hover background)
  * - Stop propagation on pointer events to prevent dnd-kit capture
  */
 export function InlineEditableText({
   value,
   className,
-  editMode,
+  editMode = true,
   onSave,
   placeholder,
 }: InlineEditableTextProps) {
@@ -28,10 +28,9 @@ export function InlineEditableText({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const startEdit = useCallback(() => {
-    if (!editMode) return;
     setEditValue(value);
     setIsEditing(true);
-  }, [editMode, value]);
+  }, [value]);
 
   const saveEdit = useCallback(() => {
     const trimmed = editValue.trim();
@@ -87,7 +86,7 @@ export function InlineEditableText({
   return (
     <span
       className={`${className} ${editMode ? "cursor-text hover:bg-muted/30 rounded px-0.5 -mx-0.5" : ""}`}
-      onClick={editMode ? (e) => { e.stopPropagation(); startEdit(); } : undefined}
+      onClick={(e) => { e.stopPropagation(); startEdit(); }}
       title={editMode ? "点击编辑名称" : undefined}
     >
       {value || (editMode && placeholder ? <span className="text-muted-foreground/40 italic">{placeholder}</span> : value)}

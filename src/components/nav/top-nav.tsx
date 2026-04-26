@@ -1,7 +1,7 @@
 "use client";
 
 import { useAppStore } from "@/lib/store";
-import { Plus, FolderPlus, Layers, Pencil, Package } from "lucide-react";
+import { Plus, FolderPlus, Layers, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
@@ -12,8 +12,7 @@ interface TopNavProps {
 }
 
 export function TopNav({ onAddCard, onAddGroup, onAddCategory }: TopNavProps) {
-  const { editMode, toggleEditMode, searchQuery, setSearchQuery } =
-    useAppStore();
+  const { searchQuery, setSearchQuery } = useAppStore();
 
   return (
     <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur border-b border-border">
@@ -66,15 +65,6 @@ export function TopNav({ onAddCard, onAddGroup, onAddCategory }: TopNavProps) {
             添加分类
           </Button>
           <div className="w-px h-5 bg-border mx-1" />
-          <Button
-            variant={editMode ? "default" : "outline"}
-            size="sm"
-            onClick={toggleEditMode}
-            className="h-7 text-xs gap-1 px-2"
-          >
-            <Pencil className="h-3 w-3" />
-            编辑
-          </Button>
           <Link href="/warehouse">
             <Button
               variant="outline"
