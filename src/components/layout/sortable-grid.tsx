@@ -706,10 +706,7 @@ function SortableCategoryBlock({
       <div
         className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize
           hover:bg-primary/20 active:bg-primary/30 transition-colors rounded-r-lg"
-        onPointerDown={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
+        onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={handleResizeStart}
       />
     </div>
@@ -914,10 +911,7 @@ function SortableSubGroupBlock({
       <div
         className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize
           hover:bg-primary/20 active:bg-primary/30 transition-colors rounded-r-md"
-        onPointerDown={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
+        onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={handleResizeStart}
       />
     </div>
@@ -1101,10 +1095,7 @@ function SortableUngroupedBlock({
       <div
         className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize
           hover:bg-primary/20 active:bg-primary/30 transition-colors rounded-r-md"
-        onPointerDown={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
+        onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={handleResizeStart}
       />
     </div>
