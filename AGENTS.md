@@ -244,6 +244,7 @@ interface Category {
   order: number;
   createdAt: number;
   parentId?: string; // 父分类ID，有此字段表示是"分组"(子分类)，无此字段表示是"分类"(顶级)
+  isParent?: boolean; // true = 顶级分类（如"开发"），false/undefined = 分组或未分类项
 }
 
 type HideDuration = "1w" | "2w" | "1m" | "permanent";
@@ -345,3 +346,210 @@ interface UserPreferences {
 
 ### HMR 缓存导致旧代码
 删除 `.next` 目录后重启 dev server：`rm -rf .next && pnpm dev`。
+
+---
+
+## 开发反思与防错指南（CRITICAL）
+
+> 以下内容来自实际开发中的教训总结。每次修改代码前必须通读此章节，避免重蹈覆辙。
+
+### 三条铁律
+
+#### 铁律一：改前先备份数据
+1. 修改代码前，先读取 `seed.ts` 和用户可能存在的 IndexedDB 数据（通过 `store.ts` 的 `loadData`）
+2. 确认修改范围：只动需要动的文件和函数
+3. 绝对不要在修改功能代码时"顺手"改数据结构、删默认分类、改网站 URL
+4. 改完后二次确认：原有数据是否完整保留
+
+#### 铁律二：严格只改用户要求的内容
+1. 用户让改什么就改什么，不要"顺便优化"其他代码
+2. 如果用户指令有歧义，**必须停下来确认**，不要自作主张
+3. 改 A 功能时，不要碰 B 功能的代码，即使你觉得"顺便修一下更好"
+4. 以下是容易混淆的点，务必确认后再动手：
+   - "分类"（顶级大类，如"开发"）vs "分组"（子分类，如"常用"）→ 用户说"分类"就是顶级，说"分组"就是子级
+   - "升级"（分组→顶级分类）vs "脱离/提级"（从父分类移出回到未分类）→ 需确认用户要哪个
+   - "拉宽"（调整宽度）vs "拉伸"（同义，都是 resize）→ 同一个意思
+   - "降级"（顶级分类→分组）vs "拖入"（把未分类分组拖到父分类里）→ 降级是大类变小组，拖入是小分组归入大类
+
+#### 铁律三：改完必须自测三遍
+1. **编译检查**：`pnpm ts-check` + `pnpm lint` 必须零错误
+2. **服务存活**：`curl -I -s --max-time 3 http://localhost:5000` 确认 200
+3. **功能验证**：在页面上实际操作修改的功能，确认可用
+4. **回归验证**：确认之前正常的功能没有被破坏
+5. **日志检查**：`tail -n 50 /app/work/logs/bypass/app.log /app/work/logs/bypass/console.log | grep -iE "error|exception"` 无新错误
+
+### 历史错误档案
+
+#### 错误 1：拉伸与拖动事件冲突（发生 3 次）
+
+**现象**：点击拉伸手柄无法拖动，或者拖动时同时触发了排序拖拽。
+
+**根因**：dnd-kit 使用 `PointerSensor` 监听 `pointerdown` 事件，而拉伸手柄使用 `onMouseDown`。两者是不同的事件系统，`e.stopPropagation()` 只能阻止同级事件冒泡，不能跨事件类型。
+
+**正确做法**：
+```tsx
+// ✅ 正确：在拉伸手柄上同时用 onPointerDown 阻止 dnd-kit，onMouseDown 处理拉伸逻辑
+<div
+  className="resize-handle"
+  onPointerDown={(e) => e.stopPropagation()}  // 阻止 pointerdown 冒泡到 dnd-kit
+  onMouseDown={handleResizeStart}              // 正常处理拉伸
+/>
+
+// ❌ 错误：在 onPointerDown 中调用 preventDefault()
+<div
+  onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+  onMouseDown={handleResizeStart}
+/>
+// preventDefault() 会阻止浏览器生成后续的 mousedown 事件，
+// 导致 handleResizeStart 永远不会被触发！
+```
+
+**关键记忆**：`preventDefault()` 和 `stopPropagation()` 作用不同——前者阻止浏览器默认行为（可能抑制后续事件），后者阻止事件冒泡。拉伸场景只需 `stopPropagation()`。
+
+---
+
+#### 错误 2：flex 布局中 width / minWidth / flex-basis 的混淆（发生 4 次）
+
+**现象**：
+- 拉宽一个分组后，相邻分组被挤压成两行
+- 拉宽后分组内部出现留白
+- 外部分类拉宽后，内部分组没有自动填充
+
+**根因**：在 flex 容器中，`width`、`minWidth`、`flex: 0 0 XX%`、`flex: 1 1 0%` 的行为完全不同：
+
+| CSS 属性 | 行为 | 适用场景 |
+|----------|------|----------|
+| `width: XX%` | 固定宽度，flex 项目可能被压缩 | 全宽独占的块（父分类） |
+| `minWidth: XX%` | 最小宽度，内容超出可扩展 | 需要保底但不限宽的场景 |
+| `flex: 0 0 XX%` | 固定基准，不增不减 | 手动调整过宽度的分组 |
+| `flex: 1 1 0%` | 均分空间，可增可减 | 默认未调整的分组 |
+| `shrink-0` | 永不压缩 | 会导致相邻项换行而非压缩 |
+
+**正确做法（"包中包"模型）**：
+```
+外层分类（width: XX%）→ 占据页面指定比例宽度
+  └─ 内层分组（flex: 1 1 0%）→ 均匀填充分类空间
+     └─ 卡片（min-w-[140px] flex-1）→ 在分组内自适应排列
+```
+- 外层拉宽 → 内层分组自动填满（`flex: 1 1 0%` 自然扩展）
+- 内层分组拉伸 → 设为 `flex: 0 0 XX%`，其余分组压缩（`flex: 1 1 0%` 自然收缩）
+- 不用 `shrink-0`，除非明确不想让某项被压缩
+
+**关键记忆**：用户说的"包中包"模型——外层包变大，里面的东西自动跟着变；里面某个东西变大了，旁边的就被挤小。这就是 flex 的 `grow` 和 `shrink` 的本职工作，不要用 `shrink-0` 强行禁用。
+
+---
+
+#### 错误 3：跨 SortableContext 拖拽失败（发生 1 次）
+
+**现象**：从"未分类"区域拖分组到上方父分类时，拖到中间就"丢了"，无法放下。
+
+**根因**：最初把父分类和未分类分组放在两个独立的 `SortableContext` 中，`closestCenter` 碰撞检测只能匹配同一 Context 内的项目。
+
+**正确做法**：所有顶层可拖拽项放在同一个 `SortableContext`，碰撞检测用 `pointerWithin` + `rectIntersection` 组合策略。通过 ID 前缀（`cat:xxx`、`ungrouped:xxx`）区分拖拽类型。
+
+---
+
+#### 错误 4：数据模型变更未考虑布局影响（发生 1 次）
+
+**现象**：添加 `isParent` 字段后，"添加分类"创建的分类出现在"未分类"区域而非顶级分类区域。
+
+**根因**：布局代码用 `!c.parentId && categories.some(sg => sg.parentId === c.id)` 判断顶级分类，新创建的分类没有 `parentId` 也没有子分组，所以被归入"未分类"。
+
+**正确做法**：数据模型变更必须同步更新布局逻辑。添加 `isParent` 字段后，布局判断条件也要改为 `!c.parentId && (c.isParent || hasSubGroups)`。
+
+---
+
+#### 错误 5：改了 A 坏了 B（发生多次）
+
+**现象**：修复拖拽手柄后卡片的编辑/删除按钮消失了；修复分组宽度后卡片的固定宽度丢了。
+
+**根因**：在修改一个组件时，不自觉地改动了其他逻辑分支的代码。例如修改 `editMode` 条件时改了 `if` 的范围，影响了旁边的按钮渲染。
+
+**正确做法**：
+1. 修改前先通读目标函数/组件的完整代码
+2. 用注释标记要改的行，确认不影响其他分支
+3. 改完后 `git diff` 逐行检查，确保只改了目标代码
+4. 回归测试：确认相关功能仍然正常
+
+---
+
+#### 错误 6：HMR 缓存导致改了等于没改（发生 2 次）
+
+**现象**：修改了代码但页面行为没变化，或者出现已修复的旧错误。
+
+**根因**：`.next` 缓存了旧编译结果，HMR 有时无法正确增量更新。
+
+**正确做法**：如果修改后页面行为异常，先 `rm -rf .next` 清缓存，再重启 dev server。
+
+---
+
+### 拖拽系统速查
+
+#### ID 前缀规则
+| 前缀 | 含义 | 可拖拽目标 |
+|------|------|-----------|
+| `cat:xxx` | 父分类 | 重排序 |
+| `ungrouped:xxx` | 未分类分组 | 重排序 / 拖入父分类降级 |
+| `sub:xxx` | 父分类内的子分组 | 重排序 |
+| `card:xxx` | 网页卡片 | 跨分组拖拽 |
+| `drop-parent:xxx` | 父分类放置区 | 接收未分类分组降级 |
+
+#### 拖拽与拉伸的事件隔离
+```tsx
+// 拉伸手柄模板（三个层级通用）
+<div
+  className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/20"
+  onPointerDown={(e) => e.stopPropagation()}  // 阻止 dnd-kit 捕获
+  onMouseDown={handleResizeStart}              // 处理拉伸逻辑
+/>
+```
+
+#### 拉伸逻辑模板
+```tsx
+const handleResizeStart = (e: React.MouseEvent) => {
+  e.stopPropagation();
+  const container = resizeRef.current;
+  if (!container) return;
+  const startX = e.clientX;
+  const startWidth = container.offsetWidth;
+
+  const handleMouseMove = (me: MouseEvent) => {
+    const dx = me.clientX - startX;
+    const parentWidth = container.parentElement?.offsetWidth || 1;
+    const newPercent = Math.max(15, Math.min(100, ((startWidth + dx) / parentWidth) * 100));
+    container.style.width = `${newPercent}%`;
+    setCategoryWidth(category.id, newPercent);  // 持久化
+  };
+
+  const handleMouseUp = () => {
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+  };
+
+  document.addEventListener('mousemove', handleMouseMove);
+  document.addEventListener('mouseup', handleMouseUp);
+};
+```
+
+#### Flex 布局速查
+```
+父分类块：style={{ width: `${widthPercent}%` }} + overflow-hidden
+  └─ 子分组容器：flex flex-wrap gap-3
+       ├─ 未调整分组：flex: 1 1 0%（均分空间）
+       └─ 手动调整分组：flex: 0 0 XX%（固定宽度）
+            └─ 卡片容器：flex flex-wrap gap-1
+                 └─ 单个卡片：min-w-[140px] flex-1（自适应）
+```
+
+### 每次修改前的 Checklist
+
+```
+□ 1. 读取当前 seed.ts 和相关文件，确认数据不会丢失
+□ 2. 只改用户要求的文件和函数，标记不动的地方
+□ 3. 改完后 pnpm ts-check + pnpm lint 确认零错误
+□ 4. curl 确认服务存活
+□ 5. 在页面上实际操作修改的功能
+□ 6. 回归测试：拖拽、拉伸、添加/编辑/删除、升级/降级
+□ 7. 检查日志无新错误
+□ 8. git diff 确认只改了目标代码
+```
