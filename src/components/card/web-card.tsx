@@ -4,6 +4,7 @@ import React, { useState, useCallback } from "react";
 import { Pencil, Trash2, ExternalLink, GripVertical } from "lucide-react";
 import type { WebCard } from "@/lib/types";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { EditableText } from "@/components/ui/editable-text";
 
 interface WebCardItemProps {
   card: WebCard;
@@ -11,6 +12,7 @@ interface WebCardItemProps {
   editMode: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  onUpdateCard: (card: WebCard) => void;
   dragListeners?: React.HTMLAttributes<HTMLElement> | null;
 }
 
@@ -20,6 +22,7 @@ export function WebCardItem({
   editMode,
   onEdit,
   onDelete,
+  onUpdateCard,
   dragListeners,
 }: WebCardItemProps) {
   const [imgError, setImgError] = useState(false);
@@ -54,7 +57,7 @@ export function WebCardItem({
         group relative flex items-center gap-1.5 px-2 py-1
         rounded border transition-all select-none
         min-w-[140px] flex-1
-        ${editMode ? "cursor-default" : "cursor-pointer hover:bg-muted/50"}
+        ${editMode ? "" : "cursor-pointer hover:bg-muted/50"}
         hover:shadow-sm
       `}
       style={{ borderLeftWidth: "2px", borderLeftColor: categoryColor }}
@@ -88,14 +91,32 @@ export function WebCardItem({
 
       {/* Text content - two-line: name on line 1, shortDesc on line 2 */}
       <div className="min-w-0 flex-1">
-        <div className="text-[11px] font-medium text-foreground leading-tight truncate">
-          {card.title}
-        </div>
-        {card.shortDesc && (
-          <div className="text-[10px] text-muted-foreground leading-tight truncate">
-            {card.shortDesc}
-          </div>
-        )}
+        <EditableText
+          value={card.title}
+          onChange={(newTitle) => onUpdateCard({ ...card, title: newTitle })}
+          className="text-[11px] font-medium text-foreground leading-tight truncate"
+          editable={editMode}
+          singleClickEdit
+        />
+        {card.shortDesc ? (
+          <EditableText
+            value={card.shortDesc}
+            onChange={(newDesc) => onUpdateCard({ ...card, shortDesc: newDesc })}
+            className="text-[10px] text-muted-foreground leading-tight truncate"
+            editable={editMode}
+            singleClickEdit
+            placeholder="点击添加简介"
+          />
+        ) : editMode ? (
+          <EditableText
+            value=""
+            onChange={(newDesc) => onUpdateCard({ ...card, shortDesc: newDesc })}
+            className="text-[10px] text-muted-foreground/40 leading-tight truncate"
+            editable={editMode}
+            singleClickEdit
+            placeholder="点击添加简介"
+          />
+        ) : null}
       </div>
 
       {/* Action buttons in edit mode */}

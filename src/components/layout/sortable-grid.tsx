@@ -5,6 +5,7 @@ import { useAppStore } from "@/lib/store";
 import { WebCardItem } from "@/components/card/web-card";
 import { Pencil, Plus, GripVertical, ArrowUpFromLine, ArrowDownFromLine, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { EditableText } from "@/components/ui/editable-text";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -532,7 +533,7 @@ function SortableCategoryBlock({
     isDragging,
   } = useSortable({ id: catId(category.id) });
 
-  const { setCategoryWidth, demoteParentCategory, toggleEditMode } = useAppStore();
+  const { setCategoryWidth, demoteParentCategory, toggleEditMode, updateCategory } = useAppStore();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [localWidth, setLocalWidth] = useState<number | null>(null);
 
@@ -610,13 +611,12 @@ function SortableCategoryBlock({
           className="w-2.5 h-2.5 rounded-full flex-shrink-0"
           style={{ backgroundColor: category.color }}
         />
-        <span
-          className="text-sm font-semibold text-foreground font-serif cursor-grab active:cursor-grabbing hover:text-primary/80 transition-colors"
-          {...attributes}
-          {...listeners}
-        >
-          {category.name}
-        </span>
+        <EditableText
+          value={category.name}
+          onChange={(newName) => updateCategory({ ...category, name: newName })}
+          className="text-sm font-semibold text-foreground font-serif"
+          editable={editMode}
+        />
 
         {/* Smooth drop hint */}
         {isHovered && isParent && (
@@ -781,6 +781,8 @@ function SortableSubGroupBlock({
   const categoryWidths = useAppStore((s) => s.categoryWidths);
   const setCategoryWidth = useAppStore((s) => s.setCategoryWidth);
   const toggleEditMode = useAppStore((s) => s.toggleEditMode);
+  const updateCategory = useAppStore((s) => s.updateCategory);
+  const updateCard = useAppStore((s) => s.updateCard);
   const [localWidth, setLocalWidth] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -855,13 +857,12 @@ function SortableSubGroupBlock({
           className="w-1 h-3 rounded-full flex-shrink-0"
           style={{ backgroundColor: category.color }}
         />
-        <span
-          className="text-xs font-medium text-foreground cursor-grab active:cursor-grabbing hover:text-primary/80 transition-colors"
-          {...attributes}
-          {...listeners}
-        >
-          {category.name}
-        </span>
+        <EditableText
+          value={category.name}
+          onChange={(newName) => updateCategory({ ...category, name: newName })}
+          className="text-xs font-medium text-foreground"
+          editable={editMode}
+        />
         <span className="text-[10px] text-muted-foreground">
           ({cards.length})
         </span>
@@ -926,6 +927,7 @@ function SortableSubGroupBlock({
               editMode={editMode}
               onEdit={() => onEditCard?.(card)}
               onDelete={() => onDeleteCard?.(card)}
+              onUpdateCard={updateCard}
             />
           ))}
           {cards.length === 0 && (
@@ -979,6 +981,8 @@ function SortableUngroupedBlock({
   const categoryWidths = useAppStore((s) => s.categoryWidths);
   const setCategoryWidth = useAppStore((s) => s.setCategoryWidth);
   const toggleEditMode = useAppStore((s) => s.toggleEditMode);
+  const updateCategory = useAppStore((s) => s.updateCategory);
+  const updateCard = useAppStore((s) => s.updateCard);
   const [localWidth, setLocalWidth] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -1053,13 +1057,12 @@ function SortableUngroupedBlock({
           className="w-1 h-3 rounded-full flex-shrink-0"
           style={{ backgroundColor: category.color }}
         />
-        <span
-          className="text-xs font-medium text-foreground cursor-grab active:cursor-grabbing hover:text-primary/80 transition-colors"
-          {...attributes}
-          {...listeners}
-        >
-          {category.name}
-        </span>
+        <EditableText
+          value={category.name}
+          onChange={(newName) => updateCategory({ ...category, name: newName })}
+          className="text-xs font-medium text-foreground"
+          editable={editMode}
+        />
         <span className="text-[10px] text-muted-foreground">
           ({cards.length})
         </span>
@@ -1124,6 +1127,7 @@ function SortableUngroupedBlock({
               editMode={editMode}
               onEdit={() => onEditCard?.(card)}
               onDelete={() => onDeleteCard?.(card)}
+              onUpdateCard={updateCard}
             />
           ))}
           {cards.length === 0 && (
@@ -1150,6 +1154,7 @@ interface SortableCardProps {
   editMode: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  onUpdateCard: (card: WebCard) => void;
 }
 
 function SortableCard({
@@ -1158,6 +1163,7 @@ function SortableCard({
   editMode,
   onEdit,
   onDelete,
+  onUpdateCard,
 }: SortableCardProps) {
   const {
     attributes,
@@ -1182,6 +1188,7 @@ function SortableCard({
         editMode={editMode}
         onEdit={onEdit}
         onDelete={onDelete}
+        onUpdateCard={onUpdateCard}
         dragListeners={{ ...attributes, ...listeners }}
       />
     </div>
