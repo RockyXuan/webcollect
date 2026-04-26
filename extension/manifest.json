@@ -14,14 +14,14 @@
     "newtab": "newtab.html"
   },
   "icons": {
-    "16": "public/icons/icon16.png",
-    "48": "public/icons/icon48.png",
-    "128": "public/icons/icon128.png"
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   },
   "background": {
     "service_worker": "background.js"
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; img-src 'self' https: data: blob:; connect-src *;"
+    "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.cn https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.cn https://fonts.gstatic.com; img-src 'self' https: data: blob:; connect-src *;"
   }
 }

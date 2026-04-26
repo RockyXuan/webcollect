@@ -7,6 +7,7 @@ const extRoot = path.resolve(__dirname);
 const projectRoot = path.resolve(__dirname, '..');
 
 export default defineConfig({
+  base: './',
   plugins: [
     react(),
     tailwindcss(),

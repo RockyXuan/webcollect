@@ -1,21 +1,21 @@
 #!/bin/bash
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 echo "Building WebCollect Chrome Extension..."
 
-# Step 1: Vite build
-cd "$(dirname "$0")/.."
-npx vite build --config extension/vite.config.ts
+# Build with Vite
+npx vite build --config "$SCRIPT_DIR/vite.config.ts"
 
-# Step 2: Copy extension files into dist
-cp extension/manifest.json extension/dist/
-cp extension/background.js extension/dist/
-cp -r extension/public extension/dist/
+# Copy extension files into dist
+cp "$SCRIPT_DIR/manifest.json" "$SCRIPT_DIR/dist/"
+cp "$SCRIPT_DIR/background.js" "$SCRIPT_DIR/dist/"
 
-# Step 3: Fix paths in HTML (absolute → relative for chrome-extension://)
-# The Vite build outputs paths like /assets/xxx which work with chrome-extension:// URLs
-# No fix needed since Chrome extension pages resolve / to extension root
+# Copy icons to dist/icons/ (manifest references icons/icon16.png etc.)
+mkdir -p "$SCRIPT_DIR/dist/icons"
+cp "$SCRIPT_DIR/public/icons/"*.png "$SCRIPT_DIR/dist/icons/"
 
-echo ""
-echo "Build complete! Output in extension/dist/"
-echo "To install: chrome://extensions → Developer mode → Load unpacked → select extension/dist/"
+echo "Extension built successfully! Output: $SCRIPT_DIR/dist/"
+echo "Load this folder in chrome://extensions to install."

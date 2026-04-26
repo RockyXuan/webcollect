@@ -11,7 +11,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { NewTabApp } from "./newtab-app";
-import "@/app/globals.css";
+import "./extension.css";
 
 const root = document.getElementById("root");
 if (root) {
