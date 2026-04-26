@@ -532,7 +532,7 @@ function SortableCategoryBlock({
     isDragging,
   } = useSortable({ id: catId(category.id) });
 
-  const { setCategoryWidth, demoteParentCategory } = useAppStore();
+  const { setCategoryWidth, demoteParentCategory, toggleEditMode } = useAppStore();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [localWidth, setLocalWidth] = useState<number | null>(null);
 
@@ -597,7 +597,7 @@ function SortableCategoryBlock({
       `}
     >
       {/* Category header - buttons right next to title */}
-      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border/50 flex-wrap">
+      <div className="group flex items-center gap-1.5 px-3 py-2 border-b border-border/50 flex-wrap">
         <span
           className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground transition-colors"
           {...attributes}
@@ -628,6 +628,19 @@ function SortableCategoryBlock({
           <span className="text-[10px] text-muted-foreground/30 transition-opacity duration-300">
             拖入分组到此分类
           </span>
+        )}
+
+        {/* Hover edit button to enter edit mode */}
+        {!editMode && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 w-5 p-0 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={toggleEditMode}
+            title="进入编辑模式"
+          >
+            <Pencil className="w-2.5 h-2.5" />
+          </Button>
         )}
 
         {/* Action buttons - right next to title */}
@@ -767,6 +780,7 @@ function SortableSubGroupBlock({
 
   const categoryWidths = useAppStore((s) => s.categoryWidths);
   const setCategoryWidth = useAppStore((s) => s.setCategoryWidth);
+  const toggleEditMode = useAppStore((s) => s.toggleEditMode);
   const [localWidth, setLocalWidth] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -828,7 +842,7 @@ function SortableSubGroupBlock({
       className="relative rounded-md border border-border/40 bg-background overflow-hidden min-w-0"
     >
       {/* Sub-group header - buttons right next to title */}
-      <div className="flex items-center gap-1.5 px-2.5 py-1.5 flex-wrap">
+      <div className="group flex items-center gap-1.5 px-2.5 py-1.5 flex-wrap">
         <span
           className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground transition-colors"
           {...attributes}
@@ -851,6 +865,19 @@ function SortableSubGroupBlock({
         <span className="text-[10px] text-muted-foreground">
           ({cards.length})
         </span>
+
+        {/* Hover edit button to enter edit mode */}
+        {!editMode && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 w-5 p-0 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={toggleEditMode}
+            title="进入编辑模式"
+          >
+            <Pencil className="w-2.5 h-2.5" />
+          </Button>
+        )}
 
         {editMode && (
           <>
@@ -951,6 +978,7 @@ function SortableUngroupedBlock({
 
   const categoryWidths = useAppStore((s) => s.categoryWidths);
   const setCategoryWidth = useAppStore((s) => s.setCategoryWidth);
+  const toggleEditMode = useAppStore((s) => s.toggleEditMode);
   const [localWidth, setLocalWidth] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -1012,7 +1040,7 @@ function SortableUngroupedBlock({
       className="relative rounded-md border border-border/40 bg-background overflow-hidden min-w-0"
     >
       {/* Header - buttons right next to title */}
-      <div className="flex items-center gap-1.5 px-2.5 py-1.5 flex-wrap">
+      <div className="group flex items-center gap-1.5 px-2.5 py-1.5 flex-wrap">
         <span
           className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground transition-colors"
           {...attributes}
@@ -1035,6 +1063,19 @@ function SortableUngroupedBlock({
         <span className="text-[10px] text-muted-foreground">
           ({cards.length})
         </span>
+
+        {/* Hover edit button to enter edit mode */}
+        {!editMode && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 w-5 p-0 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={toggleEditMode}
+            title="进入编辑模式"
+          >
+            <Pencil className="w-2.5 h-2.5" />
+          </Button>
+        )}
 
         {editMode && (
           <>
