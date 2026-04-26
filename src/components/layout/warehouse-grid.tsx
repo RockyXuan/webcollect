@@ -17,6 +17,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   ShipToMainDialog,
   ShipToMainSubGroupDialog,
 } from "@/components/dialogs/ship-to-main-dialog";
@@ -163,31 +168,38 @@ function ParentCategoryBlock({
         <Badge variant="secondary" className="text-[10px] h-4 px-1">
           {totalCards} 个网站
         </Badge>
-        <div className="flex-1" />
 
-        {/* Edit button */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-          onClick={() => { setEditName(category.name); setEditDialogOpen(true); }}
-          title="编辑分类"
-        >
-          <Pencil className="h-3 w-3" />
-        </Button>
-
-        {/* Demote button */}
-        <AlertDialog open={demoteDialogOpen} onOpenChange={setDemoteDialogOpen}>
-          <AlertDialogTrigger asChild>
+        {/* Action buttons - aligned right after title */}
+        <Tooltip>
+          <TooltipTrigger asChild>
             <Button
               variant="ghost"
               size="sm"
               className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-              title="降级为分组"
+              onClick={() => { setEditName(category.name); setEditDialogOpen(true); }}
             >
-              <ArrowDownFromLine className="h-3 w-3" />
+              <Pencil className="h-3 w-3" />
             </Button>
-          </AlertDialogTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">编辑分类</TooltipContent>
+        </Tooltip>
+
+        {/* Demote button */}
+        <AlertDialog open={demoteDialogOpen} onOpenChange={setDemoteDialogOpen}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                >
+                  <ArrowDownFromLine className="h-3 w-3" />
+                </Button>
+              </AlertDialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">降级为分组</TooltipContent>
+          </Tooltip>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>确认降级</AlertDialogTitle>
@@ -205,28 +217,36 @@ function ParentCategoryBlock({
         </AlertDialog>
 
         {/* Send to main page */}
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-6 text-[10px] gap-1 px-2"
-          onClick={() => setShipDialogOpen(true)}
-        >
-          <Send className="h-3 w-3" />
-          发货到主页
-        </Button>
-
-        {/* Delete */}
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
+        <Tooltip>
+          <TooltipTrigger asChild>
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-              title="删除分类"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-primary"
+              onClick={() => setShipDialogOpen(true)}
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <Send className="h-3.5 w-3.5" />
             </Button>
-          </AlertDialogTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">导入此分类到主页</TooltipContent>
+        </Tooltip>
+
+        {/* Delete */}
+        <AlertDialog>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </AlertDialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">删除分类</TooltipContent>
+          </Tooltip>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>确认删除</AlertDialogTitle>
@@ -325,53 +345,65 @@ function SubGroupBlock({
         <div className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: category.color }} />
         <span className="text-sm font-medium text-foreground">{category.name}</span>
         <span className="text-[10px] text-muted-foreground">{cards.length}</span>
-        <div className="flex-1" />
 
-        {/* Edit */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
-          onClick={() => { setEditName(category.name); setEditDialogOpen(true); }}
-          title="编辑分组"
-        >
-          <Pencil className="h-2.5 w-2.5" />
-        </Button>
-
-        {/* Promote (upgrade to parent) */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
-          onClick={() => promoteWarehouseCategory(category.id)}
-          title="升级为顶级分类"
-        >
-          <ArrowUpFromLine className="h-2.5 w-2.5" />
-        </Button>
-
-        {/* Send to main */}
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-5 text-[9px] gap-0.5 px-1.5"
-          onClick={() => setShipDialogOpen(true)}
-        >
-          <Send className="h-2.5 w-2.5" />
-          发送
-        </Button>
-
-        {/* Delete */}
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
+        {/* Action buttons */}
+        <Tooltip>
+          <TooltipTrigger asChild>
             <Button
               variant="ghost"
               size="sm"
-              className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
-              title="删除分组"
+              className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
+              onClick={() => { setEditName(category.name); setEditDialogOpen(true); }}
             >
-              <Trash2 className="h-2.5 w-2.5" />
+              <Pencil className="h-2.5 w-2.5" />
             </Button>
-          </AlertDialogTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">编辑分组</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
+              onClick={() => promoteWarehouseCategory(category.id)}
+            >
+              <ArrowUpFromLine className="h-2.5 w-2.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">升级为顶级分类</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0 text-muted-foreground hover:text-primary"
+              onClick={() => setShipDialogOpen(true)}
+            >
+              <Send className="h-3 w-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">导入此分组到主页</TooltipContent>
+        </Tooltip>
+
+        <AlertDialog>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="h-2.5 w-2.5" />
+                </Button>
+              </AlertDialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">删除分组</TooltipContent>
+          </Tooltip>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>确认删除</AlertDialogTitle>
@@ -463,53 +495,65 @@ function StandaloneCategoryBlock({
         <Badge variant="secondary" className="text-[10px] h-4 px-1">
           {cards.length} 个网站
         </Badge>
-        <div className="flex-1" />
 
-        {/* Edit */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-          onClick={() => { setEditName(category.name); setEditDialogOpen(true); }}
-          title="编辑分组"
-        >
-          <Pencil className="h-3 w-3" />
-        </Button>
-
-        {/* Promote */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-          onClick={() => promoteWarehouseCategory(category.id)}
-          title="升级为顶级分类"
-        >
-          <ArrowUpFromLine className="h-3 w-3" />
-        </Button>
-
-        {/* Send */}
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-6 text-[10px] gap-1 px-2"
-          onClick={() => setShipDialogOpen(true)}
-        >
-          <Send className="h-3 w-3" />
-          发货到主页
-        </Button>
-
-        {/* Delete */}
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
+        {/* Action buttons */}
+        <Tooltip>
+          <TooltipTrigger asChild>
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-              title="删除分组"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+              onClick={() => { setEditName(category.name); setEditDialogOpen(true); }}
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <Pencil className="h-3 w-3" />
             </Button>
-          </AlertDialogTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">编辑分组</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+              onClick={() => promoteWarehouseCategory(category.id)}
+            >
+              <ArrowUpFromLine className="h-3 w-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">升级为顶级分类</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-primary"
+              onClick={() => setShipDialogOpen(true)}
+            >
+              <Send className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">导入此分组到主页</TooltipContent>
+        </Tooltip>
+
+        <AlertDialog>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </AlertDialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">删除分组</TooltipContent>
+          </Tooltip>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>确认删除</AlertDialogTitle>

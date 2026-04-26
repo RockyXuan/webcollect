@@ -16,6 +16,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ShipToMainCardDialog } from "@/components/dialogs/ship-to-main-dialog";
 
 interface WarehouseCardItemProps {
@@ -90,29 +95,37 @@ export function WarehouseCardItem({ card, categoryColor }: WarehouseCardItemProp
       {/* Action buttons - visible on hover */}
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" data-action="true">
         {/* Send single card */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-5 w-5 p-0 text-muted-foreground hover:text-primary"
-          onClick={(e) => { e.stopPropagation(); setShipDialogOpen(true); }}
-          title="发送到主页"
-        >
-          <Send className="h-2.5 w-2.5" />
-        </Button>
-
-        {/* Delete */}
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
+        <Tooltip>
+          <TooltipTrigger asChild>
             <Button
               variant="ghost"
               size="sm"
-              className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
-              onClick={(e) => e.stopPropagation()}
-              title="删除"
+              className="h-5 w-5 p-0 text-muted-foreground hover:text-primary"
+              onClick={(e) => { e.stopPropagation(); setShipDialogOpen(true); }}
             >
-              <Trash2 className="h-2.5 w-2.5" />
+              <Send className="h-2.5 w-2.5" />
             </Button>
-          </AlertDialogTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">导入此网页到主页</TooltipContent>
+        </Tooltip>
+
+        {/* Delete */}
+        <AlertDialog>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Trash2 className="h-2.5 w-2.5" />
+                </Button>
+              </AlertDialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">删除</TooltipContent>
+          </Tooltip>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>确认删除</AlertDialogTitle>
