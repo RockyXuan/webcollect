@@ -3,7 +3,7 @@
 import { useAppStore } from "@/lib/store";
 import { Plus, FolderPlus, Layers, Package, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
+import { PlatformLink } from "@/components/ui/platform-link";
 
 interface TopNavProps {
   onAddCard?: (categoryId?: string) => void;
@@ -81,7 +81,7 @@ export function TopNav({ onAddCard, onAddGroup, onAddCategory, onRecycleBin }: T
               </span>
             )}
           </Button>
-          <Link href="/warehouse">
+          <PlatformLink href="/warehouse">
             <Button
               variant="outline"
               size="sm"
@@ -90,7 +90,7 @@ export function TopNav({ onAddCard, onAddGroup, onAddCategory, onRecycleBin }: T
               <Package className="h-3 w-3" />
               仓库
             </Button>
-          </Link>
+          </PlatformLink>
         </div>
       </div>
     </nav>

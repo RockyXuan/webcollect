@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "WebCollect",
+  "version": "1.0.0",
+  "description": "个人网页收藏墙 - 每次打开新标签页，快速访问你的常用网站",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  },
+  "icons": {
+    "16": "public/icons/icon16.png",
+    "48": "public/icons/icon48.png",
+    "128": "public/icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; img-src 'self' https: data: blob:; connect-src *;"
+  }
+}

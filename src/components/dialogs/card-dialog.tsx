@@ -23,6 +23,7 @@ import {
 import { Loader2, Link2 } from "lucide-react";
 import type { WebCard } from "@/lib/types";
 import { useAppStore } from "@/lib/store";
+import { fetchMeta as apiFetchMeta } from "@/lib/platform";
 
 interface CardDialogProps {
   open: boolean;
@@ -81,28 +82,18 @@ export function CardDialog({ open, onOpenChange, editingCard, defaultCategoryId 
     if (!url.trim()) return;
     setFetching(true);
     try {
-      const res = await fetch("/api/fetch-meta", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim() }),
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.error) return;
+      const data = await apiFetchMeta(url.trim());
+      if (!data) return;
       if (data.title && !title) setTitle(data.title);
       if (data.description && !shortDesc) {
         setShortDesc(data.description.slice(0, 20));
         setFullDesc(data.description);
       }
-      // Use favicon API URLs as image fallback
       if (data.image && !imageUrl) {
         setImageUrl(data.image);
       } else if (data.favicon && !imageUrl) {
         setImageUrl(data.favicon);
-      } else if (data.faviconApis?.length && !imageUrl) {
-        setImageUrl(data.faviconApis[0]);
       } else if (!imageUrl) {
-        // Last fallback: Google Favicon API from the URL domain
         try {
           const hostname = new URL(url.trim()).hostname;
           setImageUrl(`https://www.google.com/s2/favicons?domain=${hostname}&sz=64`);

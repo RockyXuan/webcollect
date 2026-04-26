@@ -5,6 +5,7 @@ import { hotSites, extraHotSites, hotSiteCategories } from "@/lib/hot-sites";
 import type { HotSite } from "@/lib/hot-sites";
 import type { SafetyCheckResult } from "@/lib/types";
 import { HIDE_DURATION_LABELS, type HideDuration } from "@/lib/types";
+import { checkSafety as apiCheckSafety } from "@/lib/platform";
 import { useAppStore } from "@/lib/store";
 import {
   Inbox,
@@ -606,21 +607,12 @@ export function HotRecommendation() {
     if (flatFiltered.length === 0) return;
     setChecking(true);
     try {
-      const res = await fetch("/api/check-safety", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          urls: flatFiltered.slice(0, 20).map((s) => s.url),
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const map: Record<string, SafetyCheckResult> = {};
-        for (const r of data.results as SafetyCheckResult[]) {
-          map[r.url] = r;
-        }
-        setSafetyMap(map);
+      const results = await apiCheckSafety(flatFiltered.slice(0, 20).map((s) => s.url));
+      const map: Record<string, SafetyCheckResult> = {};
+      for (const r of results) {
+        map[r.url] = r;
       }
+      setSafetyMap(map);
     } catch {
       /* ignore */
     }

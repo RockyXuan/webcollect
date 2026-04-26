@@ -7,11 +7,27 @@ import {
   OctagonXIcon,
   TriangleAlertIcon,
 } from "lucide-react"
-import { useTheme } from "next-themes"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 
+/**
+ * Theme-aware Toaster component.
+ * In web context uses next-themes; in extension context uses prefers-color-scheme.
+ */
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
+  // Detect theme: prefer next-themes in web, fall back to media query in extension
+  let theme: string = "system"
+  
+  try {
+    // Dynamic import only in web context - next-themes provides the useTheme hook
+    // We read from the DOM attribute set by next-themes instead of calling the hook
+    // to avoid conditional hook violations
+    if (typeof document !== "undefined") {
+      const colorScheme = document.documentElement.classList.contains("dark") ? "dark" : "light"
+      theme = colorScheme
+    }
+  } catch {
+    theme = "system"
+  }
 
   return (
     <Sonner

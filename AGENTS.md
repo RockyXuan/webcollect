@@ -69,9 +69,18 @@
 
 WebCollect 是一个美观、可拖拽的网页收藏与导览门户。用户可以把喜欢的网站像便签一样贴在墙上，支持分类管理、跨分类拖拽、自动抓取网页元数据（Open Graph）。
 
+### 双平台架构
+
+WebCollect 同时支持 **Web 版本**（Next.js）和 **Chrome 扩展版本**（Vite + React SPA），共享同一套核心组件和数据层。
+
+| 平台 | 入口 | 构建 | 存储方式 |
+|------|------|------|---------|
+| Web | `src/app/` | `pnpm build` (Next.js) | IndexedDB |
+| Chrome 扩展 | `extension/src/` | `pnpm build:ext` (Vite) | IndexedDB / chrome.storage |
+
 ### 版本技术栈
 
-- **Framework**: Next.js 16 (App Router)
+- **Framework**: Next.js 16 (App Router) / Vite (扩展版)
 - **Core**: React 19
 - **Language**: TypeScript 5
 - **UI 组件**: shadcn/ui (基于 Radix UI)
@@ -79,7 +88,8 @@ WebCollect 是一个美观、可拖拽的网页收藏与导览门户。用户可
 - **状态管理**: Zustand
 - **拖拽**: @dnd-kit/core + @dnd-kit/sortable
 - **本地存储**: IndexedDB (localforage)
-- **OG 抓取**: cheerio (后端 API)
+- **OG 抓取**: cheerio (后端 API) / 客户端 CORS 代理 (扩展版)
+- **平台适配**: `src/lib/platform.ts` — 统一 API 调用接口
 - **主题**: amber 暖色调 + classic 字体 + retro 阴影
 
 ## 目录结构
@@ -87,6 +97,17 @@ WebCollect 是一个美观、可拖拽的网页收藏与导览门户。用户可
 ```
 ├── public/                     # 静态资源
 ├── scripts/                    # 构建与启动脚本
+├── extension/                  # Chrome 扩展
+│   ├── src/
+│   │   ├── newtab.html         # 扩展新标签页 HTML 入口
+│   │   ├── newtab.tsx          # React 挂载入口
+│   │   ├── newtab-app.tsx      # 扩展版 App 组件（状态路由）
+│   │   └── stubs/              # Next.js 模块替换（next/link, next-themes）
+│   ├── dist/                   # 构建产物（加载到 Chrome 的目录）
+│   ├── manifest.json           # Chrome Manifest V3
+│   ├── background.js           # Service Worker（OG 抓取代理）
+│   ├── vite.config.ts          # Vite 构建配置
+│   └── build.sh                # 构建脚本
 ├── src/
 │   ├── app/
 │   │   ├── api/
@@ -98,6 +119,7 @@ WebCollect 是一个美观、可拖拽的网页收藏与导览门户。用户可
 │   │   └── globals.css         # 主题变量 + Tailwind
 │   ├── components/
 │   │   ├── ui/                 # shadcn/ui 基础组件
+│   │   │   ├── platform-link.tsx   # 平台感知链接（Web: next/link, Ext: <a>）
 │   │   ├── card/
 │   │   │   ├── web-card.tsx          # 主页网站卡片
 │   │   │   └── warehouse-card.tsx    # 仓库网站卡片
@@ -117,6 +139,7 @@ WebCollect 是一个美观、可拖拽的网页收藏与导览门户。用户可
 │   │   ├── types.ts            # TypeScript 类型定义
 │   │   ├── db.ts               # IndexedDB 封装（主页卡片/分类/隐藏网站/置顶分类/回收站）
 │   │   ├── db-warehouse.ts     # 仓库 IndexedDB 封装（独立命名空间）
+│   │   ├── platform.ts         # 平台适配器（Web API / Chrome 扩展 API 统一接口）
 │   │   ├── store.ts            # 主页 Zustand 状态管理
 │   │   ├── store-warehouse.ts  # 仓库 Zustand 状态管理
 │   │   ├── import-parser.ts    # Homely JSON 解析器
@@ -133,11 +156,14 @@ WebCollect 是一个美观、可拖拽的网页收藏与导览门户。用户可
 ## 构建和测试命令
 
 ```bash
-# 开发（端口 5000，含 HMR）
+# 开发（Web 版本，端口 5000，含 HMR）
 pnpm dev
 
-# 构建
+# 构建 Web 版本
 pnpm build
+
+# 构建 Chrome 扩展版本
+pnpm build:ext
 
 # 类型检查
 pnpm ts-check
@@ -158,6 +184,9 @@ pnpm lint
 | 分类管理 | `src/components/dialogs/category-dialog.tsx` | 分类创建/编辑：12 种图标 + 8 种颜色 |
 | 热门推荐 | `src/components/hot-recommendation.tsx` | 热门网站推荐：查重、收集箱快捷添加、隐藏/不感兴趣、安全扫描、设置面板 |
 | OG 抓取 | `src/app/api/fetch-meta/route.ts` | POST {url} → 解析 title/description/image/favicon |
+| 平台适配 | `src/lib/platform.ts` | 统一 API 调用：Web 调 /api/*，扩展调 chrome.runtime.sendMessage |
+| 扩展入口 | `extension/src/newtab-app.tsx` | 扩展版 App：状态路由（main/warehouse），复用共享组件 |
+| 扩展构建 | `extension/vite.config.ts` | Vite 构建：别名替换 next/link, next-themes；输出到 extension/dist |
 | 安全检查 | `src/app/api/check-safety/route.ts` | POST {urls} → 批量安全检查（白名单/HTTPS/TLD/URL模式） |
 | 仓库数据层 | `src/lib/db-warehouse.ts` | 仓库独立 IndexedDB：卡片/分类/导入批次的 CRUD，与主页数据隔离 |
 | 仓库状态 | `src/lib/store-warehouse.ts` | 仓库 Zustand Store：仓库数据加载、导入、删除、发货到主页 |
