@@ -409,13 +409,35 @@ interface RecycleBinItem {
 - **如果发现新 bug**：立即回滚到上一版本，重新审视需求后再修改
 - **不要"顺手优化"**：用户没让你改的地方绝对不要动
 
-## Chrome 插件预留
+## Chrome 扩展（已实现）
 
-- 数据操作通过 `store.ts` 抽象，未来可替换底层为 Chrome Storage API
-- 卡片数据格式标准化（UUID、创建时间、标签、URL、元数据）
-- 导入/导出 JSON 功能已就绪，便于插件数据迁移
-- 抓取逻辑通过后端 API 实现，插件版可直接通过 content script 读取 tab 信息
-- 隐藏网站数据 (hiddenSites) 按 per-user 设计，未来可按 userId 隔离
+- 扩展目录 `extension/`，使用 Vite + React SPA 构建
+- 通过 `chrome_url_overrides.newtab` 覆盖新标签页
+- 复用 Web 版核心组件（通过别名 `@/` 引用 `src/`）
+- Next.js 专属模块通过 stubs 替换（next/link → `<a>`, next-themes → 空实现）
+- API 调用通过 `platform.ts` 统一：Web 调 /api/*，扩展调 chrome.runtime.sendMessage
+- 数据存储仍用 IndexedDB（与 Web 版共享 localforage 实例）
+- manifest.json 已添加 identity 权限（用于 Google OAuth）
+- 扩展版 OAuth 登录使用 chrome.identity.launchWebAuthFlow
+
+### 扩展构建 & 安装
+
+```bash
+# 构建
+pnpm build:ext    # 或 cd extension && bash build.sh
+
+# 安装
+1. Chrome → chrome://extensions/ → 开启开发者模式
+2. 点击"加载已解压的扩展程序" → 选择 extension/dist/ 目录
+```
+
+### 扩展版注意事项
+
+- background.js 必须是纯 JS（不能用 TypeScript 类型标注）
+- Vite 必须设置 `base: './'`（Chrome 无法解析绝对路径资源）
+- Tailwind CSS v4 需要在 extension.css 中用 `@source` 指定扫描目录
+- 扩展无法访问 /api/supabase-config，需要硬编码或通过 chrome.storage 获取 Supabase 配置
+- 页面导航必须通过回调 prop（onWarehouse/onRecycleBin），不能用路由跳转
 
 ## 常见问题
 
@@ -573,6 +595,59 @@ interface RecycleBinItem {
 **根因**：`.next` 缓存了旧编译结果，HMR 有时无法正确增量更新。
 
 **正确做法**：如果修改后页面行为异常，先 `rm -rf .next` 清缓存，再重启 dev server。
+
+---
+
+#### 错误 7：Chrome 扩展 Tailwind CSS v4 样式完全丢失（发生 2 轮）
+
+**现象**：扩展页面加载后无样式，纯 HTML 排列。
+
+**根因**：`@tailwindcss/vite` 插件只扫描 Vite 模块图中的文件。扩展入口通过 `@/` 别名引用组件，但 Tailwind 不跟随别名扫描。CSS 只有 14KB。
+
+**修复**：在 `extension/src/extension.css` 中添加 `@source` 指令：
+```css
+@source "../src/components";
+@source "../src/lib";
+@source "../src/hooks";
+```
+
+**关键记忆**：Vite + Tailwind CSS v4 构建非标准项目时，必须用 `@source` 显式指定扫描路径。
+
+---
+
+#### 错误 8：Chrome 扩展 background.js Service Worker 语法错误
+
+**现象**：加载扩展报 `SyntaxError: Unexpected token ':'`，Service Worker 注册失败（Status code: 15）。
+
+**根因**：background.js 使用了 TypeScript 类型标注，Chrome Service Worker 不支持。
+
+**修复**：改为纯 JavaScript，删除所有类型标注。
+
+**关键记忆**：Chrome 扩展的 background.js / Service Worker 必须是纯 JS。
+
+---
+
+#### 错误 9：扩展版 SPA 路由不存在导致报错
+
+**现象**：点击仓库按钮报错。
+
+**根因**：TopNav 中仓库按钮使用 `PlatformLink` 跳转 `/warehouse`，Chrome 扩展是 SPA，没有路由系统。
+
+**修复**：TopNav 新增 `onWarehouse` 回调 prop，扩展版传回调切换视图状态（useState），Web 版继续用路由。
+
+**关键记忆**：共享组件中涉及页面导航的逻辑，必须通过回调 prop 而非直接路由跳转，让两个平台各自处理导航方式。
+
+---
+
+#### 错误 10：Supabase 浏览器端客户端引入 Node.js 模块
+
+**现象**：构建失败，报 `Module not found: child_process` 等错误。
+
+**根因**：`supabase-client.ts`（服务器端）使用了 Node.js 专属模块（child_process, dotenv）。浏览器端直接 import 会引入这些模块。
+
+**修复**：创建独立的 `supabase-browser.ts`，只使用 `@supabase/supabase-js` 的浏览器 API，从 `/api/supabase-config` 获取配置。
+
+**关键记忆**：Next.js 项目中，服务器端代码（`src/storage/database/`）和浏览器端代码（`src/lib/`）必须严格分离，不能交叉引用。
 
 ---
 

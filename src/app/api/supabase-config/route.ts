@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 /**
  * API route that provides Supabase configuration to the browser client.
  * This avoids exposing NEXT_PUBLIC_ env vars (which would be baked into the build).
@@ -18,6 +19,7 @@ function loadEnv(): void {
   }
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { execSync } = require('child_process');
     const pythonCode = `
 import os
