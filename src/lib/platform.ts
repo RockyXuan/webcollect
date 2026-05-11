@@ -6,7 +6,7 @@
  * 2. Chrome Extension — uses chrome.runtime.sendMessage → background.js
  */
 
-import type { SafetyCheckResult, SafetyStatus } from "./types";
+import type { LinkOpenMode, SafetyCheckResult, SafetyStatus } from "./types";
 
 // ── Platform Detection ──
 
@@ -25,6 +25,63 @@ export function isChromeExtension(): boolean {
 }
 
 // ── Types ──
+
+export function openWebCollectUrl(url: string, mode: LinkOpenMode): void {
+  if (!url) return;
+
+  if (isChromeExtension() && typeof chrome !== "undefined" && chrome.tabs) {
+    openExtensionTab(url, mode);
+    return;
+  }
+
+  openBrowserWindow(url, mode);
+}
+
+function openExtensionTab(url: string, mode: LinkOpenMode): void {
+  try {
+    if (mode === "current-tab" && chrome.tabs.update) {
+      if (chrome.tabs.getCurrent) {
+        chrome.tabs.getCurrent((tab) => {
+          if (chrome.runtime.lastError || !tab?.id) {
+            openBrowserWindow(url, mode);
+            return;
+          }
+          chrome.tabs.update(tab.id, { url }, () => {
+            if (chrome.runtime.lastError) openBrowserWindow(url, mode);
+          });
+        });
+        return;
+      }
+      chrome.tabs.update({ url }, () => {
+        if (chrome.runtime.lastError) openBrowserWindow(url, mode);
+      });
+      return;
+    }
+
+    if (chrome.tabs.create) {
+      chrome.tabs.create({ url, active: mode === "new-active-tab" }, () => {
+        if (chrome.runtime.lastError) openBrowserWindow(url, mode);
+      });
+      return;
+    }
+  } catch {
+    // Fall through to browser APIs.
+  }
+
+  openBrowserWindow(url, mode);
+}
+
+function openBrowserWindow(url: string, mode: LinkOpenMode): void {
+  if (mode === "current-tab") {
+    window.location.href = url;
+    return;
+  }
+
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  if (mode === "new-active-tab") {
+    opened?.focus();
+  }
+}
 
 export interface FetchMetaResult {
   title: string;

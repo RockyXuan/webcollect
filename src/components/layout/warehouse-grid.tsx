@@ -2,6 +2,7 @@
 
 import React, { useMemo } from "react";
 import { useWarehouseStore } from "@/lib/store-warehouse";
+import { useAppStore } from "@/lib/store";
 import type { WarehouseCard, WarehouseCategory } from "@/lib/db-warehouse";
 import { WarehouseCardItem } from "@/components/card/warehouse-card";
 import {
@@ -47,10 +48,30 @@ import {
 import { Input } from "@/components/ui/input";
 import { InlineEditableText } from "@/components/ui/inline-editable-text";
 
+function normalizeUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.hash = "";
+    if (parsed.pathname !== "/") parsed.pathname = parsed.pathname.replace(/\/+$/, "");
+    return `${parsed.hostname.toLowerCase()}${parsed.pathname}${parsed.search}`;
+  } catch {
+    return url.trim().toLowerCase().replace(/\/+$/, "");
+  }
+}
+
+export interface WarehouseDuplicateMatch {
+  sectionName: string;
+  categoryName: string;
+  cardTitle: string;
+}
+
 /* ── Warehouse Grid ── */
 export function WarehouseGrid() {
   const { cards, categories, batches, selectedBatchId, setSelectedBatch } =
     useWarehouseStore();
+  const mainCards = useAppStore((s) => s.cards);
+  const mainCategories = useAppStore((s) => s.categories);
+  const sections = useAppStore((s) => s.sections);
 
   // Filter by selected batch
   const filteredCategories = useMemo(() => {
@@ -82,12 +103,35 @@ export function WarehouseGrid() {
   const getCardsForCategory = (categoryId: string) =>
     filteredCards.filter((c) => c.categoryId === categoryId).sort((a, b) => a.order - b.order);
 
+  const duplicateByCardId = useMemo(() => {
+    const sectionById = new Map(sections.map((section) => [section.id, section.name]));
+    const categoryById = new Map(mainCategories.map((category) => [category.id, category]));
+    const mainByUrl = new Map<string, WarehouseDuplicateMatch>();
+    for (const card of mainCards) {
+      const key = normalizeUrl(card.url);
+      if (!key || mainByUrl.has(key)) continue;
+      const category = categoryById.get(card.categoryId);
+      mainByUrl.set(key, {
+        sectionName: sectionById.get(category?.sectionId || "section-default") || "主页",
+        categoryName: category?.name || "未分类",
+        cardTitle: card.title,
+      });
+    }
+
+    const next = new Map<string, WarehouseDuplicateMatch>();
+    for (const card of filteredCards) {
+      const match = mainByUrl.get(normalizeUrl(card.url));
+      if (match) next.set(card.id, match);
+    }
+    return next;
+  }, [filteredCards, mainCards, mainCategories, sections]);
+
   if (filteredCategories.length === 0 && batches.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
         <Package className="h-16 w-16 mb-4 opacity-30" />
         <p className="text-lg font-serif">仓库是空的</p>
-        <p className="text-sm mt-1">点击上方&ldquo;导入&rdquo;按钮，上传 Homely JSON 文件</p>
+        <p className="text-sm mt-1">点击上方&ldquo;导入&rdquo;按钮，上传 JSON 文件</p>
       </div>
     );
   }
@@ -114,6 +158,7 @@ export function WarehouseGrid() {
           subGroups={getSubGroups(parent.id)}
           getCardsForCategory={getCardsForCategory}
           allCards={filteredCards}
+          duplicateByCardId={duplicateByCardId}
         />
       ))}
 
@@ -121,7 +166,12 @@ export function WarehouseGrid() {
       {standaloneCategories.length > 0 && (
         <div className="flex flex-wrap gap-3">
           {standaloneCategories.map((cat) => (
-            <StandaloneCategoryBlock key={cat.id} category={cat} cards={getCardsForCategory(cat.id)} />
+            <StandaloneCategoryBlock
+              key={cat.id}
+              category={cat}
+              cards={getCardsForCategory(cat.id)}
+              duplicateByCardId={duplicateByCardId}
+            />
           ))}
         </div>
       )}
@@ -135,11 +185,13 @@ function ParentCategoryBlock({
   subGroups,
   getCardsForCategory,
   allCards,
+  duplicateByCardId,
 }: {
   category: WarehouseCategory;
   subGroups: WarehouseCategory[];
   getCardsForCategory: (id: string) => WarehouseCard[];
   allCards: WarehouseCard[];
+  duplicateByCardId: Map<string, WarehouseDuplicateMatch>;
 }) {
   const [collapsed, setCollapsed] = React.useState(false);
   const [shipDialogOpen, setShipDialogOpen] = React.useState(false);
@@ -149,6 +201,10 @@ function ParentCategoryBlock({
   const { deleteWarehouseCategory, demoteWarehouseCategory, updateWarehouseCategory } = useWarehouseStore();
 
   const totalCards = subGroups.reduce((sum, sg) => sum + getCardsForCategory(sg.id).length, 0);
+  const duplicateCount = subGroups.reduce(
+    (sum, sg) => sum + getCardsForCategory(sg.id).filter((card) => duplicateByCardId.has(card.id)).length,
+    0
+  );
 
   const handleEditSave = async () => {
     if (editName.trim()) {
@@ -174,6 +230,12 @@ function ParentCategoryBlock({
         <Badge variant="secondary" className="text-[10px] h-4 px-1">
           {totalCards} 个网站
         </Badge>
+
+        {duplicateCount > 0 && (
+          <Badge variant="destructive" className="text-[10px] h-4 px-1">
+            已存在 {duplicateCount}
+          </Badge>
+        )}
 
         {/* Action buttons - aligned right after title */}
         <Tooltip>
@@ -283,6 +345,7 @@ function ParentCategoryBlock({
                 key={sg.id}
                 category={sg}
                 cards={sgCards}
+                duplicateByCardId={duplicateByCardId}
               />
             );
           })}
@@ -325,14 +388,17 @@ function ParentCategoryBlock({
 function SubGroupBlock({
   category,
   cards,
+  duplicateByCardId,
 }: {
   category: WarehouseCategory;
   cards: WarehouseCard[];
+  duplicateByCardId: Map<string, WarehouseDuplicateMatch>;
 }) {
   const [shipDialogOpen, setShipDialogOpen] = React.useState(false);
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
   const [editName, setEditName] = React.useState(category.name);
   const { deleteWarehouseCategory, promoteWarehouseCategory, updateWarehouseCategory, updateWarehouseCard } = useWarehouseStore();
+  const duplicateCount = cards.filter((card) => duplicateByCardId.has(card.id)).length;
 
   const handleUpdateCard = async (updatedCard: WarehouseCard) => {
     await updateWarehouseCard(updatedCard);
@@ -360,6 +426,11 @@ function SubGroupBlock({
           className="text-sm font-medium text-foreground"
         />
         <span className="text-[10px] text-muted-foreground">{cards.length}</span>
+        {duplicateCount > 0 && (
+          <Badge variant="destructive" className="text-[10px] h-4 px-1">
+            已存在 {duplicateCount}
+          </Badge>
+        )}
 
         {/* Action buttons */}
         <Tooltip>
@@ -442,7 +513,13 @@ function SubGroupBlock({
       {/* Cards */}
       <div className="flex flex-wrap gap-1">
         {cards.map((card) => (
-          <WarehouseCardItem key={card.id} card={card} categoryColor={category.color} onUpdateCard={handleUpdateCard} />
+          <WarehouseCardItem
+            key={card.id}
+            card={card}
+            categoryColor={category.color}
+            onUpdateCard={handleUpdateCard}
+            duplicateMatch={duplicateByCardId.get(card.id)}
+          />
         ))}
       </div>
 
@@ -481,9 +558,11 @@ function SubGroupBlock({
 function StandaloneCategoryBlock({
   category,
   cards,
+  duplicateByCardId,
 }: {
   category: WarehouseCategory;
   cards: WarehouseCard[];
+  duplicateByCardId: Map<string, WarehouseDuplicateMatch>;
 }) {
   const [shipDialogOpen, setShipDialogOpen] = React.useState(false);
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
@@ -601,7 +680,13 @@ function StandaloneCategoryBlock({
       {/* Cards */}
       <div className="flex flex-wrap gap-1 p-3">
         {cards.map((card) => (
-          <WarehouseCardItem key={card.id} card={card} categoryColor={category.color} onUpdateCard={handleUpdateCard} />
+          <WarehouseCardItem
+            key={card.id}
+            card={card}
+            categoryColor={category.color}
+            onUpdateCard={handleUpdateCard}
+            duplicateMatch={duplicateByCardId.get(card.id)}
+          />
         ))}
       </div>
 

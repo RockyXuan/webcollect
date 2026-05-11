@@ -9,11 +9,15 @@
 
 import { create } from "zustand";
 import type { WebCard, Category } from "./types";
+import { getCards } from "./db";
 import type { WarehouseCard, WarehouseCategory, ImportBatch } from "./db-warehouse";
 import {
   getWarehouseCards,
   getWarehouseCategories,
   getImportBatches,
+  saveWarehouseCards,
+  saveWarehouseCategories,
+  saveImportBatches,
   addWarehouseCategories,
   addWarehouseCards,
   deleteImportBatch,
@@ -28,6 +32,39 @@ import {
   promoteWarehouseCategory as dbPromoteWarehouseCategory,
   demoteWarehouseCategory as dbDemoteWarehouseCategory,
 } from "./db-warehouse";
+
+function normalizeUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.hash = "";
+    if (parsed.pathname !== "/") parsed.pathname = parsed.pathname.replace(/\/+$/, "");
+    return `${parsed.hostname.toLowerCase()}${parsed.pathname}${parsed.search}`;
+  } catch {
+    return url.trim().toLowerCase().replace(/\/+$/, "");
+  }
+}
+
+function removeEmptyWarehouseShells(
+  cards: WarehouseCard[],
+  categories: WarehouseCategory[],
+  batches: ImportBatch[]
+): { cards: WarehouseCard[]; categories: WarehouseCategory[]; batches: ImportBatch[] } {
+  const cardCategoryIds = new Set(cards.map((card) => card.categoryId));
+  const nextCategories = categories.filter((category) => {
+    if (cardCategoryIds.has(category.id)) return true;
+    return categories.some((child) => child.parentId === category.id && cardCategoryIds.has(child.id));
+  });
+  const categoryIds = new Set(nextCategories.map((category) => category.id));
+  const nextCards = cards.filter((card) => categoryIds.has(card.categoryId));
+  const nextBatches = batches
+    .map((batch) => ({
+      ...batch,
+      categoryCount: nextCategories.filter((category) => category.importBatchId === batch.id).length,
+      cardCount: nextCards.filter((card) => card.importBatchId === batch.id).length,
+    }))
+    .filter((batch) => batch.categoryCount > 0 || batch.cardCount > 0);
+  return { cards: nextCards, categories: nextCategories, batches: nextBatches };
+}
 
 interface WarehouseState {
   cards: WarehouseCard[];
@@ -53,6 +90,7 @@ interface WarehouseState {
   // Delete actions
   deleteBatch: (batchId: string) => Promise<void>;
   clearAllWarehouse: () => Promise<void>;
+  deleteExistingWarehouseItems: () => Promise<number>;
   deleteWarehouseCategory: (categoryId: string) => Promise<void>;
 
   // Ship actions
@@ -134,6 +172,49 @@ export const useWarehouseStore = create<WarehouseState>((set) => ({
   clearAllWarehouse: async () => {
     await clearWarehouse();
     set({ cards: [], categories: [], batches: [], selectedBatchId: null });
+  },
+
+  deleteExistingWarehouseItems: async () => {
+    const [mainCards, warehouseCards, warehouseCategories, importBatches] = await Promise.all([
+      getCards(),
+      getWarehouseCards(),
+      getWarehouseCategories(),
+      getImportBatches(),
+    ]);
+    const mainUrls = new Set(mainCards.map((card) => normalizeUrl(card.url)).filter(Boolean));
+    const seenWarehouseUrls = new Set<string>();
+    let removedCount = 0;
+    const nextCards = warehouseCards.filter((card) => {
+      const key = normalizeUrl(card.url);
+      const existsInMain = mainUrls.has(key);
+      const repeatedInWarehouse = seenWarehouseUrls.has(key);
+      if (!repeatedInWarehouse) {
+        seenWarehouseUrls.add(key);
+      }
+      if (existsInMain || repeatedInWarehouse) {
+        removedCount += 1;
+        return false;
+      }
+      return true;
+    });
+
+    if (removedCount === 0) return 0;
+
+    const cleaned = removeEmptyWarehouseShells(nextCards, warehouseCategories, importBatches);
+    await Promise.all([
+      saveWarehouseCards(cleaned.cards),
+      saveWarehouseCategories(cleaned.categories),
+      saveImportBatches(cleaned.batches),
+    ]);
+    set({
+      cards: cleaned.cards,
+      categories: cleaned.categories,
+      batches: cleaned.batches,
+      selectedBatchId: cleaned.batches.some((batch) => batch.id === useWarehouseStore.getState().selectedBatchId)
+        ? useWarehouseStore.getState().selectedBatchId
+        : null,
+    });
+    return removedCount;
   },
 
   deleteWarehouseCategory: async (categoryId) => {

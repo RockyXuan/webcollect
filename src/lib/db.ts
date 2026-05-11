@@ -1,5 +1,5 @@
 import localforage from "localforage";
-import type { WebCard, Category, HiddenSite, RecycleBinItem } from "./types";
+import type { WebCard, Category, HiddenSite, LinkOpenMode, RecycleBinItem, CollectionSection } from "./types";
 
 localforage.config({
   name: "WebCollect",
@@ -10,6 +10,65 @@ const CARDS_KEY = "cards";
 const CATEGORIES_KEY = "categories";
 const INIT_KEY = "initialized";
 const HIDDEN_SITES_KEY = "hiddenSites";
+const SECTIONS_KEY = "collectionSections";
+const ACTIVE_SECTION_KEY = "activeCollectionSectionId";
+const WORKSPACE_RESET_AT_KEY = "currentWorkspaceResetAt";
+const LOCAL_UPDATED_AT_KEY = "localSnapshotUpdatedAt";
+const LOCAL_SYNCED_AT_KEY = "localSnapshotSyncedAt";
+const LOCAL_UPDATED_SIGNAL_KEY = "webcollect_local_snapshot_updated_at";
+
+let localChangeSilenceDepth = 0;
+
+async function touchLocalSnapshot(): Promise<void> {
+  if (localChangeSilenceDepth > 0) return;
+  const timestamp = Date.now();
+  await localforage.setItem(LOCAL_UPDATED_AT_KEY, timestamp);
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(LOCAL_UPDATED_SIGNAL_KEY, String(timestamp));
+    } catch {
+      // ignore
+    }
+    window.dispatchEvent(new CustomEvent("webcollect:local-change", { detail: { timestamp } }));
+  }
+}
+
+export async function markLocalSnapshotChanged(): Promise<void> {
+  await touchLocalSnapshot();
+}
+
+export async function getLocalSnapshotUpdatedAt(): Promise<number> {
+  const value = await localforage.getItem<number>(LOCAL_UPDATED_AT_KEY);
+  return typeof value === "number" ? value : 0;
+}
+
+export async function getLocalSnapshotSyncedAt(): Promise<number> {
+  const value = await localforage.getItem<number>(LOCAL_SYNCED_AT_KEY);
+  return typeof value === "number" ? value : 0;
+}
+
+export async function saveLocalSnapshotSyncedAt(timestamp: number): Promise<void> {
+  await localforage.setItem(LOCAL_SYNCED_AT_KEY, timestamp);
+}
+
+export async function getWorkspaceResetAt(): Promise<number> {
+  const value = await localforage.getItem<number>(WORKSPACE_RESET_AT_KEY);
+  return typeof value === "number" ? value : 0;
+}
+
+export async function saveWorkspaceResetAt(timestamp: number): Promise<void> {
+  await localforage.setItem(WORKSPACE_RESET_AT_KEY, timestamp);
+  await touchLocalSnapshot();
+}
+
+export async function withoutLocalChangeEvents<T>(fn: () => Promise<T>): Promise<T> {
+  localChangeSilenceDepth += 1;
+  try {
+    return await fn();
+  } finally {
+    localChangeSilenceDepth -= 1;
+  }
+}
 
 export async function getCards(): Promise<WebCard[]> {
   const cards = (await localforage.getItem<WebCard[]>(CARDS_KEY)) || [];
@@ -18,6 +77,7 @@ export async function getCards(): Promise<WebCard[]> {
 
 export async function saveCards(cards: WebCard[]): Promise<void> {
   await localforage.setItem(CARDS_KEY, cards);
+  await touchLocalSnapshot();
 }
 
 export async function addCard(card: WebCard): Promise<void> {
@@ -47,11 +107,17 @@ export async function getCategories(): Promise<Category[]> {
 
 export async function saveCategories(categories: Category[]): Promise<void> {
   await localforage.setItem(CATEGORIES_KEY, categories);
+  await touchLocalSnapshot();
 }
 
 export async function addCategory(category: Category): Promise<void> {
   const cats = await getCategories();
-  cats.push(category);
+  const now = Date.now();
+  cats.push({
+    ...category,
+    createdAt: category.createdAt || now,
+    updatedAt: category.updatedAt || now,
+  });
   await saveCategories(cats);
 }
 
@@ -59,7 +125,7 @@ export async function updateCategory(updated: Category): Promise<void> {
   const cats = await getCategories();
   const idx = cats.findIndex((c) => c.id === updated.id);
   if (idx >= 0) {
-    cats[idx] = updated;
+    cats[idx] = { ...updated, updatedAt: updated.updatedAt || Date.now() };
     await saveCategories(cats);
   }
 }
@@ -95,6 +161,26 @@ export async function getHiddenSites(): Promise<HiddenSite[]> {
 
 export async function saveHiddenSites(sites: HiddenSite[]): Promise<void> {
   await localforage.setItem(HIDDEN_SITES_KEY, sites);
+  await touchLocalSnapshot();
+}
+
+export async function getSections(): Promise<CollectionSection[]> {
+  const sections = (await localforage.getItem<CollectionSection[]>(SECTIONS_KEY)) || [];
+  return sections.sort((a, b) => a.order - b.order);
+}
+
+export async function saveSections(sections: CollectionSection[]): Promise<void> {
+  await localforage.setItem(SECTIONS_KEY, sections);
+  await touchLocalSnapshot();
+}
+
+export async function getActiveSectionId(): Promise<string | null> {
+  return (await localforage.getItem<string>(ACTIVE_SECTION_KEY)) || null;
+}
+
+export async function saveActiveSectionId(sectionId: string): Promise<void> {
+  await localforage.setItem(ACTIVE_SECTION_KEY, sectionId);
+  await touchLocalSnapshot();
 }
 
 const PINNED_CATEGORIES_KEY = "pinnedCategoryIds";
@@ -105,9 +191,12 @@ export async function getPinnedCategoryIds(): Promise<string[]> {
 
 export async function savePinnedCategoryIds(ids: string[]): Promise<void> {
   await localforage.setItem(PINNED_CATEGORIES_KEY, ids);
+  await touchLocalSnapshot();
 }
 
 const CATEGORY_WIDTHS_KEY = "categoryWidths";
+const VISUAL_SCALE_KEY = "visualScale";
+const LINK_OPEN_MODE_KEY = "linkOpenMode";
 
 export async function getCategoryWidths(): Promise<Record<string, number>> {
   return (await localforage.getItem<Record<string, number>>(CATEGORY_WIDTHS_KEY)) || {};
@@ -115,6 +204,31 @@ export async function getCategoryWidths(): Promise<Record<string, number>> {
 
 export async function saveCategoryWidths(widths: Record<string, number>): Promise<void> {
   await localforage.setItem(CATEGORY_WIDTHS_KEY, widths);
+  await touchLocalSnapshot();
+}
+
+export async function getVisualScale(): Promise<number> {
+  const scale = await localforage.getItem<number>(VISUAL_SCALE_KEY);
+  if (typeof scale !== "number" || Number.isNaN(scale)) return 100;
+  return Math.max(85, Math.min(125, scale));
+}
+
+export async function saveVisualScale(scale: number): Promise<void> {
+  await localforage.setItem(VISUAL_SCALE_KEY, Math.max(85, Math.min(125, scale)));
+  await touchLocalSnapshot();
+}
+
+export async function getLinkOpenMode(): Promise<LinkOpenMode> {
+  const mode = await localforage.getItem<LinkOpenMode>(LINK_OPEN_MODE_KEY);
+  if (mode === "new-background-tab" || mode === "new-active-tab" || mode === "current-tab") {
+    return mode;
+  }
+  return "new-background-tab";
+}
+
+export async function saveLinkOpenMode(mode: LinkOpenMode): Promise<void> {
+  await localforage.setItem(LINK_OPEN_MODE_KEY, mode);
+  await touchLocalSnapshot();
 }
 
 // ============ Recycle Bin ============
@@ -127,6 +241,7 @@ export async function getRecycleBin(): Promise<RecycleBinItem[]> {
 
 export async function saveRecycleBin(items: RecycleBinItem[]): Promise<void> {
   await localforage.setItem(RECYCLE_BIN_KEY, items);
+  await touchLocalSnapshot();
 }
 
 export async function getRecycleBinItem(id: string): Promise<RecycleBinItem | null> {

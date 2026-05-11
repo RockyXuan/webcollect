@@ -9,7 +9,7 @@
     "lint": "eslint",
     "start": "bash ./scripts/start.sh",
     "ts-check": "tsc -p tsconfig.json",
-    "build:ext": "bash ./extension/build.sh"
+    "build:ext": "node ./extension/build.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.958.0",

@@ -198,7 +198,7 @@ export function parseHomelyJSON(
   const content = data?.links?.content;
 
   if (!content || !Array.isArray(content)) {
-    throw new Error("无法识别的 Homely JSON 格式：缺少 links.content 数组");
+    throw new Error("无法识别的 JSON 格式：缺少可导入的 links.content 数组");
   }
 
   const batchId = generateBatchId();
@@ -451,6 +451,6 @@ export function parseImportJSON(
     case "homely":
       return parseHomelyJSON(jsonData, fileName);
     default:
-      throw new Error("无法识别的 JSON 格式。目前仅支持 Homely 导出格式。");
+      throw new Error("无法识别的 JSON 格式。目前仅支持可导入的 JSON 文件。");
   }
 }

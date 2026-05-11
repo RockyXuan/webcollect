@@ -20,8 +20,18 @@ export interface Category {
   color: string;
   order: number;
   createdAt: number;
+  updatedAt?: number;
+  sectionId?: string;
   parentId?: string; // 父分类ID，有此字段表示是"分组"(子分类)，无此字段表示是"分类"(顶级)
   isParent?: boolean; // true = 顶级分类（如"开发"、"工作"），false/undefined = 分组（可降级到父分类下）
+}
+
+export interface CollectionSection {
+  id: string;
+  name: string;
+  order: number;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface FetchMetaResult {
@@ -52,6 +62,8 @@ export interface SafetyCheckResult {
 /** Duration for hiding a recommended site */
 export type HideDuration = "1w" | "2w" | "1m" | "permanent";
 
+export type LinkOpenMode = "new-background-tab" | "new-active-tab" | "current-tab";
+
 /** A site hidden by the user from recommendations */
 export interface HiddenSite {
   siteId: string;
@@ -75,6 +87,7 @@ export interface RecycleBinItem {
 /** Per-user preferences (future: keyed by userId) */
 export interface UserPreferences {
   hiddenSites: HiddenSite[];
+  linkOpenMode?: LinkOpenMode;
 }
 
 export const HIDE_DURATION_LABELS: Record<HideDuration, string> = {

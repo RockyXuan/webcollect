@@ -65,7 +65,7 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
         // Detect format
         const format = detectJsonFormat(json);
         if (format === "unknown") {
-          setError("无法识别的 JSON 格式。目前仅支持 Homely 导出格式。");
+          setError("无法识别的 JSON 格式。目前仅支持可导入的 JSON 文件。");
           return;
         }
 
@@ -123,20 +123,20 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[560px] max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[560px] max-h-[80vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="font-serif flex items-center gap-2">
             <Package className="h-5 w-5" />
             导入书签到仓库
           </DialogTitle>
           <DialogDescription>
-            上传 Homely 等浏览器扩展导出的 JSON 文件，自动识别并导入分类和书签
+            上传 JSON 文件，自动识别并导入分类和书签
           </DialogDescription>
         </DialogHeader>
 
         {/* Step: Upload */}
         {step === "upload" && (
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 min-w-0">
             <div
               className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/20 transition-colors"
               onClick={() => fileInputRef.current?.click()}
@@ -144,7 +144,7 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
               <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
               <p className="text-sm text-foreground font-medium">点击选择 JSON 文件</p>
               <p className="text-xs text-muted-foreground mt-1">
-                支持 Homely 导出格式
+                支持可导入的 JSON 文件
               </p>
             </div>
             <input
@@ -167,11 +167,11 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
         {step === "preview" && preview && (
           <div className="space-y-4 py-4">
             {/* File info */}
-            <div className="flex items-center gap-2 p-3 rounded-md bg-muted/30">
+            <div className="flex items-center gap-2 p-3 rounded-md bg-muted/30 min-w-0">
               <FileText className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-foreground">{fileName}</span>
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{fileName}</span>
               <Badge variant="secondary" className="text-[10px]">
-                {preview.source === "homely" ? "Homely 格式" : "通用格式"}
+                {preview.source === "homely" ? "JSON 格式" : "通用格式"}
               </Badge>
             </div>
 
@@ -201,16 +201,16 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
                   <AlertTriangle className="h-3 w-3" />
                   有 {preview.skippedItems.length} 个条目未被导入
                 </div>
-                <details className="group">
+                <details className="group min-w-0">
                   <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
                     查看未识别条目详情 →
                   </summary>
-                  <div className="mt-2 space-y-1.5 max-h-[200px] overflow-y-auto">
+                  <div className="mt-2 space-y-1.5 max-h-[200px] overflow-y-auto overflow-x-hidden pr-1">
                     {preview.skippedItems.map((item: SkippedItem, idx: number) => (
-                      <div key={idx} className="flex items-start gap-2 p-2 rounded bg-muted/30 text-xs">
+                      <div key={idx} className="flex min-w-0 items-start gap-2 p-2 rounded bg-muted/30 text-xs">
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-foreground truncate">{item.itemTitle}</div>
-                          <div className="text-muted-foreground truncate">{item.url || "(空 URL)"}</div>
+                          <div className="text-muted-foreground break-all leading-relaxed">{item.url || "(空 URL)"}</div>
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-muted-foreground">
                               {item.reason === "chrome-extension" ? "依赖浏览器扩展" :

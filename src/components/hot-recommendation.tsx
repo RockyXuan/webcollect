@@ -395,6 +395,7 @@ function AddedSiteItem({
 export function HotRecommendation() {
   const cards = useAppStore((s) => s.cards);
   const categories = useAppStore((s) => s.categories);
+  const activeSectionId = useAppStore((s) => s.activeSectionId);
   const addCard = useAppStore((s) => s.addCard);
   const hiddenSites = useAppStore((s) => s.hiddenSites);
   const hideSite = useAppStore((s) => s.hideSite);
@@ -410,6 +411,21 @@ export function HotRecommendation() {
   const [showExtra, setShowExtra] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
+  const visibleCategories = useMemo(
+    () => categories.filter((cat) => (cat.sectionId || "section-default") === activeSectionId),
+    [categories, activeSectionId],
+  );
+
+  const visibleCategoryIds = useMemo(
+    () => new Set(visibleCategories.map((cat) => cat.id)),
+    [visibleCategories],
+  );
+
+  const visibleCards = useMemo(
+    () => cards.filter((card) => visibleCategoryIds.has(card.categoryId)),
+    [cards, visibleCategoryIds],
+  );
+
   /* Combine main + extra sites */
   const allSites = useMemo(
     () => (showExtra ? [...hotSites, ...extraHotSites] : hotSites),
@@ -420,7 +436,7 @@ export function HotRecommendation() {
   const userDomains = useMemo(
     () =>
       new Set(
-        cards.map((c) => {
+        visibleCards.map((c) => {
           try {
             return new URL(c.url).hostname;
           } catch {
@@ -428,7 +444,7 @@ export function HotRecommendation() {
           }
         }),
       ),
-    [cards],
+    [visibleCards],
   );
 
   /* check if a site is already in user's collection or just added */
@@ -549,8 +565,9 @@ export function HotRecommendation() {
   /* add to inbox */
   const handleQuickAdd = useCallback(
     (site: HotSite) => {
-      const inboxCat = categories.find((c) => c.id === "cat-inbox");
-      const targetCatId = inboxCat ? "cat-inbox" : categories[0]?.id || "";
+      const inboxCat = visibleCategories.find((c) => c.id === "cat-inbox");
+      const targetCatId = inboxCat ? "cat-inbox" : visibleCategories[0]?.id || "";
+      if (!targetCatId) return;
       const existingInCat = cards.filter((c) => c.categoryId === targetCatId);
       const newCard = {
         id: `card-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -569,7 +586,7 @@ export function HotRecommendation() {
       addCard(newCard);
       setAddedUrls((prev) => new Set(prev).add(site.url));
     },
-    [categories, cards, addCard],
+    [visibleCategories, cards, addCard],
   );
 
   /* add to specific category */
@@ -713,7 +730,7 @@ export function HotRecommendation() {
                   onQuickAdd={handleQuickAdd}
                   onAddToCategory={handleAddToCategory}
                   onHideSite={handleHideSite}
-                  categories={categories}
+                  categories={visibleCategories}
                   defaultHideDuration={defaultHideDuration}
                   pinnedCategoryIds={pinnedCategoryIds}
                   onTogglePin={togglePinCategory}
@@ -736,7 +753,7 @@ export function HotRecommendation() {
               onQuickAdd={handleQuickAdd}
               onAddToCategory={handleAddToCategory}
               onHideSite={handleHideSite}
-              categories={categories}
+              categories={visibleCategories}
               allAdded={group.allAdded}
               defaultHideDuration={defaultHideDuration}
               pinnedCategoryIds={pinnedCategoryIds}

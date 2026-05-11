@@ -16,8 +16,76 @@ interface SupabaseConfig {
   anonKey: string;
 }
 
+export const EXTENSION_STORAGE_KEYS = {
+  url: "webcollect_supabase_url",
+  anonKey: "webcollect_supabase_anon_key",
+} as const;
+
+export const DEFAULT_EXTENSION_CONFIG: SupabaseConfig = {
+  url: "https://qxlkigwadvgkoeqdojxx.supabase.co",
+  anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4bGtpZ3dhZHZna29lcWRvanh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNTc3MTgsImV4cCI6MjA5MjkzMzcxOH0.wY1et2-efStTxRXnepWs7PWjTyii1_ZX0glUGrC_VpM",
+};
+
 let _config: SupabaseConfig | null = null;
 let _client: SupabaseClient | null = null;
+
+function isExtensionRuntime(): boolean {
+  try {
+    return typeof chrome !== "undefined" && !!chrome.runtime?.id;
+  } catch {
+    return false;
+  }
+}
+
+function getBuildTimeEnv(key: string): string {
+  try {
+    const env = (import.meta as ImportMeta & {
+      env?: Record<string, string | undefined>;
+    }).env;
+    return env?.[key] || "";
+  } catch {
+    return "";
+  }
+}
+
+async function loadExtensionConfig(): Promise<SupabaseConfig | null> {
+  if (!isExtensionRuntime() || !chrome.storage?.local) return null;
+
+  const stored = await new Promise<Record<string, unknown>>((resolve) => {
+    chrome.storage.local.get(
+      [EXTENSION_STORAGE_KEYS.url, EXTENSION_STORAGE_KEYS.anonKey],
+      (result) => resolve(result)
+    );
+  });
+
+  const storedUrl = String(stored[EXTENSION_STORAGE_KEYS.url] || "");
+  const storedAnonKey = String(stored[EXTENSION_STORAGE_KEYS.anonKey] || "");
+  const envUrl = getBuildTimeEnv("VITE_WEBCOLLECT_SUPABASE_URL") || getBuildTimeEnv("VITE_SUPABASE_URL");
+  const envAnonKey =
+    getBuildTimeEnv("VITE_WEBCOLLECT_SUPABASE_ANON_KEY")
+    || getBuildTimeEnv("VITE_SUPABASE_ANON_KEY");
+
+  const url = String(
+    storedUrl
+      || envUrl
+      || ""
+  );
+  const anonKey = String(
+    storedAnonKey
+      || envAnonKey
+      || ""
+  );
+
+  if (!url || !anonKey) return DEFAULT_EXTENSION_CONFIG;
+  if (url === DEFAULT_EXTENSION_CONFIG.url && anonKey !== DEFAULT_EXTENSION_CONFIG.anonKey && !envAnonKey) {
+    await chrome.storage.local.set({
+      [EXTENSION_STORAGE_KEYS.url]: DEFAULT_EXTENSION_CONFIG.url,
+      [EXTENSION_STORAGE_KEYS.anonKey]: DEFAULT_EXTENSION_CONFIG.anonKey,
+    });
+    return DEFAULT_EXTENSION_CONFIG;
+  }
+  return { url, anonKey };
+}
 
 /**
  * Load Supabase config from the server API route (Web version)
@@ -25,6 +93,12 @@ let _client: SupabaseClient | null = null;
  */
 async function loadConfig(): Promise<SupabaseConfig> {
   if (_config) return _config;
+
+  const extensionConfig = await loadExtensionConfig();
+  if (extensionConfig) {
+    _config = extensionConfig;
+    return _config;
+  }
 
   try {
     const res = await fetch('/api/supabase-config');
@@ -86,6 +160,7 @@ export function getBrowserSupabaseClient(token?: string): SupabaseClient {
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: true,
+      flowType: "pkce",
     },
   });
 

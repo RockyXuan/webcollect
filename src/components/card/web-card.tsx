@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useCallback, useRef, useEffect } from "react";
-import { Pencil, Trash2, ExternalLink, GripVertical } from "lucide-react";
+import { Pencil, Trash2, ExternalLink, GripVertical, Send } from "lucide-react";
 import type { WebCard } from "@/lib/types";
+import { openWebCollectUrl } from "@/lib/platform";
+import { useAppStore } from "@/lib/store";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
 interface WebCardItemProps {
@@ -11,6 +13,7 @@ interface WebCardItemProps {
   editMode: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  onShip?: () => void;
   dragListeners?: React.HTMLAttributes<HTMLElement> | null;
   onUpdateCard?: (card: WebCard) => void;
 }
@@ -21,6 +24,7 @@ export function WebCardItem({
   editMode,
   onEdit,
   onDelete,
+  onShip,
   dragListeners,
   onUpdateCard,
 }: WebCardItemProps) {
@@ -28,6 +32,7 @@ export function WebCardItem({
   const [editingField, setEditingField] = useState<"title" | "shortDesc" | null>(null);
   const [editValue, setEditValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const linkOpenMode = useAppStore((s) => s.linkOpenMode);
 
   // Resolve the best image URL: prefer card.imageUrl, fallback to Google Favicon API
   const faviconUrl = React.useMemo(() => {
@@ -43,13 +48,8 @@ export function WebCardItem({
 
   const handleClick = useCallback(() => {
     if (editMode) return;
-    try {
-      window.open(card.url, "_blank", "noopener,noreferrer");
-    } catch {
-      // Fallback
-      window.location.href = card.url;
-    }
-  }, [editMode, card.url]);
+    openWebCollectUrl(card.url, linkOpenMode);
+  }, [editMode, card.url, linkOpenMode]);
 
   const displayAbbr = card.abbreviation || card.title?.slice(0, 2) || "?";
 
@@ -192,6 +192,15 @@ export function WebCardItem({
           >
             <Pencil className="w-2.5 h-2.5" />
           </button>
+          {onShip && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onShip(); }}
+              className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              title="飞到其他分项"
+            >
+              <Send className="w-2.5 h-2.5" />
+            </button>
+          )}
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
             className="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"

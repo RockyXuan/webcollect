@@ -4,7 +4,7 @@ import React, { useState, useMemo, useCallback, useRef } from "react";
 import { useAppStore } from "@/lib/store";
 import { InlineEditableText } from "@/components/ui/inline-editable-text";
 import { WebCardItem } from "@/components/card/web-card";
-import { Pencil, PencilOff, Plus, GripVertical, ArrowUpFromLine, ArrowDownFromLine, Layers, Trash2 } from "lucide-react";
+import { Pencil, PencilOff, Plus, GripVertical, ArrowUpFromLine, ArrowDownFromLine, Folder, Layers, Trash2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -33,7 +33,7 @@ import {
 import {
   SortableContext,
   useSortable,
-  verticalListSortingStrategy,
+  rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Category, WebCard } from "@/lib/types";
@@ -52,11 +52,54 @@ const collisionDetection: CollisionDetection = (args) => {
 };
 
 // ============ Default width calculation ============
-function getDefaultWidthPercent(cardCount: number): number {
+function getDefaultWidthPercent(cardCount: number, groupCount: number): number {
+  if (groupCount <= 1) {
+    if (cardCount <= 4) return 33;
+    if (cardCount <= 12) return 50;
+    return 66;
+  }
   if (cardCount <= 2) return 33;
-  if (cardCount <= 4) return 50;
-  if (cardCount <= 6) return 50;
+  if (cardCount <= 8) return 50;
+  if (cardCount <= 16) return 66;
   return 100;
+}
+
+function getSmartParentWidthPercent(rawWidth: number, defaultWidth: number): number {
+  const safeWidth = Number.isFinite(rawWidth) ? rawWidth : defaultWidth;
+  const maxWidth = defaultWidth >= 100 ? 100 : defaultWidth >= 66 ? 75 : 60;
+  return Math.max(30, Math.min(maxWidth, safeWidth));
+}
+
+function getDefaultChildBasis(cardCount: number): number {
+  if (cardCount <= 1) return 240;
+  if (cardCount <= 2) return 320;
+  if (cardCount <= 4) return 340;
+  if (cardCount <= 8) return 560;
+  if (cardCount <= 12) return 720;
+  return 920;
+}
+
+function getSmartChildStyle(widthPercent: number | null, cardCount: number): React.CSSProperties {
+  const maxWidth = cardCount <= 2 ? "360px" : cardCount <= 4 ? "420px" : cardCount <= 8 ? "680px" : "100%";
+
+  if (widthPercent !== null) {
+    const minPercent = cardCount <= 4 ? 8 : 14;
+    const maxPercent = cardCount <= 2 ? 45 : cardCount <= 4 ? 58 : cardCount <= 8 ? 74 : 100;
+    const smartWidth = Math.max(minPercent, Math.min(maxPercent, widthPercent));
+    return {
+      flex: `0 1 calc(${smartWidth}% - 0.75rem)`,
+      width: `calc(${smartWidth}% - 0.75rem)`,
+      minWidth: cardCount <= 4 ? "220px" : "260px",
+      maxWidth,
+    };
+  }
+
+  const basis = getDefaultChildBasis(cardCount);
+  return {
+    flex: `0 1 ${basis}px`,
+    minWidth: cardCount <= 4 ? "220px" : "260px",
+    maxWidth,
+  };
 }
 
 // ============ Props ============
@@ -67,6 +110,8 @@ interface SortableGridProps {
   onEditCategory?: (category: Category) => void;
   onAddGroup?: (parentId?: string) => void;
   onUpdateCard?: (card: WebCard) => void;
+  onShipCategory?: (category: Category) => void;
+  onShipCard?: (card: WebCard) => void;
 }
 
 export function SortableGrid({
@@ -76,10 +121,13 @@ export function SortableGrid({
   onEditCategory,
   onAddGroup,
   onUpdateCard,
+  onShipCategory,
+  onShipCard,
 }: SortableGridProps) {
   const {
     cards,
     categories,
+    activeSectionId,
     editMode,
     searchQuery,
     moveCard,
@@ -98,27 +146,31 @@ export function SortableGrid({
     useSensor(KeyboardSensor)
   );
 
+  const visibleCategories = useMemo(() => {
+    return categories.filter((c) => (c.sectionId || "section-default") === activeSectionId);
+  }, [categories, activeSectionId]);
+
   // Build hierarchy
   // Parent categories: explicitly marked isParent OR has sub-groups
   const parentCategories = useMemo(() => {
-    return categories
-      .filter((c) => !c.parentId && (c.isParent || categories.some((sg) => sg.parentId === c.id)))
+    return visibleCategories
+      .filter((c) => !c.parentId && (c.isParent || visibleCategories.some((sg) => sg.parentId === c.id)))
       .sort((a, b) => a.order - b.order);
-  }, [categories]);
+  }, [visibleCategories]);
 
   // Standalone (ungrouped): no parentId, not a parent, no sub-groups
   const standaloneCategories = useMemo(() => {
-    return categories
-      .filter((c) => !c.parentId && !c.isParent && !categories.some((sg) => sg.parentId === c.id))
+    return visibleCategories
+      .filter((c) => !c.parentId && !c.isParent && !visibleCategories.some((sg) => sg.parentId === c.id))
       .sort((a, b) => a.order - b.order);
-  }, [categories]);
+  }, [visibleCategories]);
 
   const getSubGroups = useCallback(
     (parentId: string) =>
-      categories
+      visibleCategories
         .filter((c) => c.parentId === parentId)
         .sort((a, b) => a.order - b.order),
-    [categories]
+    [visibleCategories]
   );
 
   const getCardsForCategory = useCallback(
@@ -138,17 +190,14 @@ export function SortableGrid({
     [cards, searchQuery]
   );
 
-  // All top-level sortable IDs (parent cats + ungrouped)
-  const allTopLevelIds = useMemo(() => {
-    const ids: string[] = [];
-    for (const parent of parentCategories) {
-      ids.push(catId(parent.id));
-    }
-    for (const standalone of standaloneCategories) {
-      ids.push(ungroupId(standalone.id));
-    }
-    return ids;
-  }, [parentCategories, standaloneCategories]);
+  const parentSortableIds = useMemo(
+    () => parentCategories.map((parent) => catId(parent.id)),
+    [parentCategories]
+  );
+  const standaloneSortableIds = useMemo(
+    () => standaloneCategories.map((standalone) => ungroupId(standalone.id)),
+    [standaloneCategories]
+  );
 
   // Drag overlay label
   const getOverlayLabel = useCallback(
@@ -178,6 +227,43 @@ export function SortableGrid({
     setActiveId(String(event.active.id));
   };
 
+  const getContainingParentId = useCallback(
+    (id: string): string | null => {
+      if (id.startsWith("cat:")) return id.replace("cat:", "");
+      if (id.startsWith("sub:")) {
+        const category = categories.find((c) => c.id === id.replace("sub:", ""));
+        return category?.parentId || null;
+      }
+      if (id.startsWith("card:")) {
+        const card = cards.find((c) => c.id === id.replace("card:", ""));
+        const category = card ? categories.find((c) => c.id === card.categoryId) : null;
+        return category?.parentId || (category?.isParent ? category.id : null);
+      }
+      return null;
+    },
+    [categories, cards]
+  );
+
+  const getSubGroupDropTarget = useCallback(
+    (id: string): { parentId: string; overSubId?: string } | null => {
+      if (id.startsWith("cat:")) {
+        return { parentId: id.replace("cat:", "") };
+      }
+      if (id.startsWith("sub:")) {
+        const category = categories.find((c) => c.id === id.replace("sub:", ""));
+        return category?.parentId ? { parentId: category.parentId, overSubId: category.id } : null;
+      }
+      if (id.startsWith("card:")) {
+        const card = cards.find((c) => c.id === id.replace("card:", ""));
+        const category = card ? categories.find((c) => c.id === card.categoryId) : null;
+        if (category?.parentId) return { parentId: category.parentId, overSubId: category.id };
+        if (category?.isParent) return { parentId: category.id };
+      }
+      return null;
+    },
+    [categories, cards]
+  );
+
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
     if (!over) {
@@ -187,55 +273,48 @@ export function SortableGrid({
     const aid = String(active.id);
     const oid = String(over.id);
 
-    // Use requestAnimationFrame to batch state update outside render
-    requestAnimationFrame(() => {
-      // Only care about ungrouped/sub items being dragged toward parent categories
-      if (!aid.startsWith("ungrouped:") && !aid.startsWith("sub:")) {
-        setHoveredParentId(null);
-        return;
-      }
+    if (!aid.startsWith("ungrouped:") && !aid.startsWith("sub:")) {
+      setHoveredParentId(null);
+      return;
+    }
 
-      // Direct hit on a parent category
-      if (oid.startsWith("cat:")) {
-        setHoveredParentId(oid.replace("cat:", ""));
-        return;
-      }
+    if (oid.startsWith("cat:")) {
+      setHoveredParentId(oid.replace("cat:", ""));
+      return;
+    }
 
-      // Hit something inside a parent category (sub-group or card) — find the parent
-      if (oid.startsWith("sub:")) {
-        const subCatId = oid.replace("sub:", "");
-        const subCat = categories.find((c) => c.id === subCatId);
-        if (subCat?.parentId) {
-          // For sub-group drags, only highlight if it's a different parent
-          if (aid.startsWith("sub:")) {
-            const activeSubId = aid.replace("sub:", "");
-            const activeSub = categories.find((c) => c.id === activeSubId);
-            if (activeSub?.parentId === subCat.parentId) {
-              setHoveredParentId(null);
-              return;
-            }
-          }
-          setHoveredParentId(subCat.parentId);
-          return;
-        }
-      }
-
-      if (oid.startsWith("card:")) {
-        const cardData = cards.find((c) => c.id === oid.replace("card:", ""));
-        if (cardData) {
-          const cat = categories.find((c) => c.id === cardData.categoryId);
-          if (cat?.parentId) {
-            setHoveredParentId(cat.parentId);
+    if (oid.startsWith("sub:")) {
+      const subCatId = oid.replace("sub:", "");
+      const subCat = categories.find((c) => c.id === subCatId);
+      if (subCat?.parentId) {
+        if (aid.startsWith("sub:")) {
+          const activeSubId = aid.replace("sub:", "");
+          const activeSub = categories.find((c) => c.id === activeSubId);
+          if (activeSub?.parentId === subCat.parentId) {
+            setHoveredParentId(null);
             return;
           }
         }
+        setHoveredParentId(subCat.parentId);
+        return;
       }
-    });
+    }
+
+    if (oid.startsWith("card:")) {
+      const cardData = cards.find((c) => c.id === oid.replace("card:", ""));
+      if (cardData) {
+        const cat = categories.find((c) => c.id === cardData.categoryId);
+        if (cat?.parentId) {
+          setHoveredParentId(cat.parentId);
+          return;
+        }
+      }
+    }
 
     setHoveredParentId(null);
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
     setHoveredParentId(null);
@@ -263,7 +342,7 @@ export function SortableGrid({
 
       if (targetParentId) {
         const categoryId = aid.replace("ungrouped:", "");
-        moveCategoryToParent(categoryId, targetParentId);
+        await moveCategoryToParent(categoryId, targetParentId);
         return;
       }
     }
@@ -279,15 +358,16 @@ export function SortableGrid({
         const [moved] = ordered.splice(oldIndex, 1);
         ordered.splice(newIndex, 0, moved);
         const { reorderCategories } = useAppStore.getState();
-        reorderCategories(ordered.map((c) => c.id));
+        await reorderCategories(ordered.map((c) => c.id));
       }
       return;
     }
 
     // Parent → Parent: reorder
-    if (aid.startsWith("cat:") && oid.startsWith("cat:")) {
+    if (aid.startsWith("cat:")) {
       const activeCatId = aid.replace("cat:", "");
-      const overCatId = oid.replace("cat:", "");
+      const overCatId = getContainingParentId(oid);
+      if (!overCatId || activeCatId === overCatId) return;
       const orderedCats = [...parentCategories];
       const oldIndex = orderedCats.findIndex((c) => c.id === activeCatId);
       const newIndex = orderedCats.findIndex((c) => c.id === overCatId);
@@ -295,50 +375,44 @@ export function SortableGrid({
         const [moved] = orderedCats.splice(oldIndex, 1);
         orderedCats.splice(newIndex, 0, moved);
         const { reorderCategories } = useAppStore.getState();
-        reorderCategories(orderedCats.map((c) => c.id));
+        await reorderCategories(orderedCats.map((c) => c.id));
       }
       return;
     }
 
-    // Sub-group → Sub-group: reorder within same parent or cross-parent
-    if (aid.startsWith("sub:") && oid.startsWith("sub:")) {
+    // Sub-group → Sub-group / parent / child card: reorder within same parent or cross-parent
+    if (aid.startsWith("sub:")) {
       const activeSubId = aid.replace("sub:", "");
-      const overSubId = oid.replace("sub:", "");
       const activeSub = categories.find((c) => c.id === activeSubId);
-      const overSub = categories.find((c) => c.id === overSubId);
-      if (activeSub && overSub) {
-        // Cross-parent: move sub-group to different parent
-        if (activeSub.parentId !== overSub.parentId) {
-          const targetParentId = overSub.parentId;
-          if (targetParentId) {
-            moveCategoryToParent(activeSubId, targetParentId);
+      const target = getSubGroupDropTarget(oid);
+      if (activeSub && target) {
+        const targetSiblings = categories
+          .filter((c) => c.parentId === target.parentId && c.id !== activeSubId)
+          .sort((a, b) => a.order - b.order);
+        const overSiblingIndex = target.overSubId
+          ? targetSiblings.findIndex((c) => c.id === target.overSubId)
+          : -1;
+        const insertIndex = overSiblingIndex >= 0 ? overSiblingIndex : targetSiblings.length;
+
+        // Same parent, reorder within parent
+        if (activeSub.parentId === target.parentId) {
+          const siblings = categories
+            .filter((c) => c.parentId === target.parentId)
+            .sort((a, b) => a.order - b.order);
+          const oldIndex = siblings.findIndex((c) => c.id === activeSubId);
+          const newIndex = target.overSubId
+            ? siblings.findIndex((c) => c.id === target.overSubId)
+            : siblings.length - 1;
+          if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+            const [moved] = siblings.splice(oldIndex, 1);
+            siblings.splice(newIndex, 0, moved);
+            await useAppStore.getState().reorderCategories(siblings.map((c) => c.id));
           }
           return;
         }
-        // Same parent, reorder within parent
-        if (activeSub.parentId && activeSub.parentId === overSub.parentId) {
-          const siblings = categories
-            .filter((c) => c.parentId === activeSub.parentId)
-            .sort((a, b) => a.order - b.order);
-          const oldIndex = siblings.findIndex((c) => c.id === activeSubId);
-          const newIndex = siblings.findIndex((c) => c.id === overSubId);
-          if (oldIndex !== -1 && newIndex !== -1) {
-            const [moved] = siblings.splice(oldIndex, 1);
-            siblings.splice(newIndex, 0, moved);
-            for (let i = 0; i < siblings.length; i++) {
-              useAppStore.getState().updateCategory({ ...siblings[i], order: i });
-            }
-          }
-        }
-      }
-      return;
-    }
 
-    // Sub-group → Parent category header: move to different parent
-    if (aid.startsWith("sub:") && oid.startsWith("cat:")) {
-      const activeSubId = aid.replace("sub:", "");
-      const targetParentId = oid.replace("cat:", "");
-      moveCategoryToParent(activeSubId, targetParentId);
+        await moveCategoryToParent(activeSubId, target.parentId, insertIndex);
+      }
       return;
     }
 
@@ -348,7 +422,7 @@ export function SortableGrid({
       const overCardId = oid.replace("card:", "");
       const overCard = cards.find((c) => c.id === overCardId);
       if (overCard) {
-        moveCard(activeCardId, overCard.categoryId, overCard.order);
+        await moveCard(activeCardId, overCard.categoryId, overCard.order);
       }
       return;
     }
@@ -357,7 +431,7 @@ export function SortableGrid({
     if (aid.startsWith("card:") && (oid.startsWith("cat:") || oid.startsWith("ungrouped:") || oid.startsWith("sub:"))) {
       const activeCardId = aid.replace("card:", "");
       const targetCatId = oid.replace("cat:", "").replace("ungrouped:", "").replace("sub:", "");
-      moveCard(activeCardId, targetCatId, 0);
+      await moveCard(activeCardId, targetCatId, 0);
       return;
     }
   };
@@ -394,8 +468,8 @@ export function SortableGrid({
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <SortableContext items={allTopLevelIds} strategy={verticalListSortingStrategy}>
-        <div className="space-y-4 p-4">
+      <div className="flex flex-wrap items-start gap-4 p-4">
+        <SortableContext items={parentSortableIds} strategy={rectSortingStrategy}>
           {/* ====== Top section: Parent categories ====== */}
           {parentCategories.map((parent) => {
             const subGroups = getSubGroups(parent.id);
@@ -413,14 +487,15 @@ export function SortableGrid({
                 isHovered={hoveredParentId === parent.id}
                 isDraggingActive={activeId !== null}
                 widthPercent={categoryWidths[parent.id]}
-                defaultWidthPercent={getDefaultWidthPercent(totalCards)}
+                defaultWidthPercent={getDefaultWidthPercent(totalCards, subGroups.length)}
                 onEditCategory={onEditCategory}
                 onAddCard={onAddCard}
                 onAddGroup={onAddGroup}
+                onShipCategory={onShipCategory}
               >
                 {/* Sub-groups in flex-wrap so they can sit side by side */}
                 <SortableSubGroupContainer parentId={parent.id}>
-                  <div className="flex flex-wrap gap-3">
+                  <div className="flex flex-wrap items-start gap-3">
                     {subGroups.map((sub) => {
                       const subCards = getCardsForCategory(sub.id);
                       return (
@@ -435,6 +510,8 @@ export function SortableGrid({
                           onDeleteCard={onDeleteCard}
                           onDetach={() => detachCategoryFromParent(sub.id)}
                           onUpdateCard={onUpdateCard}
+                          onShipCategory={onShipCategory}
+                          onShipCard={onShipCard}
                         />
                       );
                     })}
@@ -448,8 +525,9 @@ export function SortableGrid({
           })}
 
           {/* ====== Bottom section: "未分类" ====== */}
+        </SortableContext>
           {standaloneCategories.length > 0 && (
-            <div className="rounded-lg border border-dashed border-border/60 bg-muted/20">
+            <div className="w-full rounded-lg border border-dashed border-border/60 bg-muted/20">
               <div className="flex items-center gap-2 px-3 py-2 border-b border-border/30">
                 <span className="text-xs font-semibold text-muted-foreground">
                   未分类
@@ -468,7 +546,8 @@ export function SortableGrid({
                   </span>
                 )}
               </div>
-              <div className="p-3 flex flex-wrap gap-3">
+              <SortableContext items={standaloneSortableIds} strategy={rectSortingStrategy}>
+              <div className="p-3 flex flex-wrap items-start gap-3">
                 {standaloneCategories.map((cat) => {
                   const catCards = getCardsForCategory(cat.id);
                   return (
@@ -483,14 +562,16 @@ export function SortableGrid({
                       onDeleteCard={onDeleteCard}
                       onPromoteToParent={promoteToParent}
                       onUpdateCard={onUpdateCard}
+                      onShipCategory={onShipCategory}
+                      onShipCard={onShipCard}
                     />
                   );
                 })}
               </div>
+              </SortableContext>
             </div>
           )}
         </div>
-      </SortableContext>
 
       {/* ====== Drag Overlay: compact badge ====== */}
       <DragOverlay dropAnimation={{ duration: 250, easing: "cubic-bezier(0.2, 0, 0, 1)" }}>
@@ -531,6 +612,7 @@ interface SortableCategoryBlockProps {
   onEditCategory?: (category: Category) => void;
   onAddCard?: (categoryId?: string) => void;
   onAddGroup?: (parentId?: string) => void;
+  onShipCategory?: (category: Category) => void;
   children: React.ReactNode;
 }
 
@@ -545,6 +627,7 @@ function SortableCategoryBlock({
   onEditCategory,
   onAddCard,
   onAddGroup,
+  onShipCategory,
   children,
 }: SortableCategoryBlockProps) {
   const {
@@ -563,13 +646,17 @@ function SortableCategoryBlock({
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [confirmDemoteOpen, setConfirmDemoteOpen] = useState(false);
 
-  const widthPercent = localWidth ?? storedWidth ?? defaultWidthPercent;
+  const rawWidthPercent = localWidth ?? storedWidth ?? defaultWidthPercent;
+  const widthPercent = getSmartParentWidthPercent(rawWidthPercent, defaultWidthPercent);
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
+  const style: React.CSSProperties = {
+    transform: isDragging ? undefined : CSS.Transform.toString(transform),
     transition: isDragging ? transition : `${transition}, min-height 0.3s ease-out`,
-    opacity: isDragging ? 0.4 : 1,
-    width: `${widthPercent}%`,
+    opacity: isDragging ? 0.2 : 1,
+    flex: `0 1 calc(${widthPercent}% - 1rem)`,
+    width: `calc(${widthPercent}% - 1rem)`,
+    minWidth: "min(100%, 360px)",
+    maxWidth: "100%",
     minHeight: isDraggingActive ? '60px' : undefined,
   };
 
@@ -585,8 +672,8 @@ function SortableCategoryBlock({
 
       const handleMouseMove = (ev: MouseEvent) => {
         const dx = ev.clientX - startX;
-        const newWidth = Math.max(120, startWidth + dx);
-        const newPercent = Math.max(15, Math.min(100, (newWidth / parentWidth) * 100));
+        const newWidth = Math.max(180, startWidth + dx);
+        const newPercent = Math.max(8, Math.min(100, (newWidth / parentWidth) * 100));
         setLocalWidth(newPercent);
       };
 
@@ -641,6 +728,10 @@ function SortableCategoryBlock({
           className="w-2.5 h-2.5 rounded-full flex-shrink-0"
           style={{ backgroundColor: category.color }}
         />
+        <Folder
+          className="w-3.5 h-3.5 shrink-0 text-muted-foreground/70"
+          aria-hidden="true"
+        />
         <InlineEditableText
           value={category.name}
           className="text-sm font-semibold text-foreground font-serif hover:text-primary/80 transition-colors"
@@ -660,19 +751,6 @@ function SortableCategoryBlock({
             编辑
           </Button>
         )}
-        {globalEditMode && isHeaderHovered && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-5 text-[11px] gap-0.5 px-1.5 text-muted-foreground hover:text-destructive animate-in fade-in duration-200"
-            onClick={(e) => { e.stopPropagation(); toggleEditMode(); }}
-            title="退出编辑模式"
-          >
-            <PencilOff className="w-2.5 h-2.5" />
-            退出编辑
-          </Button>
-        )}
-
         {/* Smooth drop hint */}
         {isHovered && isParent && (
           <span className="text-[10px] text-primary/70 font-medium animate-in fade-in duration-300">
@@ -717,6 +795,15 @@ function SortableCategoryBlock({
             >
               <Plus className="w-2.5 h-2.5" />
             </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0"
+              onClick={() => onShipCategory?.(category)}
+              title="飞到其他分项"
+            >
+              <Send className="w-2.5 h-2.5" />
+            </Button>
             {/* Delete category */}
             <Button
               variant="ghost"
@@ -739,6 +826,18 @@ function SortableCategoryBlock({
               </Button>
             )}
           </>
+        )}
+        {globalEditMode && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto h-5 text-[11px] gap-0.5 px-1.5 text-muted-foreground hover:text-destructive"
+            onClick={(e) => { e.stopPropagation(); toggleEditMode(); }}
+            title="退出编辑模式"
+          >
+            <PencilOff className="w-2.5 h-2.5" />
+            退出编辑
+          </Button>
         )}
       </div>
 
@@ -818,7 +917,7 @@ function SortableSubGroupContainer({ parentId, children }: SortableSubGroupConta
   const subIds = useMemo(() => subGroups.map((sg) => subId(sg.id)), [subGroups]);
 
   return (
-    <SortableContext items={subIds} strategy={verticalListSortingStrategy}>
+    <SortableContext items={subIds} strategy={rectSortingStrategy}>
       {children}
     </SortableContext>
   );
@@ -835,6 +934,8 @@ interface SortableSubGroupBlockProps {
   onDeleteCard?: (card: WebCard) => void;
   onDetach?: () => void;
   onUpdateCard?: (card: WebCard) => void;
+  onShipCategory?: (category: Category) => void;
+  onShipCard?: (card: WebCard) => void;
 }
 
 function SortableSubGroupBlock({
@@ -847,6 +948,8 @@ function SortableSubGroupBlock({
   onDeleteCard,
   onDetach,
   onUpdateCard,
+  onShipCategory,
+  onShipCard,
 }: SortableSubGroupBlockProps) {
   const {
     attributes,
@@ -878,8 +981,8 @@ function SortableSubGroupBlock({
 
       const handleMouseMove = (ev: MouseEvent) => {
         const dx = ev.clientX - startX;
-        const newWidth = Math.max(120, startWidth + dx);
-        const newPercent = Math.max(15, Math.min(100, (newWidth / parentWidth) * 100));
+        const newWidth = Math.max(180, startWidth + dx);
+        const newPercent = Math.max(8, Math.min(100, (newWidth / parentWidth) * 100));
         setLocalWidth(newPercent);
       };
 
@@ -906,13 +1009,11 @@ function SortableSubGroupBlock({
     [setNodeRef]
   );
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
+  const style: React.CSSProperties = {
+    transform: isDragging ? undefined : CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.4 : 1,
-    ...(widthPercent !== null
-      ? { flex: `0 0 ${widthPercent}%` }
-      : { flex: "1 1 0%" }),
+    opacity: isDragging ? 0.2 : 1,
+    ...getSmartChildStyle(widthPercent, cards.length),
   };
 
   return (
@@ -934,6 +1035,10 @@ function SortableSubGroupBlock({
         <div
           className="w-1 h-3 rounded-full flex-shrink-0"
           style={{ backgroundColor: category.color }}
+        />
+        <Layers
+          className="w-3 h-3 shrink-0 text-muted-foreground/70"
+          aria-hidden="true"
         />
         <InlineEditableText
           value={category.name}
@@ -977,6 +1082,15 @@ function SortableSubGroupBlock({
             <Button
               variant="ghost"
               size="sm"
+              className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
+              onClick={() => onShipCategory?.(category)}
+              title="飞到其他分项"
+            >
+              <Send className="w-2.5 h-2.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
               title="删除分组"
               onClick={() => setConfirmDeleteOpen(true)}
@@ -990,7 +1104,7 @@ function SortableSubGroupBlock({
       {/* Cards */}
       <SortableContext
         items={cards.map((c) => cardId(c.id))}
-        strategy={verticalListSortingStrategy}
+        strategy={rectSortingStrategy}
       >
         <div className="flex flex-wrap gap-1 px-2.5 pb-2">
           {cards.map((card) => (
@@ -1002,6 +1116,7 @@ function SortableSubGroupBlock({
               onEdit={() => onEditCard?.(card)}
               onDelete={() => onDeleteCard?.(card)}
               onUpdateCard={onUpdateCard}
+              onShip={() => onShipCard?.(card)}
             />
           ))}
           {cards.length === 0 && (
@@ -1012,7 +1127,7 @@ function SortableSubGroupBlock({
 
       {/* Resize handle - right edge, always available */}
       <div
-        className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize
+        className="absolute right-0 top-0 bottom-0 z-20 w-2.5 cursor-col-resize
           hover:bg-primary/20 active:bg-primary/30 transition-colors rounded-r-md"
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={handleResizeStart}
@@ -1053,6 +1168,8 @@ interface SortableUngroupedBlockProps {
   onDeleteCard?: (card: WebCard) => void;
   onPromoteToParent?: (categoryId: string) => void;
   onUpdateCard?: (card: WebCard) => void;
+  onShipCategory?: (category: Category) => void;
+  onShipCard?: (card: WebCard) => void;
 }
 
 function SortableUngroupedBlock({
@@ -1065,6 +1182,8 @@ function SortableUngroupedBlock({
   onDeleteCard,
   onPromoteToParent,
   onUpdateCard,
+  onShipCategory,
+  onShipCard,
 }: SortableUngroupedBlockProps) {
   const {
     attributes,
@@ -1124,13 +1243,11 @@ function SortableUngroupedBlock({
     [setNodeRef]
   );
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
+  const style: React.CSSProperties = {
+    transform: isDragging ? undefined : CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.4 : 1,
-    ...(widthPercent !== null
-      ? { flex: `0 0 ${widthPercent}%` }
-      : { flex: "1 1 0%" }),
+    opacity: isDragging ? 0.2 : 1,
+    ...getSmartChildStyle(widthPercent, cards.length),
   };
 
   return (
@@ -1152,6 +1269,10 @@ function SortableUngroupedBlock({
         <div
           className="w-1 h-3 rounded-full flex-shrink-0"
           style={{ backgroundColor: category.color }}
+        />
+        <Layers
+          className="w-3 h-3 shrink-0 text-muted-foreground/70"
+          aria-hidden="true"
         />
         <InlineEditableText
           value={category.name}
@@ -1195,6 +1316,15 @@ function SortableUngroupedBlock({
             <Button
               variant="ghost"
               size="sm"
+              className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
+              onClick={() => onShipCategory?.(category)}
+              title="飞到其他分项"
+            >
+              <Send className="w-2.5 h-2.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
               title="删除分组"
               onClick={() => setConfirmDeleteOpen(true)}
@@ -1208,7 +1338,7 @@ function SortableUngroupedBlock({
       {/* Cards */}
       <SortableContext
         items={cards.map((c) => cardId(c.id))}
-        strategy={verticalListSortingStrategy}
+        strategy={rectSortingStrategy}
       >
         <div className="flex flex-wrap gap-1 px-2.5 pb-2">
           {cards.map((card) => (
@@ -1220,6 +1350,7 @@ function SortableUngroupedBlock({
               onEdit={() => onEditCard?.(card)}
               onDelete={() => onDeleteCard?.(card)}
               onUpdateCard={onUpdateCard}
+              onShip={() => onShipCard?.(card)}
             />
           ))}
           {cards.length === 0 && (
@@ -1230,7 +1361,7 @@ function SortableUngroupedBlock({
 
       {/* Resize handle - right edge, always available */}
       <div
-        className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize
+        className="absolute right-0 top-0 bottom-0 z-20 w-2.5 cursor-col-resize
           hover:bg-primary/20 active:bg-primary/30 transition-colors rounded-r-md"
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={handleResizeStart}
@@ -1268,6 +1399,7 @@ interface SortableCardProps {
   onEdit: () => void;
   onDelete: () => void;
   onUpdateCard?: (card: WebCard) => void;
+  onShip?: () => void;
 }
 
 function SortableCard({
@@ -1277,6 +1409,7 @@ function SortableCard({
   onEdit,
   onDelete,
   onUpdateCard,
+  onShip,
 }: SortableCardProps) {
   const {
     attributes,
@@ -1287,10 +1420,10 @@ function SortableCard({
     isDragging,
   } = useSortable({ id: cardId(card.id) });
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
+  const style: React.CSSProperties = {
+    transform: isDragging ? undefined : CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.4 : 1,
+    opacity: isDragging ? 0.2 : 1,
   };
 
   return (
@@ -1301,6 +1434,7 @@ function SortableCard({
         editMode={editMode}
         onEdit={onEdit}
         onDelete={onDelete}
+        onShip={onShip}
         onUpdateCard={onUpdateCard}
         dragListeners={{ ...attributes, ...listeners }}
       />

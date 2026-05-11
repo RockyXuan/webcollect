@@ -721,3 +721,19 @@ const handleResizeStart = (e: React.MouseEvent) => {
 □ 7. 检查日志无新错误
 □ 8. git diff 确认只改了目标代码
 ```
+# Coding Workflow Overlay (MANDATORY)
+
+Before any non-trivial coding task, read and follow:
+
+- `tasks/skills.md` - project coding skills and workflow rules
+- `tasks/lessons.md` - mistakes and user corrections that must not repeat
+- `tasks/todo.md` - active task checklist, verification, and review notes
+
+For tasks involving more than three steps, architecture decisions, sync/storage logic, or user-data risk:
+
+1. Write a concrete checklist in `tasks/todo.md`.
+2. Confirm the plan with the user unless they explicitly asked to continue immediately.
+3. Implement only the checked scope.
+4. Update checklist status as work progresses.
+5. Run the relevant verification commands before reporting completion.
+6. If the user corrects a mistake, add the lesson to `tasks/lessons.md`.

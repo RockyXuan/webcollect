@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -33,7 +33,11 @@ interface CardDialogProps {
 }
 
 export function CardDialog({ open, onOpenChange, editingCard, defaultCategoryId }: CardDialogProps) {
-  const { categories, addCard, updateCard } = useAppStore();
+  const { categories, activeSectionId, addCard, updateCard } = useAppStore();
+  const visibleCategories = useMemo(
+    () => categories.filter((cat) => (cat.sectionId || "section-default") === activeSectionId),
+    [categories, activeSectionId]
+  );
 
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
@@ -49,10 +53,10 @@ export function CardDialog({ open, onOpenChange, editingCard, defaultCategoryId 
 
   // Derive a safe categoryId: must match an existing category
   const safeCategoryId = useCallback((): string => {
-    if (categoryId && categories.some((c) => c.id === categoryId)) return categoryId;
-    if (defaultCategoryId && categories.some((c) => c.id === defaultCategoryId)) return defaultCategoryId;
-    return categories[0]?.id || "";
-  }, [categoryId, defaultCategoryId, categories]);
+    if (categoryId && visibleCategories.some((c) => c.id === categoryId)) return categoryId;
+    if (defaultCategoryId && visibleCategories.some((c) => c.id === defaultCategoryId)) return defaultCategoryId;
+    return visibleCategories[0]?.id || "";
+  }, [categoryId, defaultCategoryId, visibleCategories]);
 
   useEffect(() => {
     if (open) {
@@ -73,10 +77,13 @@ export function CardDialog({ open, onOpenChange, editingCard, defaultCategoryId 
         setNote("");
         setAbbreviation("");
         setImageUrl("");
-        setCategoryId(defaultCategoryId || categories[0]?.id || "");
+        const defaultVisibleCategory = defaultCategoryId && visibleCategories.some((c) => c.id === defaultCategoryId)
+          ? defaultCategoryId
+          : visibleCategories[0]?.id || "";
+        setCategoryId(defaultVisibleCategory);
       }
     }
-  }, [open, editingCard, categories, defaultCategoryId]);
+  }, [open, editingCard, visibleCategories, defaultCategoryId]);
 
   const fetchMeta = useCallback(async () => {
     if (!url.trim()) return;
@@ -152,7 +159,7 @@ export function CardDialog({ open, onOpenChange, editingCard, defaultCategoryId 
           </DialogDescription>
         </DialogHeader>
 
-        {categories.length === 0 ? (
+        {visibleCategories.length === 0 ? (
           <div className="py-8 text-center text-muted-foreground text-sm">
             请先创建一个分类
           </div>
@@ -194,7 +201,7 @@ export function CardDialog({ open, onOpenChange, editingCard, defaultCategoryId 
                     <SelectValue placeholder="选择分类" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.map((cat) => (
+                    {visibleCategories.map((cat) => (
                       <SelectItem key={cat.id} value={cat.id}>
                         {cat.name}
                       </SelectItem>

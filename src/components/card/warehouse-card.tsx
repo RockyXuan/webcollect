@@ -23,13 +23,20 @@ import {
 } from "@/components/ui/tooltip";
 import { ShipToMainCardDialog } from "@/components/dialogs/ship-to-main-dialog";
 
+interface WarehouseDuplicateMatch {
+  sectionName: string;
+  categoryName: string;
+  cardTitle: string;
+}
+
 interface WarehouseCardItemProps {
   card: WarehouseCard;
   categoryColor: string;
   onUpdateCard?: (card: WarehouseCard) => void;
+  duplicateMatch?: WarehouseDuplicateMatch;
 }
 
-export function WarehouseCardItem({ card, categoryColor, onUpdateCard }: WarehouseCardItemProps) {
+export function WarehouseCardItem({ card, categoryColor, onUpdateCard, duplicateMatch }: WarehouseCardItemProps) {
   const [imgError, setImgError] = useState(false);
   const [shipDialogOpen, setShipDialogOpen] = useState(false);
   const { deleteWarehouseCard } = useWarehouseStore();
@@ -109,9 +116,12 @@ export function WarehouseCardItem({ card, categoryColor, onUpdateCard }: Warehou
 
   return (
     <div
-      className="group relative flex items-center gap-1.5 px-2 py-1 rounded border transition-all select-none min-w-[140px] flex-1 cursor-pointer hover:bg-muted/50 hover:shadow-sm"
-      style={{ borderLeftWidth: "2px", borderLeftColor: categoryColor }}
+      className={`group relative flex items-center gap-1.5 px-2 py-1 rounded border transition-all select-none min-w-[140px] flex-1 cursor-pointer hover:shadow-sm ${
+        duplicateMatch ? "bg-red-50/70 border-red-200 text-muted-foreground hover:bg-red-50" : "hover:bg-muted/50"
+      }`}
+      style={{ borderLeftWidth: "2px", borderLeftColor: duplicateMatch ? "#ef4444" : categoryColor }}
       onClick={handleClick}
+      title={duplicateMatch ? `已存在于 ${duplicateMatch.sectionName} / ${duplicateMatch.categoryName}，可删除仓库副本或仍然发送` : undefined}
     >
       {/* Favicon */}
       <div className="h-5 w-5 shrink-0 flex items-center justify-center">
@@ -126,6 +136,11 @@ export function WarehouseCardItem({ card, categoryColor, onUpdateCard }: Warehou
           <span className="text-[9px] font-bold text-muted-foreground bg-muted rounded px-0.5">
             {displayAbbr}
           </span>
+        )}
+        {duplicateMatch && (
+          <div className="text-[9px] text-red-600 truncate leading-tight">
+            已在 {duplicateMatch.sectionName}/{duplicateMatch.categoryName}
+          </div>
         )}
       </div>
 

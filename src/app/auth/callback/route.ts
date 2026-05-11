@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-// The client you created from the Server-Side Auth instructions
-import { getSupabaseClient } from "@/storage/database/supabase-client";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -9,6 +7,7 @@ export async function GET(request: Request) {
   const next = searchParams.get("next") ?? "/";
 
   if (code) {
+    const { getSupabaseClient } = await import("@/storage/database/supabase-client");
     const client = getSupabaseClient();
     const { error } = await client.auth.exchangeCodeForSession(code);
     if (!error) {

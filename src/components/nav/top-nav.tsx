@@ -1,10 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useAppStore } from "@/lib/store";
-import { Plus, FolderPlus, Layers, Package, Trash2 } from "lucide-react";
+import { Plus, FolderPlus, Layers, Package, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PlatformLink } from "@/components/ui/platform-link";
-import { UserMenu } from "@/components/auth/user-menu";
+import { SyncStatusBadge, UserMenu } from "@/components/auth/user-menu";
 
 interface TopNavProps {
   onAddCard?: (categoryId?: string) => void;
@@ -15,8 +16,57 @@ interface TopNavProps {
 }
 
 export function TopNav({ onAddCard, onAddGroup, onAddCategory, onRecycleBin, onWarehouse }: TopNavProps) {
-  const { searchQuery, setSearchQuery } = useAppStore();
+  const {
+    searchQuery,
+    setSearchQuery,
+    visualScale,
+    sections,
+    activeSectionId,
+    setActiveSection,
+    addSection,
+    updateSection,
+    deleteSection,
+    editMode,
+    loadData,
+  } = useAppStore();
   const recycleBinCount = useAppStore((s) => s.recycleBin.length);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.style.fontSize = `${visualScale}%`;
+  }, [visualScale]);
+
+  const handleAddSection = () => {
+    const name = window.prompt("新分项名称", "常用 AI");
+    if (name?.trim()) {
+      void addSection(name.trim());
+    }
+  };
+
+  const handleRenameSection = (sectionId: string, currentName: string) => {
+    const name = window.prompt("重命名分项", currentName);
+    if (!name?.trim() || name.trim() === currentName) return;
+    const section = sections.find((item) => item.id === sectionId);
+    if (!section) return;
+    void updateSection({ ...section, name: name.trim() });
+  };
+
+  const handleDeleteSection = (sectionId: string, sectionName: string) => {
+    if (sectionId === "section-default") return;
+    const ok = window.confirm(
+      `删除分项“${sectionName}”？为防止丢数据，只会删除这个页签，里面的分类、分组和网页会移到首页。`
+    );
+    if (ok) void deleteSection(sectionId);
+  };
+
+  const handleRefreshLocalView = async () => {
+    setIsRefreshing(true);
+    try {
+      await loadData();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   return (
     <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur border-b border-border">
@@ -41,6 +91,18 @@ export function TopNav({ onAddCard, onAddGroup, onAddCategory, onRecycleBin, onW
 
         {/* Right: Add buttons + Edit toggle */}
         <div className="flex items-center gap-2">
+          <SyncStatusBadge />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleRefreshLocalView}
+            disabled={isRefreshing}
+            className="h-7 text-xs gap-1 px-2"
+            title={"\u5237\u65b0\u672c\u5730\u89c6\u56fe"}
+          >
+            <RefreshCw className={`h-3 w-3 ${isRefreshing ? "animate-spin" : ""}`} />
+            {"\u5237\u65b0"}
+          </Button>
           <Button
             variant="default"
             size="sm"
@@ -108,6 +170,59 @@ export function TopNav({ onAddCard, onAddGroup, onAddCategory, onRecycleBin, onW
           <div className="w-px h-5 bg-border mx-1" />
           <UserMenu />
         </div>
+      </div>
+      <div className="flex items-center gap-2 px-4 py-2 overflow-x-auto border-t border-border/40 bg-background/70">
+        {sections.map((section) => {
+          const active = section.id === activeSectionId;
+          const canDelete = section.id !== "section-default";
+          return (
+            <div key={section.id} className="flex shrink-0 items-center gap-0.5">
+              <Button
+                variant={active ? "default" : "outline"}
+                size="sm"
+                className="h-7 shrink-0 rounded-md px-3 text-xs"
+                onClick={() => void setActiveSection(section.id)}
+                title={section.name}
+              >
+                {section.name}
+              </Button>
+              {editMode && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 shrink-0 p-0 text-muted-foreground hover:text-primary"
+                    onClick={() => handleRenameSection(section.id, section.name)}
+                    title="重命名分项"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                  {canDelete && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 shrink-0 p-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => handleDeleteSection(section.id, section.name)}
+                      title="删除分项"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 shrink-0 px-2 text-xs text-muted-foreground hover:text-foreground"
+          onClick={handleAddSection}
+          title="添加分项"
+        >
+          <Plus className="h-3 w-3 mr-1" />
+          分项
+        </Button>
       </div>
     </nav>
   );

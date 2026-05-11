@@ -26,6 +26,8 @@ import {
   Home,
   Clock,
   FileText,
+  RefreshCw,
+  XCircle,
 } from "lucide-react";
 
 export default function WarehousePage() {
@@ -37,11 +39,22 @@ export default function WarehousePage() {
     setSelectedBatch,
     deleteBatch,
     clearAllWarehouse,
+    deleteExistingWarehouseItems,
     cards,
     categories,
   } = useWarehouseStore();
 
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await loadData();
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 250);
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -92,6 +105,31 @@ export default function WarehousePage() {
 
           {/* Right: Actions */}
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1 px-2"
+              disabled={isRefreshing}
+              onClick={handleRefresh}
+            >
+              <RefreshCw className={`h-3 w-3 ${isRefreshing ? "animate-spin" : ""}`} />
+              刷新
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1 px-2"
+              disabled={cards.length === 0}
+              onClick={async () => {
+                const removed = await deleteExistingWarehouseItems();
+                if (removed === 0) {
+                  window.alert("没有找到已存在或重复的仓库网页。");
+                }
+              }}
+            >
+              <XCircle className="h-3 w-3" />
+              删除已存在
+            </Button>
             <Button
               variant="default"
               size="sm"
