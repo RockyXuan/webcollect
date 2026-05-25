@@ -12,6 +12,9 @@ import { useAppStore } from "@/lib/store";
 import { useAuthStore } from "@/lib/auth-store";
 import { useWarehouseStore } from "@/lib/store-warehouse";
 import { saveCards, saveCategories, setInitialized } from "@/lib/db";
+import { restoreLatestHealthyWorkspaceIfNeeded } from "@/lib/emergency-restore";
+import { drainFloatingCaptureQueue, publishCaptureDestinationCache } from "@/lib/floating-capture";
+import { isChromeExtension } from "@/lib/platform";
 import { SortableGrid } from "@/components/layout/sortable-grid";
 import { WarehouseGrid } from "@/components/layout/warehouse-grid";
 import { TopNav } from "@/components/nav/top-nav";
@@ -31,7 +34,7 @@ export function NewTabApp() {
   const [view, setView] = useState<View>("main");
 
   // 鈹€鈹€ Main page state 鈹€鈹€
-  const { loadData, isLoading, softDeleteCard, updateCard } = useAppStore();
+  const { loadData, isLoading, softDeleteCard, updateCard, categories, sections } = useAppStore();
 
   const [cardDialogOpen, setCardDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -70,6 +73,21 @@ export function NewTabApp() {
   useEffect(() => {
     const init = async () => {
       try {
+        const restore = await restoreLatestHealthyWorkspaceIfNeeded();
+        if (restore.restored) {
+          console.warn("[WebCollect] Emergency workspace restore applied before auth sync", restore);
+        }
+      } catch (error) {
+        console.error("[WebCollect] Emergency workspace restore failed", error);
+      }
+
+      try {
+        await useAuthStore.getState().initialize();
+      } catch (error) {
+        console.error("[WebCollect] Auth initialization failed", error);
+      }
+
+      try {
         await loadData();
         const state = useAppStore.getState();
         if (!state.initialized) {
@@ -93,20 +111,40 @@ export function NewTabApp() {
             useAppStore.setState({ initialized: true });
           }
         }
+        await publishCaptureDestinationCache();
+        await drainFloatingCaptureQueue();
       } catch (error) {
         console.error("[WebCollect] Local data initialization failed", error);
         useAppStore.setState({ isLoading: false });
       }
-
-      void useAuthStore.getState().initialize().catch((error) => {
-        console.error("[WebCollect] Auth initialization failed", error);
-      });
       void loadWarehouseData().catch((error) => {
         console.error("[WebCollect] Warehouse initialization failed", error);
       });
     };
     init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    void publishCaptureDestinationCache();
+  }, [categories, sections]);
+
+  useEffect(() => {
+    if (!isChromeExtension() || typeof chrome === "undefined" || !chrome.runtime?.onMessage) return;
+    const handleQueueMessage = (message: { type?: string }) => {
+      if (message?.type === "CAPTURE_QUEUE_UPDATED") {
+        void drainFloatingCaptureQueue();
+      }
+    };
+    const handleFocus = () => {
+      void drainFloatingCaptureQueue();
+    };
+    chrome.runtime.onMessage.addListener(handleQueueMessage);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      chrome.runtime.onMessage.removeListener(handleQueueMessage);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, []);
 
   // 鈹€鈹€ Card handlers 鈹€鈹€
   const handleAddCard = useCallback((categoryId?: string) => {
@@ -146,17 +184,17 @@ export function NewTabApp() {
   // 鈹€鈹€ Loading state 鈹€鈹€
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-muted-foreground font-serif">{"\u6b63\u5728\u6574\u7406\u6536\u85cf\u5939..."}</p>
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="wc-glass flex flex-col items-center gap-4 rounded-[28px] px-10 py-8">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+          <p className="text-sm font-medium text-slate-500">正在整理收藏夹...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       {view === "main" ? (
         <>
           <TopNav
@@ -167,7 +205,7 @@ export function NewTabApp() {
             onWarehouse={() => setView("warehouse")}
           />
 
-          <main className="w-full px-3 sm:px-5 lg:px-6 py-4 space-y-4">
+          <main className="wc-shell wc-page-main space-y-7 px-5 py-7">
             <ErrorBoundary>
               <SortableGrid
                 onAddCard={handleAddCard}
@@ -192,9 +230,9 @@ export function NewTabApp() {
             </ErrorBoundary>
           </main>
 
-          <footer className="border-t border-border/40 mt-4 py-4">
-            <div className="px-3 sm:px-5 lg:px-6 text-center text-xs text-muted-foreground/60">
-              <p className="font-serif">WebCollect</p>
+          <footer className="mt-6 py-7">
+            <div className="wc-shell px-5 text-center text-xs text-slate-400">
+              <p>WebCollect</p>
             </div>
           </footer>
 
@@ -231,22 +269,22 @@ export function NewTabApp() {
         </>
       ) : (
         <>
-          <nav className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-50">
-            <div className="max-w-[1400px] mx-auto px-4 h-12 flex items-center justify-between">
+          <nav className="sticky top-0 z-50 border-b border-white/60 bg-white/70 backdrop-blur-2xl">
+            <div className="wc-shell flex h-16 items-center justify-between px-5">
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setView("main")}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-sm font-medium text-slate-500 transition-colors hover:text-blue-600"
                 >
                   {"\u2190 \u8fd4\u56de\u4e3b\u9875"}
                 </button>
-                <span className="text-lg font-serif font-semibold">{"\u4ed3\u5e93"}</span>
+                <span className="text-xl font-semibold text-slate-950">{"\u4ed3\u5e93"}</span>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleRefreshWarehouse}
                   disabled={isWarehouseRefreshing}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm rounded-md border border-border bg-background hover:bg-muted transition-colors"
+                  className="wc-action-secondary inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm transition-colors"
                   title="Refresh warehouse"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${isWarehouseRefreshing ? "animate-spin" : ""}`} />
@@ -260,7 +298,7 @@ export function NewTabApp() {
                     }
                   }}
                   disabled={warehouseCards.length === 0}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm rounded-md border border-border bg-background hover:bg-muted transition-colors disabled:opacity-40"
+                  className="wc-action-secondary inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm transition-colors disabled:opacity-40"
                   title="Delete existing and duplicate pages"
                 >
                   <XCircle className="h-3.5 w-3.5" />
@@ -272,7 +310,7 @@ export function NewTabApp() {
                     await clearAllWarehouse();
                   }}
                   disabled={warehouseCards.length === 0 && warehouseCategories.length === 0}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm rounded-md border border-destructive/40 text-destructive bg-background hover:bg-destructive/10 transition-colors disabled:opacity-40"
+                  className="inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-white/75 px-4 py-2 text-sm text-rose-600 transition-colors hover:bg-rose-50 disabled:opacity-40"
                   title="Clear warehouse"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -280,14 +318,14 @@ export function NewTabApp() {
                 </button>
                 <button
                 onClick={() => setImportDialogOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                className="wc-action-primary inline-flex items-center gap-2 rounded-2xl px-5 py-2 text-sm transition-colors"
               >
                 {"\u5bfc\u5165"}
               </button>
               </div>
             </div>
           </nav>
-          <main className="max-w-[1400px] mx-auto px-4 py-4">
+          <main className="wc-shell px-5 py-7">
             <ErrorBoundary>
               <WarehouseGrid />
             </ErrorBoundary>

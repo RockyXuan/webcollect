@@ -1,10 +1,38 @@
 "use client";
 
 import React, { useState, useCallback, useRef, useEffect } from "react";
-import { Pencil, Trash2, ExternalLink, GripVertical, Send } from "lucide-react";
+import {
+  AppWindow,
+  BookOpen,
+  Bookmark,
+  Bot,
+  Chrome,
+  Clapperboard,
+  Cloud,
+  Download,
+  ExternalLink,
+  FileText,
+  Flag,
+  FlaskConical,
+  Globe2,
+  GripVertical,
+  History,
+  LayoutGrid,
+  Mail,
+  MapPinned,
+  Pencil,
+  Puzzle,
+  Search as SearchIcon,
+  Send,
+  Settings,
+  Star,
+  Trash2,
+  type LucideIcon,
+} from "lucide-react";
 import type { WebCard } from "@/lib/types";
 import { openWebCollectUrl } from "@/lib/platform";
 import { useAppStore } from "@/lib/store";
+import type { EditAction } from "@/components/ui/edit-action-dock";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
 interface WebCardItemProps {
@@ -16,6 +44,195 @@ interface WebCardItemProps {
   onShip?: () => void;
   dragListeners?: React.HTMLAttributes<HTMLElement> | null;
   onUpdateCard?: (card: WebCard) => void;
+}
+
+type SemanticIconMatch = {
+  Icon: LucideIcon;
+  prefer: boolean;
+  background: string;
+  color: string;
+};
+
+const semanticIconRules: Array<SemanticIconMatch & { terms: string[] }> = [
+  {
+    terms: ["settings", "setting", "preferences", "config", "配置", "设置"],
+    Icon: Settings,
+    prefer: true,
+    background: "linear-gradient(135deg, rgba(219,234,254,0.96), rgba(255,255,255,0.82))",
+    color: "#2563eb",
+  },
+  {
+    terms: ["extensions", "extension", "plugin", "plugins", "addon", "addons", "扩展", "插件"],
+    Icon: Puzzle,
+    prefer: true,
+    background: "linear-gradient(135deg, rgba(237,233,254,0.98), rgba(255,255,255,0.84))",
+    color: "#7c3aed",
+  },
+  {
+    terms: ["flags", "flag", "实验", "开关"],
+    Icon: Flag,
+    prefer: true,
+    background: "linear-gradient(135deg, rgba(254,243,199,0.96), rgba(255,255,255,0.84))",
+    color: "#d97706",
+  },
+  {
+    terms: ["applications", "application", "apps", "app", "应用"],
+    Icon: AppWindow,
+    prefer: true,
+    background: "linear-gradient(135deg, rgba(207,250,254,0.95), rgba(255,255,255,0.84))",
+    color: "#0891b2",
+  },
+  {
+    terms: ["bookmarks", "bookmark", "favorites", "favorite", "书签", "收藏"],
+    Icon: Bookmark,
+    prefer: true,
+    background: "linear-gradient(135deg, rgba(220,252,231,0.96), rgba(255,255,255,0.84))",
+    color: "#16a34a",
+  },
+  {
+    terms: ["downloads", "download", "下载"],
+    Icon: Download,
+    prefer: true,
+    background: "linear-gradient(135deg, rgba(224,242,254,0.98), rgba(255,255,255,0.84))",
+    color: "#0284c7",
+  },
+  {
+    terms: ["history", "历史", "记录"],
+    Icon: History,
+    prefer: true,
+    background: "linear-gradient(135deg, rgba(241,245,249,0.98), rgba(255,255,255,0.86))",
+    color: "#475569",
+  },
+  {
+    terms: ["experiments", "experiment", "labs", "lab"],
+    Icon: FlaskConical,
+    prefer: true,
+    background: "linear-gradient(135deg, rgba(250,232,255,0.98), rgba(255,255,255,0.84))",
+    color: "#c026d3",
+  },
+  {
+    terms: ["chrome", "web store", "browser", "浏览器"],
+    Icon: Chrome,
+    prefer: false,
+    background: "linear-gradient(135deg, rgba(219,234,254,0.96), rgba(255,255,255,0.82))",
+    color: "#2563eb",
+  },
+  {
+    terms: ["mail", "gmail", "email", "邮箱", "邮件"],
+    Icon: Mail,
+    prefer: false,
+    background: "linear-gradient(135deg, rgba(254,226,226,0.96), rgba(255,255,255,0.84))",
+    color: "#dc2626",
+  },
+  {
+    terms: ["map", "maps", "地图", "导航"],
+    Icon: MapPinned,
+    prefer: false,
+    background: "linear-gradient(135deg, rgba(220,252,231,0.96), rgba(255,255,255,0.84))",
+    color: "#059669",
+  },
+  {
+    terms: ["search", "find", "搜索", "查询"],
+    Icon: SearchIcon,
+    prefer: false,
+    background: "linear-gradient(135deg, rgba(219,234,254,0.96), rgba(255,255,255,0.82))",
+    color: "#2563eb",
+  },
+  {
+    terms: ["book", "books", "read", "reading", "library", "阅读", "读书", "图书"],
+    Icon: BookOpen,
+    prefer: false,
+    background: "linear-gradient(135deg, rgba(220,252,231,0.96), rgba(255,255,255,0.84))",
+    color: "#15803d",
+  },
+  {
+    terms: ["ai", "gpt", "chat", "bot", "assistant", "智能"],
+    Icon: Bot,
+    prefer: false,
+    background: "linear-gradient(135deg, rgba(237,233,254,0.98), rgba(255,255,255,0.84))",
+    color: "#6d28d9",
+  },
+  {
+    terms: ["drive", "cloud", "盘", "网盘", "云"],
+    Icon: Cloud,
+    prefer: false,
+    background: "linear-gradient(135deg, rgba(224,242,254,0.98), rgba(255,255,255,0.84))",
+    color: "#0284c7",
+  },
+  {
+    terms: ["video", "movie", "youtube", "film", "影视", "电影", "视频"],
+    Icon: Clapperboard,
+    prefer: false,
+    background: "linear-gradient(135deg, rgba(254,226,226,0.96), rgba(255,255,255,0.84))",
+    color: "#e11d48",
+  },
+  {
+    terms: ["docs", "doc", "document", "file", "文档", "文件"],
+    Icon: FileText,
+    prefer: false,
+    background: "linear-gradient(135deg, rgba(241,245,249,0.98), rgba(255,255,255,0.86))",
+    color: "#475569",
+  },
+  {
+    terms: ["tools", "tool", "workspace", "dashboard", "平台", "工具"],
+    Icon: LayoutGrid,
+    prefer: false,
+    background: "linear-gradient(135deg, rgba(219,234,254,0.96), rgba(255,255,255,0.82))",
+    color: "#2563eb",
+  },
+];
+
+function getUrlProtocol(url: string) {
+  try {
+    return new URL(url).protocol;
+  } catch {
+    return "";
+  }
+}
+
+function getCardTokens(text: string) {
+  return text.toLowerCase().split(/[^a-z0-9\u4e00-\u9fa5]+/).filter(Boolean);
+}
+
+function hasSemanticTerm(text: string, tokens: string[], term: string) {
+  const normalizedTerm = term.toLowerCase();
+  if (normalizedTerm.includes(" ")) return text.includes(normalizedTerm);
+  if (/^[a-z0-9]+$/.test(normalizedTerm)) return tokens.includes(normalizedTerm);
+  return text.includes(normalizedTerm);
+}
+
+function getSemanticIcon(card: WebCard): SemanticIconMatch | null {
+  const haystack = [
+    card.title,
+    card.shortDesc,
+    card.fullDesc,
+    card.note,
+    card.url,
+    card.abbreviation,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  const tokens = getCardTokens(haystack);
+  const protocol = getUrlProtocol(card.url);
+  const isBrowserInternal = ["chrome:", "edge:", "about:", "brave:"].includes(protocol);
+
+  for (const rule of semanticIconRules) {
+    if (rule.terms.some((term) => hasSemanticTerm(haystack, tokens, term))) {
+      return { ...rule, prefer: rule.prefer || isBrowserInternal };
+    }
+  }
+
+  if (isBrowserInternal) {
+    return {
+      Icon: Globe2,
+      prefer: true,
+      background: "linear-gradient(135deg, rgba(219,234,254,0.96), rgba(255,255,255,0.82))",
+      color: "#2563eb",
+    };
+  }
+
+  return null;
 }
 
 export function WebCardItem({
@@ -33,6 +250,8 @@ export function WebCardItem({
   const [editValue, setEditValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const linkOpenMode = useAppStore((s) => s.linkOpenMode);
+  const isPinnedBookmark = useAppStore((s) => s.pinnedBookmarkItems.some((item) => item.cardId === card.id));
+  const togglePinBookmark = useAppStore((s) => s.togglePinBookmark);
 
   // Resolve the best image URL: prefer card.imageUrl, fallback to Google Favicon API
   const faviconUrl = React.useMemo(() => {
@@ -45,6 +264,11 @@ export function WebCardItem({
     }
   }, [card.url]);
   const displayImageUrl = card.imageUrl || faviconUrl;
+  const semanticIcon = React.useMemo(() => getSemanticIcon(card), [card]);
+  const shouldUseSemanticIcon = Boolean(
+    semanticIcon && (semanticIcon.prefer || imgError || !displayImageUrl),
+  );
+  const SemanticIcon = semanticIcon?.Icon;
 
   const handleClick = useCallback(() => {
     if (editMode) return;
@@ -88,6 +312,10 @@ export function WebCardItem({
     }
   }, [editingField]);
 
+  useEffect(() => {
+    setImgError(false);
+  }, [displayImageUrl]);
+
   // Handle key events in the inline input
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
@@ -100,46 +328,60 @@ export function WebCardItem({
     e.stopPropagation(); // Prevent dnd-kit from capturing
   }, [saveEdit, cancelEdit]);
 
+  const hasHoverDetails = Boolean(card.title || card.shortDesc || card.fullDesc || card.note || card.url);
+  const detailDescription = card.fullDesc || card.shortDesc;
+  const shouldShowHoverDetails = !editMode && !editingField && hasHoverDetails;
+
+  const cardActions: EditAction[] = [
+    { id: "edit", label: "编辑详情", icon: Pencil, onSelect: onEdit },
+    ...(onShip ? [{ id: "ship", label: "飞到其他编组", icon: Send, onSelect: onShip }] : []),
+    { id: "delete", label: "删除网页", icon: Trash2, tone: "danger" as const, onSelect: onDelete },
+  ];
+
   const cardContent = (
     <div
       className={`
-        group relative flex items-center gap-1.5 px-2 py-1
-        rounded border transition-all select-none
-        min-w-[140px] flex-1
-        ${editMode ? "cursor-default" : "cursor-pointer hover:bg-muted/50"}
-        hover:shadow-sm
+        wc-site-tile group relative flex min-h-12 items-center gap-2.5 px-3 py-2
+        transition-all
+        w-[var(--wc-site-tile-width)] min-w-[var(--wc-site-tile-width)] max-w-[var(--wc-site-tile-width)] flex-none
+        ${editMode ? "wc-site-tile-editing cursor-default select-text" : "cursor-pointer select-none hover:-translate-y-0.5"}
       `}
-      style={{ borderLeftWidth: "2px", borderLeftColor: categoryColor }}
+      style={{ borderLeftWidth: "3px", borderLeftColor: categoryColor }}
       onClick={handleClick}
     >
       {/* Drag handle - always visible for direct drag */}
       {dragListeners && (
         <span
-          className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-foreground transition-colors"
+          className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-blue-500 transition-colors"
           {...dragListeners}
           title="拖动排序"
         >
-          <GripVertical className="w-3 h-3" />
+          <GripVertical className="h-3.5 w-3.5" />
         </span>
       )}
 
       {/* Icon / Abbreviation - small 6x6 */}
-      <div className="flex-shrink-0 w-5 h-5 rounded flex items-center justify-center bg-muted/80 text-[8px] font-bold overflow-hidden">
-        {displayImageUrl && !imgError ? (
+      <div
+        className="flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/70 bg-white/85 text-[10px] font-bold shadow-sm shadow-blue-100"
+        style={shouldUseSemanticIcon && semanticIcon ? { background: semanticIcon.background, color: semanticIcon.color } : undefined}
+      >
+        {shouldUseSemanticIcon && SemanticIcon ? (
+          <SemanticIcon className="h-[18px] w-[18px]" strokeWidth={2.3} />
+        ) : displayImageUrl && !imgError ? (
           <img
             src={displayImageUrl}
             alt={card.title}
-            className="w-full h-full object-cover rounded"
+            className="h-full w-full rounded-xl object-cover"
             onError={() => setImgError(true)}
             loading="lazy"
           />
         ) : (
-          <span className="text-muted-foreground">{displayAbbr}</span>
+          <span className="text-slate-500">{displayAbbr}</span>
         )}
       </div>
 
       {/* Text content - two-line: name on line 1, shortDesc on line 2 */}
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-[1_1_0] overflow-hidden">
         {editingField === "title" ? (
           <input
             ref={inputRef}
@@ -149,11 +391,11 @@ export function WebCardItem({
             onBlur={saveEdit}
             onKeyDown={handleKeyDown}
             onPointerDown={(e) => e.stopPropagation()}
-            className="text-[11px] font-medium text-foreground leading-tight w-full bg-transparent border-b border-primary outline-none px-0 py-0"
+            className="w-full border-b border-blue-500 bg-transparent px-0 py-0 text-[12px] font-semibold leading-tight text-slate-900 outline-none"
           />
         ) : (
           <div
-            className={`text-[11px] font-medium text-foreground leading-tight truncate ${editMode && onUpdateCard ? "cursor-text hover:bg-muted/30 rounded px-0.5 -mx-0.5" : ""}`}
+            className={`block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[12px] font-semibold leading-tight text-slate-900 ${editMode && onUpdateCard ? "cursor-text hover:bg-white/70 rounded px-0.5 -mx-0.5" : ""}`}
             onClick={editMode && onUpdateCard ? (e) => startEdit("title", e) : undefined}
             title={editMode && onUpdateCard ? "点击编辑名称" : undefined}
           >
@@ -169,70 +411,93 @@ export function WebCardItem({
             onBlur={saveEdit}
             onKeyDown={handleKeyDown}
             onPointerDown={(e) => e.stopPropagation()}
-            className="text-[10px] text-muted-foreground leading-tight w-full bg-transparent border-b border-primary outline-none px-0 py-0"
+            className="w-full border-b border-blue-500 bg-transparent px-0 py-0 text-[11px] leading-tight text-slate-500 outline-none"
           />
         ) : (
           <div
-            className={`text-[10px] text-muted-foreground leading-tight truncate ${editMode && onUpdateCard ? "cursor-text hover:bg-muted/30 rounded px-0.5 -mx-0.5" : ""}`}
+            className={`block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[11px] leading-tight text-slate-500 ${editMode && onUpdateCard ? "cursor-text hover:bg-white/70 rounded px-0.5 -mx-0.5" : ""}`}
             onClick={editMode && onUpdateCard ? (e) => startEdit("shortDesc", e) : undefined}
-            title={editMode && onUpdateCard ? "点击编辑简介" : undefined}
+            title={editMode && onUpdateCard ? "点击编辑简介" : (card.fullDesc || card.shortDesc || undefined)}
           >
-            {card.shortDesc || (editMode && onUpdateCard ? <span className="text-muted-foreground/40 italic">添加简介...</span> : null)}
+            {card.shortDesc || (editMode && onUpdateCard ? <span className="italic text-slate-400">添加简介...</span> : null)}
           </div>
         )}
       </div>
 
-      {/* Action buttons in edit mode */}
+      {/* Floating action dock in edit mode */}
       {editMode && (
-        <div className="flex items-center gap-0.5 flex-shrink-0">
-          <button
-            onClick={(e) => { e.stopPropagation(); onEdit(); }}
-            className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-            title="编辑详情"
-          >
-            <Pencil className="w-2.5 h-2.5" />
-          </button>
-          {onShip && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onShip(); }}
-              className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-              title="飞到其他分项"
-            >
-              <Send className="w-2.5 h-2.5" />
-            </button>
-          )}
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-            title="删除"
-          >
-            <Trash2 className="w-2.5 h-2.5" />
-          </button>
+        <div
+          className="wc-site-action-dock"
+          role="toolbar"
+          aria-label="网页操作"
+          onClick={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          {cardActions.map((action) => {
+            const Icon = action.icon;
+            return (
+              <button
+                key={action.id}
+                type="button"
+                className={`wc-edit-dock-button ${action.tone === "danger" ? "wc-edit-dock-button-danger" : ""}`}
+                disabled={action.disabled}
+                title={action.label}
+                aria-label={action.label}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  action.onSelect();
+                }}
+              >
+                <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            );
+          })}
         </div>
       )}
 
       {/* External link icon on hover (non-edit mode) */}
       {!editMode && (
-        <ExternalLink className="w-2.5 h-2.5 text-muted-foreground/0 group-hover:text-muted-foreground/50 transition-colors flex-shrink-0" />
+        <>
+          <ExternalLink className="h-3 w-3 flex-shrink-0 text-slate-300/0 transition-colors group-hover:text-blue-400/80" />
+          <button
+            type="button"
+            className={`wc-site-pin ${isPinnedBookmark ? "wc-site-pin-active" : ""}`}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              togglePinBookmark(card.id);
+            }}
+            title={isPinnedBookmark ? "取消固定到顶部收藏栏" : "固定到顶部收藏栏"}
+          >
+            <Star className={`h-3.5 w-3.5 ${isPinnedBookmark ? "fill-current" : ""}`} />
+          </button>
+        </>
       )}
     </div>
   );
 
-  // Only show hover card in non-edit mode and when there's extra info
-  if (!editMode && (card.fullDesc || card.note)) {
+  if (shouldShowHoverDetails) {
     return (
-      <HoverCard openDelay={400} closeDelay={100}>
+      <HoverCard openDelay={320} closeDelay={120}>
         <HoverCardTrigger asChild>
           {cardContent}
         </HoverCardTrigger>
-        <HoverCardContent side="top" className="w-64 p-3" sideOffset={4}>
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-foreground">{card.title}</span>
-              <span className="text-[10px] text-muted-foreground truncate">{card.url}</span>
+        <HoverCardContent
+          side="right"
+          align="start"
+          className="wc-card-hover-detail w-80 rounded-2xl border border-white/80 bg-white/95 p-4 shadow-[0_24px_60px_rgba(37,99,235,0.18)] backdrop-blur-xl"
+          sideOffset={10}
+        >
+          <div className="space-y-2">
+            <div className="space-y-1">
+              <p className="break-words text-sm font-semibold leading-snug text-slate-950">{card.title}</p>
+              <p className="break-all text-[10px] leading-relaxed text-slate-400">{card.url}</p>
             </div>
-            {card.fullDesc && (
-              <p className="text-xs text-muted-foreground leading-relaxed">{card.fullDesc}</p>
+            {card.shortDesc && (
+              <p className="break-words text-xs leading-relaxed text-slate-600">{card.shortDesc}</p>
+            )}
+            {detailDescription && detailDescription !== card.shortDesc && (
+              <p className="break-words text-xs leading-relaxed text-slate-500">{detailDescription}</p>
             )}
             {card.note && (
               <p className="text-[11px] text-primary/80 italic">备注: {card.note}</p>

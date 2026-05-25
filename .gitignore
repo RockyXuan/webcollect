@@ -83,6 +83,11 @@ Desktop.ini
 *.temp
 .tmp/
 .temp/
+tmp/
+
+# Local thread exports / handoff scratch files
+LASTWEBCOLLECT MD.docx
+lastwebcollectthreadmd.txt
 
 # Optional files
 *.tgz

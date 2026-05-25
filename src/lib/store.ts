@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { WebCard, Category, HiddenSite, HideDuration, LinkOpenMode, RecycleBinItem, CollectionSection } from "./types";
+import type { WebCard, Category, HiddenSite, HideDuration, LinkOpenMode, RecycleBinItem, CollectionSection, PinnedBookmarkItem } from "./types";
 import {
   getCards,
   saveCards,
@@ -16,6 +16,8 @@ import {
   saveHiddenSites,
   getPinnedCategoryIds,
   savePinnedCategoryIds,
+  getPinnedBookmarkItems,
+  savePinnedBookmarkItems,
   getCategoryWidths,
   saveCategoryWidths,
   getVisualScale,
@@ -35,6 +37,12 @@ import {
   withoutLocalChangeEvents,
 } from "./db";
 import { createLocalDataSnapshot } from "./local-snapshots";
+import {
+  normalizePinnedBookmarkItems,
+  reorderPinnedBookmarkItems,
+  togglePinnedBookmarkItem,
+  updatePinnedBookmarkItem,
+} from "./pinned-bookmarks";
 
 const DEFAULT_SECTION_ID = "section-default";
 
@@ -182,23 +190,38 @@ function ensureParentDirectCardsAreVisible(
   return { categories: nextCategories, cards: nextCards, changed };
 }
 
-function removeRecoveredMainData(categories: Category[], cards: WebCard[]): { categories: Category[]; cards: WebCard[] } {
+function removeRecoveredMainData(
+  categories: Category[],
+  cards: WebCard[],
+  activeSectionId: string
+): { categories: Category[]; cards: WebCard[]; changed: boolean } {
   const recoveredIds = new Set(
     categories
       .filter((category) => /^Recovered\s+[0-9a-f-]+$/i.test(category.name.trim()))
       .map((category) => category.id)
   );
+  if (recoveredIds.size === 0) {
+    return { categories, cards, changed: false };
+  }
+
   const nextCategories = categories.filter((category) => !recoveredIds.has(category.id));
-  const validIds = new Set(nextCategories.map((category) => category.id));
-  return {
-    categories: nextCategories,
-    cards: cards.filter((card) => validIds.has(card.categoryId) && !recoveredIds.has(card.categoryId)),
-  };
+  const now = Date.now();
+  const inbox = ensureInboxForSection(nextCategories, activeSectionId, now);
+  let nextOrder = cards
+    .filter((card) => card.categoryId === inbox.inboxId)
+    .reduce((max, card) => Math.max(max, card.order), -1);
+  const nextCards = cards.map((card) => {
+    if (!recoveredIds.has(card.categoryId)) return card;
+    nextOrder += 1;
+    return { ...card, categoryId: inbox.inboxId, order: nextOrder, updatedAt: now };
+  });
+
+  return { categories: inbox.categories, cards: nextCards, changed: true };
 }
 
 function ensureSectionInboxes(categories: Category[], sections: CollectionSection[]): Category[] {
   const nextCategories = categories.map((category) =>
-    category.name.trim() === "\u6536\u96c6\u7bb1" ? { ...category, isParent: false } : category
+    category.name.trim() === "\u6536\u96c6\u7bb1" && category.isParent ? { ...category, isParent: false } : category
   );
   for (const section of sections) {
     const hasInbox = nextCategories.some(
@@ -221,6 +244,118 @@ function ensureSectionInboxes(categories: Category[], sections: CollectionSectio
     }
   }
   return nextCategories;
+}
+
+function ensureInboxForSection(
+  categories: Category[],
+  sectionId: string,
+  now: number
+): { categories: Category[]; inboxId: string; changed: boolean } {
+  const existing = categories.find(
+    (category) =>
+      !category.parentId &&
+      (category.sectionId || DEFAULT_SECTION_ID) === sectionId &&
+      category.name.trim() === "\u6536\u96c6\u7bb1"
+  );
+  if (existing) {
+    return { categories, inboxId: existing.id, changed: false };
+  }
+
+  const preferredId = sectionId === DEFAULT_SECTION_ID ? "cat-inbox" : `cat-inbox-${sectionId}`;
+  const ids = new Set(categories.map((category) => category.id));
+  const inboxId = ids.has(preferredId) ? `cat-inbox-${sectionId}-${now}` : preferredId;
+  return {
+    categories: [
+      ...categories,
+      {
+        id: inboxId,
+        name: "\u6536\u96c6\u7bb1",
+        icon: "inbox",
+        color: "#888888",
+        order: 99,
+        createdAt: now,
+        updatedAt: now,
+        sectionId,
+      },
+    ],
+    inboxId,
+    changed: true,
+  };
+}
+
+function repairMainDataVisibility(
+  categories: Category[],
+  cards: WebCard[],
+  sections: CollectionSection[],
+  activeSectionId: string
+): { categories: Category[]; cards: WebCard[]; changed: boolean } {
+  const sectionIds = new Set(sections.map((section) => section.id));
+  const fallbackSectionId = sectionIds.has(activeSectionId)
+    ? activeSectionId
+    : getDefaultSectionId(sections);
+  const now = Date.now();
+
+  const categoriesWithInboxes = ensureSectionInboxes(categories, sections);
+  let changed =
+    categoriesWithInboxes.length !== categories.length ||
+    categoriesWithInboxes.some((category, index) => category !== categories[index]);
+  let nextCategories = categoriesWithInboxes.map((category) => ({ ...category }));
+
+  const categoryById = () => new Map(nextCategories.map((category) => [category.id, category]));
+  let byId = categoryById();
+
+  nextCategories = nextCategories.map((category) => {
+    let next = category;
+    const sectionId = next.sectionId || DEFAULT_SECTION_ID;
+    if (!sectionIds.has(sectionId)) {
+      next = { ...next, sectionId: fallbackSectionId, updatedAt: now };
+      changed = true;
+    }
+
+    if (next.parentId) {
+      const parent = byId.get(next.parentId);
+      if (!parent) {
+        const detached = { ...next, isParent: false, updatedAt: now };
+        delete detached.parentId;
+        next = detached;
+        changed = true;
+      } else {
+        const rawParentSectionId = parent.sectionId || DEFAULT_SECTION_ID;
+        const parentSectionId = sectionIds.has(rawParentSectionId) ? rawParentSectionId : fallbackSectionId;
+        if ((next.sectionId || DEFAULT_SECTION_ID) !== parentSectionId) {
+          next = { ...next, sectionId: parentSectionId, updatedAt: now };
+          changed = true;
+        }
+      }
+    }
+
+    return next;
+  });
+
+  byId = categoryById();
+  let nextCards = cards.map((card) => ({ ...card }));
+  const invalidCards = nextCards.filter((card) => !byId.has(card.categoryId));
+  if (invalidCards.length > 0) {
+    const inbox = ensureInboxForSection(nextCategories, fallbackSectionId, now);
+    nextCategories = inbox.categories;
+    const maxOrder = nextCards
+      .filter((card) => card.categoryId === inbox.inboxId)
+      .reduce((max, card) => Math.max(max, card.order), -1);
+    let offset = 1;
+    nextCards = nextCards.map((card) => {
+      if (byId.has(card.categoryId)) return card;
+      changed = true;
+      return {
+        ...card,
+        categoryId: inbox.inboxId,
+        order: maxOrder + offset++,
+        updatedAt: now,
+      };
+    });
+    changed = true;
+  }
+
+  return { categories: nextCategories, cards: nextCards, changed };
 }
 
 async function resolveCardDropCategoryId(
@@ -308,6 +443,13 @@ interface AppState {
   togglePinCategory: (categoryId: string) => void;
   isCategoryPinned: (categoryId: string) => boolean;
 
+  // Global bookmark bar
+  pinnedBookmarkItems: PinnedBookmarkItem[];
+  togglePinBookmark: (cardId: string) => void;
+  updatePinnedBookmark: (item: PinnedBookmarkItem) => void;
+  reorderPinnedBookmarks: (orderedIds: string[]) => void;
+  isBookmarkPinned: (cardId: string) => boolean;
+
   // Category widths
   categoryWidths: Record<string, number>;
   setCategoryWidth: (categoryId: string, widthPercent: number) => void;
@@ -340,18 +482,20 @@ export const useAppStore = create<AppState>((set, get) => ({
   editMode: false,
   defaultHideDuration: "1w" as HideDuration,
   pinnedCategoryIds: [] as string[],
+  pinnedBookmarkItems: [] as PinnedBookmarkItem[],
   categoryWidths: {} as Record<string, number>,
   visualScale: 100,
   linkOpenMode: "new-background-tab",
 
   loadData: async () => {
     set({ isLoading: true });
-    const [storedCards, initCategories, init, hiddenSites, pinnedIds, widths, visualScale, linkOpenMode, storedSections, storedActiveSectionId, workspaceResetAt] = await Promise.all([
+    const [storedCards, initCategories, init, hiddenSites, pinnedIds, pinnedBookmarkItems, widths, visualScale, linkOpenMode, storedSections, storedActiveSectionId, workspaceResetAt] = await Promise.all([
       getCards(),
       getCategories(),
       isInitialized(),
       getHiddenSites(),
       getPinnedCategoryIds(),
+      getPinnedBookmarkItems(),
       getCategoryWidths(),
       getVisualScale(),
       getLinkOpenMode(),
@@ -401,6 +545,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       await withoutLocalChangeEvents(() => saveCategories(categories));
     }
 
+    const visibilityRepair = repairMainDataVisibility(categories, cards, sections, activeSectionId);
+    if (visibilityRepair.changed) {
+      categories = visibilityRepair.categories;
+      cards = visibilityRepair.cards;
+      await withoutLocalChangeEvents(async () => {
+        await saveCategories(categories);
+        await saveCards(cards);
+      });
+    }
+
     // Clean up expired hidden sites (non-permanent)
     const now = Date.now();
     const cleanedHidden = hiddenSites.filter((h) => {
@@ -423,6 +577,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       activeSectionId,
       hiddenSites: cleanedHidden,
       pinnedCategoryIds: pinnedIds,
+      pinnedBookmarkItems: normalizePinnedBookmarkItems(pinnedBookmarkItems),
       categoryWidths: widths,
       visualScale,
       linkOpenMode,
@@ -453,6 +608,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         return c;
       });
       await withoutLocalChangeEvents(() => saveCards(updated));
+      cards = updated;
       set({ cards: updated });
     }
 
@@ -465,11 +621,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       await withoutLocalChangeEvents(() => saveCategories(categories));
     }
 
-    const cleanedMainData = removeRecoveredMainData(categories, cards);
-    if (
-      cleanedMainData.categories.length !== categories.length ||
-      cleanedMainData.cards.length !== cards.length
-    ) {
+    const cleanedMainData = removeRecoveredMainData(categories, cards, activeSectionId);
+    if (cleanedMainData.changed) {
       categories = cleanedMainData.categories;
       cards = cleanedMainData.cards;
       await withoutLocalChangeEvents(async () => {
@@ -949,6 +1102,28 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   isCategoryPinned: (categoryId) => {
     return get().pinnedCategoryIds.includes(categoryId);
+  },
+
+  togglePinBookmark: async (cardId) => {
+    const next = togglePinnedBookmarkItem(get().pinnedBookmarkItems, cardId);
+    await savePinnedBookmarkItems(next);
+    set({ pinnedBookmarkItems: next });
+  },
+
+  updatePinnedBookmark: async (item) => {
+    const next = updatePinnedBookmarkItem(get().pinnedBookmarkItems, item);
+    await savePinnedBookmarkItems(next);
+    set({ pinnedBookmarkItems: next });
+  },
+
+  reorderPinnedBookmarks: async (orderedIds) => {
+    const next = reorderPinnedBookmarkItems(get().pinnedBookmarkItems, orderedIds);
+    await savePinnedBookmarkItems(next);
+    set({ pinnedBookmarkItems: next });
+  },
+
+  isBookmarkPinned: (cardId) => {
+    return get().pinnedBookmarkItems.some((item) => item.cardId === cardId);
   },
 
   setCategoryWidth: (categoryId, widthPercent) => {

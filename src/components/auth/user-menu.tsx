@@ -5,12 +5,17 @@ import { AlertCircle, Check, History, Loader2, LogOut, RefreshCw, Settings, Tras
 import { useAuthStore } from "@/lib/auth-store";
 import type { LinkOpenMode } from "@/lib/types";
 import { LocalSnapshotDialog } from "@/components/dialogs/local-snapshot-dialog";
-import { saveVersionAndClearLocalData } from "@/lib/local-snapshots";
+import { restoreStructureFromBestLocalSnapshot, saveVersionAndClearLocalData } from "@/lib/local-snapshots";
 import { isChromeExtension } from "@/lib/platform";
 import { DEFAULT_EXTENSION_CONFIG, EXTENSION_STORAGE_KEYS, setSupabaseConfig } from "@/lib/supabase-browser";
-import { repairLayoutFromHomelyImport } from "@/lib/recover-layout";
 import { useAppStore } from "@/lib/store";
 import { pushLocalSnapshotToCloud } from "@/lib/sync";
+import {
+  DEFAULT_FLOATING_CAPTURE_PREFS,
+  getFloatingCapturePrefs,
+  saveFloatingCapturePrefs,
+  type FloatingCapturePrefs,
+} from "@/lib/floating-capture";
 
 function formatSyncTime(timestamp: number): string {
   return new Date(timestamp).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
@@ -41,17 +46,17 @@ export function SyncStatusBadge() {
         ? AlertCircle
         : RefreshCw;
   const tone = syncStatus === "error"
-    ? "border-destructive/40 bg-destructive/10 text-destructive"
+    ? "border-rose-200 bg-rose-50/90 text-rose-600"
     : syncStatus === "syncing" || syncStatus === "queued"
-      ? "border-primary/40 bg-primary/10 text-primary"
-      : "border-border bg-card text-muted-foreground";
+      ? "border-blue-200 bg-blue-50/90 text-blue-600"
+      : "border-emerald-200 bg-white/80 text-slate-600";
 
   return (
     <button
       type="button"
       disabled={syncStatus === "syncing"}
       onClick={manualSync}
-      className={`hidden lg:flex h-7 max-w-[260px] items-center gap-1.5 rounded-md border px-2 text-[11px] transition-colors hover:bg-accent disabled:cursor-wait disabled:opacity-80 ${tone}`}
+      className={`wc-sync-status-badge hidden rounded-2xl border px-3 text-xs shadow-sm shadow-blue-100/50 backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:bg-white disabled:cursor-wait disabled:opacity-80 lg:flex ${tone}`}
       title={
         syncStatus === "error" && error
           ? `${error}\n\u70b9\u51fb\u91cd\u8bd5\u4e91\u7aef\u540c\u6b65`
@@ -59,14 +64,15 @@ export function SyncStatusBadge() {
       }
     >
       {showLocalText && (
-        <>
+        <span className="wc-sync-status-line text-[11px] leading-none text-emerald-600">
           <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
-          <span className="shrink-0">{localText}</span>
-          <span className="text-muted-foreground/40">/</span>
-        </>
+          <span className="truncate">{localText}</span>
+        </span>
       )}
-      <Icon className={`h-3.5 w-3.5 shrink-0 ${syncStatus === "syncing" ? "animate-spin" : ""}`} />
-      <span className="truncate">{cloudText}</span>
+      <span className="wc-sync-status-line">
+        <Icon className={`h-3.5 w-3.5 shrink-0 ${syncStatus === "syncing" ? "animate-spin" : ""}`} />
+        <span className="truncate">{cloudText}</span>
+      </span>
     </button>
   );
 }
@@ -95,6 +101,7 @@ export function UserMenu() {
   const [repairMessage, setRepairMessage] = useState("");
   const [clearingData, setClearingData] = useState(false);
   const [clearMessage, setClearMessage] = useState("");
+  const [capturePrefs, setCapturePrefs] = useState<FloatingCapturePrefs | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const visualScale = useAppStore((s) => s.visualScale);
   const setVisualScale = useAppStore((s) => s.setVisualScale);
@@ -142,6 +149,11 @@ export function UserMenu() {
     );
   }, []);
 
+  useEffect(() => {
+    if (!isChromeExtension()) return;
+    void getFloatingCapturePrefs().then(setCapturePrefs);
+  }, []);
+
   const saveExtensionConfig = async () => {
     if (!isChromeExtension() || !chrome.storage?.local) return;
     const config = {
@@ -161,7 +173,7 @@ export function UserMenu() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <div className="flex items-center gap-1.5 text-xs text-slate-500">
         <Loader2 className="h-3.5 w-3.5 animate-spin" />
       </div>
     );
@@ -172,7 +184,7 @@ export function UserMenu() {
       <div className="relative flex items-center gap-1.5" ref={menuRef}>
         <button
           onClick={loginWithGoogle}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md border border-border bg-card text-foreground hover:bg-accent transition-colors"
+          className="wc-login-button"
         >
           <svg className="h-3.5 w-3.5" viewBox="0 0 24 24">
             <path
@@ -192,7 +204,7 @@ export function UserMenu() {
               d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
             />
           </svg>
-          Login
+          Google 登录
         </button>
         {isChromeExtension() && (
           <button
@@ -201,45 +213,45 @@ export function UserMenu() {
               setConfigOpen((open) => !open);
               setConfigSaved(false);
             }}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-            title="Login settings"
+            className="wc-round-tool"
+            title="登录配置"
           >
             <Settings className="h-3.5 w-3.5" />
           </button>
         )}
         {(error || configOpen) && (
-          <div className="absolute right-0 top-full mt-2 w-96 rounded-lg border border-border bg-card shadow-lg z-50 p-3 space-y-3">
+          <div className="wc-config-popover absolute right-0 top-full z-50 mt-3 w-96 max-w-[calc(100vw-24px)] p-4">
             {error && (
-              <div className="flex gap-2 text-xs text-destructive">
+              <div className="wc-inline-message-danger flex gap-2 p-3 text-xs">
                 <AlertCircle className="h-4 w-4 shrink-0" />
                 <span className="max-h-24 overflow-y-auto break-words">{error}</span>
               </div>
             )}
             {isChromeExtension() && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-foreground">Extension Supabase config</p>
+              <div className="space-y-3">
+                <p className="text-sm font-semibold text-slate-900">扩展登录配置</p>
                 <input
                   value={supabaseUrl}
                   onChange={(e) => setSupabaseUrl(e.target.value)}
                   placeholder="https://your-project.supabase.co"
-                  className="w-full px-2 py-1.5 text-xs rounded-md border border-border bg-background text-foreground"
+                  className="wc-input h-9 w-full rounded-2xl px-3 text-xs text-slate-900 outline-none"
                 />
                 <input
                   value={supabaseAnonKey}
                   onChange={(e) => setSupabaseAnonKey(e.target.value)}
                   placeholder="Supabase anon public key"
-                  className="w-full px-2 py-1.5 text-xs rounded-md border border-border bg-background text-foreground"
+                  className="wc-input h-9 w-full rounded-2xl px-3 text-xs text-slate-900 outline-none"
                 />
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] text-muted-foreground">
-                    {configSaved ? "Saved. Reload this page, then login." : "Find it in Supabase Project Settings > API."}
+                  <span className="text-[11px] leading-relaxed text-slate-500">
+                    {configSaved ? "已保存，刷新页面后再登录。" : "在 Supabase Project Settings > API 中查看。"}
                   </span>
                   <button
                     type="button"
                     onClick={saveExtensionConfig}
-                    className="px-2.5 py-1.5 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+                    className="wc-action-primary h-8 rounded-xl px-3 text-xs"
                   >
-                    Save
+                    保存
                   </button>
                 </div>
               </div>
@@ -309,21 +321,44 @@ export function UserMenu() {
     }
   };
 
-  const repairImportedLayout = async () => {
+  const updateCapturePrefs = async (patch: Partial<FloatingCapturePrefs>) => {
+    const next = {
+      ...(capturePrefs || DEFAULT_FLOATING_CAPTURE_PREFS),
+      ...patch,
+    };
+    setCapturePrefs(next);
+    await saveFloatingCapturePrefs(next);
+  };
+
+  const toggleAllLinksHover = async () => {
+    if (!capturePrefs) return;
+    if (!capturePrefs.allLinksHoverEnabled) {
+      const ok = window.confirm(
+        "开启后，页面上几乎所有链接悬停都会出现 WC 提示，可能比较打扰。建议只在临时整理链接时开启。确定开启吗？"
+      );
+      if (!ok) return;
+    }
+    await updateCapturePrefs({
+      hoverEnabled: true,
+      allLinksHoverEnabled: !capturePrefs.allLinksHoverEnabled,
+    });
+  };
+
+  const restoreStructureOnly = async () => {
     const ok = window.confirm(
-      "\u5c06\u5148\u4fdd\u5b58\u672c\u5730\u5feb\u7167\uff0c\u7136\u540e\u6309\u5bfc\u5165\u7ed3\u6784\u4fee\u590d\u88ab\u6253\u6563\u7684\u5206\u7ec4\u5173\u7cfb\u3002\u8fd9\u4e0d\u4f1a\u5220\u9664\u4f60\u7684\u7f51\u9875\u3002\u7ee7\u7eed\u5417\uff1f"
+      "\u5c06\u5148\u4fdd\u5b58\u5f53\u524d\u72b6\u6001\uff0c\u7136\u540e\u4ece\u672c\u5730\u5386\u53f2\u4e2d\u9009\u62e9\u7ed3\u6784\u6700\u5b8c\u6574\u7684\u4e00\u7248\uff0c\u53ea\u6062\u590d\u5206\u9879/\u5206\u7c7b/\u5206\u7ec4\u5173\u7cfb\uff0c\u4fdd\u7559\u6240\u6709\u73b0\u6709\u7f51\u9875\u3002\u5982\u679c\u4f60\u5f53\u524d\u9875\u9762\u5df2\u7ecf\u6b63\u786e\uff0c\u8bf7\u4e0d\u8981\u70b9\u8fd9\u4e2a\uff0c\u76f4\u63a5\u624b\u52a8\u4e91\u540c\u6b65\u3002\u7ee7\u7eed\u5417\uff1f"
     );
     if (!ok) return;
     setRepairingLayout(true);
     setRepairMessage("");
     try {
-      const result = await repairLayoutFromHomelyImport();
+      const result = await restoreStructureFromBestLocalSnapshot();
       await useAppStore.getState().loadData();
       setRepairMessage(
-        `\u5df2\u4fee\u590d ${result.categoriesTouched} \u4e2a\u5206\u7c7b\u5173\u7cfb\uff0c\u79fb\u52a8 ${result.cardsMoved} \u4e2a\u7f51\u9875`
+        `\u5df2\u4ece ${formatSyncTime(result.snapshotCreatedAt)} \u7684\u5feb\u7167\u4fee\u590d\u7ed3\u6784\uff1a${result.categoriesTouched} \u4e2a\u5206\u7c7b\u5173\u7cfb\uff0c${result.cardsMoved} \u4e2a\u7f51\u9875\u4f4d\u7f6e\uff0c\u5df2\u4fdd\u7559 ${result.newCardsKept} \u4e2a\u73b0\u6709\u7f51\u9875\u3002\u786e\u8ba4\u9875\u9762\u6b63\u786e\u540e\u518d\u624b\u52a8\u4e91\u540c\u6b65\u3002`
       );
     } catch (err) {
-      setRepairMessage(err instanceof Error ? err.message : "\u4fee\u590d\u5931\u8d25");
+      setRepairMessage(err instanceof Error ? err.message : "\u4fee\u590d\u7ed3\u6784\u5931\u8d25");
     } finally {
       setRepairingLayout(false);
     }
@@ -334,150 +369,287 @@ export function UserMenu() {
       <LocalSnapshotDialog open={snapshotOpen} onOpenChange={setSnapshotOpen} />
       <button
         onClick={() => setMenuOpen(!menuOpen)}
-        className="flex items-center gap-1.5 rounded-full p-0.5 hover:ring-2 hover:ring-primary/30 transition-all"
+        aria-label="打开账户设置"
+        className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--wc-primary-gradient)] p-1 text-white shadow-[0_14px_32px_rgba(37,99,235,0.32)] transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(79,70,229,0.36)]"
       >
         {user?.avatarUrl ? (
           <img
             src={user.avatarUrl}
             alt={user.displayName || user.email}
-            className="h-7 w-7 rounded-full object-cover"
+            className="h-9 w-9 rounded-full object-cover ring-2 ring-white/80"
           />
         ) : (
-          <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center">
-            <User className="h-4 w-4 text-primary" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15">
+            <User className="h-4 w-4 text-white" />
           </div>
         )}
       </button>
 
       {menuOpen && (
-        <div className="absolute right-0 top-full mt-1.5 w-56 rounded-lg border border-border bg-card shadow-lg z-50 py-1">
-          <div className="px-3 py-2 border-b border-border">
-            <p className="text-sm font-medium text-foreground truncate">
-              {user?.displayName || "User"}
-            </p>
-            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+        <div
+          className="wc-drawer-backdrop fixed inset-0 z-40"
+          aria-hidden="true"
+          onClick={() => {
+            setMenuOpen(false);
+            setConfigOpen(false);
+          }}
+        />
+      )}
+
+      {menuOpen && (
+        <div className="wc-settings-panel fixed right-6 top-5 z-50 max-h-[calc(100vh-2.5rem)] overflow-y-auto p-4">
+          <div className="wc-settings-hero mb-4 flex items-center gap-4 p-4">
+            <div className="wc-settings-avatar flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-2xl font-semibold">
+              {(user?.displayName || user?.email || "X").slice(0, 1).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-lg font-semibold text-slate-950">
+                {user?.displayName || "User"}
+              </p>
+              <p className="truncate text-sm text-slate-500">{user?.email}</p>
+            </div>
           </div>
 
-          <div className="px-3 py-2 flex items-center gap-2 text-xs text-muted-foreground border-b border-border">
+          <div className="wc-settings-card mb-3 flex items-center gap-3 px-4 py-3 text-sm text-slate-600">
             <SyncIcon className={`h-3.5 w-3.5 ${syncStatus === "syncing" ? "animate-spin" : ""}`} />
             <span>{syncLabel[syncStatus]}</span>
             {lastSyncAt && syncStatus !== "syncing" && (
-              <span className="ml-auto text-[10px]">
+              <span className="ml-auto text-xs">
                 {formatSyncTime(lastSyncAt)}
               </span>
             )}
           </div>
 
-          <button
-            type="button"
-            disabled={syncStatus === "syncing"}
-            onClick={manualSync}
-            className="w-full px-3 py-2 text-left text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors border-b border-border"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${syncStatus === "syncing" ? "animate-spin" : ""}`} />
-            {"\u624b\u52a8\u540c\u6b65\u5f53\u524d\u9875\u9762"}
-          </button>
-
-          <div className="px-3 py-2 border-b border-border flex items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>{"\u540c\u6b65\u6a21\u5f0f"}</span>
-            <div className="inline-flex rounded-md border border-border overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setSyncMode("manual")}
-                className={`px-2 py-1 transition-colors ${syncMode === "manual" ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`}
-              >
-                {"\u624b\u52a8"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setSyncMode("auto")}
-                className={`px-2 py-1 transition-colors ${syncMode === "auto" ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`}
-              >
-                {"\u81ea\u52a8"}
-              </button>
-            </div>
-          </div>
-
-          <div className="px-3 py-2 border-b border-border space-y-2 text-xs text-muted-foreground">
-            <div className="flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1.5">
-                <Type className="h-3.5 w-3.5" />
-                {"\u9875\u9762\u5927\u5c0f"}
-              </span>
-              <span className="text-[11px] tabular-nums">{visualScale}%</span>
-            </div>
-            <input
-              type="range"
-              min={85}
-              max={125}
-              step={5}
-              value={visualScale}
-              onChange={(e) => setVisualScale(Number(e.target.value))}
-              className="w-full accent-primary"
-              title={"\u9875\u9762\u5927\u5c0f"}
-            />
-          </div>
-
-          <div className="px-3 py-2 border-b border-border flex items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>{"\u7f51\u9875\u6253\u5f00\u65b9\u5f0f"}</span>
-            <select
-              value={linkOpenMode}
-              onChange={(e) => setLinkOpenMode(e.target.value as LinkOpenMode)}
-              className="h-7 max-w-[128px] rounded-md border border-border bg-card px-2 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
-              title={"\u7f51\u9875\u6253\u5f00\u65b9\u5f0f"}
+          <div className="wc-settings-card mb-3 space-y-3 p-3">
+            <div className="wc-settings-label px-1">同步</div>
+            <button
+              type="button"
+              disabled={syncStatus === "syncing"}
+              onClick={manualSync}
+              className="wc-panel-action"
             >
-              <option value="new-background-tab">{"\u7559\u5728 WebCollect"}</option>
-              <option value="new-active-tab">{"\u5207\u5230\u65b0\u6807\u7b7e"}</option>
-              <option value="current-tab">{"\u5f53\u524d\u9875\u6253\u5f00"}</option>
-            </select>
+              <RefreshCw className={`h-3.5 w-3.5 ${syncStatus === "syncing" ? "animate-spin" : ""}`} />
+              {"手动同步当前页面"}
+            </button>
+            <div className="flex items-center justify-between gap-3 px-1 text-xs text-slate-500">
+              <span>{"同步模式"}</span>
+              <div className="wc-segmented">
+                <button
+                  type="button"
+                  onClick={() => setSyncMode("manual")}
+                  data-active={syncMode === "manual"}
+                >
+                  {"手动"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSyncMode("auto")}
+                  data-active={syncMode === "auto"}
+                >
+                  {"自动"}
+                </button>
+              </div>
+            </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              setMenuOpen(false);
-              setSnapshotOpen(true);
-            }}
-            className="w-full px-3 py-2 text-left text-xs text-muted-foreground hover:bg-accent hover:text-foreground flex items-center gap-2 transition-colors border-b border-border"
-          >
-            <History className="h-3.5 w-3.5" />
-            {"\u7248\u672c\u56de\u6863"}
-          </button>
+          <div className="wc-settings-card mb-3 space-y-4 p-3">
+            <div className="wc-settings-label px-1">显示</div>
+            <div className="space-y-2 px-1 text-xs text-slate-500">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5">
+                  <Type className="h-3.5 w-3.5" />
+                  {"页面大小"}
+                </span>
+                <span className="text-[11px] tabular-nums text-slate-500">{visualScale}%</span>
+              </div>
+              <input
+                type="range"
+                min={85}
+                max={125}
+                step={5}
+                value={visualScale}
+                onChange={(e) => setVisualScale(Number(e.target.value))}
+                className="wc-range w-full"
+                title={"页面大小"}
+              />
+            </div>
 
-          <button
-            type="button"
-            disabled={clearingData || syncStatus === "syncing"}
-            onClick={saveVersionAndClearData}
-            className="w-full px-3 py-2 text-left text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-wait flex items-center gap-2 transition-colors border-b border-border"
-          >
-            {clearingData ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-            {"\u4fdd\u5b58\u7248\u672c\u5e76\u6e05\u7a7a\u6570\u636e"}
-          </button>
+            <div className="flex items-center justify-between gap-3 px-1 text-xs text-slate-500">
+              <span>{"网页打开方式"}</span>
+              <select
+                value={linkOpenMode}
+                onChange={(e) => setLinkOpenMode(e.target.value as LinkOpenMode)}
+                className="wc-select h-8 max-w-[150px] px-2 text-xs outline-none"
+                title={"网页打开方式"}
+              >
+                <option value="new-background-tab">{"留在 WebCollect"}</option>
+                <option value="new-active-tab">{"切到新标签"}</option>
+                <option value="current-tab">{"当前页打开"}</option>
+              </select>
+            </div>
+          </div>
 
-          <button
-            type="button"
-            disabled={repairingLayout}
-            onClick={repairImportedLayout}
-            className="w-full px-3 py-2 text-left text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50 disabled:cursor-wait flex items-center gap-2 transition-colors border-b border-border"
-          >
-            {repairingLayout ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wrench className="h-3.5 w-3.5" />}
-            {"\u4fee\u590d\u5bfc\u5165\u7ed3\u6784"}
-          </button>
+          {isChromeExtension() && capturePrefs && (
+            <div className="wc-settings-card mb-3 space-y-3 p-3 text-xs text-slate-500">
+              <div className="flex items-center justify-between gap-3">
+                <span className="inline-flex items-center gap-1.5">
+                  <Settings className="h-3.5 w-3.5" />
+                  {"浮窗组件"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => updateCapturePrefs({ enabled: !capturePrefs.enabled })}
+                  className="wc-pill-toggle"
+                  data-active={capturePrefs.enabled}
+                >
+                  {capturePrefs.enabled ? "已开启" : "已关闭"}
+                </button>
+              </div>
+              <p className="text-[11px] leading-relaxed text-slate-500/90">
+                浮窗组件会在网页右侧提供 WC 快捷收集，也可以在显性的链接地址上停留后弹出 WC 小按钮。
+              </p>
+              <div className="space-y-1.5">
+                <div className="px-1 text-[11px] font-semibold text-slate-500">浮窗形象</div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => updateCapturePrefs({ mascot: "chipmunk" })}
+                    className="wc-mascot-choice"
+                    data-active={capturePrefs.mascot !== "otter"}
+                    aria-label="花栗鼠浮窗形象"
+                    title="花栗鼠浮窗形象"
+                  >
+                    <span
+                      className="wc-mascot-choice-art"
+                      style={{ backgroundImage: "url('/assets/mascots/chipmunk-pill.png')" }}
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateCapturePrefs({ mascot: "otter" })}
+                    className="wc-mascot-choice"
+                    data-active={capturePrefs.mascot === "otter"}
+                    aria-label="水獭浮窗形象"
+                    title="水獭浮窗形象"
+                  >
+                    <span
+                      className="wc-mascot-choice-art"
+                      style={{ backgroundImage: "url('/assets/mascots/otter-pill.png')" }}
+                    />
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => updateCapturePrefs({ hoverEnabled: !capturePrefs.hoverEnabled })}
+                  className="wc-pill-toggle"
+                  data-active={capturePrefs.hoverEnabled}
+                >
+                  {`${capturePrefs.hoverEnabled ? "✓ " : ""}显性链接提示`}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateCapturePrefs({ contextMenuEnabled: !capturePrefs.contextMenuEnabled })}
+                  className="wc-pill-toggle"
+                  data-active={capturePrefs.contextMenuEnabled}
+                >
+                  {`${capturePrefs.contextMenuEnabled ? "✓ " : ""}右键菜单`}
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleAllLinksHover}
+                  className="wc-pill-toggle col-span-2"
+                  data-active={capturePrefs.allLinksHoverEnabled}
+                  title="开启后，页面上几乎所有链接都会出现 WC 提示，可能比较打扰。"
+                >
+                  {`${capturePrefs.allLinksHoverEnabled ? "✓ " : ""}所有链接提示（谨慎开启）`}
+                </button>
+              </div>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => updateCapturePrefs({ pauseUntil: Date.now() + 60 * 60 * 1000 })}
+                  className="wc-pill-toggle flex-1 text-center"
+                >
+                  {"暂停 1 小时"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateCapturePrefs({ pauseUntil: null })}
+                  className="wc-pill-toggle flex-1 text-center"
+                >
+                  {"恢复显示"}
+                </button>
+              </div>
+              {capturePrefs.disabledHosts.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => updateCapturePrefs({ disabledHosts: [] })}
+                  className="wc-pill-toggle w-full"
+                  title={"\u6e05\u9664\u6240\u6709\u201c\u6c38\u4e45\u4e0d\u663e\u793a\u201d\u7684\u7f51\u7ad9\u8bb0\u5f55"}
+                >
+                  {"恢复永久不显示的网站"}
+                  <span className="ml-1 text-slate-400">
+                    ({capturePrefs.disabledHosts.length})
+                  </span>
+                </button>
+              )}
+              <p className="text-[11px] leading-relaxed text-slate-500/90">
+                {"本机设置，首版不参与云同步。“永久不显示”可在这里统一恢复。"}
+              </p>
+            </div>
+          )}
+
+          <div className="wc-settings-card space-y-1 p-3">
+            <div className="wc-settings-label px-1">版本与维护</div>
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                setSnapshotOpen(true);
+              }}
+              className="wc-panel-action"
+            >
+              <History className="h-3.5 w-3.5" />
+              {"版本回档"}
+            </button>
+
+            <button
+              type="button"
+              disabled={repairingLayout}
+              onClick={restoreStructureOnly}
+              className="wc-panel-action"
+            >
+              {repairingLayout ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wrench className="h-3.5 w-3.5" />}
+              {"修复结构（保留网页）"}
+            </button>
+
+            <button
+              type="button"
+              disabled={clearingData || syncStatus === "syncing"}
+              onClick={saveVersionAndClearData}
+              className="wc-panel-action wc-panel-action-danger"
+            >
+              {clearingData ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              {"保存版本并清空数据"}
+            </button>
+          </div>
 
           {repairMessage && (
-            <div className="px-3 py-2 border-b border-border text-[11px] leading-relaxed text-muted-foreground">
+            <div className="wc-inline-message mt-3 p-3 text-[11px] leading-relaxed">
               {repairMessage}
             </div>
           )}
 
           {clearMessage && (
-            <div className="px-3 py-2 border-b border-border text-[11px] leading-relaxed text-muted-foreground">
+            <div className="wc-inline-message mt-3 p-3 text-[11px] leading-relaxed">
               {clearMessage}
             </div>
           )}
 
           {syncStatus === "error" && error && (
-            <div className="max-h-32 overflow-y-auto break-words px-3 py-2 border-b border-border text-[11px] leading-relaxed text-destructive">
+            <div className="wc-inline-message-danger mt-3 max-h-32 overflow-y-auto break-words p-3 text-[11px] leading-relaxed">
               {error}
             </div>
           )}
@@ -487,10 +659,10 @@ export function UserMenu() {
               setMenuOpen(false);
               logout();
             }}
-            className="w-full px-3 py-2 text-left text-xs text-muted-foreground hover:bg-accent hover:text-foreground flex items-center gap-2 transition-colors"
+            className="wc-panel-action mt-3 justify-center"
           >
             <LogOut className="h-3.5 w-3.5" />
-            {"\u9000\u51fa\u767b\u5f55"}
+            {"退出登录"}
           </button>
         </div>
       )}

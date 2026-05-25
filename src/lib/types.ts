@@ -13,6 +13,18 @@ export interface WebCard {
   updatedAt: number;
 }
 
+export type PinnedBookmarkDisplayMode = "icon" | "label" | "both";
+
+export interface PinnedBookmarkItem {
+  id: string;
+  cardId: string;
+  order: number;
+  displayMode: PinnedBookmarkDisplayMode;
+  customLabel?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface Category {
   id: string;
   name: string;

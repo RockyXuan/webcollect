@@ -13,10 +13,12 @@
 import { create } from "zustand";
 import { getBrowserSupabaseClient, initBrowserSupabase } from "@/lib/supabase-browser";
 import { isChromeExtension } from "@/lib/platform";
+import { saveCloudWorkspaceSnapshot } from "@/lib/cloud-snapshots";
 import { pushLocalSnapshotToCloud, syncData } from "@/lib/sync";
 import { useAppStore } from "@/lib/store";
 import { getLocalSnapshotSyncedAt, getLocalSnapshotUpdatedAt } from "@/lib/db";
 import { createLocalDataSnapshot } from "@/lib/local-snapshots";
+import { EMERGENCY_RESTORE_PENDING_PUSH_KEY } from "@/lib/emergency-restore";
 
 // 鈹€鈹€ Types 鈹€鈹€
 
@@ -102,6 +104,22 @@ let backgroundSyncRunning = false;
 let cloudRestoreRunning = false;
 let localSafetySnapshotTimer: ReturnType<typeof setTimeout> | null = null;
 
+function hasEmergencyRestorePendingPush(): boolean {
+  try {
+    return !!localStorage.getItem(EMERGENCY_RESTORE_PENDING_PUSH_KEY);
+  } catch {
+    return false;
+  }
+}
+
+function clearEmergencyRestorePendingPush(): void {
+  try {
+    localStorage.removeItem(EMERGENCY_RESTORE_PENDING_PUSH_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 function saveSession(user: AuthUser): void {
   try {
     localStorage.setItem(SESSION_KEY, JSON.stringify(user));
@@ -150,7 +168,12 @@ async function triggerSync(userId: string): Promise<void> {
   store.setState({ syncStatus: "syncing", localSavedAt: null });
 
   try {
-    await syncData(userId);
+    if (hasEmergencyRestorePendingPush()) {
+      await pushLocalSnapshotToCloud(userId);
+      clearEmergencyRestorePendingPush();
+    } else {
+      await syncData(userId);
+    }
     await useAppStore.getState().loadData();
     store.setState({ syncStatus: "success", lastSyncAt: Date.now(), error: null });
     ensureAutoSyncInterval();
@@ -214,8 +237,17 @@ function scheduleLocalSafetySnapshot(): void {
   if (typeof window === "undefined" || localSafetySnapshotTimer) return;
   localSafetySnapshotTimer = setTimeout(() => {
     localSafetySnapshotTimer = null;
-    void createLocalDataSnapshot("auto-local-change", "\u672c\u5730\u4fee\u6539\u81ea\u52a8\u7248\u672c").catch((error) => {
-      console.warn("[Auth] Failed to save local safety snapshot:", error);
+    void (async () => {
+      const snapshot = await createLocalDataSnapshot("auto-local-change", "本地修改自动版本");
+      const user = useAuthStore.getState().user;
+      if (snapshot && user) {
+        await saveCloudWorkspaceSnapshot(user.id, snapshot, {
+          kind: "system",
+          source: "auto-local-change",
+        });
+      }
+    })().catch((error) => {
+      console.warn("[Auth] Failed to save local/cloud safety snapshot:", error);
     });
   }, 10_000);
 }
@@ -340,7 +372,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (cached) {
       set({ user: cached, isLoggedIn: true, isLoading: false });
       if (isAutoSyncEnabled()) {
-        void triggerSync(cached.id);
+        await triggerSync(cached.id);
       }
       return;
     }
@@ -356,7 +388,7 @@ export const useAuthStore = create<AuthState>((set) => ({
           await upsertUser(user);
           set({ user, isLoggedIn: true, isLoading: false });
           if (isAutoSyncEnabled()) {
-            void triggerSync(user.id);
+            await triggerSync(user.id);
           }
           return;
         }

@@ -1,5 +1,11 @@
 import localforage from "localforage";
-import type { WebCard, Category, HiddenSite, LinkOpenMode, RecycleBinItem, CollectionSection } from "./types";
+import type { WebCard, Category, HiddenSite, LinkOpenMode, RecycleBinItem, CollectionSection, PinnedBookmarkItem } from "./types";
+import {
+  DEFAULT_VISUAL_SCALE,
+  VISUAL_SCALE_BASELINE_MIGRATION_KEY,
+  clampVisualScale,
+  shouldMigrateLegacyNinetyScale,
+} from "./visual-scale";
 
 localforage.config({
   name: "WebCollect",
@@ -184,6 +190,8 @@ export async function saveActiveSectionId(sectionId: string): Promise<void> {
 }
 
 const PINNED_CATEGORIES_KEY = "pinnedCategoryIds";
+const PINNED_BOOKMARK_ITEMS_KEY = "pinnedBookmarkItems";
+const PINNED_BOOKMARK_ITEMS_UPDATED_AT_KEY = "pinnedBookmarkItemsUpdatedAt";
 
 export async function getPinnedCategoryIds(): Promise<string[]> {
   return (await localforage.getItem<string[]>(PINNED_CATEGORIES_KEY)) || [];
@@ -191,6 +199,20 @@ export async function getPinnedCategoryIds(): Promise<string[]> {
 
 export async function savePinnedCategoryIds(ids: string[]): Promise<void> {
   await localforage.setItem(PINNED_CATEGORIES_KEY, ids);
+  await touchLocalSnapshot();
+}
+
+export async function getPinnedBookmarkItems(): Promise<PinnedBookmarkItem[]> {
+  return (await localforage.getItem<PinnedBookmarkItem[]>(PINNED_BOOKMARK_ITEMS_KEY)) || [];
+}
+
+export async function getPinnedBookmarkItemsUpdatedAt(): Promise<number> {
+  return (await localforage.getItem<number>(PINNED_BOOKMARK_ITEMS_UPDATED_AT_KEY)) || 0;
+}
+
+export async function savePinnedBookmarkItems(items: PinnedBookmarkItem[], updatedAt = Date.now()): Promise<void> {
+  await localforage.setItem(PINNED_BOOKMARK_ITEMS_KEY, items);
+  await localforage.setItem(PINNED_BOOKMARK_ITEMS_UPDATED_AT_KEY, updatedAt);
   await touchLocalSnapshot();
 }
 
@@ -209,12 +231,18 @@ export async function saveCategoryWidths(widths: Record<string, number>): Promis
 
 export async function getVisualScale(): Promise<number> {
   const scale = await localforage.getItem<number>(VISUAL_SCALE_KEY);
-  if (typeof scale !== "number" || Number.isNaN(scale)) return 100;
-  return Math.max(85, Math.min(125, scale));
+  if (typeof scale !== "number" || Number.isNaN(scale)) return DEFAULT_VISUAL_SCALE;
+  const migrationDone = (await localforage.getItem<boolean>(VISUAL_SCALE_BASELINE_MIGRATION_KEY)) === true;
+  if (shouldMigrateLegacyNinetyScale(scale, migrationDone)) {
+    await localforage.setItem(VISUAL_SCALE_KEY, DEFAULT_VISUAL_SCALE);
+    await localforage.setItem(VISUAL_SCALE_BASELINE_MIGRATION_KEY, true);
+    return DEFAULT_VISUAL_SCALE;
+  }
+  return clampVisualScale(scale);
 }
 
 export async function saveVisualScale(scale: number): Promise<void> {
-  await localforage.setItem(VISUAL_SCALE_KEY, Math.max(85, Math.min(125, scale)));
+  await localforage.setItem(VISUAL_SCALE_KEY, clampVisualScale(scale));
   await touchLocalSnapshot();
 }
 

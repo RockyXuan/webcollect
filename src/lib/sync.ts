@@ -17,6 +17,7 @@
  */
 
 import { getBrowserSupabaseClient, initBrowserSupabase } from "@/lib/supabase-browser";
+import { DEFAULT_VISUAL_SCALE } from "@/lib/visual-scale";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   getCards,
@@ -27,6 +28,9 @@ import {
   saveHiddenSites,
   getPinnedCategoryIds,
   savePinnedCategoryIds,
+  getPinnedBookmarkItems,
+  getPinnedBookmarkItemsUpdatedAt,
+  savePinnedBookmarkItems,
   getCategoryWidths,
   saveCategoryWidths,
   getVisualScale,
@@ -57,9 +61,10 @@ import {
   type WarehouseCategory,
   type ImportBatch,
 } from "@/lib/db-warehouse";
-import { createLocalDataSnapshot } from "@/lib/local-snapshots";
+import { createLocalDataSnapshot, getLocalDataSnapshots } from "@/lib/local-snapshots";
+import { normalizePinnedBookmarkItems } from "@/lib/pinned-bookmarks";
 import { allDefaultCategories } from "@/lib/seed";
-import type { WebCard, Category, HiddenSite, LinkOpenMode, CollectionSection, RecycleBinItem } from "@/lib/types";
+import type { WebCard, Category, HiddenSite, LinkOpenMode, CollectionSection, RecycleBinItem, PinnedBookmarkItem } from "@/lib/types";
 
 // 鈹€鈹€ Types 鈹€鈹€
 
@@ -224,7 +229,6 @@ function ensureFallbackInboxCategory(
     createdAt: now,
     updatedAt: now,
     sectionId: "section-default",
-    isParent: true,
   };
   categories.push(inboxCategory);
   categoriesById.set(inboxCategory.id, inboxCategory);
@@ -283,28 +287,18 @@ async function upsertCategoriesWithParents(
   userId: string
 ): Promise<void> {
   const orderedCategories = sortCategoriesByParentDepth(categories);
+  const categoryIds = new Set(orderedCategories.map((cat) => cat.id));
 
   for (const cat of orderedCategories) {
     const cloudCat = {
       ...localToCloudCategory(cat, userId),
-      parent_id: null,
+      parent_id: cat.parentId && categoryIds.has(cat.parentId) ? cat.parentId : null,
     };
     const { error } = await client
       .from("categories")
       .upsert(cloudCat, { onConflict: "id" });
     if (error) {
-      console.error("[Sync] Failed to create category:", cat.id, error.message);
-      throw new Error(`Failed to create category "${cat.name}": ${error.message}`);
-    }
-  }
-
-  for (const cat of orderedCategories) {
-    const cloudCat = localToCloudCategory(cat, userId);
-    const { error } = await client
-      .from("categories")
-      .upsert(cloudCat, { onConflict: "id" });
-    if (error) {
-      console.error("[Sync] Failed to update category:", cat.id, error.message);
+      console.error("[Sync] Failed to upsert category:", cat.id, error.message);
       throw new Error(`Failed to update category "${cat.name}": ${error.message}`);
     }
   }
@@ -358,6 +352,28 @@ async function upsertCardsInChunks(
       .upsert(chunk, { onConflict: "id" });
     if (error) {
       throw new Error(`Failed to push card batch ${Math.floor(index / chunkSize) + 1}: ${error.message}`);
+    }
+  }
+}
+
+async function deleteRowsByIdsInChunks(
+  client: SupabaseClient,
+  table: "cards" | "categories",
+  ids: string[],
+  userId: string
+): Promise<void> {
+  const uniqueIds = [...new Set(ids)].filter(isUuid);
+  const chunkSize = 100;
+  for (let index = 0; index < uniqueIds.length; index += chunkSize) {
+    const chunk = uniqueIds.slice(index, index + chunkSize);
+    if (chunk.length === 0) continue;
+    const { error } = await client
+      .from(table)
+      .delete()
+      .eq("user_id", userId)
+      .in("id", chunk);
+    if (error) {
+      throw new Error(`Failed to remove duplicated ${table}: ${error.message}`);
     }
   }
 }
@@ -432,6 +448,94 @@ function normalizeUrl(value: string): string {
   } catch {
     return value.trim().replace(/\/$/, "").toLowerCase();
   }
+}
+
+interface DefaultDuplicateCleanupResult {
+  categories: Category[];
+  cards: WebCard[];
+  removedCards: number;
+  removedCategories: number;
+  removedCardIds: string[];
+  removedCategoryIds: string[];
+}
+
+function cleanDefaultSectionDuplicateCards(
+  categories: Category[],
+  cards: WebCard[]
+): DefaultDuplicateCleanupResult {
+  const categoryById = new Map(categories.map((category) => [category.id, category]));
+  const cardsByUrl = new Map<string, WebCard[]>();
+
+  for (const card of cards) {
+    const key = normalizeUrl(card.url);
+    if (!key) continue;
+    const group = cardsByUrl.get(key) || [];
+    group.push(card);
+    cardsByUrl.set(key, group);
+  }
+
+  const duplicateHomeCardIds = new Set<string>();
+  for (const group of cardsByUrl.values()) {
+    const hasNonDefault = group.some((card) => {
+      const category = categoryById.get(card.categoryId);
+      return category && (category.sectionId || "section-default") !== "section-default";
+    });
+    if (!hasNonDefault) continue;
+
+    for (const card of group) {
+      const category = categoryById.get(card.categoryId);
+      if ((category?.sectionId || "section-default") === "section-default") {
+        duplicateHomeCardIds.add(card.id);
+      }
+    }
+  }
+
+  // Avoid pruning a deliberate small cross-section shortcut. The broken state
+  // has hundreds of homepage duplicates, while normal use should only have a few.
+  if (duplicateHomeCardIds.size < 12) {
+    return {
+      categories,
+      cards,
+      removedCards: 0,
+      removedCategories: 0,
+      removedCardIds: [],
+      removedCategoryIds: [],
+    };
+  }
+
+  const nextCards = cards.filter((card) => !duplicateHomeCardIds.has(card.id));
+  const reachableCategoryIds = new Set<string>();
+
+  function markCategoryAndParents(categoryId: string | undefined): void {
+    if (!categoryId || reachableCategoryIds.has(categoryId)) return;
+    const category = categoryById.get(categoryId);
+    if (!category) return;
+    reachableCategoryIds.add(category.id);
+    markCategoryAndParents(category.parentId);
+  }
+
+  for (const card of nextCards) {
+    markCategoryAndParents(card.categoryId);
+  }
+
+  const nextCategories = categories.filter((category) => {
+    const sectionId = category.sectionId || "section-default";
+    if (sectionId !== "section-default") return true;
+    if (reachableCategoryIds.has(category.id)) return true;
+    return category.name.trim() === "\u6536\u96c6\u7bb1" && !category.parentId;
+  });
+  const nextCategoryIds = new Set(nextCategories.map((category) => category.id));
+
+  return {
+    categories: nextCategories,
+    cards: nextCards,
+    removedCards: cards.length - nextCards.length,
+    removedCategories: categories.length - nextCategories.length,
+    removedCardIds: [...duplicateHomeCardIds],
+    removedCategoryIds: categories
+      .filter((category) => !nextCategoryIds.has(category.id))
+      .map((category) => category.id),
+  };
 }
 
 function categorySemanticKey(category: Category, categoryById: Map<string, Category>, seen = new Set<string>()): string {
@@ -558,6 +662,22 @@ function isNonEmptyArray(value: unknown): value is unknown[] {
 
 function isLinkOpenMode(value: unknown): value is LinkOpenMode {
   return value === "new-background-tab" || value === "new-active-tab" || value === "current-tab";
+}
+
+function mergePinnedBookmarkPreferences(
+  cloudItems: PinnedBookmarkItem[],
+  localItems: PinnedBookmarkItem[]
+): PinnedBookmarkItem[] {
+  const byCardId = new Map<string, PinnedBookmarkItem>();
+  for (const item of [...cloudItems, ...localItems]) {
+    if (!item.cardId) continue;
+    const existing = byCardId.get(item.cardId);
+    if (!existing || item.updatedAt > existing.updatedAt) {
+      byCardId.set(item.cardId, item);
+    }
+  }
+
+  return normalizePinnedBookmarkItems([...byCardId.values()]);
 }
 
 function preferencesToMap(cloudPrefs: CloudPreference[]): Record<string, { value: unknown; updatedAt: string }> {
@@ -698,6 +818,64 @@ function localMainDataLooksMuchSmallerThanCloud(
   if (cloudScore < 20) return false;
   const localScore = mainDataScore(categories, cards);
   return localScore + 5 < cloudScore * 0.75;
+}
+
+function hierarchyLinkCount(categories: Category[]): number {
+  const ids = new Set(categories.map((category) => category.id));
+  return categories.filter((category) => category.parentId && ids.has(category.parentId)).length;
+}
+
+function hierarchyStructureScore(
+  categories: Category[],
+  cards: WebCard[],
+  sections: CollectionSection[]
+): number {
+  const cardCountByCategory = new Map<string, number>();
+  for (const card of cards) {
+    cardCountByCategory.set(card.categoryId, (cardCountByCategory.get(card.categoryId) || 0) + 1);
+  }
+  const parentCount = categories.filter((category) =>
+    !category.parentId && (category.isParent || categories.some((child) => child.parentId === category.id))
+  ).length;
+  const standaloneWithCards = categories.filter((category) =>
+    !category.parentId &&
+    !category.isParent &&
+    (cardCountByCategory.get(category.id) || 0) > 0
+  ).length;
+  const sectionIds = new Set([
+    ...sections.map((section) => section.id),
+    ...categories.map((category) => category.sectionId || "section-default"),
+  ]);
+  return hierarchyLinkCount(categories) * 30 + parentCount * 10 + sectionIds.size * 8 - standaloneWithCards * 8;
+}
+
+async function localHasRicherStructureSnapshot(
+  categories: Category[],
+  cards: WebCard[],
+  sections: CollectionSection[]
+): Promise<boolean> {
+  if (categories.length < 8 || cards.length < 8) return false;
+  const currentLinks = hierarchyLinkCount(categories);
+  const currentSectionIds = new Set([
+    ...sections.map((section) => section.id),
+    ...categories.map((category) => category.sectionId || "section-default"),
+  ]);
+  if (currentSectionIds.size > 1 || currentLinks > 1) return false;
+  const currentScore = hierarchyStructureScore(categories, cards, sections);
+  const snapshots = await getLocalDataSnapshots();
+  const best = snapshots
+    .filter((snapshot) => snapshot.counts.categories >= Math.max(5, Math.floor(categories.length * 0.35)))
+    .map((snapshot) => ({
+      links: hierarchyLinkCount(snapshot.data.categories),
+      score: hierarchyStructureScore(snapshot.data.categories, snapshot.data.cards, snapshot.data.sections),
+    }))
+    .sort((a, b) => b.score - a.score)[0];
+  if (!best || best.links < 3) return false;
+  return best.links >= currentLinks + 3 && best.score > currentScore + 40;
+}
+
+function getFlattenedHierarchyGuardMessage(): string {
+  return "当前分类结构像是被异常打平，已暂停这次同步以保护数据。请先打开版本回档检查当前页面，确认后再手动同步。";
 }
 
 async function writeSyncBackup(
@@ -852,7 +1030,13 @@ function localLayoutLooksCollapsed(
   sections: CollectionSection[],
   categorySectionIds: Record<string, string>
 ): boolean {
-  return isDefaultOnlySections(sections) && categorySectionsAreDefaultOnly(categorySectionIds);
+  if (!categorySectionsAreDefaultOnly(categorySectionIds)) return false;
+  if (isDefaultOnlySections(sections)) return true;
+
+  // A bad restore can keep the tab list (FOM/HODL/etc.) but lose every
+  // category-to-tab assignment. That is still a collapsed layout and must not
+  // be allowed to overwrite richer cloud section preferences.
+  return sections.some((section) => section.id !== "section-default");
 }
 
 function mergeHiddenSites(localHiddenSites: HiddenSite[], cloudHiddenSites: HiddenSite[]): HiddenSite[] {
@@ -886,19 +1070,32 @@ function removeRecoveredMainData(
       .filter((category) => /^Recovered\s+[0-9a-f-]+$/i.test(category.name.trim()))
       .map((category) => category.id)
   );
-  if (recoveredIds.size === 0) {
-    const validIds = new Set(categories.map((category) => category.id));
-    return {
-      categories,
-      cards: cards.filter((card) => validIds.has(card.categoryId)),
-    };
+
+  let nextCategories = recoveredIds.size > 0
+    ? categories.filter((category) => !recoveredIds.has(category.id))
+    : categories;
+  const validIds = new Set(nextCategories.map((category) => category.id));
+  const cardsNeedingFallback = cards.filter(
+    (card) => recoveredIds.has(card.categoryId) || !validIds.has(card.categoryId)
+  );
+  if (cardsNeedingFallback.length === 0) {
+    return { categories: nextCategories, cards };
   }
 
-  const nextCategories = categories.filter((category) => !recoveredIds.has(category.id));
-  const validIds = new Set(nextCategories.map((category) => category.id));
+  const categoriesById = new Map(nextCategories.map((category) => [category.id, category]));
+  const fallbackCategory = ensureFallbackInboxCategory(nextCategories, categoriesById);
+  nextCategories = categoriesById.has(fallbackCategory.id) ? nextCategories : [...nextCategories, fallbackCategory];
+  let nextOrder = cards
+    .filter((card) => card.categoryId === fallbackCategory.id)
+    .reduce((max, card) => Math.max(max, card.order), -1);
+
   return {
     categories: nextCategories,
-    cards: cards.filter((card) => validIds.has(card.categoryId) && !recoveredIds.has(card.categoryId)),
+    cards: cards.map((card) => {
+      if (!recoveredIds.has(card.categoryId) && validIds.has(card.categoryId)) return card;
+      nextOrder += 1;
+      return { ...card, categoryId: fallbackCategory.id, order: nextOrder, updatedAt: Date.now() };
+    }),
   };
 }
 
@@ -930,6 +1127,8 @@ export async function syncData(userId: string): Promise<void> {
     rawLocalCategories,
     localHiddenSites,
     localPinnedIds,
+    localPinnedBookmarkItems,
+    localPinnedBookmarkItemsUpdatedAt,
     localWidths,
     localVisualScale,
     localLinkOpenMode,
@@ -947,6 +1146,8 @@ export async function syncData(userId: string): Promise<void> {
     getCategories(),
     getHiddenSites(),
     getPinnedCategoryIds(),
+    getPinnedBookmarkItems(),
+    getPinnedBookmarkItemsUpdatedAt(),
     getCategoryWidths(),
     getVisualScale(),
     getLinkOpenMode(),
@@ -1119,25 +1320,75 @@ export async function syncData(userId: string): Promise<void> {
     new Set(localCategories.map((category) => category.id)),
     new Set(localCards.map((card) => card.id))
   );
-  const sectionedCategories = deduped.categories.map((category) => ({
-    ...category,
-    sectionId: category.sectionId || categorySections[category.id] || defaultSectionId,
-  }));
+  const dedupedCategorySections = { ...categorySections };
+  for (const [fromId, toId] of deduped.categoryIdMap.entries()) {
+    if (categorySections[fromId] && !dedupedCategorySections[toId]) {
+      dedupedCategorySections[toId] = categorySections[fromId];
+    }
+  }
+  const sectionedCategories = deduped.categories.map((category) => {
+    const preferredSectionId = dedupedCategorySections[category.id];
+    return {
+      ...category,
+      sectionId: shouldPreferCloudLayout && preferredSectionId
+        ? preferredSectionId
+        : category.sectionId || preferredSectionId || defaultSectionId,
+    };
+  });
   const cleanedMainData = removeRecoveredMainData(sectionedCategories, deduped.cards);
-  const mergedCategories = cleanedMainData.categories;
-  const mergedCards = cleanedMainData.cards;
+  const defaultDuplicateCleanup = hasMultiSectionLayout(prefSections, prefCategorySections)
+    ? cleanDefaultSectionDuplicateCards(cleanedMainData.categories, cleanedMainData.cards)
+    : { ...cleanedMainData, removedCards: 0, removedCategories: 0, removedCardIds: [], removedCategoryIds: [] };
+  if (defaultDuplicateCleanup.removedCards > 0) {
+    console.warn(
+      `[Sync] Removed ${defaultDuplicateCleanup.removedCards} duplicated homepage card copies ` +
+      `and ${defaultDuplicateCleanup.removedCategories} empty homepage categories from the local merge candidate.`
+    );
+  }
+  const mergedCategories = defaultDuplicateCleanup.categories;
+  const mergedCards = defaultDuplicateCleanup.cards;
+  const mergedSectionsForGuard = shouldPreferCloudLayout
+    ? mergeSections(localSections, prefSections)
+    : mergeSections(prefSections, localSections);
+
+  if (
+    !localResetWins &&
+    await localHasRicherStructureSnapshot(mergedCategories, mergedCards, mergedSectionsForGuard)
+  ) {
+    console.warn("[Sync] Refusing to write a flattened hierarchy while a richer local snapshot exists.");
+    throw new Error(getFlattenedHierarchyGuardMessage());
+  }
 
   await withoutLocalChangeEvents(async () => {
     await saveCategories(mergedCategories);
     await saveCards(mergedCards);
   });
+  if (defaultDuplicateCleanup.removedCards > 0) {
+    await createLocalDataSnapshot(
+      "cloud-layout-dedupe-candidate",
+      "\u4e91\u7aef\u7ed3\u6784\u53bb\u91cd\u5019\u9009\u7248\u672c",
+      { force: true }
+    );
+  }
 
-  // 6. Push local changes to cloud
-  // Push all merged categories in two phases so child groups never reference
-  // a parent row that has not been created yet.
+  // 6. Push local changes to cloud. Categories are ordered by parent depth so
+  // child groups reference already-created parents without a transient flat state.
   await upsertCategoriesWithParents(client, mergedCategories, userId);
 
   await upsertCardsInChunks(client, mergedCards, userId);
+
+  if (defaultDuplicateCleanup.removedCards > 0) {
+    await writeSyncBackup(
+      client,
+      userId,
+      "before-default-homepage-duplicate-cleanup",
+      cloudCategories,
+      cloudCards,
+      cloudPrefs
+    );
+    await deleteRowsByIdsInChunks(client, "cards", defaultDuplicateCleanup.removedCardIds, userId);
+    await deleteRowsByIdsInChunks(client, "categories", defaultDuplicateCleanup.removedCategoryIds, userId);
+  }
 
   await deleteRecoveredCloudRows(client, userId, cloudCategories, cloudCards, cloudPrefs);
 
@@ -1149,6 +1400,8 @@ export async function syncData(userId: string): Promise<void> {
     userId,
     localHiddenSites,
     localPinnedIds,
+    localPinnedBookmarkItems,
+    localPinnedBookmarkItemsUpdatedAt,
     localWidths,
     localVisualScale,
     localLinkOpenMode,
@@ -1171,7 +1424,7 @@ export async function syncData(userId: string): Promise<void> {
 
 export async function pushLocalSnapshotToCloud(
   userId: string,
-  options: { allowDestructiveClear?: boolean } = {}
+  options: { allowDestructiveClear?: boolean; skipStructureGuard?: boolean } = {}
 ): Promise<void> {
   console.log("[Sync] Pushing local snapshot for user:", userId);
 
@@ -1182,6 +1435,8 @@ export async function pushLocalSnapshotToCloud(
     rawLocalCategories,
     localHiddenSites,
     localPinnedIds,
+    localPinnedBookmarkItems,
+    localPinnedBookmarkItemsUpdatedAt,
     localWidths,
     localVisualScale,
     localLinkOpenMode,
@@ -1199,6 +1454,8 @@ export async function pushLocalSnapshotToCloud(
     getCategories(),
     getHiddenSites(),
     getPinnedCategoryIds(),
+    getPinnedBookmarkItems(),
+    getPinnedBookmarkItemsUpdatedAt(),
     getCategoryWidths(),
     getVisualScale(),
     getLinkOpenMode(),
@@ -1307,6 +1564,15 @@ export async function pushLocalSnapshotToCloud(
   if (
     !options.allowDestructiveClear &&
     !resetReplacement &&
+    !options.skipStructureGuard &&
+    await localHasRicherStructureSnapshot(localCategories, localCards, localSections)
+  ) {
+    console.warn("[Sync] Refusing to push a flattened local hierarchy while a richer local snapshot exists.");
+    throw new Error(getFlattenedHierarchyGuardMessage());
+  }
+  if (
+    !options.allowDestructiveClear &&
+    !resetReplacement &&
     (
       localSnapshotLooksMuchSmallerThanCloud(localScore, cloudScore)
       || localMainDataLooksMuchSmallerThanCloud(localCategories, localCards, cloudCategories, cloudCards)
@@ -1368,6 +1634,8 @@ export async function pushLocalSnapshotToCloud(
     currentWorkspaceResetAt: workspaceResetAt,
     hiddenSites: localHiddenSites,
     pinnedCategoryIds: localPinnedIds,
+    pinnedBookmarkItems: localPinnedBookmarkItems,
+    pinnedBookmarkItemsUpdatedAt: localPinnedBookmarkItemsUpdatedAt,
     categoryWidths: localWidths,
     visualScale: localVisualScale,
     linkOpenMode: localLinkOpenMode,
@@ -1393,6 +1661,8 @@ async function syncPreferences(
   userId: string,
   localHiddenSites: HiddenSite[],
   localPinnedIds: string[],
+  localPinnedBookmarkItems: PinnedBookmarkItem[],
+  localPinnedBookmarkItemsUpdatedAt: number,
   localWidths: Record<string, number>,
   localVisualScale: number,
   localLinkOpenMode: LinkOpenMode,
@@ -1441,6 +1711,33 @@ async function syncPreferences(
     });
   }
 
+  const cloudPinnedBookmarkItems = !shouldIgnoreCloudPreference(cloudPrefsMap, "pinnedBookmarkItems", workspaceResetAt)
+    && Array.isArray(cloudPrefsMap.pinnedBookmarkItems?.value)
+    ? cloudPrefsMap.pinnedBookmarkItems.value as PinnedBookmarkItem[]
+    : [];
+  const cloudPinnedBookmarkItemsUpdatedAt = shouldIgnoreCloudPreference(cloudPrefsMap, "pinnedBookmarkItemsUpdatedAt", workspaceResetAt)
+    ? 0
+    : Math.max(
+        getNumberPreference(cloudPrefsMap, "pinnedBookmarkItemsUpdatedAt"),
+        getPreferenceUpdatedAt(cloudPrefsMap, "pinnedBookmarkItems")
+      );
+  const localPinnedBookmarkItemsForMerge = cloudResetIsNewerThanLocal ? [] : localPinnedBookmarkItems;
+  const localPinnedBookmarkItemsUpdatedAtForMerge = cloudResetIsNewerThanLocal ? 0 : localPinnedBookmarkItemsUpdatedAt;
+  const mergedPinnedBookmarkUpdatedAt = Math.max(
+    localPinnedBookmarkItemsUpdatedAtForMerge,
+    cloudPinnedBookmarkItemsUpdatedAt
+  );
+  const mergedPinnedBookmarkItems = cloudResetIsNewerThanLocal || cloudPinnedBookmarkItemsUpdatedAt > localPinnedBookmarkItemsUpdatedAtForMerge
+    ? normalizePinnedBookmarkItems(cloudPinnedBookmarkItems)
+    : localPinnedBookmarkItemsUpdatedAtForMerge > cloudPinnedBookmarkItemsUpdatedAt
+      ? normalizePinnedBookmarkItems(localPinnedBookmarkItemsForMerge)
+      : mergePinnedBookmarkPreferences(cloudPinnedBookmarkItems, localPinnedBookmarkItemsForMerge);
+  if (JSON.stringify(mergedPinnedBookmarkItems) !== JSON.stringify(localPinnedBookmarkItems)) {
+    await withoutLocalChangeEvents(async () => {
+      await savePinnedBookmarkItems(mergedPinnedBookmarkItems, mergedPinnedBookmarkUpdatedAt || Date.now());
+    });
+  }
+
   const cloudWidths = shouldIgnoreCloudPreference(cloudPrefsMap, "categoryWidths", workspaceResetAt)
     ? null
     : cloudPrefsMap.categoryWidths?.value;
@@ -1457,9 +1754,13 @@ async function syncPreferences(
   const cloudVisualScale = shouldIgnoreCloudPreference(cloudPrefsMap, "visualScale", workspaceResetAt)
     ? null
     : cloudPrefsMap.visualScale?.value;
-  const localVisualScaleForMerge = cloudResetIsNewerThanLocal ? 100 : localVisualScale;
-  const mergedVisualScale = typeof cloudVisualScale === "number" && localVisualScaleForMerge === 100
-    ? cloudVisualScale
+  const localVisualScaleForMerge = cloudResetIsNewerThanLocal ? DEFAULT_VISUAL_SCALE : localVisualScale;
+  const cloudVisualScaleForMerge =
+    cloudVisualScale === 90 && localVisualScaleForMerge === DEFAULT_VISUAL_SCALE
+      ? DEFAULT_VISUAL_SCALE
+      : cloudVisualScale;
+  const mergedVisualScale = typeof cloudVisualScaleForMerge === "number" && localVisualScaleForMerge === DEFAULT_VISUAL_SCALE
+    ? cloudVisualScaleForMerge
     : localVisualScaleForMerge;
   if (mergedVisualScale !== localVisualScale) {
     await withoutLocalChangeEvents(async () => {
@@ -1580,6 +1881,8 @@ async function syncPreferences(
     currentWorkspaceResetAt: workspaceResetAt,
     hiddenSites: mergedHiddenSites,
     pinnedCategoryIds: mergedPinnedIds,
+    pinnedBookmarkItems: mergedPinnedBookmarkItems,
+    pinnedBookmarkItemsUpdatedAt: mergedPinnedBookmarkUpdatedAt || Date.now(),
     categoryWidths: mergedWidths,
     visualScale: mergedVisualScale,
     linkOpenMode: mergedLinkOpenMode,

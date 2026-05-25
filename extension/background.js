@@ -10,7 +10,23 @@
  * Chrome Service Workers do not support TS type annotations.
  */
 
-// Listen for messages from the newtab page
+const CAPTURE_QUEUE_KEY = 'webcollect.capture.queue';
+const CAPTURE_PREFS_KEY = 'webcollect.capture.prefs';
+const CAPTURE_DESTINATIONS_KEY = 'webcollect.capture.destinations';
+const CAPTURE_CONTEXT_MENU_ID = 'webcollect-capture-link';
+
+const DEFAULT_CAPTURE_PREFS = {
+  enabled: true,
+  buttonEnabled: true,
+  hoverEnabled: true,
+  allLinksHoverEnabled: false,
+  contextMenuEnabled: true,
+  mascot: 'chipmunk',
+  pauseUntil: null,
+  disabledHosts: [],
+};
+
+// Listen for messages from the newtab page and content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'FETCH_META') {
     handleFetchMeta(message.url)
@@ -22,6 +38,41 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'CHECK_SAFETY') {
     handleCheckSafety(message.urls)
       .then(result => sendResponse({ success: true, data: result }))
+      .catch(err => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
+  if (message.type === 'CAPTURE_GET_PREFS') {
+    getCapturePrefs()
+      .then(prefs => sendResponse({ success: true, prefs }))
+      .catch(err => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
+  if (message.type === 'CAPTURE_SET_PREFS') {
+    saveCapturePrefs(message.prefs)
+      .then(() => sendResponse({ success: true }))
+      .catch(err => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
+  if (message.type === 'CAPTURE_GET_DESTINATIONS') {
+    getStorageValue(CAPTURE_DESTINATIONS_KEY, { updatedAt: 0, sections: [], categories: [] })
+      .then(cache => sendResponse({ success: true, cache }))
+      .catch(err => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
+  if (message.type === 'CAPTURE_QUEUE_ADD') {
+    addCaptureQueueItem(message.draft)
+      .then(item => sendResponse({ success: true, item }))
+      .catch(err => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
+  if (message.type === 'CAPTURE_QUEUE_LIST') {
+    getStorageValue(CAPTURE_QUEUE_KEY, [])
+      .then(queue => sendResponse({ success: true, queue }))
       .catch(err => sendResponse({ success: false, error: err.message }));
     return true;
   }
@@ -175,12 +226,179 @@ function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// Floating capture queue helpers
+
+function getStorageValue(key, fallback) {
+  return new Promise((resolve) => {
+    chrome.storage.local.get([key], (result) => {
+      if (chrome.runtime.lastError) {
+        resolve(fallback);
+        return;
+      }
+      resolve(result[key] ?? fallback);
+    });
+  });
+}
+
+function setStorageValue(key, value) {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.set({ [key]: value }, () => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+async function getCapturePrefs() {
+  const stored = await getStorageValue(CAPTURE_PREFS_KEY, {});
+  return {
+    ...DEFAULT_CAPTURE_PREFS,
+    ...stored,
+    mascot: stored.mascot === 'otter' ? 'otter' : 'chipmunk',
+    disabledHosts: Array.isArray(stored.disabledHosts) ? stored.disabledHosts : [],
+  };
+}
+
+async function saveCapturePrefs(prefs) {
+  await setStorageValue(CAPTURE_PREFS_KEY, {
+    ...DEFAULT_CAPTURE_PREFS,
+    ...(prefs || {}),
+    mascot: prefs?.mascot === 'otter' ? 'otter' : 'chipmunk',
+    disabledHosts: Array.isArray(prefs?.disabledHosts) ? prefs.disabledHosts : [],
+  });
+}
+
+function normalizeCaptureUrl(input) {
+  const trimmed = String(input || '').trim();
+  if (!trimmed) return null;
+  if (/^(https?:\/\/|chrome:\/\/|edge:\/\/|about:)/i.test(trimmed)) return trimmed;
+  if (/^[\w.-]+\.[a-z]{2,}(\/.*)?$/i.test(trimmed)) return `https://${trimmed}`;
+  return null;
+}
+
+function extractFirstUrl(text) {
+  const match = String(text || '').match(/((?:https?:\/\/|chrome:\/\/|edge:\/\/|about:)[^\s<>"']+|(?:www\.)?[\w.-]+\.[a-z]{2,}(?:\/[^\s<>"']*)?)/i);
+  return match ? normalizeCaptureUrl(match[1]) : null;
+}
+
+function titleFromUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname || parsed.pathname || url;
+  } catch (e) {
+    return url;
+  }
+}
+
+function hostFromUrl(url) {
+  try {
+    return new URL(url).host;
+  } catch (e) {
+    return '';
+  }
+}
+
+async function addCaptureQueueItem(draft) {
+  if (!draft) throw new Error('Missing capture draft');
+  const normalizedUrl = normalizeCaptureUrl(draft.url);
+  if (!normalizedUrl) throw new Error('Invalid URL');
+  const title = String(draft.title || '').trim() || titleFromUrl(normalizedUrl);
+  if (!title) throw new Error('Missing title');
+
+  const queue = await getStorageValue(CAPTURE_QUEUE_KEY, []);
+  const existing = queue.find((item) =>
+    item.status === 'pending' && normalizeCaptureUrl(item.draft?.url || '') === normalizedUrl
+  );
+  if (existing) return existing;
+
+  const now = Date.now();
+  const item = {
+    id: `capture-${now}-${Math.random().toString(36).slice(2, 9)}`,
+    draft: {
+      ...draft,
+      url: normalizedUrl,
+      title,
+      description: String(draft.description || ''),
+    },
+    createdAt: now,
+    updatedAt: now,
+    status: 'pending',
+  };
+  queue.push(item);
+  await setStorageValue(CAPTURE_QUEUE_KEY, queue);
+  chrome.runtime.sendMessage({ type: 'CAPTURE_QUEUE_UPDATED' }, () => {
+    void chrome.runtime.lastError;
+  });
+  return item;
+}
+
+function buildContextDraft(info, tab) {
+  const url = normalizeCaptureUrl(info.linkUrl)
+    || extractFirstUrl(info.selectionText)
+    || normalizeCaptureUrl(info.pageUrl)
+    || normalizeCaptureUrl(tab?.url);
+  if (!url) return null;
+
+  const selection = String(info.selectionText || '').trim();
+  return {
+    url,
+    title: selection && selection.length <= 80 ? selection : (tab?.title || titleFromUrl(url)),
+    description: selection && selection.length > 80 ? selection.slice(0, 240) : '',
+    sourceType: 'context-menu',
+    sourcePageUrl: info.pageUrl || tab?.url || '',
+    sourcePageTitle: tab?.title || '',
+  };
+}
+
+function setupCaptureContextMenus() {
+  if (!chrome.contextMenus) return;
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: CAPTURE_CONTEXT_MENU_ID,
+      title: '收集到 WebCollect',
+      contexts: ['page', 'link', 'selection'],
+    });
+  });
+}
+
+chrome.contextMenus?.onClicked.addListener((info, tab) => {
+  if (info.menuItemId !== CAPTURE_CONTEXT_MENU_ID) return;
+  void (async () => {
+    const prefs = await getCapturePrefs();
+    const host = hostFromUrl(info.pageUrl || tab?.url || '');
+    const paused = typeof prefs.pauseUntil === 'number' && prefs.pauseUntil > Date.now();
+    if (!prefs.enabled || !prefs.contextMenuEnabled || paused || prefs.disabledHosts.includes(host)) return;
+
+    const draft = buildContextDraft(info, tab);
+    if (!draft) return;
+
+    if (tab?.id) {
+      chrome.tabs.sendMessage(tab.id, { type: 'CAPTURE_OPEN_PANEL', draft }, async () => {
+        if (chrome.runtime.lastError) {
+          await addCaptureQueueItem(draft);
+        }
+      });
+      return;
+    }
+
+    await addCaptureQueueItem(draft);
+  })();
+});
+
 // ── Extension Install/Update ──
 
 chrome.runtime.onInstalled.addListener((details) => {
+  setupCaptureContextMenus();
   if (details.reason === 'install') {
     console.log('WebCollect extension installed');
   } else if (details.reason === 'update') {
     console.log('WebCollect extension updated to version', chrome.runtime.getManifest().version);
   }
+});
+
+chrome.runtime.onStartup?.addListener(() => {
+  setupCaptureContextMenus();
 });

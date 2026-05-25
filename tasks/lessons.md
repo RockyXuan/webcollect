@@ -294,3 +294,124 @@ Before delivery:
 - When feasible, run `next build --webpack` through the Windows Next binary.
 - Rebuild the extension package when extension files changed.
 - Record any new user correction here so the next session does not repeat the same mistake.
+
+## 2026-05-11: Category Parent Links Must Be Written Atomically
+
+User correction: after a sync/code update, organized groups such as `chrome`, `搜索`, `YT TT INS X`, and `城建` moved into `未分类` across homepage/FOM sections while newly captured cards still existed.
+
+Rule:
+- Never write a transient flattened hierarchy to cloud. A two-phase write of `parent_id = null` followed by restoring parent links is unsafe because any interruption or concurrent tab can observe and persist the flattened state.
+- Parent/child category upserts must be ordered by parent depth and write the real `parent_id` in the same user-visible operation.
+- If current local data looks flatter than a richer local snapshot, normal sync and manual cloud push must refuse to proceed and direct the user to structure-only repair.
+- Recovery should prefer structure-only restore over full rollback: restore section IDs, parent links, category ordering, and card category IDs while preserving newly added cards. Only send truly orphaned new cards to the current homepage inbox.
+- After structure repair, ask the user to inspect the visible layout first, then run manual cloud sync. Do not auto-push a repaired layout before the user confirms it looks right.
+
+Verification checklist:
+- Trigger sync with nested categories and confirm no intermediate cloud row has `parent_id` nulled unless the category is truly top-level.
+- Simulate/inspect a flattened local layout with a richer snapshot and confirm cloud push is blocked.
+- Run structure-only repair and confirm new cards remain present while old groups return under their former sections/categories.
+
+## 2026-05-13: Manual Sync Must Trust The Visible Workspace
+
+User correction: the flattened-structure protection kept telling the user to repair even when the current visible workspace was the version they wanted to save, and the repair path could move data back to an unwanted older structure.
+
+Rule:
+- A manual sync button means "save the current visible workspace to cloud." It must not force the user through a repair flow unless the current state is clearly empty/destructive.
+- Repair actions must be one conservative path: always preserve existing webpages and only relink structure. Do not expose competing repair buttons with overlapping names.
+- User-facing rollback history should prioritize intentional manual versions. Automatic safety snapshots are useful internally, but they must not crowd out or replace manually saved restore points.
+- UI strings rendered inside JSX text nodes must not contain raw `\uXXXX` escapes; use actual strings or interpolation so the user sees readable text.
+
+Verification checklist:
+- With a visibly correct workspace, click manual sync and confirm it attempts to push the current page rather than asking for structure repair.
+- Open the account menu and confirm there is only one structure repair entry.
+- Open version rollback and confirm the list shows manually saved versions grouped by date, not every automatic safety backup.
+- Toggle floating widget settings and confirm labels are readable.
+
+## 2026-05-13: Refresh Must Repair Invisible References, Not Just Reload
+
+User correction: groups such as `chrome`, `邮箱`, and `搜索` showed `0` cards after refresh, while warehouse duplicate detection still reported those URLs as already existing on the homepage.
+
+Rule:
+- A card that still exists in IndexedDB is user data even if its `categoryId` points at a missing, moved, or hidden category. Never filter it out to make the structure valid.
+- `loadData()` and the visible refresh button must repair non-renderable relationships: detach groups whose parent no longer exists, align child-group `sectionId` with their parent, and move cards with missing categories into the current section inbox.
+- Sync cleanup must also preserve orphaned cards by moving them to a valid inbox before upload. Foreign-key safety is not a reason to delete user pages.
+- Warehouse duplicate detection seeing a URL that the homepage cannot render is a smoke test for broken category/card references.
+
+Verification checklist:
+- Create or simulate a card pointing to a deleted category; refresh should show it in `收集箱`, not drop it.
+- Create or simulate a child group whose parent is missing; refresh should show it as an unclassified group with its cards.
+- Create or simulate a child group whose section differs from its parent; refresh should show it under the parent section.
+- Re-import a Homely file after refresh and confirm duplicates correspond to visible homepage cards.
+
+## 2026-05-13: Floating Capture Hover Must Be Quiet By Default
+
+User correction: showing a capture prompt on every hovered link makes normal browsing noisy, especially sidebars and navigation.
+
+Rule:
+- Default hover capture should only react to explicit visible URL text, such as `github.com/...` or `https://...`, not every `<a>` element.
+- An all-links hover mode can exist, but it must be opt-in, default off, and warn that it will be noisy.
+- Hover affordances should be compact and branded. Use a small WC trigger after a short stationary delay instead of an immediate text pill.
+- Clicking the WC trigger opens the form; hover alone must not open the form.
+
+Verification checklist:
+- Hover a sidebar/nav link whose text is not a URL; no WC trigger should appear.
+- Hover visible URL text for at least 0.7s; the WC trigger should appear.
+- Enable all-links hover from settings only after confirmation, then confirm ordinary links can show WC.
+
+## 2026-05-18: Tabs Existing Does Not Mean Section Layout Is Safe
+
+User correction: after loading a rebuilt extension, tabs such as `FOM` and `HODL` still existed, but category-to-tab assignments collapsed into the default homepage, making RWA/HODL/AI content appear under `主页`.
+
+Rule:
+- Treat "all categories point to `section-default`" as a collapsed layout even when non-default tabs still exist.
+- When cloud preferences still contain a real multi-section `collectionSections/categorySectionIds` layout, that cloud layout must override newer-looking local category rows whose `sectionId` was accidentally flattened.
+- Initial app/new-tab loading must await auth restore sync before running local migrations, or an empty/default extension install can mark itself newer and queue a destructive push.
+- Manual sync and auto sync must use the guarded local-snapshot push path; only explicit clear/reset flows may bypass destructive guards.
+
+Verification checklist:
+- Simulate local sections containing multiple tabs while every category has `section-default`; sync should pull cloud category section preferences instead of pushing local.
+- Reload a fresh extension with a cached session; cloud restore should complete before local `loadData()` migrations run.
+- Long sync status text should wrap inside its own compact badge and not push warehouse/account controls onto a new row.
+
+## 2026-05-18: Recovery Must Prefer A Full Healthy Version Over Structure Repair
+
+User correction: structure-only repair still produced the wrong workspace; the priority became restoring the latest version where sections, groups, categories, and cards are visibly distributed correctly.
+
+Rule:
+- When the visible workspace is already flattened, do not keep layering structure repairs onto it. Pick the latest healthy full snapshot first.
+- A healthy recovery candidate must have real cards in multiple sections, non-default section content, parent-child category links, and must not place known crypto/RWA groups such as `Bstocks`, `Macro & stocks`, `zksync`, or `coin` on the homepage.
+- If local snapshots are gone after extension reinstall, fall back to the checked-in `assets/homely411.json` source to rebuild a full structured workspace rather than asking the user to manually sort hundreds of links.
+- Run emergency restoration before auth/cloud sync on startup so the restored local version can become the version that sync merges and uploads.
+
+Verification checklist:
+- Generate the Homely fallback and confirm it creates content across HODL/FOM/AI instead of only `主页`.
+- Confirm startup calls emergency restore before `useAuthStore.initialize()`.
+- After restore, confirm `localSnapshotSyncedAt` is reset and a local-change signal is emitted so sync sees the restored version as current.
+## 2026-05-18: Homely Is Not A Valid Latest WebCollect Restore Source
+
+User correction: the checked-in Homely JSON was only an early imported/reference source. The desired restore target is the latest real WebCollect workspace with FOM/HODL/AI/non-common sections, not a reconstructed Homely fallback.
+
+Rule:
+- Do not use `assets/homely411.json` as an emergency replacement unless the user explicitly asks to re-import Homely.
+- Prefer real WebCollect local snapshots, cloud `collectionSections/categorySectionIds`, or a user-provided export.
+- If cloud has both homepage duplicates and non-home copies of the same URLs, keep the non-home section copies, back up first, and remove only the duplicate homepage copies.
+
+Verification checklist:
+- Query cloud distribution by `categorySectionIds` before cleanup.
+- Confirm a full backup preference exists before any row deletion.
+- Confirm post-cleanup HODL/FOM/AI counts are non-zero and homepage no longer contains the duplicated RWA/HODL/AI pile.
+
+## 2026-05-18: Manual Versions Must Be Account-Scoped Cloud Data
+
+User correction: deleting and reloading the extension made the manually saved versions disappear, because the save button only wrote localforage history.
+
+Rule:
+- Treat manual snapshots as account data, not extension-instance data.
+- Manual saves must write a full workspace snapshot to Supabase and remain visible after extension reinstall/login.
+- Local snapshots are only fast fallback backups; UI must label them as local and not imply they are durable cloud versions.
+- System automatic snapshots may be cloud-backed, but must be deduped to one latest version per day.
+
+Verification checklist:
+- Save manually, reload/reinstall extension, log in, and confirm the same manual snapshot appears under cloud manual saves.
+- Confirm `workspace_snapshots` RLS blocks cross-user access.
+- Confirm system snapshots use one `user_id + kind + day_key` row per day instead of minute-by-minute rows.

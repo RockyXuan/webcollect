@@ -28,6 +28,12 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: path.resolve(extRoot, 'src/newtab.html'),
+        'floating-capture': path.resolve(extRoot, 'src/content/floating-capture.ts'),
+      },
+      output: {
+        entryFileNames: 'assets/[name].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name][extname]',
       },
     },
   },

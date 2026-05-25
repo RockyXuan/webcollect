@@ -9,6 +9,8 @@ const viteBin = join(projectRoot, "node_modules", "vite", "bin", "vite.js");
 const distDir = join(extensionRoot, "dist");
 const iconSourceDir = join(extensionRoot, "public", "icons");
 const iconDistDir = join(distDir, "icons");
+const mascotSourceDir = join(extensionRoot, "src", "assets", "mascots");
+const mascotDistDir = join(distDir, "assets", "mascots");
 
 console.log("Building WebCollect Chrome Extension...");
 
@@ -35,6 +37,11 @@ if (existsSync(iconSourceDir)) {
       cpSync(join(iconSourceDir, fileName), join(iconDistDir, fileName));
     }
   }
+}
+
+if (existsSync(mascotSourceDir)) {
+  mkdirSync(mascotDistDir, { recursive: true });
+  cpSync(mascotSourceDir, mascotDistDir, { recursive: true });
 }
 
 console.log(`Extension built successfully! Output: ${distDir}`);

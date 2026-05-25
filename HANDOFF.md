@@ -1,0 +1,297 @@
+# Project Handoff
+
+Generated on 2026-05-25 for the WebCollect handoff from the Windows Codex thread to a new development thread.
+
+## 1. Project Snapshot
+
+WebCollect is a personal smart bookmark workspace: a Next.js web app plus a Chrome extension new-tab/content-script experience for collecting, organizing, searching, syncing, and restoring webpage collections.
+
+Current stack:
+
+- Next.js 16 App Router, React 19, TypeScript 5.
+- Tailwind CSS 4 style layer plus project-specific `wc-*` glass UI classes.
+- Zustand-style local store in `src/lib/store.ts`.
+- Local persistence with `localforage` / IndexedDB.
+- Supabase Auth + database sync for account-scoped data.
+- Chrome Manifest V3 extension built with Vite in `extension/`.
+- Drag/drop powered by `@dnd-kit`.
+
+Current product goal:
+
+- Preserve the existing data model and sync safety while continuing the UI/product polish: blue-glass hierarchy, global search, global bookmark bar, floating capture, cloud rollback, and non-disruptive edit mode.
+
+## 2. Current Workspace State
+
+Inspected workspace:
+
+- Windows path used for the actual work: `C:\Users\asus\Documents\Codex\2026-05-02\https-github-com-rockyxuan-webcollect-coze`
+- Remote: `origin https://github.com/RockyXuan/webcollect`
+- Branch at inspection time: `ai-next-fixes`
+- Last committed baseline before this handoff commit: `8bd2485 fix: stabilize sync drag and lessons`
+
+Important note:
+
+- A later shell context pointed to `C:\Users\asus\Documents\Codex\2026-05-17\rockyxuan-webcollect-https-github-com-rockyxuan`, but the meaningful git workspace and all current changes were in the 2026-05-02 directory above.
+
+Uncommitted work at inspection time was large and intentional. It included:
+
+- Web and extension blue-glass UI refresh.
+- Global search command-panel behavior.
+- Global pinned bookmark bar.
+- Edit-mode jelly action docks.
+- Floating capture widget and mascot assets.
+- Cloud snapshot/version rollback support.
+- Sync hardening and safety lessons.
+- Review/test scripts and project notes.
+
+Local-only files intentionally ignored and not meant for git:
+
+- `tmp/`
+- `LASTWEBCOLLECT MD.docx`
+- `lastwebcollectthreadmd.txt`
+
+## 3. How To Run
+
+Install dependencies:
+
+```bash
+corepack pnpm install --frozen-lockfile
+```
+
+Start web development server:
+
+```bash
+corepack pnpm dev
+```
+
+The app is expected to run on port 5000 through the project scripts/server defaults unless overridden with `PORT`.
+
+Type-check:
+
+```bash
+corepack pnpm ts-check
+```
+
+Lint:
+
+```bash
+corepack pnpm lint
+```
+
+Build Chrome extension:
+
+```bash
+corepack pnpm build:ext
+```
+
+Build the Next.js app with webpack:
+
+```bash
+corepack pnpm exec next build --webpack
+```
+
+Check whitespace:
+
+```bash
+git diff --check
+```
+
+Optional focused script checks:
+
+```bash
+corepack pnpm tsx scripts/test-workspace-search.ts
+corepack pnpm tsx scripts/test-pinned-bookmarks.ts
+corepack pnpm tsx scripts/test-cloud-snapshots.ts
+corepack pnpm node scripts/generate-webcollect-review.mjs
+```
+
+Chrome extension loading:
+
+1. Run `corepack pnpm build:ext`.
+2. Open Chrome extensions page.
+3. Load unpacked extension from `extension/dist`.
+
+## 4. Key Files And Directories
+
+- `README.md` - project overview. Some older Chinese text may appear garbled in Windows console output; prefer opening in an editor.
+- `AGENTS.md` - repository rules. The most important rule is data safety: do not delete or overwrite user workspace data.
+- `package.json` - scripts and dependency list.
+- `src/app/page.tsx` - main WebCollect page composition.
+- `src/app/globals.css` - primary web UI visual system, including the blue-glass `wc-*` classes.
+- `src/components/nav/top-nav.tsx` - header, search input/dropdown, section tabs, account controls, bookmark bar placement.
+- `src/components/bookmark/bookmark-bar.tsx` - global pinned bookmark bar UI and edit mode.
+- `src/components/layout/sortable-grid.tsx` - main section/category/group layout, drag/drop, edit-mode docks.
+- `src/components/card/web-card.tsx` - website card rendering, semantic icons, hover detail, pin controls, card action dock.
+- `src/components/ui/edit-action-dock.tsx` - reusable jelly/floating action dock used by edit mode.
+- `src/components/dialogs/card-dialog.tsx` - add/edit website modal.
+- `src/components/dialogs/local-snapshot-dialog.tsx` - version rollback UI for cloud/manual/system/local snapshots.
+- `src/components/auth/user-menu.tsx` - account/settings panel, sync controls, visual scale, floating capture settings.
+- `src/components/hot-recommendation.tsx` - discovery/recommendation center.
+- `src/lib/store.ts` - main client store and actions.
+- `src/lib/db.ts` - local persistence helpers.
+- `src/lib/sync.ts` - Supabase sync logic and safety checks.
+- `src/lib/local-snapshots.ts` - local snapshot serialization and daily/manual backup helpers.
+- `src/lib/cloud-snapshots.ts` - account-scoped cloud snapshot archive.
+- `src/lib/workspace-search.ts` - global search index/scoring/tokenization.
+- `src/lib/pinned-bookmarks.ts` - bookmark bar utilities and state helpers.
+- `src/lib/visual-scale.ts` - visual-scale migration and rendering baseline.
+- `src/lib/floating-capture.ts` - floating capture preference/shared helpers.
+- `src/storage/database/shared/schema.ts` - Supabase schema types.
+- `src/storage/database/supabase-init.sql` - SQL bootstrap/migration reference.
+- `extension/background.js` - MV3 background bridge, context menu, capture handling.
+- `extension/src/newtab-app.tsx` - extension new-tab React app.
+- `extension/src/extension.css` - extension mirror of the Web UI styles; keep this in sync with important `wc-*` web CSS.
+- `extension/src/content/floating-capture.ts` - content-script floating capture pill/panel.
+- `extension/src/assets/mascots/` - extension mascot and WC/add-button assets.
+- `public/assets/mascots/` - public mascot assets used by web/settings previews.
+- `scripts/generate-webcollect-review.mjs` - read-only project review report generator.
+- `scripts/test-workspace-search.ts` - focused search behavior checks.
+- `scripts/test-pinned-bookmarks.ts` - focused bookmark-bar behavior checks.
+- `scripts/test-cloud-snapshots.ts` - focused cloud snapshot serialization/dedupe checks.
+- `tasks/todo.md` - running implementation checklist.
+- `tasks/lessons.md` - important lessons and data-safety notes from this long thread.
+
+## 5. What Has Been Done
+
+Blue-glass UI refresh:
+
+- Reworked the page, header, category panels, group panels, cards, settings panel, modals, and discovery surfaces around the same soft blue-glass language.
+- Tightened spacing and visual scale so the current 100% should feel close to the old preferred 90% density.
+- Strengthened card and panel boundaries so the UI is less washed out on different displays.
+- Mirrored important visual classes into `extension/src/extension.css` so the extension does not lose web-only styling.
+
+Global search:
+
+- Added a pure front-end search index in `src/lib/workspace-search.ts`.
+- Search now indexes section/category/group/card title, URL/domain, shortcut, description, long description, and notes.
+- Search dropdown includes a Google search row plus internal WebCollect results with paths like `HODL / DEFI / pendle`.
+- Multi-word matching supports partial memory cases such as searching by title pieces, notes, or descriptions.
+
+Global pinned bookmark bar:
+
+- Added `pinnedBookmarkItems` preference data and utilities.
+- Added `src/components/bookmark/bookmark-bar.tsx`.
+- Bookmark bar is global across sections and references existing cards rather than copying card data.
+- Normal mode stays compact and avoids hover expansion.
+- Bookmark bar edit mode enables drag sorting, label/display edits, and unpin behavior.
+
+Edit-mode jelly action docks:
+
+- Added `src/components/ui/edit-action-dock.tsx`.
+- Category/group actions now float in a jelly/glass dock instead of taking layout space.
+- Website card edit/delete/move actions are also presented through floating controls rather than widening the card.
+- Goal: entering edit mode should preserve the normal layout dimensions.
+
+Website cards:
+
+- Added/expanded hover detail behavior so clipped titles/descriptions can be inspected without changing card width.
+- Added hover pin-star behavior for card-to-bookmark actions while keeping normal card sizing stable.
+- Added more semantic fallback icon logic for common Chrome/website labels.
+
+Floating capture extension:
+
+- Added content-script floating capture widget with chipmunk/otter mascot pill assets.
+- Supports hover reveal, edge docking, dragging, context-menu capture, visible link prompt, and current-page capture.
+- Added settings previews in the account panel.
+- Uses committed local assets under `extension/src/assets/mascots/` and `public/assets/mascots/`; do not depend on Downloads.
+
+Cloud snapshots/version rollback:
+
+- Added account-scoped `workspace_snapshots` schema and cloud snapshot helpers.
+- Manual save is intended to create a persistent cloud snapshot for the logged-in account.
+- System automatic snapshots should dedupe to one latest entry per day.
+- Rollback UI separates cloud manual saves, cloud daily automatic saves, and local fallback backups.
+
+Sync safety:
+
+- Hardened sync rules to avoid pushing a default/flattened local workspace over a richer cloud workspace.
+- Added/reset sync markers and improved local-vs-cloud status display.
+- Manual sync should trust the currently visible workspace, but destructive/default-state sync paths should stay guarded.
+- Lessons recorded in `tasks/lessons.md`.
+
+Discovery center:
+
+- Polished recommendation cards/buttons/categories.
+- Replaced Chinese letter shorthand category badges with more icon-like category signals where possible.
+
+Project review tooling:
+
+- Added `scripts/generate-webcollect-review.mjs`.
+- Added focused test scripts for search, pinned bookmarks, and cloud snapshots.
+- Added generated report under `docs/reports/`.
+
+## 6. Important Decisions
+
+- Do not treat Homely JSON or early seed imports as the latest WebCollect restore source unless the user explicitly asks. The user clarified those were old/import/reference data, not the current curated workspace.
+- Manual snapshots must follow the account/cloud, not the local extension install. Deleting and reloading the extension must not erase manually saved versions.
+- System snapshots should be daily-deduped. Do not create a new system backup every minute.
+- Ordinary sync and rollback are separate concepts. Snapshot archive entries should be restore points, not automatic merge inputs.
+- Do not overwrite cloud data with a suspicious local default state. Richer cloud structure should win unless the user intentionally resets/clears/restores.
+- Keep extension styles in sync manually. The Chrome extension does not automatically receive all Next/global CSS behavior.
+- The floating capture pill should use committed image assets, not the Windows Downloads folder.
+- Edit mode should be non-layout-disruptive. Action controls should float above the layout and use tooltips/labels for clarity.
+- The bookmark bar references existing cards. If a card is deleted or moved to trash, the bookmark bar should ignore the dead reference rather than copying stale site data.
+
+## 7. Open Issues And Risks
+
+- Browser visual QA was not completed in this final handoff pass. The builds pass, but the new thread should still inspect the UI in a real browser and extension.
+- Supabase SQL must be applied/verified in the real project before cloud snapshot archive behavior is guaranteed for every account. Check RLS for `workspace_snapshots`.
+- Lint currently passes with warnings, including `@next/next/no-img-element`, a stale `.eslintignore` warning, and one unused eslint-disable warning.
+- Next build passes but warns that a custom Babel config disables SWC.
+- Extension build passes but warns about a large chunk and an ineffective dynamic import warning.
+- Old Windows console output can garble Chinese markdown text. Use an editor that preserves UTF-8 when editing docs/tasks.
+- The worktree originally had large local-only artifacts: `LASTWEBCOLLECT MD.docx`, `lastwebcollectthreadmd.txt`, and `tmp/`. They are ignored now and should not be committed later.
+- User data remains sensitive. Before any data migration, sync rewrite, restore script, or reset flow, create a cloud manual save and ideally a local export.
+- The user is moving development to Mac mini, so paths will change. Do not hard-code Windows-only paths into application code.
+
+## 8. Recommended Next Steps
+
+1. Pull the branch on the Mac mini and read this file, `AGENTS.md`, `tasks/lessons.md`, and `tasks/todo.md`.
+2. Run `git status -sb` before touching anything. Do not overwrite user changes.
+3. Install dependencies with `corepack pnpm install --frozen-lockfile`.
+4. Run the regression commands: `corepack pnpm ts-check`, `corepack pnpm lint`, `corepack pnpm build:ext`, `corepack pnpm exec next build --webpack`, and `git diff --check`.
+5. Start the app with `corepack pnpm dev` and visually verify the main page at the local URL.
+6. Load `extension/dist` as an unpacked Chrome extension and test new-tab UI plus the content-script floating capture widget.
+7. Verify global search with examples like `pendle`, `VPN`, and multi-word title/note fragments.
+8. Verify the bookmark bar: pin from a card, edit the bar, reorder, unpin, refresh, and confirm persistence.
+9. Verify edit mode: category/group/card jelly action docks should not change layout width/height.
+10. Verify Supabase cloud snapshots on a logged-in account, including manual save, reload/reinstall survival, daily system dedupe, and restore.
+
+## 9. Verification Log
+
+Actually run during the recent work before this handoff:
+
+- `corepack pnpm ts-check` - passed.
+- `corepack pnpm lint` - passed with warnings:
+  - 6 warnings total at handoff time.
+  - Several `@next/next/no-img-element` warnings.
+  - One unused eslint-disable warning in `src/app/api/supabase-config/route.ts`.
+  - One unused `useState` warning in `src/components/dialogs/recycle-bin-dialog.tsx`.
+- `corepack pnpm build:ext` - passed with Vite warnings:
+  - main chunk larger than 500 kB.
+  - one dynamic import warning.
+- `corepack pnpm exec next build --webpack` - passed with known custom Babel/SWC warnings.
+- `git diff --check` - passed, only CRLF conversion warnings from Git on Windows.
+- `corepack pnpm tsx scripts/test-workspace-search.ts` - passed.
+- `corepack pnpm tsx scripts/test-pinned-bookmarks.ts` - passed.
+- `corepack pnpm tsx scripts/test-cloud-snapshots.ts` - passed.
+
+Not fully verified in this handoff pass:
+
+- Full browser visual QA after the final handoff files.
+- Real Chrome extension reload on the user's Chrome profile after the latest handoff commit.
+- Supabase RLS and migration execution against production/cloud database.
+- Cross-device persistence from Windows to Mac mini.
+
+## 10. Notes For Future Codex
+
+- Start with code and git status. If this document conflicts with the code, trust code and `git status`.
+- Do not assume old chat context is complete or reliable. This handoff is a summary, not a substitute for reading the changed files.
+- Treat `tasks/lessons.md` as important guardrails, especially around data restoration and sync.
+- Never use Homely import data as a recovery source unless the user explicitly asks.
+- Keep `.gitignore` exclusions for local old-thread exports and `tmp/`.
+- Do not commit real secrets, `.env*`, browser profile data, or downloaded thread exports.
+- When changing web UI `wc-*` classes, check whether matching extension styles are also needed in `extension/src/extension.css`.
+- When changing data structures, update `src/lib/types.ts`, local snapshots, cloud snapshots, sync, Supabase SQL/schema, and any focused test scripts together.
+- Prefer incremental fixes over rewrites. The project has fragile user data and a long UI tuning history.
+- Before major changes, ask the user whether they have made a current manual cloud save.

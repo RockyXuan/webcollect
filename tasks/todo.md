@@ -2,6 +2,109 @@
 
 Use this file for every non-trivial task before implementation.
 
+## Current Task: Cloud Account Snapshot Archive
+
+- [x] Find the root cause of missing manual versions -> Verification: header save only wrote `localSnapshotHistory` in localforage; Supabase had no account-level snapshot table.
+- [x] Add an account-scoped cloud snapshot archive -> Verification: `workspace_snapshots` exists in Supabase with RLS, manual/system kinds, full workspace payload, and daily system uniqueness.
+- [x] Connect manual save and daily automatic backup -> Verification: header save writes local fallback plus cloud manual snapshot when logged in; local safety snapshots upsert one cloud system snapshot per day.
+- [x] Separate cloud and local rollback views -> Verification: rollback dialog now shows cloud manual saves, cloud daily auto saves, and local fallback backups separately.
+- [x] Add a deterministic review script -> Verification: `scripts/generate-webcollect-review.mjs` writes `docs/reports/webcollect-review-2026-05-18.md`.
+
+## Review
+
+Manual saves now follow the logged-in account instead of only the extension install. Local snapshots remain as a safety net, but the durable restore points are in Supabase `workspace_snapshots` and are not part of normal sync merge.
+
+## Current Task: Floating Mascot Pill Fidelity
+
+- [x] Keep the confirmed animal heads unchanged -> Verification: floating capture now uses the existing chipmunk/otter head PNGs for both peek and expanded states instead of redrawing animals.
+- [x] Rebuild the expanded pill as separated layers -> Verification: the old whole-pill image is replaced with a capsule shell, animal head layer, real `wc-3d.png`, and real `plus-3d.png`.
+- [x] Persist the downloaded artwork inside the extension project -> Verification: `wc-3d.png` and `plus-3d.png` are trimmed transparent PNG assets under `extension/src/assets/mascots/` and copied into `extension/dist/assets/mascots/` by the extension build.
+- [x] Run verification -> Verification: `corepack pnpm ts-check`, `corepack pnpm build:ext`, `corepack pnpm lint`, and `git diff --check` pass.
+
+## Review
+
+This pass only changes the visual construction of the floating capture side button. Capture queueing, hover-link draft inference, panel fields, drag docking, preferences, and storage behavior are unchanged.
+
+## Current Task: Header Save Shortcut And Capture Autofill
+
+- [x] Move manual version save to the homepage header -> Verification: header now has a `保存` action before `刷新`, backed by the existing manual local snapshot API; rollback dialog no longer owns the save button.
+- [x] Compact the right-side toolbar -> Verification: add actions now read `网页`, `分组`, and `分类` with plus icons, and the sync status badge is narrower in both web and extension styles.
+- [x] Improve floating capture URL/title inference -> Verification: hover capture now prefers visible real URLs over known redirect links such as `t.co`, and derives concise titles/descriptions from nearby page text.
+- [x] Replace the hover WC bubble with the selected mascot -> Verification: the hover trigger uses the chipmunk/otter head asset and hides when the capture panel is open.
+- [x] Run verification -> Verification: `corepack pnpm ts-check`, `corepack pnpm lint`, `corepack pnpm build:ext`, and `git diff --check` pass.
+
+## Review
+
+This pass keeps snapshot storage, sync payloads, queued capture storage, and WebCollect import logic unchanged. It only moves the manual save entry point, compresses header chrome, and improves the content-script draft shown before saving.
+
+## Current Task: Edit Mode Width And Hover Details
+
+- [x] Make section tabs clearer in edit mode -> Verification: edit-mode section controls no longer reserve hidden inline width; rename is discoverable through a dashed editable tab and hover actions.
+- [x] Give website tiles a wider edit-mode layout -> Verification: edit mode uses `--wc-site-tile-edit-width` and expands child group panel widths, while normal mode keeps the fixed short tile width.
+- [x] Add hover detail cards for clipped content -> Verification: hovering a site tile opens a delayed detail card with title, URL, summary, full description, and notes when available.
+- [x] Run verification -> Verification: `corepack pnpm ts-check`, `corepack pnpm lint`, `corepack pnpm build:ext`, and `git diff --check` pass.
+
+## Review
+
+This task only adjusts editing affordance, tile sizing, and hover display. It does not change card/category data ownership, sync, storage, restore, or drag IDs.
+
+## Current Task: Snapshot Archive And Fixed Tile Widths
+
+- [x] Separate manual saves from system snapshots -> Verification: the rollback dialog now renders manual snapshots and system automatic snapshots in separate sections.
+- [x] Keep system snapshots lightweight -> Verification: local snapshot pruning now keeps only the latest non-manual snapshot for each local day while preserving manual saves separately.
+- [x] Keep website tiles a consistent length -> Verification: site tiles use a shared `--wc-site-tile-width`, and group grids place fixed-width columns instead of stretching items with `1fr`.
+- [x] Run verification -> Verification: `corepack pnpm ts-check`, `corepack pnpm lint`, `corepack pnpm build:ext`, and `git diff --check` pass.
+
+## Review
+
+This task only adjusts rollback history retention/display and visual tile sizing. It does not change Supabase schema, restore semantics, sync payload shape, drag IDs, card/category ownership, or user content data.
+
+## Current Task: High-Fidelity Blue Glass UI Phase 1
+
+- [x] Re-read the exported UI brief and current implementation gap -> Verification: prior completed pass is visually insufficient; restart from first-viewport shell only.
+- [x] Rebuild visual tokens and global shell styling -> Verification: `globals.css` now defines the blue-purple glass background, header, action, tab, and logo primitives used by the reference.
+- [x] Rebuild Header and section Tabs without touching data logic -> Verification: `TopNav` keeps existing callbacks/store methods while replacing old dense chrome and mojibake labels.
+- [x] Bridge the same visual system into the Chrome extension stylesheet -> Verification: `extension/src/extension.css` now contains the `wc-*` blue glass classes and the built `extension/dist/assets/main.css` includes `wc-app-header`, `wc-header-primary`, `wc-glass-card`, and `wc-site-tile`.
+- [x] Verify Phase 1 with static checks and extension build -> Verification: `corepack pnpm ts-check`, `corepack pnpm lint`, and `corepack pnpm build:ext` pass. Automated browser screenshot is still pending because Playwright is not installed in this workspace and no active Browser tool is available in this turn; stop here for user visual review before moving to deeper dashboard-card styling.
+
+## Review
+
+Phase 1 is intentionally limited to the visual foundation and top navigation shell. It does not change Supabase sync, IndexedDB, import/warehouse logic, drag/drop data behavior, seed data, or user content. The broken extension screenshot was caused by the extension build using `extension/src/extension.css` instead of Next's `src/app/globals.css`; the missing `wc-*` classes have now been duplicated into the extension stylesheet. Extension build and static checks pass; the next checkpoint is user visual review after reloading `extension/dist`.
+
+## Current Task: Blue Glass Dashboard Phase 2
+
+- [x] Add dashboard/card-wall visual classes without changing data flow -> Verification: `sortable-grid.tsx` only receives presentational `wc-*` classes around existing category, group, ungrouped, and card-list render paths.
+- [x] Style parent category panels and subgroup panels as layered blue glass cards -> Verification: `src/app/globals.css` and `extension/src/extension.css` share matching dashboard CSS for Web and Chrome extension builds.
+- [x] Improve site tile flow inside groups -> Verification: group card lists use a responsive grid so tiles wrap into compact rows instead of long sparse strips.
+- [x] Run verification -> Verification: `corepack pnpm ts-check`, `corepack pnpm lint`, `corepack pnpm build:ext`, and `git diff --check` pass.
+
+## Review
+
+Phase 2 is limited to homepage/dashboard visual polish. It adds the large glass parent panels, softer subgroup cards, responsive tile grids, and an ungrouped glass panel while preserving existing drag IDs, store calls, sync code, database code, import code, and user data. Lint still reports the same pre-existing warnings only; extension build succeeds and outputs the refreshed `extension/dist`.
+
+## Current Task: Quiet Floating Capture Hover
+
+- [x] Restrict default hover capture to explicit visible URL text -> Verification: sidebar/nav links do not show the hover trigger, while visible URLs such as `github.com/...` do.
+- [x] Add an opt-in all-links hover mode with warning -> Verification: default is off and enabling it asks for confirmation.
+- [x] Replace the hover text pill with a delayed WC round trigger -> Verification: no standalone hover text pill appears; the WC trigger appears after 0.7s and opens the form only when clicked.
+- [x] Run verification and rebuild extension package -> Verification: type check, lint, extension build, diff check, and zip rebuild.
+
+## Review
+
+Quieted the floating capture hover path without touching sync, drag, or main data storage. By default, hover capture now only reacts to links whose visible text looks like an explicit URL; the noisy all-link hover mode is local-only, off by default, and asks for confirmation before enabling. The old text pill is replaced by a delayed round WC trigger with a progress ring, and the form opens only after clicking the WC trigger. Verification passed with type check, lint warnings only, extension build, diff check, and rebuilt extension zip.
+
+## Current Task: Polish Floating Capture And Ungrouped Editing
+
+- [x] Refresh floating capture destinations when the panel opens -> Verification: user sections/categories/groups appear in the floating form instead of stale defaults.
+- [x] Clarify floating capture pause/disable controls and improve the WC trigger -> Verification: pause/per-site disable text is understandable and the trigger is compact.
+- [x] Add an edit/exit entry to the ungrouped area -> Verification: the ungrouped area can enter and leave edit mode without relying on another category.
+- [x] Constrain card description text width -> Verification: long descriptions truncate inside the card and full text remains available on hover.
+- [x] Run verification and rebuild package -> Verification: `corepack pnpm ts-check`, extension type check, lint, extension build, Next production build, diff check, and zip rebuild.
+
+## Review
+
+Polished the floating capture widget without touching sync or drag storage logic: the panel refreshes destination cache every time it opens, the target lists include sections, parent categories, and group candidates, and the current-site disable action is now labeled as permanent hiding with an account-menu restore path. The floating trigger is a compact WC button. The unclassified area now has its own edit/exit control, and card descriptions are width-constrained with ellipsis plus full text available through hover/title. Verification passed with type checks, lint warnings only, extension build, Next production build, diff check, and rebuilt extension zip.
+
 ## Current Task: Recover Lost Layout And Add Rollback Snapshots
 
 - [x] Locate the best recoverable previous snapshot/cache without writing over current data -> Verification: cloud read attempt was non-mutating; current code now preserves future local versions because previous full snapshots were not available in the old build.
@@ -161,3 +264,172 @@ Focused only on `sortable-grid.tsx`. The root cause was the child block width fl
 ## Review
 
 Added a durable handoff section to `tasks/lessons.md` so future WebCollect work does not depend only on chat history. The new notes group the hard-earned rules by sync/data safety, drag/layout, warehouse persistence, status UX, and future implementation protocol.
+
+## Current Task: Floating Capture Widget
+
+- [x] Write the execution plan and scope boundary -> Verification: `docs/superpowers/plans/2026-05-11-floating-capture-widget.md` records queue-first isolation, default inbox behavior, and non-goals.
+- [x] Add the extension content script entry -> Verification: extension manifest includes a content script and Vite emits a deterministic `assets/floating-capture.js`.
+- [x] Add background queue, prefs, and context-menu handling -> Verification: content script/right-click can save capture drafts into `chrome.storage.local` without touching IndexedDB.
+- [x] Drain capture queue from WebCollect new tab -> Verification: pending drafts become normal cards through existing `addCard`; duplicates are skipped.
+- [x] Add account-menu floating widget settings -> Verification: global enable, hover toggle, context-menu toggle, pause, and restore are available under the user menu.
+- [x] Run verification and rebuild package -> Verification: `corepack pnpm ts-check`, `corepack pnpm lint`, `corepack pnpm build:ext`, and zip rebuild.
+
+## Review
+
+Implemented the floating capture widget as an isolated Chrome extension path. Ordinary pages get a shadow-DOM floating button and hover shortcut; the background service worker owns context-menu capture, metadata fetch reuse, local preferences, destination-cache reads, and queue writes. WebCollect new tab publishes a lightweight destination cache and drains pending captures through the existing `addCard` store action, skipping duplicate URLs and falling back to `收集箱` when the selected target is missing. Account settings now include local-only floating widget controls. Verification passed: root type check, extension type check, lint with pre-existing warnings only, extension build, manifest parse check, diff check, and rebuilt `WebCollect-extension-dist.zip`.
+## Current Task: Stop Flattened Hierarchy Sync And Preserve New Cards
+
+- [x] Identify the root cause of groups moving into `未分类` -> Verification: `upsertCategoriesWithParents` was writing every category with `parent_id = null` before restoring parent links, creating a user-visible flattened cloud state if interrupted.
+- [x] Remove the dangerous transient-flat cloud write -> Verification: category upserts are now ordered by parent depth and write the real `parent_id` in a single pass.
+- [x] Add structure-only recovery that keeps newly captured cards -> Verification: recovery restores sections/category parent links/card category IDs from the best local snapshot and does not full-rollback card content.
+- [x] Expose recovery in rollback dialog and account menu -> Verification: user can run `只修结构（保留新网页）` without choosing a full snapshot rollback.
+- [x] Block future pushes of flattened hierarchy over richer local snapshots -> Verification: normal sync and manual cloud push throw a clear guard error instead of writing flattened data.
+- [x] Run verification and rebuild package -> Verification: `corepack pnpm ts-check`, extension type check, `corepack pnpm lint`, `corepack pnpm build:ext`, `git diff --check`, zip rebuild.
+
+## Review
+
+Verification passed. The intended user recovery path is: load the rebuilt extension, open WebCollect, use account menu `只修结构（保留新网页）`, inspect the restored homepage/FOM/HODL/AI layout, then manually trigger cloud sync only after the visible structure is correct.
+## Current Task: Simplify Sync Repair And Manual Rollback
+
+- [x] Treat manual sync as "push the current visible workspace" -> Verification: manual sync skips the flattened-structure guard that was incorrectly blocking the user's current layout.
+- [x] Merge the two structure-repair entries in the account menu -> Verification: the user menu now has one `修复结构（保留网页）` action and no separate import repair action.
+- [x] Keep rollback history user-facing and manual-only -> Verification: the rollback dialog reads only manual snapshots and clear-before snapshots; automatic safety snapshots stay internal.
+- [x] Fix floating widget setting text rendering -> Verification: account-menu floating widget buttons render `Hover 链接` and `右键菜单` instead of raw unicode escape text.
+- [x] Run verification and rebuild package -> Verification: `corepack pnpm ts-check`, extension type check, `corepack pnpm lint`, `corepack pnpm build:ext`, `git diff --check`, and zip rebuild.
+
+## Review
+
+Verification passed. This change intentionally does not touch seed data, drag/drop, layout, or the user's cards/categories. Manual cloud sync now treats the visible current workspace as authoritative, rollback only shows manual user versions, and the account menu exposes one conservative structure-repair action that preserves webpages.
+
+## Current Task: Repair Invisible Cards On Refresh
+
+- [x] Identify why warehouse still sees duplicates while homepage groups show `0` -> Verification: homepage duplicate checks read all cards, but the grid only renders cards whose category and parent/section links are visible.
+- [x] Repair invisible local placements without deleting webpages -> Verification: `loadData()` now detaches groups whose parent is missing, aligns child groups to the parent section, and moves cards with missing categories into the current section inbox.
+- [x] Stop sync cleanup from dropping cards with missing categories -> Verification: sync fallback moves invalid/recovered-category cards into a valid inbox before upload instead of filtering them out.
+- [x] Run verification and rebuild package -> Verification: `corepack pnpm ts-check`, extension type check, `corepack pnpm lint`, `corepack pnpm build:ext`, `git diff --check`, and `WebCollect-extension-dist.zip` rebuild.
+
+## Review
+
+Verification passed. The intended user behavior is that the top-bar refresh is no longer just a visual reload: it also repairs non-renderable local relationships while preserving every webpage record.
+
+## Current Task: Blue Glass UI Redesign
+
+- [x] Record the visual scope and data-safety boundary -> Verification: `WEB_COLLECT_UI_REDESIGN_BRIEF.md` documents UI-only constraints and non-goals.
+- [x] Establish the blue-purple glass visual tokens -> Verification: global CSS exposes shared surface, button, tab, tile, input, and shell styles.
+- [x] Redesign the header and section tabs -> Verification: search, sync status, refresh, add actions, warehouse, recycle bin, and account menu stay wired.
+- [x] Redesign the dashboard cards and site tiles -> Verification: existing drag/edit/add/delete behavior stays on the same store methods.
+- [x] Redesign the add website dialog and account panel -> Verification: all existing fields and settings remain reachable.
+- [x] Restyle the recommendation area -> Verification: add, hide, search, more, and settings behavior remains unchanged.
+- [x] Run verification -> Verification: `corepack pnpm ts-check`, `corepack pnpm lint`, `corepack pnpm build:ext`, and `corepack pnpm exec next build --webpack`.
+
+## Review
+
+The blue glass UI pass is implemented as a presentation-layer change. The shared visual tokens, header, section tabs, dashboard cards, website tiles, add-card dialog, account panel, and recommendation area were restyled without changing sync, IndexedDB, import, warehouse, or drag data algorithms. Verification passed for type check, lint, extension build, and Next production build. A live dev-server smoke check was attempted, but the local dev process returned a transient 500 while the production build succeeded; avoid force-killing local Node processes unless the user asks.
+
+## Current Task: Blue Glass UI Phase 3 Modal And Account Panel Polish
+
+- [x] Re-read the old-thread handoff and lock the Phase 3 scope -> Verification: `LASTWEBCOLLECT MD.docx` shows Phase 1/2 were user-approved and Phase 3 is the next checkpoint.
+- [x] Add shared modal and settings-panel glass classes -> Verification: `src/app/globals.css` and `extension/src/extension.css` both define the same `wc-modal-*`, `wc-settings-*`, segmented, toggle, message, login, and config popover styles.
+- [x] Polish the add/edit website modal without changing fields or save behavior -> Verification: `card-dialog.tsx` still uses the same `url`, category, title, descriptions, note, abbreviation, image URL, metadata fetch, `addCard`, and `updateCard` paths.
+- [x] Polish the account panel and unauthenticated extension config UI -> Verification: `user-menu.tsx` preserves manual sync, sync mode, visual scale, link open mode, floating capture settings, snapshots, structure repair, clear flow, logout, login, and extension Supabase config.
+- [x] Run verification -> Verification: `corepack pnpm ts-check`, `corepack pnpm build:ext`, `corepack pnpm lint`, `corepack pnpm exec next build --webpack`, and `git diff --check` pass.
+
+## Review
+
+Phase 3 is scoped to presentation-layer polish. The add/edit website modal now uses a more refined two-column glass shell with a visual preview rail while preserving every input and submission path. The account menu is now a consistent right-side glass settings panel with grouped cards, segmented sync mode controls, polished range/select controls, floating-capture toggles, and a restrained danger section. The same visual classes were mirrored into extension CSS so the Chrome new-tab build does not lose the updated styling. Static verification and production builds pass; local dev-server visual QA could not be completed because the dev server did not begin listening on the test ports in this environment.
+
+## Current Task: Blue Glass UI Phase 4 Discover Recommendations
+
+- [x] Preserve the recommendation data and behavior boundary -> Verification: `HotRecommendation` still uses `hotSites`, `extraHotSites`, `checkSafety`, `addCard`, `hideSite`, category add popovers, and the existing hidden-site duration setting.
+- [x] Add discover-center visual classes to Web and extension CSS -> Verification: `src/app/globals.css` and `extension/src/extension.css` both define `wc-discover-*`, `wc-featured-*`, category cards, and value strip styles.
+- [x] Upgrade recommendation layout into a discover center -> Verification: the component now renders a hero search area, orbit visual, featured recommendation cards, six category overview cards, the original grouped recommendation list/search results, and a value strip.
+- [x] Run verification -> Verification: `corepack pnpm ts-check`, `corepack pnpm build:ext`, `corepack pnpm lint`, `corepack pnpm exec next build --webpack`, and `git diff --check` pass.
+
+## Review
+
+Phase 4 keeps the recommendation logic intact while changing presentation. The old compact recommendation list is now a blue-glass discover center with search, "more" toggle, settings, featured site cards, category overview cards, grouped recommendations, and a bottom value strip. Quick add, category add, hide, safety scan, hidden duration, already-added state, and extra recommendations still run through the same existing functions. Static verification passes, and lint is down to 6 pre-existing warnings after removing stale recommendation props and replacing the recommendation favicons with background-image blocks.
+
+## Current Task: Blue Glass UI Phase 5 Static Visual QA
+
+- [x] Audit the primary redesigned surfaces for old shadcn/backend-style residues -> Verification: header, dashboard grid, website cards, add/edit modal, account panel, and recommendation center no longer contain `bg-card`, `border-border`, `bg-popover`, `hover:bg-muted`, or `text-muted-foreground` residues in their main implementation files.
+- [x] Tighten the recommendation center details -> Verification: collapsed categories, added-site rows, and category picker popovers now use the same slate/blue glass styling as the rest of the discover center.
+- [x] Tighten card-wall secondary text and empty states -> Verification: website-card abbreviation/fallback text, hover details, subgroup empty states, and drag hints now use the shared slate color ramp instead of old muted tokens.
+- [x] Run verification -> Verification: `corepack pnpm ts-check`, `corepack pnpm lint`, `corepack pnpm build:ext`, `corepack pnpm exec next build --webpack`, and `git diff --check` pass.
+
+## Review
+
+The primary Phase 1-4 UI surfaces are now aligned to the blue glass template at code level: background/header, section tabs, dashboard/group panels, website cards, add/edit modal, account panel, unauthenticated config panel, and recommendation/discover center. The warehouse route still has older utility classes, but it was not part of this accepted template pass. Live screenshot QA remains blocked by local permission issues around Next CLI, Chrome headless, and Node REPL, so the next useful review step is user-side loading with screenshots.
+
+## Current Task: Screenshot Feedback Polish
+
+- [x] Add semantic icon fallback for cards without useful favicons -> Verification: `WebCardItem` now prefers contextual Lucide icons for browser/internal tools such as Extensions, Flags, Apps, Bookmarks, Downloads, History, and Settings, while normal websites still prefer real favicons.
+- [x] Refine featured recommendation primary buttons -> Verification: featured recommendation add buttons now use a smaller glass pill style instead of the oversized blue-purple filled bar.
+- [x] Improve narrow-width header behavior -> Verification: compact layouts make the header non-sticky, reduce padding and control height, allow action buttons/tabs to scroll horizontally, and reduce main-content top padding in both Web and extension entrypoints.
+- [x] Run verification -> Verification: `corepack pnpm ts-check`, `corepack pnpm lint`, `corepack pnpm build:ext`, `corepack pnpm exec next build --webpack`, and `git diff --check` pass.
+
+## Review
+
+This pass directly addresses the five screenshots: Chrome utility cards should no longer fall back to a generic globe when their title clearly indicates a browser function; the discover center's featured row is less visually heavy; and the narrow Chrome-window layout should show more content because the header is shorter and no longer pinned in compact width. The changes are presentation-layer only and do not alter sync, storage, card data, drag/drop, or recommendation behavior.
+
+## Current Task: Screenshot Feedback Polish 2
+
+- [x] Replace hot-category Chinese initials with semantic icons -> Verification: discover category cards now render icons for AI, productivity, developer, design, social media, reading, business, learning, news, shopping, video, music, and generic tools.
+- [x] Redesign the floating capture side button -> Verification: the content-script floating button now uses the WebCollect blue glass style instead of the old warm brown capsule.
+- [x] Add docked hover and drag behavior to the floating capture side button -> Verification: the button is half-hidden on the nearest screen edge, expands on hover/open/drag, can be dragged between left and right edges, and persists its side/top position locally.
+- [x] Keep capture panel behavior intact while polishing it visually -> Verification: opening the panel, selecting destination, pausing, hiding per-site, saving to the capture queue, hover-link capture, and runtime open-panel messages still use the same existing paths.
+- [x] Run verification -> Verification: `corepack pnpm ts-check`, `corepack pnpm lint`, `corepack pnpm build:ext`, `corepack pnpm exec next build --webpack`, and `git diff --check` pass.
+
+## Review
+
+The main UI template pass is effectively complete for the accepted WebCollect surfaces: header, tabs, dashboard, card wall, add/edit modal, account settings panel, discover center, and extension CSS mirror are all aligned to the blue glass direction. This follow-up removes the remaining text-initial category icons and makes the web-page floating capture widget feel like part of the same product system, with side docking, hover reveal, drag repositioning, and a blue glass capture panel.
+
+## Current Task: Floating Capture Mascot Button
+
+- [x] Add mascot preference to floating capture settings -> Verification: capture prefs now persist `mascot`, defaulting to `chipmunk`, with `otter` as the alternate choice.
+- [x] Add account-panel mascot selector -> Verification: the extension account settings panel exposes 花栗鼠 and 水獭 options under the floating-widget controls.
+- [x] Replace the generic WC side pill with mascot-head artwork -> Verification: the content script renders inline SVG head artwork for the chipmunk and otter options, keeping only the head portion in the button.
+- [x] Preserve hidden-state geometry -> Verification: hidden/docked state uses only edge translation; it does not scale, squash, or otherwise deform the mascot head.
+- [x] Run verification -> Verification: `corepack pnpm ts-check`, `corepack pnpm lint`, `corepack pnpm build:ext`, `corepack pnpm exec next build --webpack`, and `git diff --check` pass.
+
+## Review
+
+The floating capture entry now follows the provided mascot concept direction more closely: default chipmunk, optional otter, head-only artwork, WebCollect blue glass capsule, and unchanged click-to-collect behavior. The artwork is implemented as inline SVG inside the extension content script so it does not depend on external image assets or base64 attachments.
+
+## Current Task: Sync Structure Collapse Hotfix
+
+- [x] Identify the data-shape failure -> Verification: the broken state is not missing cards; it is a flattened `categorySectionIds`/`sectionId` layout where tabs can still exist while all categories point to `section-default`.
+- [x] Protect cloud layout from collapsed local mappings -> Verification: sync now treats default-only category assignments as unsafe even if non-default tabs remain, and cloud section preferences win during category merge.
+- [x] Fix startup ordering -> Verification: web and extension new-tab initialization await auth/cloud restore before local `loadData()` migrations can stamp the fresh local state as newer.
+- [x] Keep manual sync guarded -> Verification: manual sync uses the normal protected snapshot push path; destructive guard bypass remains reserved for explicit clear/reset.
+- [x] Improve header status adaptation -> Verification: sync status renders as a fixed-width two-line badge and compact widths hide quiet button labels instead of pushing account/warehouse controls down.
+- [x] Run verification -> Verification: `corepack pnpm ts-check`, `corepack pnpm lint`, `corepack pnpm build:ext`, `corepack pnpm exec next build --webpack`, and `git diff --check` pass.
+
+## Review
+
+This hotfix addresses the post-reload sync scramble rather than UI polish alone. The code now protects a real cloud multi-section layout from a local state where every category has fallen back to the homepage, and the app no longer runs local migrations before the cached-session cloud restore has had a chance to repair the workspace.
+
+## Current Task: Emergency Full Workspace Restore
+
+- [x] Stop relying on structure-only repair -> Verification: added a startup recovery path that restores a full healthy snapshot when the current workspace is visibly collapsed.
+- [x] Select the latest healthy local version -> Verification: candidates must contain many cards/categories, multiple sections with cards, non-default content, parent-child links, and no known RWA/crypto groups parked on `主页`.
+- [x] Add fallback when local snapshots are unavailable -> Verification: `assets/homely411.json` can rebuild a full structured workspace with about 7 sections, 105 categories/groups, and 315 cards distributed across HODL/FOM/AI/unused.
+- [x] Run recovery before cloud sync -> Verification: both Web and extension startup invoke emergency restore before `useAuthStore.initialize()`, allowing the restored local version to win the next sync.
+- [x] Preserve a bad-state backup before replacing data -> Verification: Homely fallback writes a `before-emergency-homely-restore` local snapshot, while snapshot restore uses the existing rollback backup path.
+- [x] Run verification -> Verification: `corepack pnpm ts-check`, `corepack pnpm lint`, `corepack pnpm build:ext`, `corepack pnpm exec next build --webpack`, `git diff --check`, and extension zip rebuild pass.
+
+## Review
+
+The new emergency restore path targets data recovery first. On startup it detects the specific broken pattern where a large workspace is collapsed into the homepage, restores the newest healthy full local snapshot if one exists, and otherwise rebuilds a complete structured workspace from the original Homely source data. This runs before auth/cloud sync so the repaired local version is saved as the current version and can be pushed back through the normal guarded sync path.
+
+## Correction: Snapshot-Only Restore And Cloud Duplicate Cleanup
+
+- [x] Remove the rejected Homely fallback -> Verification: Homely is only an early import/reference fixture and must not be used as the latest WebCollect recovery source.
+- [x] Expose all local versions for inspection -> Verification: the rollback dialog lists manual and system snapshots, labels their origin, and marks structure-health candidates.
+- [x] Confirm the cloud data shape -> Verification: Supabase still had real FOM/HODL/AI section preferences, but homepage card copies duplicated URLs that also existed in non-home sections.
+- [x] Back up before cleanup -> Verification: wrote `manualRecoveryBackup-20260518-cloud-home-duplicates` in `user_preferences` with full categories/cards/preferences before deleting rows.
+- [x] Remove duplicate homepage copies -> Verification: deleted only homepage card copies whose URL also existed in a non-home section, plus empty homepage categories left behind by that cleanup.
+- [x] Add recurrence guard in sync -> Verification: sync now detects large-scale homepage duplicates during merge, keeps the non-home copies, writes a local rollback candidate, and removes duplicate cloud rows.
+
+## Review
+
+Cloud data now keeps the real structured sections instead of the duplicated homepage pile: after cleanup Supabase has 321 cards and 116 categories, with HODL/FOM/AI/non-common content distributed by `categorySectionIds`. The backup key above is the rollback point if this candidate needs to be undone.

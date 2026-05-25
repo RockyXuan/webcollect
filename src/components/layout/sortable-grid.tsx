@@ -3,7 +3,13 @@
 import React, { useState, useMemo, useCallback, useRef } from "react";
 import { useAppStore } from "@/lib/store";
 import { InlineEditableText } from "@/components/ui/inline-editable-text";
+import { EditActionDock, type EditAction } from "@/components/ui/edit-action-dock";
 import { WebCardItem } from "@/components/card/web-card";
+import {
+  getSearchMatchedCardIds,
+  getSearchMatchedCategoryIds,
+  searchWorkspace,
+} from "@/lib/workspace-search";
 import { Pencil, PencilOff, Plus, GripVertical, ArrowUpFromLine, ArrowDownFromLine, Folder, Layers, Trash2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -70,34 +76,40 @@ function getSmartParentWidthPercent(rawWidth: number, defaultWidth: number): num
   return Math.max(30, Math.min(maxWidth, safeWidth));
 }
 
-function getDefaultChildBasis(cardCount: number): number {
-  if (cardCount <= 1) return 240;
-  if (cardCount <= 2) return 320;
-  if (cardCount <= 4) return 340;
-  if (cardCount <= 8) return 560;
-  if (cardCount <= 12) return 720;
-  return 920;
+function getDefaultChildBasis(cardCount: number): string {
+  if (cardCount <= 4) return "16.75rem";
+  if (cardCount <= 8) return "32rem";
+  if (cardCount <= 12) return "47.25rem";
+  return "62.5rem";
+}
+
+function getMaxChildWidth(cardCount: number): string {
+  if (cardCount <= 4) return "16.75rem";
+  if (cardCount <= 6) return "47.25rem";
+  if (cardCount <= 10) return "62.5rem";
+  return "77.75rem";
 }
 
 function getSmartChildStyle(widthPercent: number | null, cardCount: number): React.CSSProperties {
-  const maxWidth = cardCount <= 2 ? "360px" : cardCount <= 4 ? "420px" : cardCount <= 8 ? "680px" : "100%";
+  const maxWidth = getMaxChildWidth(cardCount);
 
   if (widthPercent !== null) {
     const minPercent = cardCount <= 4 ? 8 : 14;
-    const maxPercent = cardCount <= 2 ? 45 : cardCount <= 4 ? 58 : cardCount <= 8 ? 74 : 100;
+    const maxPercent = cardCount <= 4 ? 42 : cardCount <= 8 ? 74 : 100;
     const smartWidth = Math.max(minPercent, Math.min(maxPercent, widthPercent));
     return {
       flex: `0 1 calc(${smartWidth}% - 0.75rem)`,
       width: `calc(${smartWidth}% - 0.75rem)`,
-      minWidth: cardCount <= 4 ? "220px" : "260px",
+      minWidth: "min(100%, 16.75rem)",
       maxWidth,
     };
   }
 
   const basis = getDefaultChildBasis(cardCount);
   return {
-    flex: `0 1 ${basis}px`,
-    minWidth: cardCount <= 4 ? "220px" : "260px",
+    flex: `0 1 ${basis}`,
+    width: basis,
+    minWidth: "min(100%, 16.75rem)",
     maxWidth,
   };
 }
@@ -127,6 +139,7 @@ export function SortableGrid({
   const {
     cards,
     categories,
+    sections,
     activeSectionId,
     editMode,
     searchQuery,
@@ -150,27 +163,63 @@ export function SortableGrid({
     return categories.filter((c) => (c.sectionId || "section-default") === activeSectionId);
   }, [categories, activeSectionId]);
 
+  const trimmedSearchQuery = searchQuery.trim();
+  const searchResults = useMemo(
+    () => (
+      trimmedSearchQuery
+        ? searchWorkspace({ cards, categories, sections }, trimmedSearchQuery)
+        : null
+    ),
+    [cards, categories, sections, trimmedSearchQuery]
+  );
+  const matchedCardIds = useMemo(
+    () => (searchResults ? getSearchMatchedCardIds(searchResults) : new Set<string>()),
+    [searchResults]
+  );
+  const matchedCategoryIds = useMemo(
+    () => (searchResults ? getSearchMatchedCategoryIds(searchResults) : new Set<string>()),
+    [searchResults]
+  );
+
+  const categoryHasSearchMatch = useCallback(
+    (category: Category) => {
+      if (!searchResults) return true;
+      if (matchedCategoryIds.has(category.id)) return true;
+      if (cards.some((card) => card.categoryId === category.id && matchedCardIds.has(card.id))) return true;
+      return visibleCategories.some(
+        (child) =>
+          child.parentId === category.id &&
+          (matchedCategoryIds.has(child.id) ||
+            cards.some((card) => card.categoryId === child.id && matchedCardIds.has(card.id)))
+      );
+    },
+    [cards, matchedCardIds, matchedCategoryIds, searchResults, visibleCategories]
+  );
+
   // Build hierarchy
   // Parent categories: explicitly marked isParent OR has sub-groups
   const parentCategories = useMemo(() => {
     return visibleCategories
       .filter((c) => !c.parentId && (c.isParent || visibleCategories.some((sg) => sg.parentId === c.id)))
+      .filter(categoryHasSearchMatch)
       .sort((a, b) => a.order - b.order);
-  }, [visibleCategories]);
+  }, [categoryHasSearchMatch, visibleCategories]);
 
   // Standalone (ungrouped): no parentId, not a parent, no sub-groups
   const standaloneCategories = useMemo(() => {
     return visibleCategories
       .filter((c) => !c.parentId && !c.isParent && !visibleCategories.some((sg) => sg.parentId === c.id))
+      .filter(categoryHasSearchMatch)
       .sort((a, b) => a.order - b.order);
-  }, [visibleCategories]);
+  }, [categoryHasSearchMatch, visibleCategories]);
 
   const getSubGroups = useCallback(
     (parentId: string) =>
       visibleCategories
         .filter((c) => c.parentId === parentId)
+        .filter((category) => !searchResults || matchedCategoryIds.has(parentId) || categoryHasSearchMatch(category))
         .sort((a, b) => a.order - b.order),
-    [visibleCategories]
+    [categoryHasSearchMatch, matchedCategoryIds, searchResults, visibleCategories]
   );
 
   const getCardsForCategory = useCallback(
@@ -178,16 +227,13 @@ export function SortableGrid({
       const filtered = cards
         .filter((c) => c.categoryId === categoryId)
         .sort((a, b) => a.order - b.order);
-      if (!searchQuery) return filtered;
-      const q = searchQuery.toLowerCase();
-      return filtered.filter(
-        (c) =>
-          c.title.toLowerCase().includes(q) ||
-          c.url.toLowerCase().includes(q) ||
-          (c.shortDesc && c.shortDesc.toLowerCase().includes(q))
-      );
+      if (!searchResults) return filtered;
+      if (matchedCategoryIds.has(categoryId)) return filtered;
+      const category = categories.find((item) => item.id === categoryId);
+      if (category?.parentId && matchedCategoryIds.has(category.parentId)) return filtered;
+      return filtered.filter((card) => matchedCardIds.has(card.id));
     },
-    [cards, searchQuery]
+    [cards, categories, matchedCardIds, matchedCategoryIds, searchResults]
   );
 
   const parentSortableIds = useMemo(
@@ -468,7 +514,7 @@ export function SortableGrid({
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className="flex flex-wrap items-start gap-4 p-4">
+      <div className="wc-dashboard-grid flex flex-wrap items-start gap-6">
         <SortableContext items={parentSortableIds} strategy={rectSortingStrategy}>
           {/* ====== Top section: Parent categories ====== */}
           {parentCategories.map((parent) => {
@@ -495,7 +541,7 @@ export function SortableGrid({
               >
                 {/* Sub-groups in flex-wrap so they can sit side by side */}
                 <SortableSubGroupContainer parentId={parent.id}>
-                  <div className="flex flex-wrap items-start gap-3">
+                  <div className="wc-group-flow flex flex-wrap items-start gap-4">
                     {subGroups.map((sub) => {
                       const subCards = getCardsForCategory(sub.id);
                       return (
@@ -516,7 +562,7 @@ export function SortableGrid({
                       );
                     })}
                     {subGroups.length === 0 && !editMode && (
-                      <p className="text-[10px] text-muted-foreground py-1">暂无分组</p>
+                      <p className="py-1 text-[10px] text-slate-400">暂无分组</p>
                     )}
                   </div>
                 </SortableSubGroupContainer>
@@ -527,27 +573,51 @@ export function SortableGrid({
           {/* ====== Bottom section: "未分类" ====== */}
         </SortableContext>
           {standaloneCategories.length > 0 && (
-            <div className="w-full rounded-lg border border-dashed border-border/60 bg-muted/20">
-              <div className="flex items-center gap-2 px-3 py-2 border-b border-border/30">
-                <span className="text-xs font-semibold text-muted-foreground">
+            <div className="wc-glass-card wc-ungrouped-panel w-full overflow-hidden">
+              <div className="wc-category-header flex items-center gap-2 border-b border-white/60 px-5 py-4">
+                <span className="text-sm font-semibold text-slate-700">
                   未分类
                 </span>
-                <span className="text-[10px] text-muted-foreground/60">
+                <span className="text-xs text-slate-400">
                   ({standaloneCategories.length} 个分组)
                 </span>
                 {editMode && (
-                  <span className="text-[10px] text-muted-foreground/50 ml-1">
+                  <span className="ml-1 text-xs text-slate-400">
                     — 拖入上方分类即可降级为分组
                   </span>
                 )}
                 {!editMode && (
-                  <span className="text-[10px] text-muted-foreground/40 ml-1">
+                  <span className="ml-1 text-xs text-slate-400">
                     — 拖拽分组到上方分类可降级
                   </span>
                 )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`ml-auto h-8 rounded-xl px-3 text-xs ${
+                    editMode ? "text-slate-500 hover:bg-rose-50 hover:text-rose-600" : "text-slate-500 hover:bg-white/80 hover:text-blue-600"
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleEditMode();
+                  }}
+                  title={editMode ? "\u9000\u51fa\u672a\u5206\u7c7b\u7f16\u8f91" : "\u7f16\u8f91\u672a\u5206\u7c7b"}
+                >
+                  {editMode ? (
+                    <>
+                      <PencilOff className="w-2.5 h-2.5" />
+                      {"\u9000\u51fa\u7f16\u8f91"}
+                    </>
+                  ) : (
+                    <>
+                      <Pencil className="w-2.5 h-2.5" />
+                      {"\u7f16\u8f91"}
+                    </>
+                  )}
+                </Button>
               </div>
               <SortableContext items={standaloneSortableIds} strategy={rectSortingStrategy}>
-              <div className="p-3 flex flex-wrap items-start gap-3">
+              <div className="wc-group-flow flex flex-wrap items-start gap-4 p-5">
                 {standaloneCategories.map((cat) => {
                   const catCards = getCardsForCategory(cat.id);
                   return (
@@ -581,9 +651,7 @@ export function SortableGrid({
             if (!info) return null;
             return (
               <div
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md
-                  bg-card/95 border border-border/40 shadow-sm backdrop-blur-sm
-                  text-xs font-medium text-foreground"
+                className="inline-flex items-center gap-2 rounded-2xl border border-white/70 bg-white/90 px-4 py-2 text-sm font-semibold text-slate-800 shadow-lg backdrop-blur-xl"
               >
                 <div
                   className="w-1.5 h-1.5 rounded-full flex-shrink-0"
@@ -700,24 +768,39 @@ function SortableCategoryBlock({
     [setNodeRef]
   );
 
+  const categoryActions: EditAction[] = [
+    { id: "edit", label: "编辑分类", icon: Pencil, onSelect: () => onEditCategory?.(category) },
+    ...(isParent ? [{ id: "add-group", label: "添加分组", icon: Layers, onSelect: () => onAddGroup?.(category.id) }] : []),
+    { id: "add-card", label: "添加网页", icon: Plus, onSelect: () => onAddCard?.() },
+    { id: "ship", label: "飞到其他分项", icon: Send, onSelect: () => onShipCategory?.(category) },
+    { id: "delete", label: "删除分类", icon: Trash2, tone: "danger" as const, onSelect: () => setConfirmDeleteOpen(true) },
+    ...(isParent ? [{ id: "demote", label: "降级为分组", icon: ArrowDownFromLine, tone: "danger" as const, onSelect: () => setConfirmDemoteOpen(true) }] : []),
+  ];
+
+  const handleDockTriggerClick = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!globalEditMode) toggleEditMode();
+  };
+
   return (
     <div
       ref={setRef}
       style={style}
+      data-wc-category-id={category.id}
       className={`
-        relative rounded-lg border bg-card overflow-hidden
-        ${isHovered ? "border-primary/60 shadow-sm bg-primary/[0.03]" : "border-border"}
-        transition-[border-color,background-color,box-shadow,min-height] duration-300 ease-out
+        wc-glass-card wc-category-panel relative overflow-hidden
+        ${isHovered ? "ring-2 ring-blue-400/35 shadow-[0_28px_70px_rgba(59,130,246,0.18)]" : ""}
+        transition-all duration-300 ease-out
       `}
     >
       {/* Category header - buttons right next to title */}
       <div
-        className="flex items-center gap-1.5 px-3 py-2 border-b border-border/50 flex-wrap"
+        className="wc-category-header relative z-10 flex items-center gap-2 border-b border-white/60 px-5 py-4 flex-wrap"
         onMouseEnter={() => setIsHeaderHovered(true)}
         onMouseLeave={() => setIsHeaderHovered(false)}
       >
         <span
-          className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground transition-colors"
+          className="cursor-grab active:cursor-grabbing text-slate-400/70 hover:text-blue-600 transition-colors"
           {...attributes}
           {...listeners}
           title="拖动排序"
@@ -725,31 +808,35 @@ function SortableCategoryBlock({
           <GripVertical className="w-4 h-4" />
         </span>
         <div
-          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+          className="h-2.5 w-2.5 flex-shrink-0 rounded-full shadow-sm shadow-blue-300/40"
           style={{ backgroundColor: category.color }}
         />
         <Folder
-          className="w-3.5 h-3.5 shrink-0 text-muted-foreground/70"
+          className="h-4 w-4 shrink-0 text-blue-500/70"
           aria-hidden="true"
         />
         <InlineEditableText
           value={category.name}
-          className="text-sm font-semibold text-foreground font-serif hover:text-primary/80 transition-colors"
+          className="text-[17px] font-semibold text-slate-900 font-serif hover:text-blue-600 transition-colors"
           editMode={editMode}
           onSave={(newName) => updateCategory({ ...category, name: newName })}
         />
-        {/* Edit mode toggle - show "编辑" when not in edit mode, "退出编辑" when in edit mode */}
-        {isHeaderHovered && !globalEditMode && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-5 text-[11px] gap-0.5 px-1.5 text-muted-foreground hover:text-primary animate-in fade-in duration-200"
-            onClick={(e) => { e.stopPropagation(); toggleEditMode(); }}
-            title="进入编辑模式"
-          >
-            <Pencil className="w-2.5 h-2.5" />
-            编辑
-          </Button>
+        {(isHeaderHovered || globalEditMode) && (
+          <EditActionDock
+            actions={categoryActions}
+            trigger={
+              <Button
+                variant="ghost"
+                size="sm"
+                className="wc-edit-dock-trigger h-7 w-7 rounded-full p-0 text-slate-500 hover:bg-white/80 hover:text-blue-600 animate-in fade-in duration-200"
+                onClick={handleDockTriggerClick}
+                title={globalEditMode ? "分类操作" : "进入编辑模式"}
+                aria-label={globalEditMode ? "分类操作" : "进入编辑模式"}
+              >
+                <Pencil className="w-2.5 h-2.5" />
+              </Button>
+            }
+          />
         )}
         {/* Smooth drop hint */}
         {isHovered && isParent && (
@@ -758,80 +845,16 @@ function SortableCategoryBlock({
           </span>
         )}
         {isDraggingActive && isParent && !isHovered && (
-          <span className="text-[10px] text-muted-foreground/30 transition-opacity duration-300">
+          <span className="text-[10px] text-slate-400/60 transition-opacity duration-300">
             拖入分组到此分类
           </span>
         )}
 
-        {/* Action buttons - right next to title */}
-        {editMode && (
-          <>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0 ml-0.5"
-              onClick={() => onEditCategory?.(category)}
-              title="编辑分类"
-            >
-              <Pencil className="w-2.5 h-2.5" />
-            </Button>
-            {isParent && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-5 w-5 p-0"
-                onClick={() => onAddGroup?.(category.id)}
-                title="添加分组"
-              >
-                <Layers className="w-2.5 h-2.5" />
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0"
-              onClick={() => onAddCard?.()}
-              title="添加网页"
-            >
-              <Plus className="w-2.5 h-2.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0"
-              onClick={() => onShipCategory?.(category)}
-              title="飞到其他分项"
-            >
-              <Send className="w-2.5 h-2.5" />
-            </Button>
-            {/* Delete category */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
-              title="删除分类"
-              onClick={() => setConfirmDeleteOpen(true)}
-            >
-              <Trash2 className="w-2.5 h-2.5" />
-            </Button>
-            {isParent && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
-                title="降级为分组"
-                onClick={() => setConfirmDemoteOpen(true)}
-              >
-                <ArrowDownFromLine className="w-2.5 h-2.5" />
-              </Button>
-            )}
-          </>
-        )}
         {globalEditMode && (
           <Button
             variant="ghost"
             size="sm"
-            className="ml-auto h-5 text-[11px] gap-0.5 px-1.5 text-muted-foreground hover:text-destructive"
+            className="wc-edit-exit-chip h-8 gap-1 rounded-full px-3 text-xs text-slate-500 hover:bg-rose-50 hover:text-rose-600"
             onClick={(e) => { e.stopPropagation(); toggleEditMode(); }}
             title="退出编辑模式"
           >
@@ -842,12 +865,12 @@ function SortableCategoryBlock({
       </div>
 
       {/* Category body */}
-      <div className="p-3">{children}</div>
+      <div className="wc-category-body relative z-10 p-5">{children}</div>
 
       {/* Resize handle - right edge, always available */}
       <div
-        className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize
-          hover:bg-primary/20 active:bg-primary/30 transition-colors rounded-r-lg"
+        className="absolute right-0 top-0 bottom-0 z-20 w-2 cursor-col-resize
+          rounded-r-[28px] transition-colors hover:bg-blue-400/20 active:bg-blue-500/25"
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={handleResizeStart}
       />
@@ -963,9 +986,12 @@ function SortableSubGroupBlock({
   const categoryWidths = useAppStore((s) => s.categoryWidths);
   const setCategoryWidth = useAppStore((s) => s.setCategoryWidth);
   const updateCategory = useAppStore((s) => s.updateCategory);
+  const globalEditMode = useAppStore((s) => s.editMode);
+  const toggleEditMode = useAppStore((s) => s.toggleEditMode);
   const [localWidth, setLocalWidth] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [isHeaderHovered, setIsHeaderHovered] = useState(false);
 
   const widthPercent = localWidth ?? categoryWidths[category.id] ?? null;
 
@@ -1009,6 +1035,19 @@ function SortableSubGroupBlock({
     [setNodeRef]
   );
 
+  const groupActions: EditAction[] = [
+    { id: "edit", label: "编辑分组", icon: Pencil, onSelect: () => onEditCategory?.(category) },
+    { id: "add-card", label: "添加网页", icon: Plus, onSelect: () => onAddCard?.(category.id) },
+    { id: "promote", label: "升级为分类", icon: ArrowUpFromLine, onSelect: () => onDetach?.() },
+    { id: "ship", label: "飞到其他分项", icon: Send, onSelect: () => onShipCategory?.(category) },
+    { id: "delete", label: "删除分组", icon: Trash2, tone: "danger", onSelect: () => setConfirmDeleteOpen(true) },
+  ];
+
+  const handleDockTriggerClick = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!globalEditMode) toggleEditMode();
+  };
+
   const style: React.CSSProperties = {
     transform: isDragging ? undefined : CSS.Transform.toString(transform),
     transition,
@@ -1020,84 +1059,57 @@ function SortableSubGroupBlock({
     <div
       ref={setRef}
       style={style}
-      className="relative rounded-md border border-border/40 bg-background overflow-hidden min-w-0"
+      data-wc-category-id={category.id}
+      className="wc-soft-card wc-group-panel relative min-w-0 overflow-hidden"
     >
       {/* Sub-group header - buttons right next to title */}
-      <div className="flex items-center gap-1.5 px-2.5 py-1.5 flex-wrap">
+      <div
+        className="wc-group-header flex items-center gap-2 px-4 py-3 flex-wrap"
+        onMouseEnter={() => setIsHeaderHovered(true)}
+        onMouseLeave={() => setIsHeaderHovered(false)}
+      >
         <span
-          className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground transition-colors"
+          className="cursor-grab active:cursor-grabbing text-slate-400/70 hover:text-blue-600 transition-colors"
           {...attributes}
           {...listeners}
           title="拖动排序"
         >
-          <GripVertical className="w-3.5 h-3.5" />
+          <GripVertical className="h-3.5 w-3.5" />
         </span>
         <div
-          className="w-1 h-3 rounded-full flex-shrink-0"
+          className="h-4 w-1 rounded-full flex-shrink-0 shadow-sm shadow-blue-300/30"
           style={{ backgroundColor: category.color }}
         />
         <Layers
-          className="w-3 h-3 shrink-0 text-muted-foreground/70"
+          className="h-3.5 w-3.5 shrink-0 text-blue-500/70"
           aria-hidden="true"
         />
         <InlineEditableText
           value={category.name}
-          className="text-xs font-medium text-foreground hover:text-primary/80 transition-colors"
+          className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors"
           editMode={editMode}
           onSave={(newName) => updateCategory({ ...category, name: newName })}
         />
-        <span className="text-[10px] text-muted-foreground">
+        <span className="text-xs text-slate-400">
           ({cards.length})
         </span>
 
-        {editMode && (
-          <>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0 ml-0.5"
-              onClick={() => onEditCategory?.(category)}
-              title="编辑分组"
-            >
-              <Pencil className="w-2.5 h-2.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0"
-              onClick={() => onAddCard?.(category.id)}
-              title="添加网页"
-            >
-              <Plus className="w-2.5 h-2.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
-              onClick={onDetach}
-              title="升级为分类"
-            >
-              <ArrowUpFromLine className="w-2.5 h-2.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
-              onClick={() => onShipCategory?.(category)}
-              title="飞到其他分项"
-            >
-              <Send className="w-2.5 h-2.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
-              title="删除分组"
-              onClick={() => setConfirmDeleteOpen(true)}
-            >
-              <Trash2 className="w-2.5 h-2.5" />
-            </Button>
-          </>
+        {(isHeaderHovered || globalEditMode) && (
+          <EditActionDock
+            actions={groupActions}
+            trigger={
+              <Button
+                variant="ghost"
+                size="sm"
+                className="wc-edit-dock-trigger h-7 w-7 rounded-full p-0 text-slate-500 hover:bg-white/80 hover:text-blue-600 animate-in fade-in duration-200"
+                onClick={handleDockTriggerClick}
+                title={globalEditMode ? "分组操作" : "进入编辑模式"}
+                aria-label={globalEditMode ? "分组操作" : "进入编辑模式"}
+              >
+                <Pencil className="w-2.5 h-2.5" />
+              </Button>
+            }
+          />
         )}
       </div>
 
@@ -1106,7 +1118,7 @@ function SortableSubGroupBlock({
         items={cards.map((c) => cardId(c.id))}
         strategy={rectSortingStrategy}
       >
-        <div className="flex flex-wrap gap-1 px-2.5 pb-2">
+        <div className={`wc-group-card-list flex flex-wrap gap-2 px-4 pb-4 ${editMode ? "wc-group-card-list-editing" : ""}`}>
           {cards.map((card) => (
             <SortableCard
               key={card.id}
@@ -1120,15 +1132,15 @@ function SortableSubGroupBlock({
             />
           ))}
           {cards.length === 0 && (
-            <p className="text-[10px] text-muted-foreground py-1">暂无网站</p>
+            <p className="py-1 text-[10px] text-slate-400">暂无网站</p>
           )}
         </div>
       </SortableContext>
 
       {/* Resize handle - right edge, always available */}
       <div
-        className="absolute right-0 top-0 bottom-0 z-20 w-2.5 cursor-col-resize
-          hover:bg-primary/20 active:bg-primary/30 transition-colors rounded-r-md"
+        className="absolute right-0 top-0 bottom-0 z-20 w-3 cursor-col-resize
+          rounded-r-2xl transition-colors hover:bg-blue-400/20 active:bg-blue-500/25"
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={handleResizeStart}
       />
@@ -1197,9 +1209,12 @@ function SortableUngroupedBlock({
   const categoryWidths = useAppStore((s) => s.categoryWidths);
   const setCategoryWidth = useAppStore((s) => s.setCategoryWidth);
   const updateCategory = useAppStore((s) => s.updateCategory);
+  const globalEditMode = useAppStore((s) => s.editMode);
+  const toggleEditMode = useAppStore((s) => s.toggleEditMode);
   const [localWidth, setLocalWidth] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [isHeaderHovered, setIsHeaderHovered] = useState(false);
 
   const widthPercent = localWidth ?? categoryWidths[category.id] ?? null;
 
@@ -1243,6 +1258,19 @@ function SortableUngroupedBlock({
     [setNodeRef]
   );
 
+  const groupActions: EditAction[] = [
+    { id: "edit", label: "编辑分组", icon: Pencil, onSelect: () => onEditCategory?.(category) },
+    { id: "add-card", label: "添加网页", icon: Plus, onSelect: () => onAddCard?.(category.id) },
+    { id: "promote", label: "升级为分类", icon: ArrowUpFromLine, onSelect: () => onPromoteToParent?.(category.id) },
+    { id: "ship", label: "飞到其他分项", icon: Send, onSelect: () => onShipCategory?.(category) },
+    { id: "delete", label: "删除分组", icon: Trash2, tone: "danger", onSelect: () => setConfirmDeleteOpen(true) },
+  ];
+
+  const handleDockTriggerClick = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!globalEditMode) toggleEditMode();
+  };
+
   const style: React.CSSProperties = {
     transform: isDragging ? undefined : CSS.Transform.toString(transform),
     transition,
@@ -1254,84 +1282,57 @@ function SortableUngroupedBlock({
     <div
       ref={setRef}
       style={style}
-      className="relative rounded-md border border-border/40 bg-background overflow-hidden min-w-0"
+      data-wc-category-id={category.id}
+      className="wc-soft-card wc-group-panel relative min-w-0 overflow-hidden"
     >
       {/* Header - buttons right next to title */}
-      <div className="flex items-center gap-1.5 px-2.5 py-1.5 flex-wrap">
+      <div
+        className="wc-group-header flex items-center gap-2 px-4 py-3 flex-wrap"
+        onMouseEnter={() => setIsHeaderHovered(true)}
+        onMouseLeave={() => setIsHeaderHovered(false)}
+      >
         <span
-          className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground transition-colors"
+          className="cursor-grab active:cursor-grabbing text-slate-400/70 hover:text-blue-600 transition-colors"
           {...attributes}
           {...listeners}
           title="拖动排序"
         >
-          <GripVertical className="w-3.5 h-3.5" />
+          <GripVertical className="h-3.5 w-3.5" />
         </span>
         <div
-          className="w-1 h-3 rounded-full flex-shrink-0"
+          className="h-4 w-1 rounded-full flex-shrink-0 shadow-sm shadow-blue-300/30"
           style={{ backgroundColor: category.color }}
         />
         <Layers
-          className="w-3 h-3 shrink-0 text-muted-foreground/70"
+          className="h-3.5 w-3.5 shrink-0 text-blue-500/70"
           aria-hidden="true"
         />
         <InlineEditableText
           value={category.name}
-          className="text-xs font-medium text-foreground hover:text-primary/80 transition-colors"
+          className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors"
           editMode={editMode}
           onSave={(newName) => updateCategory({ ...category, name: newName })}
         />
-        <span className="text-[10px] text-muted-foreground">
+        <span className="text-xs text-slate-400">
           ({cards.length})
         </span>
 
-        {editMode && (
-          <>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0 ml-0.5"
-              onClick={() => onEditCategory?.(category)}
-              title="编辑"
-            >
-              <Pencil className="w-2.5 h-2.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0"
-              onClick={() => onAddCard?.(category.id)}
-              title="添加网页"
-            >
-              <Plus className="w-2.5 h-2.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
-              onClick={() => onPromoteToParent?.(category.id)}
-              title="升级为分类"
-            >
-              <ArrowUpFromLine className="w-2.5 h-2.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
-              onClick={() => onShipCategory?.(category)}
-              title="飞到其他分项"
-            >
-              <Send className="w-2.5 h-2.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
-              title="删除分组"
-              onClick={() => setConfirmDeleteOpen(true)}
-            >
-              <Trash2 className="w-2.5 h-2.5" />
-            </Button>
-          </>
+        {(isHeaderHovered || globalEditMode) && (
+          <EditActionDock
+            actions={groupActions}
+            trigger={
+              <Button
+                variant="ghost"
+                size="sm"
+                className="wc-edit-dock-trigger h-7 w-7 rounded-full p-0 text-slate-500 hover:bg-white/80 hover:text-blue-600 animate-in fade-in duration-200"
+                onClick={handleDockTriggerClick}
+                title={globalEditMode ? "分组操作" : "进入编辑模式"}
+                aria-label={globalEditMode ? "分组操作" : "进入编辑模式"}
+              >
+                <Pencil className="w-2.5 h-2.5" />
+              </Button>
+            }
+          />
         )}
       </div>
 
@@ -1340,7 +1341,7 @@ function SortableUngroupedBlock({
         items={cards.map((c) => cardId(c.id))}
         strategy={rectSortingStrategy}
       >
-        <div className="flex flex-wrap gap-1 px-2.5 pb-2">
+        <div className={`wc-group-card-list flex flex-wrap gap-2 px-4 pb-4 ${editMode ? "wc-group-card-list-editing" : ""}`}>
           {cards.map((card) => (
             <SortableCard
               key={card.id}
@@ -1354,15 +1355,15 @@ function SortableUngroupedBlock({
             />
           ))}
           {cards.length === 0 && (
-            <p className="text-[10px] text-muted-foreground py-1">暂无网站</p>
+            <p className="py-1 text-[10px] text-slate-400">暂无网站</p>
           )}
         </div>
       </SortableContext>
 
       {/* Resize handle - right edge, always available */}
       <div
-        className="absolute right-0 top-0 bottom-0 z-20 w-2.5 cursor-col-resize
-          hover:bg-primary/20 active:bg-primary/30 transition-colors rounded-r-md"
+        className="absolute right-0 top-0 bottom-0 z-20 w-3 cursor-col-resize
+          rounded-r-2xl transition-colors hover:bg-blue-400/20 active:bg-blue-500/25"
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={handleResizeStart}
       />
@@ -1427,7 +1428,7 @@ function SortableCard({
   };
 
   return (
-    <div ref={setNodeRef} style={style}>
+    <div ref={setNodeRef} style={style} data-wc-card-id={card.id}>
       <WebCardItem
         card={card}
         categoryColor={categoryColor}

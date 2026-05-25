@@ -12,6 +12,7 @@ import { HotRecommendation } from "@/components/hot-recommendation";
 import { useAppStore } from "@/lib/store";
 import { useAuthStore } from "@/lib/auth-store";
 import { saveCards, saveCategories, setInitialized } from "@/lib/db";
+import { restoreLatestHealthyWorkspaceIfNeeded } from "@/lib/emergency-restore";
 import type { WebCard, Category } from "@/lib/types";
 
 export default function HomePage() {
@@ -32,6 +33,21 @@ export default function HomePage() {
 
   useEffect(() => {
     const init = async () => {
+      try {
+        const restore = await restoreLatestHealthyWorkspaceIfNeeded();
+        if (restore.restored) {
+          console.warn("[WebCollect] Emergency workspace restore applied before auth sync", restore);
+        }
+      } catch (error) {
+        console.error("[WebCollect] Emergency workspace restore failed", error);
+      }
+
+      try {
+        await useAuthStore.getState().initialize();
+      } catch (error) {
+        console.error("[WebCollect] Auth initialization failed", error);
+      }
+
       try {
         await loadData();
         const state = useAppStore.getState();
@@ -60,10 +76,6 @@ export default function HomePage() {
         console.error("[WebCollect] Local data initialization failed", error);
         useAppStore.setState({ isLoading: false });
       }
-
-      void useAuthStore.getState().initialize().catch((error) => {
-        console.error("[WebCollect] Auth initialization failed", error);
-      });
     };
     init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -103,17 +115,17 @@ export default function HomePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-muted-foreground font-serif">{"\u6b63\u5728\u6574\u7406\u6536\u85cf\u5939..."}</p>
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="wc-glass flex flex-col items-center gap-4 rounded-[28px] px-10 py-8">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+          <p className="text-sm font-medium text-slate-500">正在整理收藏夹...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <TopNav
         onAddCard={handleAddCard}
         onAddGroup={handleAddGroup}
@@ -121,7 +133,7 @@ export default function HomePage() {
         onRecycleBin={() => setRecycleBinOpen(true)}
       />
 
-      <main className="w-full px-3 sm:px-5 lg:px-6 py-4 space-y-4">
+      <main className="wc-shell wc-page-main space-y-7 px-5 py-7">
         <ErrorBoundary>
           <SortableGrid
             onAddCard={handleAddCard}
@@ -146,9 +158,9 @@ export default function HomePage() {
         </ErrorBoundary>
       </main>
 
-      <footer className="border-t border-border/40 mt-4 py-4">
-        <div className="px-3 sm:px-5 lg:px-6 text-center text-xs text-muted-foreground/60">
-          <p className="font-serif">{"WebCollect - \u4f60\u7684\u4e2a\u4eba\u7f51\u9875\u6536\u85cf\u5899"}</p>
+      <footer className="mt-6 py-7">
+        <div className="wc-shell px-5 text-center text-xs text-slate-400">
+          <p>WebCollect - 你的个人网页收藏墙</p>
         </div>
       </footer>
 
