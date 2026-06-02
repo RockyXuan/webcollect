@@ -174,7 +174,7 @@ async function triggerSync(userId: string): Promise<void> {
     } else {
       await syncData(userId);
     }
-    await useAppStore.getState().loadData();
+    await useAppStore.getState().loadData({ showLoading: false });
     store.setState({ syncStatus: "success", lastSyncAt: Date.now(), error: null });
     ensureAutoSyncInterval();
   } catch (err) {
@@ -372,7 +372,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (cached) {
       set({ user: cached, isLoggedIn: true, isLoading: false });
       if (isAutoSyncEnabled()) {
-        await triggerSync(cached.id);
+        void triggerSync(cached.id);
       }
       return;
     }
@@ -388,7 +388,7 @@ export const useAuthStore = create<AuthState>((set) => ({
           await upsertUser(user);
           set({ user, isLoggedIn: true, isLoading: false });
           if (isAutoSyncEnabled()) {
-            await triggerSync(user.id);
+            void triggerSync(user.id);
           }
           return;
         }

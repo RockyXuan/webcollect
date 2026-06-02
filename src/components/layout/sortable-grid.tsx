@@ -10,7 +10,7 @@ import {
   getSearchMatchedCategoryIds,
   searchWorkspace,
 } from "@/lib/workspace-search";
-import { Pencil, PencilOff, Plus, GripVertical, ArrowUpFromLine, ArrowDownFromLine, Folder, Layers, Trash2, Send } from "lucide-react";
+import { Pencil, PencilOff, Plus, GripVertical, ArrowUpFromLine, ArrowDownFromLine, Folder, Layers, Trash2, Send, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -70,10 +70,9 @@ function getDefaultWidthPercent(cardCount: number, groupCount: number): number {
   return 100;
 }
 
-function getSmartParentWidthPercent(rawWidth: number, defaultWidth: number): number {
+export function getSmartParentWidthPercent(rawWidth: number, defaultWidth: number): number {
   const safeWidth = Number.isFinite(rawWidth) ? rawWidth : defaultWidth;
-  const maxWidth = defaultWidth >= 100 ? 100 : defaultWidth >= 66 ? 75 : 60;
-  return Math.max(30, Math.min(maxWidth, safeWidth));
+  return Math.max(30, Math.min(100, safeWidth));
 }
 
 function getDefaultChildBasis(cardCount: number): string {
@@ -84,18 +83,18 @@ function getDefaultChildBasis(cardCount: number): string {
 }
 
 function getMaxChildWidth(cardCount: number): string {
-  if (cardCount <= 4) return "16.75rem";
+  if (cardCount <= 4) return "77.75rem";
   if (cardCount <= 6) return "47.25rem";
   if (cardCount <= 10) return "62.5rem";
   return "77.75rem";
 }
 
-function getSmartChildStyle(widthPercent: number | null, cardCount: number): React.CSSProperties {
+export function getSmartChildStyle(widthPercent: number | null, cardCount: number): React.CSSProperties {
   const maxWidth = getMaxChildWidth(cardCount);
 
   if (widthPercent !== null) {
     const minPercent = cardCount <= 4 ? 8 : 14;
-    const maxPercent = cardCount <= 4 ? 42 : cardCount <= 8 ? 74 : 100;
+    const maxPercent = 100;
     const smartWidth = Math.max(minPercent, Math.min(maxPercent, widthPercent));
     return {
       flex: `0 1 calc(${smartWidth}% - 0.75rem)`,
@@ -112,6 +111,27 @@ function getSmartChildStyle(widthPercent: number | null, cardCount: number): Rea
     minWidth: "min(100%, 16.75rem)",
     maxWidth,
   };
+}
+
+function DirectEditButton({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="wc-direct-edit-trigger h-7 w-7 shrink-0 rounded-full p-0 text-slate-500 hover:bg-white/80 hover:text-blue-600 animate-in fade-in duration-200"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+    >
+      <Pencil className="w-2.5 h-2.5" />
+    </Button>
+  );
 }
 
 // ============ Props ============
@@ -769,7 +789,6 @@ function SortableCategoryBlock({
   );
 
   const categoryActions: EditAction[] = [
-    { id: "edit", label: "编辑分类", icon: Pencil, onSelect: () => onEditCategory?.(category) },
     ...(isParent ? [{ id: "add-group", label: "添加分组", icon: Layers, onSelect: () => onAddGroup?.(category.id) }] : []),
     { id: "add-card", label: "添加网页", icon: Plus, onSelect: () => onAddCard?.() },
     { id: "ship", label: "飞到其他分项", icon: Send, onSelect: () => onShipCategory?.(category) },
@@ -795,7 +814,7 @@ function SortableCategoryBlock({
     >
       {/* Category header - buttons right next to title */}
       <div
-        className="wc-category-header relative z-10 flex items-center gap-2 border-b border-white/60 px-5 py-4 flex-wrap"
+        className="wc-category-header relative z-10 flex items-center gap-2 border-b border-white/60 px-5 py-4"
         onMouseEnter={() => setIsHeaderHovered(true)}
         onMouseLeave={() => setIsHeaderHovered(false)}
       >
@@ -817,10 +836,19 @@ function SortableCategoryBlock({
         />
         <InlineEditableText
           value={category.name}
-          className="text-[17px] font-semibold text-slate-900 font-serif hover:text-blue-600 transition-colors"
+          className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[17px] font-semibold text-slate-900 font-serif hover:text-blue-600 transition-colors"
           editMode={editMode}
           onSave={(newName) => updateCategory({ ...category, name: newName })}
         />
+        {(isHeaderHovered || globalEditMode) && (
+          <DirectEditButton
+            label="编辑分类"
+            onClick={(event) => {
+              event.stopPropagation();
+              onEditCategory?.(category);
+            }}
+          />
+        )}
         {(isHeaderHovered || globalEditMode) && (
           <EditActionDock
             actions={categoryActions}
@@ -830,10 +858,10 @@ function SortableCategoryBlock({
                 size="sm"
                 className="wc-edit-dock-trigger h-7 w-7 rounded-full p-0 text-slate-500 hover:bg-white/80 hover:text-blue-600 animate-in fade-in duration-200"
                 onClick={handleDockTriggerClick}
-                title={globalEditMode ? "分类操作" : "进入编辑模式"}
-                aria-label={globalEditMode ? "分类操作" : "进入编辑模式"}
+                title={globalEditMode ? "分类更多操作" : "进入编辑模式"}
+                aria-label={globalEditMode ? "分类更多操作" : "进入编辑模式"}
               >
-                <Pencil className="w-2.5 h-2.5" />
+                <MoreHorizontal className="w-3 h-3" />
               </Button>
             }
           />
@@ -1036,7 +1064,6 @@ function SortableSubGroupBlock({
   );
 
   const groupActions: EditAction[] = [
-    { id: "edit", label: "编辑分组", icon: Pencil, onSelect: () => onEditCategory?.(category) },
     { id: "add-card", label: "添加网页", icon: Plus, onSelect: () => onAddCard?.(category.id) },
     { id: "promote", label: "升级为分类", icon: ArrowUpFromLine, onSelect: () => onDetach?.() },
     { id: "ship", label: "飞到其他分项", icon: Send, onSelect: () => onShipCategory?.(category) },
@@ -1064,7 +1091,7 @@ function SortableSubGroupBlock({
     >
       {/* Sub-group header - buttons right next to title */}
       <div
-        className="wc-group-header flex items-center gap-2 px-4 py-3 flex-wrap"
+        className="wc-group-header flex items-center gap-2 px-4 py-3"
         onMouseEnter={() => setIsHeaderHovered(true)}
         onMouseLeave={() => setIsHeaderHovered(false)}
       >
@@ -1086,13 +1113,22 @@ function SortableSubGroupBlock({
         />
         <InlineEditableText
           value={category.name}
-          className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors"
+          className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors"
           editMode={editMode}
           onSave={(newName) => updateCategory({ ...category, name: newName })}
         />
-        <span className="text-xs text-slate-400">
+        <span className="shrink-0 text-xs text-slate-400">
           ({cards.length})
         </span>
+        {(isHeaderHovered || globalEditMode) && (
+          <DirectEditButton
+            label="编辑分组"
+            onClick={(event) => {
+              event.stopPropagation();
+              onEditCategory?.(category);
+            }}
+          />
+        )}
 
         {(isHeaderHovered || globalEditMode) && (
           <EditActionDock
@@ -1103,10 +1139,10 @@ function SortableSubGroupBlock({
                 size="sm"
                 className="wc-edit-dock-trigger h-7 w-7 rounded-full p-0 text-slate-500 hover:bg-white/80 hover:text-blue-600 animate-in fade-in duration-200"
                 onClick={handleDockTriggerClick}
-                title={globalEditMode ? "分组操作" : "进入编辑模式"}
-                aria-label={globalEditMode ? "分组操作" : "进入编辑模式"}
+                title={globalEditMode ? "分组更多操作" : "进入编辑模式"}
+                aria-label={globalEditMode ? "分组更多操作" : "进入编辑模式"}
               >
-                <Pencil className="w-2.5 h-2.5" />
+                <MoreHorizontal className="w-3 h-3" />
               </Button>
             }
           />
@@ -1259,7 +1295,6 @@ function SortableUngroupedBlock({
   );
 
   const groupActions: EditAction[] = [
-    { id: "edit", label: "编辑分组", icon: Pencil, onSelect: () => onEditCategory?.(category) },
     { id: "add-card", label: "添加网页", icon: Plus, onSelect: () => onAddCard?.(category.id) },
     { id: "promote", label: "升级为分类", icon: ArrowUpFromLine, onSelect: () => onPromoteToParent?.(category.id) },
     { id: "ship", label: "飞到其他分项", icon: Send, onSelect: () => onShipCategory?.(category) },
@@ -1287,7 +1322,7 @@ function SortableUngroupedBlock({
     >
       {/* Header - buttons right next to title */}
       <div
-        className="wc-group-header flex items-center gap-2 px-4 py-3 flex-wrap"
+        className="wc-group-header flex items-center gap-2 px-4 py-3"
         onMouseEnter={() => setIsHeaderHovered(true)}
         onMouseLeave={() => setIsHeaderHovered(false)}
       >
@@ -1309,13 +1344,22 @@ function SortableUngroupedBlock({
         />
         <InlineEditableText
           value={category.name}
-          className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors"
+          className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors"
           editMode={editMode}
           onSave={(newName) => updateCategory({ ...category, name: newName })}
         />
-        <span className="text-xs text-slate-400">
+        <span className="shrink-0 text-xs text-slate-400">
           ({cards.length})
         </span>
+        {(isHeaderHovered || globalEditMode) && (
+          <DirectEditButton
+            label="编辑分组"
+            onClick={(event) => {
+              event.stopPropagation();
+              onEditCategory?.(category);
+            }}
+          />
+        )}
 
         {(isHeaderHovered || globalEditMode) && (
           <EditActionDock
@@ -1326,10 +1370,10 @@ function SortableUngroupedBlock({
                 size="sm"
                 className="wc-edit-dock-trigger h-7 w-7 rounded-full p-0 text-slate-500 hover:bg-white/80 hover:text-blue-600 animate-in fade-in duration-200"
                 onClick={handleDockTriggerClick}
-                title={globalEditMode ? "分组操作" : "进入编辑模式"}
-                aria-label={globalEditMode ? "分组操作" : "进入编辑模式"}
+                title={globalEditMode ? "分组更多操作" : "进入编辑模式"}
+                aria-label={globalEditMode ? "分组更多操作" : "进入编辑模式"}
               >
-                <Pencil className="w-2.5 h-2.5" />
+                <MoreHorizontal className="w-3 h-3" />
               </Button>
             }
           />
