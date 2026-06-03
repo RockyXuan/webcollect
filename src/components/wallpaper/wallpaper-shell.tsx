@@ -8,10 +8,13 @@ import type { WallpaperMode, WallpaperPrefs } from "@/lib/wallpaper-types";
 
 const LONG_PRESS_MS = 700;
 const IDLE_HINT_MS = 2000;
+const LOADING_HINT_MS = 250;
 const FLING_WINDOW_MS = 650;
 const FLING_DISTANCE_PX = 420;
 const FLING_EVENT_NAME = "mousemove";
 const WIKIMEDIA_PREVIEW_WIDTH = 1600;
+const CHIPMUNK_MASCOT_URL = "/assets/mascots/chipmunk-pill.png";
+const OTTER_MASCOT_URL = "/assets/mascots/otter-pill.png";
 
 interface WallpaperShellProps {
   mode: WallpaperMode;
@@ -95,6 +98,7 @@ export function WallpaperShell({
   const nextWallpaper = useWallpaperStore((state) => state.nextWallpaper);
   const updatePrefs = useWallpaperStore((state) => state.updatePrefs);
   const [fullImageLoaded, setFullImageLoaded] = useState(false);
+  const [showLoadingHint, setShowLoadingHint] = useState(false);
   const [hintVisible, setHintVisible] = useState(false);
   const longPressTimerRef = useRef<number | null>(null);
   const idleHintTimerRef = useRef<number | null>(null);
@@ -146,21 +150,41 @@ export function WallpaperShell({
 
   useEffect(() => {
     let active = true;
+    let loadingTimer: number | null = window.setTimeout(() => {
+      if (active) setShowLoadingHint(true);
+    }, LOADING_HINT_MS);
     setFullImageLoaded(false);
+    setShowLoadingHint(false);
     const image = new window.Image();
     image.decoding = "async";
+    const markLoaded = () => {
+      if (!active) return;
+      setFullImageLoaded(true);
+      setShowLoadingHint(false);
+      if (loadingTimer !== null) {
+        window.clearTimeout(loadingTimer);
+        loadingTimer = null;
+      }
+    };
     image.onload = () => {
-      if (active) setFullImageLoaded(true);
+      if (typeof image.decode === "function") {
+        void image.decode().catch(() => undefined).finally(markLoaded);
+      } else {
+        markLoaded();
+      }
     };
     image.onerror = () => {
-      if (active) setFullImageLoaded(false);
+      markLoaded();
     };
     image.src = wallpaper.imageUrl;
     if (image.complete && image.naturalWidth > 0) {
-      setFullImageLoaded(true);
+      markLoaded();
     }
     return () => {
       active = false;
+      if (loadingTimer !== null) {
+        window.clearTimeout(loadingTimer);
+      }
     };
   }, [wallpaper.imageUrl]);
 
@@ -265,6 +289,7 @@ export function WallpaperShell({
     return (
       <div
         className="wc-wallpaper-stage"
+        data-loaded={fullImageLoaded ? "true" : "false"}
         tabIndex={0}
         onMouseMove={handleWallpaperMouseMove}
         onPointerDown={(event) => startLongPress(event, onEnterCollection)}
@@ -280,13 +305,29 @@ export function WallpaperShell({
         />
         <div className="wc-wallpaper-vignette" aria-hidden="true" />
 
-        <figure className="wc-zoom-quote" aria-label="Zoom 模式短句">
-          <blockquote>{quote.zh}</blockquote>
-          <p>{quote.en}</p>
-          <figcaption>{quote.source}</figcaption>
-        </figure>
+        <div
+          className={`wc-zoom-loading ${showLoadingHint ? "wc-zoom-loading-visible" : ""}`}
+          aria-hidden={showLoadingHint ? "false" : "true"}
+        >
+          <div className="wc-zoom-loading-card">
+            <div className="wc-zoom-mascot-track" aria-hidden="true">
+              <img className="wc-zoom-mascot wc-zoom-mascot-chipmunk" src={CHIPMUNK_MASCOT_URL} alt="" />
+              <img className="wc-zoom-mascot wc-zoom-mascot-otter" src={OTTER_MASCOT_URL} alt="" />
+            </div>
+            <div className="wc-zoom-progress" />
+            <p className="wc-zoom-loading-text">正在准备高清 Zoom 画面...</p>
+          </div>
+        </div>
 
-        {prefs.showZoomHints ? (
+        {fullImageLoaded ? (
+          <figure className="wc-zoom-quote" aria-label="Zoom 模式短句">
+            <blockquote>{quote.zh}</blockquote>
+            <p>{quote.en}</p>
+            <figcaption>{quote.source}</figcaption>
+          </figure>
+        ) : null}
+
+        {fullImageLoaded && prefs.showZoomHints ? (
           <div
             className={`wc-zoom-idle-hint ${hintVisible ? "wc-zoom-idle-hint-visible" : ""}`}
             data-wallpaper-control

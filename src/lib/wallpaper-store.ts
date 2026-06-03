@@ -9,6 +9,7 @@ import {
   fetchRemoteWallpapers,
   getNextWallpaper,
   getRotationMs,
+  isPackagedWallpaper,
   mergeWallpaperLibrary,
   pruneWallpaperLibrary,
   shouldRefreshWallpapers,
@@ -55,9 +56,12 @@ export const useWallpaperStore = create<WallpaperState>((set, get) => ({
       getWallpaperLibrary(),
     ]);
     const wallpapers = pruneWallpaperLibrary(mergeWallpaperLibrary(FALLBACK_WALLPAPERS, storedLibrary));
-    const current = prefs.rotationInterval === "open"
+    const preferredCurrent = prefs.rotationInterval === "open"
       ? getNextWallpaper(wallpapers, prefs.currentWallpaperId)
       : getCurrentWallpaper(wallpapers, prefs.currentWallpaperId);
+    const current = preferredCurrent && isPackagedWallpaper(preferredCurrent)
+      ? preferredCurrent
+      : FALLBACK_WALLPAPERS[0];
     const nextPrefs = {
       ...prefs,
       currentWallpaperId: current?.id || FALLBACK_WALLPAPERS[0]?.id || null,

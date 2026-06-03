@@ -95,6 +95,38 @@ function getErrorMessage(err: unknown, fallback: string): string {
   return summarizeAuthError(err instanceof Error ? err.message : fallback);
 }
 
+export interface ExtensionAuthDiagnostics {
+  extensionId: string;
+  redirectUrl: string;
+}
+
+export function getExtensionAuthDiagnostics(): ExtensionAuthDiagnostics | null {
+  try {
+    if (typeof chrome === "undefined" || !chrome.runtime?.id || !chrome.identity?.getRedirectURL) {
+      return null;
+    }
+    return {
+      extensionId: chrome.runtime.id,
+      redirectUrl: chrome.identity.getRedirectURL("auth"),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function formatExtensionAuthError(message: string, redirectUrl: string): string {
+  const extensionId = typeof chrome !== "undefined" && chrome.runtime?.id ? chrome.runtime.id : "unknown";
+  const baseHint = `扩展 ID: ${extensionId}\nRedirect URL: ${redirectUrl}`;
+  if (/Authorization page could not be loaded|page could not be loaded/i.test(message)) {
+    return [
+      "Google 授权页无法打开。通常是 Supabase / Google OAuth 没有允许当前扩展的 Redirect URL。",
+      baseHint,
+      `原始错误: ${message}`,
+    ].join("\n");
+  }
+  return [`扩展登录失败: ${message}`, baseHint].join("\n");
+}
+
 let autoSyncTimer: ReturnType<typeof setTimeout> | null = null;
 let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
 let autoSyncRunning = false;
@@ -415,7 +447,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         await loginWithGoogleWeb();
       }
     } catch (err) {
-      const message = getErrorMessage(err, "鐧诲綍澶辫触");
+      const message = getErrorMessage(err, "登录失败");
       set({ error: message, isLoading: false });
     }
   },
@@ -530,10 +562,10 @@ async function loginWithGoogleExtension(): Promise<void> {
   });
 
   if (oauthError) {
-    throw new Error(`Google login failed: ${oauthError.message}`);
+    throw new Error(formatExtensionAuthError(`Supabase OAuth start failed: ${oauthError.message}`, redirectTo));
   }
   if (!oauthData.url) {
-    throw new Error("Google OAuth did not return a login URL.");
+    throw new Error(formatExtensionAuthError("Supabase did not return a Google login URL.", redirectTo));
   }
 
   const finalUrl = await new Promise<string>((resolve, reject) => {
@@ -542,11 +574,11 @@ async function loginWithGoogleExtension(): Promise<void> {
       interactive: true,
     }, (responseUrl) => {
       if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
+        reject(new Error(formatExtensionAuthError(chrome.runtime.lastError.message || "Chrome Identity API returned an unknown error.", redirectTo)));
         return;
       }
       if (!responseUrl) {
-        reject(new Error("Google OAuth did not return to the extension."));
+        reject(new Error(formatExtensionAuthError("Google OAuth did not return to the extension.", redirectTo)));
         return;
       }
       resolve(responseUrl);
@@ -562,18 +594,18 @@ async function loginWithGoogleExtension(): Promise<void> {
       || callbackUrl.hash.match(/error_description=([^&]+)/)?.[1];
     if (error || errorDescription) {
       throw new Error(
-        `Google OAuth callback error: ${decodeURIComponent(errorDescription || error || "unknown")}`
+        formatExtensionAuthError(`Google OAuth callback error: ${decodeURIComponent(errorDescription || error || "unknown")}`, redirectTo)
       );
     }
-    throw new Error("Google OAuth callback is missing the code parameter. Check Supabase Redirect URLs and PKCE settings.");
+    throw new Error(formatExtensionAuthError("Google OAuth callback is missing the code parameter. Check Supabase Redirect URLs and PKCE settings.", redirectTo));
   }
 
   const { data: sessionData, error: sessionError } = await client.auth.exchangeCodeForSession(code);
   if (sessionError) {
-    throw new Error(`Google OAuth session exchange failed: ${sessionError.message}`);
+    throw new Error(formatExtensionAuthError(`Google OAuth session exchange failed: ${sessionError.message}`, redirectTo));
   }
   if (!sessionData.user) {
-    throw new Error("Google OAuth did not return a user.");
+    throw new Error(formatExtensionAuthError("Google OAuth did not return a user.", redirectTo));
   }
 
   const user = mapSupabaseUser(sessionData.user as unknown as Record<string, unknown>);

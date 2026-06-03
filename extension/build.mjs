@@ -11,6 +11,8 @@ const iconSourceDir = join(extensionRoot, "public", "icons");
 const iconDistDir = join(distDir, "icons");
 const mascotSourceDir = join(extensionRoot, "src", "assets", "mascots");
 const mascotDistDir = join(distDir, "assets", "mascots");
+const wallpaperSourceDir = join(projectRoot, "public", "assets", "wallpapers");
+const wallpaperDistDir = join(distDir, "assets", "wallpapers");
 
 console.log("Building WebCollect Chrome Extension...");
 
@@ -42,6 +44,11 @@ if (existsSync(iconSourceDir)) {
 if (existsSync(mascotSourceDir)) {
   mkdirSync(mascotDistDir, { recursive: true });
   cpSync(mascotSourceDir, mascotDistDir, { recursive: true });
+}
+
+if (existsSync(wallpaperSourceDir)) {
+  mkdirSync(wallpaperDistDir, { recursive: true });
+  cpSync(wallpaperSourceDir, wallpaperDistDir, { recursive: true });
 }
 
 console.log(`Extension built successfully! Output: ${distDir}`);

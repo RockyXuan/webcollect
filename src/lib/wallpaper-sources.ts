@@ -2,7 +2,7 @@ import { ZOOM_CURATED_WALLPAPERS } from "./zoom-curated-wallpapers";
 import { WALLPAPER_CATEGORIES, type WallpaperCategory, type WallpaperItem, type WallpaperPrefs } from "./wallpaper-types";
 
 export const WALLPAPER_REMOTE_LIMIT = 24;
-export const WALLPAPER_CURATED_MIN = 12;
+export const WALLPAPER_CURATED_MIN = 6;
 export const WALLPAPER_LIBRARY_LIMIT = WALLPAPER_REMOTE_LIMIT + WALLPAPER_CURATED_MIN;
 export const WALLPAPER_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 export const ZOOM_WALLPAPER_MIN_WIDTH = 3000;
@@ -22,7 +22,12 @@ export const DEFAULT_WALLPAPER_PREFS: WallpaperPrefs = {
   updatedAt: 0,
 };
 
-export const FALLBACK_WALLPAPERS: WallpaperItem[] = ZOOM_CURATED_WALLPAPERS;
+export function isPackagedWallpaper(item: WallpaperItem): boolean {
+  return item.imageUrl.startsWith("/assets/wallpapers/")
+    && item.thumbnailUrl.startsWith("/assets/wallpapers/");
+}
+
+export const FALLBACK_WALLPAPERS: WallpaperItem[] = ZOOM_CURATED_WALLPAPERS.filter(isPackagedWallpaper);
 
 const CATEGORY_SEARCH_TERMS: Record<WallpaperCategory, string[]> = {
   landscape: [
@@ -165,15 +170,17 @@ export function pruneWallpaperLibrary(items: WallpaperItem[], limit = WALLPAPER_
   const curatedCount = Math.min(WALLPAPER_CURATED_MIN, fallbacks.length, limit);
   const remoteCount = Math.min(WALLPAPER_REMOTE_LIMIT, Math.max(0, limit - curatedCount));
   return [
-    ...remote.slice(0, remoteCount),
     ...fallbacks.slice(0, curatedCount),
+    ...remote.slice(0, remoteCount),
   ].slice(0, limit);
 }
 
 export function getNextWallpaper(items: WallpaperItem[], currentId: string | null): WallpaperItem | null {
-  if (items.length === 0) return null;
-  const currentIndex = currentId ? items.findIndex((item) => item.id === currentId) : -1;
-  return items[(currentIndex + 1) % items.length] || items[0] || null;
+  const packagedItems = items.filter(isPackagedWallpaper);
+  const displayItems = packagedItems.length > 0 ? packagedItems : items;
+  if (displayItems.length === 0) return null;
+  const currentIndex = currentId ? displayItems.findIndex((item) => item.id === currentId) : -1;
+  return displayItems[(currentIndex + 1) % displayItems.length] || displayItems[0] || null;
 }
 
 export function getRotationMs(interval: WallpaperPrefs["rotationInterval"]): number | null {

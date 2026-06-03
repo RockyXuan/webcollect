@@ -1,0 +1,306 @@
+.wc-wallpaper-stage {
+  position: fixed;
+  inset: 0;
+  min-height: 100vh;
+  overflow: hidden;
+  background: #08111f;
+  color: white;
+  cursor: default;
+  outline: none;
+}
+
+.wc-wallpaper-preview,
+.wc-wallpaper-image {
+  position: absolute;
+  inset: 0;
+  background-position: center;
+  background-size: cover;
+  transform: scale(1.006);
+}
+
+.wc-wallpaper-preview {
+  background-color: #08111f;
+  filter: saturate(0.96) contrast(1.02);
+}
+
+.wc-wallpaper-image {
+  opacity: 0;
+  transition: opacity 620ms ease;
+}
+
+.wc-wallpaper-image-loaded {
+  opacity: 1;
+}
+
+.wc-wallpaper-vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(5, 10, 20, 0.08), rgba(5, 10, 20, 0.38)),
+    radial-gradient(circle at 50% 74%, rgba(15, 23, 42, 0.08), rgba(15, 23, 42, 0.36) 68%);
+  pointer-events: none;
+}
+
+.wc-zoom-quote {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(2.4rem, 8vh, 5.6rem);
+  z-index: 2;
+  width: min(46rem, calc(100vw - 2rem));
+  margin: 0;
+  color: rgba(255, 255, 255, 0.92);
+  text-align: center;
+  text-shadow: 0 2px 26px rgba(0, 0, 0, 0.44);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.wc-zoom-quote blockquote {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: clamp(1.1rem, 2.2vw, 1.72rem);
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: 0;
+}
+
+.wc-zoom-quote p {
+  margin-top: 0.35rem;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: clamp(0.76rem, 1.2vw, 0.96rem);
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.wc-zoom-quote figcaption {
+  margin-top: 0.45rem;
+  color: rgba(255, 255, 255, 0.60);
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+.wc-zoom-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(148, 197, 253, 0.12), transparent 28%),
+    rgba(5, 10, 20, 0.62);
+  opacity: 0;
+  transition: opacity 220ms ease;
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+}
+
+.wc-zoom-loading-visible {
+  opacity: 1;
+}
+
+.wc-zoom-loading-card {
+  width: min(22rem, calc(100vw - 2rem));
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 1.35rem;
+  background: rgba(11, 18, 32, 0.54);
+  padding: 1rem 1rem 1.1rem;
+  box-shadow: 0 28px 92px rgba(0, 0, 0, 0.30);
+  backdrop-filter: blur(22px);
+}
+
+.wc-zoom-mascot-track {
+  position: relative;
+  height: 2.6rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.wc-zoom-mascot {
+  position: absolute;
+  top: 50%;
+  width: 2rem;
+  height: 2rem;
+  object-fit: contain;
+  transform: translateY(-50%);
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.24));
+}
+
+.wc-zoom-mascot-chipmunk {
+  animation: wc-zoom-run-a 2.2s ease-in-out infinite;
+}
+
+.wc-zoom-mascot-otter {
+  animation: wc-zoom-run-b 2.2s ease-in-out infinite;
+}
+
+.wc-zoom-progress {
+  position: relative;
+  margin-top: 0.85rem;
+  height: 0.34rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.wc-zoom-progress::before {
+  position: absolute;
+  inset: 0;
+  width: 42%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(147, 197, 253, 0.78), rgba(255, 255, 255, 0.86));
+  content: "";
+  animation: wc-zoom-progress 1.28s ease-in-out infinite;
+}
+
+.wc-zoom-loading-text {
+  margin-top: 0.7rem;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.wc-wallpaper-collection-shell {
+  position: relative;
+  min-height: 100vh;
+}
+
+.wc-zoom-idle-hint {
+  position: fixed;
+  left: 50%;
+  bottom: clamp(7.4rem, 18vh, 10rem);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 0.72rem;
+  border: 1px dashed rgba(255, 255, 255, 0.52);
+  border-radius: 999px;
+  background: rgba(11, 18, 32, 0.34);
+  padding: 0.54rem 0.72rem 0.54rem 0.95rem;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.82rem;
+  font-weight: 600;
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.24);
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  transition: opacity 260ms ease, transform 260ms ease;
+  backdrop-filter: blur(18px);
+  pointer-events: none;
+}
+
+.wc-zoom-idle-hint-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+}
+
+.wc-zoom-idle-hint button {
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 0.28rem 0.52rem;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.wc-zoom-idle-hint button:hover {
+  background: rgba(255, 255, 255, 0.20);
+  color: white;
+}
+
+.wc-zoom-idle-hint-collection {
+  bottom: clamp(4.8rem, 10vh, 6.5rem);
+  border-color: rgba(37, 99, 235, 0.30);
+  background: rgba(255, 255, 255, 0.58);
+  color: rgba(15, 23, 42, 0.76);
+  box-shadow: 0 20px 62px rgba(37, 99, 235, 0.12);
+}
+
+.wc-zoom-idle-hint-collection button {
+  border-color: rgba(37, 99, 235, 0.18);
+  background: rgba(37, 99, 235, 0.08);
+  color: rgba(37, 99, 235, 0.82);
+}
+
+.wc-wallpaper-floating-return {
+  position: fixed;
+  right: 1.15rem;
+  bottom: 1.15rem;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  border: 1px solid rgba(147, 197, 253, 0.50);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 0.65rem 0.85rem;
+  color: #2563eb;
+  font-size: 0.8rem;
+  font-weight: 800;
+  box-shadow: 0 16px 42px rgba(37, 99, 235, 0.16);
+  backdrop-filter: blur(16px);
+}
+
+.wc-wallpaper-floating-return:hover {
+  background: rgba(239, 246, 255, 0.95);
+}
+
+.wc-wallpaper-setting-chip {
+  border: 1px solid rgba(203, 213, 225, 0.85);
+  border-radius: 1rem;
+  background: rgba(248, 250, 252, 0.86);
+  padding: 0.7rem 0.85rem;
+  color: #475569;
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.wc-wallpaper-setting-chip-active {
+  border-color: rgba(37, 99, 235, 0.45);
+  background: rgba(219, 234, 254, 0.86);
+  color: #1d4ed8;
+}
+
+.wc-wallpaper-select {
+  width: 100%;
+  border: 1px solid rgba(203, 213, 225, 0.86);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0.68rem 0.8rem;
+  color: #0f172a;
+  font-size: 0.9rem;
+  font-weight: 700;
+  outline: none;
+}
+
+@keyframes wc-zoom-run-a {
+  0%,
+  100% {
+    left: 0.52rem;
+  }
+  50% {
+    left: calc(100% - 5.2rem);
+  }
+}
+
+@keyframes wc-zoom-run-b {
+  0%,
+  100% {
+    left: 2.85rem;
+  }
+  50% {
+    left: calc(100% - 2.85rem);
+  }
+}
+
+@keyframes wc-zoom-progress {
+  0% {
+    transform: translateX(-105%);
+  }
+  100% {
+    transform: translateX(245%);
+  }
+}

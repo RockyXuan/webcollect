@@ -5,6 +5,9 @@ const pageSource = readFileSync("src/app/page.tsx", "utf8");
 const extensionSource = readFileSync("extension/src/newtab-app.tsx", "utf8");
 const topNavSource = readFileSync("src/components/nav/top-nav.tsx", "utf8");
 const shellSource = readFileSync("src/components/wallpaper/wallpaper-shell.tsx", "utf8");
+const sharedZoomCss = readFileSync("src/styles/zoom-wallpaper.css", "utf8");
+const extensionCss = readFileSync("extension/src/extension.css", "utf8");
+const manifestSource = readFileSync("extension/manifest.json", "utf8");
 
 for (const [label, source] of [
   ["web page", pageSource],
@@ -24,5 +27,23 @@ assert.ok(shellSource.includes("onEnterCollection"), "WallpaperShell should ente
 assert.ok(shellSource.includes("onReturnToWallpaper"), "WallpaperShell should support long-press return from the wall");
 assert.ok(shellSource.includes("mousemove"), "WallpaperShell should wire mouse movement gestures");
 assert.ok(shellSource.includes("Space") && shellSource.includes("Enter"), "WallpaperShell should support keyboard entry");
+assert.ok(shellSource.includes("wc-zoom-loading"), "WallpaperShell should render a non-blocking Zoom loading overlay");
+assert.ok(shellSource.includes("wc-zoom-quote"), "WallpaperShell should render the bilingual Zoom quote");
+
+for (const selector of [
+  ".wc-wallpaper-preview",
+  ".wc-wallpaper-image-loaded",
+  ".wc-zoom-quote",
+  ".wc-zoom-idle-hint",
+  ".wc-zoom-loading",
+]) {
+  assert.ok(sharedZoomCss.includes(selector), `shared Zoom CSS should define ${selector}`);
+}
+
+assert.ok(
+  extensionCss.includes("@import '../../src/styles/zoom-wallpaper.css';"),
+  "extension CSS should import the shared Zoom wallpaper stylesheet"
+);
+assert.ok(manifestSource.includes('"key"'), "extension manifest should pin a stable extension ID for OAuth redirects");
 
 console.log("wallpaper wiring tests passed");

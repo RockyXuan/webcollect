@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle, Check, History, Loader2, LogOut, RefreshCw, Settings, Trash2, Type, User, Wrench } from "lucide-react";
-import { useAuthStore } from "@/lib/auth-store";
+import { getExtensionAuthDiagnostics, useAuthStore, type ExtensionAuthDiagnostics } from "@/lib/auth-store";
 import type { LinkOpenMode } from "@/lib/types";
 import { LocalSnapshotDialog } from "@/components/dialogs/local-snapshot-dialog";
 import { restoreStructureFromBestLocalSnapshot, saveVersionAndClearLocalData } from "@/lib/local-snapshots";
@@ -95,6 +95,7 @@ export function UserMenu() {
   const [configOpen, setConfigOpen] = useState(false);
   const [supabaseUrl, setSupabaseUrl] = useState("");
   const [supabaseAnonKey, setSupabaseAnonKey] = useState("");
+  const [authDiagnostics, setAuthDiagnostics] = useState<ExtensionAuthDiagnostics | null>(null);
   const [configSaved, setConfigSaved] = useState(false);
   const [snapshotOpen, setSnapshotOpen] = useState(false);
   const [repairingLayout, setRepairingLayout] = useState(false);
@@ -123,6 +124,7 @@ export function UserMenu() {
 
   useEffect(() => {
     if (!isChromeExtension() || !chrome.storage?.local) return;
+    setAuthDiagnostics(getExtensionAuthDiagnostics());
     chrome.storage.local.get(
       [EXTENSION_STORAGE_KEYS.url, EXTENSION_STORAGE_KEYS.anonKey],
       (result) => {
@@ -169,6 +171,14 @@ export function UserMenu() {
     }
     clearError();
     setConfigSaved(true);
+  };
+
+  const copyText = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      // Clipboard can be unavailable inside some extension contexts.
+    }
   };
 
   if (isLoading) {
@@ -230,6 +240,27 @@ export function UserMenu() {
             {isChromeExtension() && (
               <div className="space-y-3">
                 <p className="text-sm font-semibold text-slate-900">扩展登录配置</p>
+                {authDiagnostics && (
+                  <div className="rounded-2xl border border-blue-100/80 bg-blue-50/70 p-3 text-[11px] text-slate-600">
+                    <div className="mb-2 font-semibold text-slate-800">OAuth 诊断</div>
+                    <button
+                      type="button"
+                      className="mb-1 block w-full truncate rounded-xl bg-white/80 px-2 py-1.5 text-left font-mono text-[10px] text-slate-600"
+                      onClick={() => copyText(authDiagnostics.extensionId)}
+                      title="点击复制扩展 ID"
+                    >
+                      ID: {authDiagnostics.extensionId}
+                    </button>
+                    <button
+                      type="button"
+                      className="block w-full truncate rounded-xl bg-white/80 px-2 py-1.5 text-left font-mono text-[10px] text-slate-600"
+                      onClick={() => copyText(authDiagnostics.redirectUrl)}
+                      title="点击复制 Redirect URL"
+                    >
+                      Redirect: {authDiagnostics.redirectUrl}
+                    </button>
+                  </div>
+                )}
                 <input
                   value={supabaseUrl}
                   onChange={(e) => setSupabaseUrl(e.target.value)}

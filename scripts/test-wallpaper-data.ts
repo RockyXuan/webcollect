@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
+import { existsSync, statSync } from "node:fs";
 import {
   DEFAULT_WALLPAPER_PREFS,
   FALLBACK_WALLPAPERS,
   filterZoomWallpapers,
   filterUsableWallpapers,
   getNextWallpaper,
+  isPackagedWallpaper,
   isZoomWallpaperCandidate,
   mergeWallpaperLibrary,
   pruneWallpaperLibrary,
@@ -26,11 +28,14 @@ assert.deepEqual(DEFAULT_WALLPAPER_PREFS.enabledCategories, [
   "weather",
 ]);
 
-assert.ok(FALLBACK_WALLPAPERS.length >= 30, "fallback library should include at least thirty curated wallpapers");
-assert.equal(FALLBACK_WALLPAPERS, ZOOM_CURATED_WALLPAPERS, "fallback library should use the curated Zoom registry");
+assert.ok(ZOOM_CURATED_WALLPAPERS.length >= 30, "curated registry should keep at least thirty sourced wallpapers");
+assert.ok(FALLBACK_WALLPAPERS.length >= 6, "fallback library should include at least six packaged local wallpapers");
+assert.ok(FALLBACK_WALLPAPERS.every(isPackagedWallpaper), "fallback wallpapers should be packaged local display assets");
 assert.ok(
   FALLBACK_WALLPAPERS.every((item) => {
     const aspectRatio = item.width / item.height;
+    const filePath = `public${item.imageUrl}`;
+    const stat = existsSync(filePath) ? statSync(filePath) : null;
     return item.license
       && item.sourceUrl
       && item.imageUrl
@@ -42,9 +47,12 @@ assert.ok(
       && item.quality
       && item.sourceCollection
       && item.quoteId
-      && !/\/thumb\/|preview|width=960|thumbnail/i.test(item.imageUrl);
+      && !/\/thumb\/|preview|width=960|thumbnail/i.test(item.imageUrl)
+      && stat
+      && stat.size > 500_000
+      && stat.size < 6_500_000;
   }),
-  "fallback wallpapers should be ultrahigh-resolution original images with attribution and no thumbnail URLs"
+  "fallback wallpapers should be local optimized high-resolution assets with attribution"
 );
 
 const sourceCollections = new Set(FALLBACK_WALLPAPERS.map((item) => item.sourceCollection));
@@ -100,11 +108,11 @@ assert.equal(merged.find((item) => item.id === "valid")?.title, "Updated");
 const pruned = pruneWallpaperLibrary(
   Array.from({ length: 15 }, (_, index) => ({ ...valid, id: `item-${index}`, fetchedAt: index }))
 );
-assert.equal(pruned.length, 27);
-assert.equal(pruned[0].id, "item-14");
+assert.equal(pruned.length, 15 + FALLBACK_WALLPAPERS.length);
+assert.ok(isPackagedWallpaper(pruned[0]), "packaged local wallpapers should lead the pruned library");
 assert.ok(
-  pruned.filter((item) => FALLBACK_WALLPAPERS.some((fallback) => fallback.id === item.id)).length >= 12,
-  "pruned library should preserve at least twelve curated fallbacks"
+  pruned.filter((item) => FALLBACK_WALLPAPERS.some((fallback) => fallback.id === item.id)).length >= FALLBACK_WALLPAPERS.length,
+  "pruned library should preserve all packaged fallbacks"
 );
 
 const next = getNextWallpaper([valid, { ...valid, id: "second" }], "valid");

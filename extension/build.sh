@@ -17,5 +17,9 @@ cp "$SCRIPT_DIR/background.js" "$SCRIPT_DIR/dist/"
 mkdir -p "$SCRIPT_DIR/dist/icons"
 cp "$SCRIPT_DIR/public/icons/"*.png "$SCRIPT_DIR/dist/icons/"
 
+# Copy packaged Zoom wallpaper assets so new tabs can open without remote image downloads.
+mkdir -p "$SCRIPT_DIR/dist/assets/wallpapers"
+cp "$PROJECT_ROOT/public/assets/wallpapers/"* "$SCRIPT_DIR/dist/assets/wallpapers/"
+
 echo "Extension built successfully! Output: $SCRIPT_DIR/dist/"
 echo "Load this folder in chrome://extensions to install."
