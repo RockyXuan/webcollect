@@ -537,11 +537,10 @@ async function loginWithGoogleWeb(): Promise<void> {
   });
 
   if (error) {
-    throw new Error(`Google 鐧诲綍澶辫触: ${error.message}`);
+    throw new Error(`Google 登录失败: ${error.message}`);
   }
 
-  // After redirect back, Supabase will have the session.
-  // The initialize() function will pick it up on page reload.
+  // Supabase JS detects the code on the landing page and persists the browser session.
 }
 
 // 鈹€鈹€ Extension version: chrome.identity.launchWebAuthFlow 鈹€鈹€

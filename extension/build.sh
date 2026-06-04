@@ -6,6 +6,8 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 echo "Building WebCollect Chrome Extension..."
 
+node "$PROJECT_ROOT/scripts/check-auth-contracts.mjs"
+
 # Build with Vite
 npx vite build --config "$SCRIPT_DIR/vite.config.ts"
 

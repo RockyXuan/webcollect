@@ -395,6 +395,14 @@ The main UI template pass is effectively complete for the accepted WebCollect su
 
 The floating capture entry now follows the provided mascot concept direction more closely: default chipmunk, optional otter, head-only artwork, WebCollect blue glass capsule, and unchanged click-to-collect behavior. The artwork is implemented as inline SVG inside the extension content script so it does not depend on external image assets or base64 attachments.
 
+## Current Task: Zoom Release OAuth Regression Hotfix
+
+- [x] Identify root cause -> Verification: the release fix added a manifest `key`, changing the extension ID to `mjmbbmjemliiedhlnpgphckpmhmpjgab` and therefore changing the Chrome OAuth redirect URL.
+- [x] Restore existing extension OAuth identity behavior -> Verification: removed the hard-coded manifest `key`; extension login again derives redirect URL from the installed extension via `chrome.identity.getRedirectURL("auth")`.
+- [x] Harden Web login callback without changing Web redirect behavior -> Verification: Web login keeps the existing origin redirect, and `/auth/callback` forwards `code` to the browser client if a provider lands there instead of exchanging it server-side without browser cookies.
+- [x] Add recurrence guard -> Verification: `scripts/check-auth-contracts.mjs` fails builds if manifest key, identity permission, launchWebAuthFlow, web callback, or OAuth diagnostics drift.
+- [x] Gate extension builds -> Verification: `extension/build.mjs` and `extension/build.sh` run the auth contract check before packaging.
+
 ## Current Task: Sync Structure Collapse Hotfix
 
 - [x] Identify the data-shape failure -> Verification: the broken state is not missing cards; it is a flattened `categorySectionIds`/`sectionId` layout where tabs can still exist while all categories point to `section-default`.

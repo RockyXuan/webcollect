@@ -415,3 +415,20 @@ Verification checklist:
 - Save manually, reload/reinstall extension, log in, and confirm the same manual snapshot appears under cloud manual saves.
 - Confirm `workspace_snapshots` RLS blocks cross-user access.
 - Confirm system snapshots use one `user_id + kind + day_key` row per day instead of minute-by-minute rows.
+
+## 2026-06-04: Visual Features Must Not Change OAuth Identity
+
+User correction: a Zoom wallpaper release changed Chrome extension OAuth behavior and blocked login on Windows/Mac. The visual feature was unrelated to auth, so this is a release-safety failure.
+
+Rule:
+- Do not add or change `extension/manifest.json` `key` unless there is an explicit OAuth redirect migration plan and live verification on the target Supabase project.
+- Chrome extension login must derive its redirect URL from `chrome.identity.getRedirectURL("auth")` for the currently installed extension.
+- Web login should keep its existing origin redirect unless there is an explicit Supabase allowlist migration. The `/auth/callback` route must remain compatible by forwarding the OAuth `code` back to the browser client if a provider ever lands there. Do not exchange the code server-side unless browser session cookies are explicitly handled.
+- Any release that touches UI startup, new tab, auth store, manifest, Supabase config, or extension build scripts must run the auth contract gate before packaging.
+- Release notes must mention the actual extension redirect URL if login could be affected.
+
+Verification checklist:
+- Run `node scripts/check-auth-contracts.mjs` before `build:ext`.
+- Confirm `extension/manifest.json` has no hard-coded `key` unless the user has approved the OAuth migration.
+- Confirm the extension build still includes `identity` permission and `launchWebAuthFlow`.
+- Confirm Web login keeps the existing origin redirect, and callback route does not server-side consume the OAuth code.

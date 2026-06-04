@@ -16,6 +16,19 @@ const wallpaperDistDir = join(distDir, "assets", "wallpapers");
 
 console.log("Building WebCollect Chrome Extension...");
 
+const authContractResult = spawnSync(
+  process.execPath,
+  [join(projectRoot, "scripts", "check-auth-contracts.mjs")],
+  {
+    cwd: projectRoot,
+    stdio: "inherit",
+  }
+);
+
+if (authContractResult.status !== 0) {
+  process.exit(authContractResult.status ?? 1);
+}
+
 const viteResult = spawnSync(
   process.execPath,
   [viteBin, "build", "--config", join(extensionRoot, "vite.config.ts")],

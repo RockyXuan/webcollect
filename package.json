@@ -8,6 +8,7 @@
     "preinstall": "npx only-allow pnpm",
     "lint": "eslint",
     "start": "bash ./scripts/start.sh",
+    "test:auth": "node ./scripts/check-auth-contracts.mjs",
     "ts-check": "tsc -p tsconfig.json",
     "build:ext": "node ./extension/build.mjs"
   },

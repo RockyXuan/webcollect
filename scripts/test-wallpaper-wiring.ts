@@ -44,6 +44,6 @@ assert.ok(
   extensionCss.includes("@import '../../src/styles/zoom-wallpaper.css';"),
   "extension CSS should import the shared Zoom wallpaper stylesheet"
 );
-assert.ok(manifestSource.includes('"key"'), "extension manifest should pin a stable extension ID for OAuth redirects");
+assert.equal(manifestSource.includes('"key"'), false, "extension manifest should not change the user's existing OAuth extension ID");
 
 console.log("wallpaper wiring tests passed");

@@ -2,7 +2,6 @@
   "manifest_version": 3,
   "name": "WebCollect",
   "version": "1.0.0",
-  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvrxi+lIUx2Za8+CS/FTQGMc+tlkJMG0EO3WLxXX7aR8sjnVriukhPzChYToiLliJIzVY8JQ+bSr5TXjGNgQQh1DiDOvvyl1srUk2PyZy16Rx2Dto147t9l2rqG+WePo4iKGfBkhV/4OxdP/+2ZpqppMIjgzrdJ4GMSbPbUqv6pEh1L3mT7rhYRsObLCoFxwKggHFpEOSoOlAGStVlHOppI04DNbLJb72qGFeur3KIk4Q/o8g7WfVLEyCrcNHRvPBJr0rfW+J3bRJKVqDqLMkVeUi22J0BNzn87aERijCc5LlR654pwIOrfBJccTXs9Oze91vjHwkuygABZp+t0l9YQIDAQAB",
   "description": "个人网页收藏墙：打开新标签页，快速访问和整理常用网站。",
   "permissions": [
     "storage",
