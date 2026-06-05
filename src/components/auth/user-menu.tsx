@@ -259,6 +259,19 @@ export function UserMenu() {
                     >
                       Redirect: {authDiagnostics.redirectUrl}
                     </button>
+                    <button
+                      type="button"
+                      className="mt-1 block w-full truncate rounded-xl bg-white/80 px-2 py-1.5 text-left font-mono text-[10px] text-slate-600"
+                      onClick={() => copyText(authDiagnostics.expectedRedirectUrl)}
+                      title="点击复制固定 Redirect URL"
+                    >
+                      固定 Redirect: {authDiagnostics.expectedRedirectUrl}
+                    </button>
+                    {!authDiagnostics.isExpectedExtensionId && (
+                      <p className="mt-2 text-[10px] leading-relaxed text-rose-600">
+                        当前扩展 ID 不是固定 ID，请换用最新版 Release。
+                      </p>
+                    )}
                   </div>
                 )}
                 <input

@@ -98,16 +98,27 @@ function getErrorMessage(err: unknown, fallback: string): string {
 export interface ExtensionAuthDiagnostics {
   extensionId: string;
   redirectUrl: string;
+  expectedExtensionId: string;
+  expectedRedirectUrl: string;
+  isExpectedExtensionId: boolean;
 }
+
+export const EXPECTED_EXTENSION_ID = "immpcmhmabobllnopedaoflcjneigbko";
+export const EXPECTED_EXTENSION_REDIRECT_URL = `https://${EXPECTED_EXTENSION_ID}.chromiumapp.org/auth`;
 
 export function getExtensionAuthDiagnostics(): ExtensionAuthDiagnostics | null {
   try {
     if (typeof chrome === "undefined" || !chrome.runtime?.id || !chrome.identity?.getRedirectURL) {
       return null;
     }
+    const extensionId = chrome.runtime.id;
+    const redirectUrl = chrome.identity.getRedirectURL("auth");
     return {
-      extensionId: chrome.runtime.id,
-      redirectUrl: chrome.identity.getRedirectURL("auth"),
+      extensionId,
+      redirectUrl,
+      expectedExtensionId: EXPECTED_EXTENSION_ID,
+      expectedRedirectUrl: EXPECTED_EXTENSION_REDIRECT_URL,
+      isExpectedExtensionId: extensionId === EXPECTED_EXTENSION_ID,
     };
   } catch {
     return null;
@@ -116,7 +127,10 @@ export function getExtensionAuthDiagnostics(): ExtensionAuthDiagnostics | null {
 
 function formatExtensionAuthError(message: string, redirectUrl: string): string {
   const extensionId = typeof chrome !== "undefined" && chrome.runtime?.id ? chrome.runtime.id : "unknown";
-  const baseHint = `扩展 ID: ${extensionId}\nRedirect URL: ${redirectUrl}`;
+  const stableIdHint = extensionId === EXPECTED_EXTENSION_ID
+    ? `固定扩展 ID 已生效。Supabase Redirect URL 必须包含: ${EXPECTED_EXTENSION_REDIRECT_URL}`
+    : `当前扩展 ID 不是固定 ID。请安装包含固定 key 的新 Release；固定 ID 应为: ${EXPECTED_EXTENSION_ID}`;
+  const baseHint = `扩展 ID: ${extensionId}\nRedirect URL: ${redirectUrl}\n${stableIdHint}`;
   if (/Authorization page could not be loaded|page could not be loaded/i.test(message)) {
     return [
       "Google 授权页无法打开。通常是 Supabase / Google OAuth 没有允许当前扩展的 Redirect URL。",
