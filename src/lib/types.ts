@@ -38,6 +38,14 @@ export interface Category {
   isParent?: boolean; // true = 顶级分类（如"开发"、"工作"），false/undefined = 分组（可降级到父分类下）
 }
 
+export interface CategoryLayoutPreference {
+  widthPercent?: number;
+  columns?: number;
+  updatedAt: number;
+}
+
+export type CategoryLayoutPreferences = Record<string, CategoryLayoutPreference>;
+
 export interface CollectionSection {
   id: string;
   name: string;

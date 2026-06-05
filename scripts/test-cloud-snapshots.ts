@@ -53,6 +53,7 @@ const sampleSnapshot: LocalSnapshotEntry = {
     pinnedCategoryIds: [],
     pinnedBookmarkItems: [],
     categoryWidths: {},
+    categoryLayouts: {},
     visualScale: 100,
     linkOpenMode: "new-background-tab",
     sections: [{

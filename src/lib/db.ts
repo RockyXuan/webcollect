@@ -1,5 +1,6 @@
 import localforage from "localforage";
-import type { WebCard, Category, HiddenSite, LinkOpenMode, RecycleBinItem, CollectionSection, PinnedBookmarkItem } from "./types";
+import type { WebCard, Category, HiddenSite, LinkOpenMode, RecycleBinItem, CollectionSection, PinnedBookmarkItem, CategoryLayoutPreferences } from "./types";
+import { sanitizeCategoryLayouts } from "./category-layouts";
 import {
   DEFAULT_VISUAL_SCALE,
   VISUAL_SCALE_BASELINE_MIGRATION_KEY,
@@ -217,6 +218,8 @@ export async function savePinnedBookmarkItems(items: PinnedBookmarkItem[], updat
 }
 
 const CATEGORY_WIDTHS_KEY = "categoryWidths";
+const CATEGORY_LAYOUTS_KEY = "categoryLayouts";
+const CATEGORY_LAYOUTS_UPDATED_AT_KEY = "categoryLayoutsUpdatedAt";
 const VISUAL_SCALE_KEY = "visualScale";
 const LINK_OPEN_MODE_KEY = "linkOpenMode";
 
@@ -226,6 +229,23 @@ export async function getCategoryWidths(): Promise<Record<string, number>> {
 
 export async function saveCategoryWidths(widths: Record<string, number>): Promise<void> {
   await localforage.setItem(CATEGORY_WIDTHS_KEY, widths);
+  await touchLocalSnapshot();
+}
+
+export async function getCategoryLayouts(): Promise<CategoryLayoutPreferences> {
+  return sanitizeCategoryLayouts(await localforage.getItem<CategoryLayoutPreferences>(CATEGORY_LAYOUTS_KEY));
+}
+
+export async function getCategoryLayoutsUpdatedAt(): Promise<number> {
+  return (await localforage.getItem<number>(CATEGORY_LAYOUTS_UPDATED_AT_KEY)) || 0;
+}
+
+export async function saveCategoryLayouts(
+  layouts: CategoryLayoutPreferences,
+  updatedAt = Date.now()
+): Promise<void> {
+  await localforage.setItem(CATEGORY_LAYOUTS_KEY, sanitizeCategoryLayouts(layouts));
+  await localforage.setItem(CATEGORY_LAYOUTS_UPDATED_AT_KEY, updatedAt);
   await touchLocalSnapshot();
 }
 

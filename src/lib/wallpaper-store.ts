@@ -7,7 +7,7 @@ import {
   FALLBACK_WALLPAPERS,
   cacheWallpaperImages,
   fetchRemoteWallpapers,
-  getNextWallpaper,
+  getRandomWallpaper,
   getRotationMs,
   isPackagedWallpaper,
   mergeWallpaperLibrary,
@@ -56,9 +56,8 @@ export const useWallpaperStore = create<WallpaperState>((set, get) => ({
       getWallpaperLibrary(),
     ]);
     const wallpapers = pruneWallpaperLibrary(mergeWallpaperLibrary(FALLBACK_WALLPAPERS, storedLibrary));
-    const preferredCurrent = prefs.rotationInterval === "open"
-      ? getNextWallpaper(wallpapers, prefs.currentWallpaperId)
-      : getCurrentWallpaper(wallpapers, prefs.currentWallpaperId);
+    const preferredCurrent = getRandomWallpaper(wallpapers, prefs.currentWallpaperId)
+      || getCurrentWallpaper(wallpapers, prefs.currentWallpaperId);
     const current = preferredCurrent && isPackagedWallpaper(preferredCurrent)
       ? preferredCurrent
       : FALLBACK_WALLPAPERS[0];
@@ -91,7 +90,7 @@ export const useWallpaperStore = create<WallpaperState>((set, get) => ({
 
   nextWallpaper: async () => {
     const state = get();
-    const next = getNextWallpaper(state.wallpapers, state.prefs.currentWallpaperId);
+    const next = getRandomWallpaper(state.wallpapers, state.prefs.currentWallpaperId);
     if (!next) return;
     const prefs = { ...state.prefs, currentWallpaperId: next.id };
     set({ prefs });
@@ -142,7 +141,7 @@ export const useWallpaperStore = create<WallpaperState>((set, get) => ({
   cacheCurrentAndNext: async () => {
     const state = get();
     const current = getCurrentWallpaper(state.wallpapers, state.prefs.currentWallpaperId);
-    const next = getNextWallpaper(state.wallpapers, current.id);
+    const next = getRandomWallpaper(state.wallpapers, current.id);
     await cacheWallpaperImages(next ? [current, next] : [current]);
   },
 }));

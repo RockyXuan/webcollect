@@ -3,6 +3,7 @@ import {
   getActiveSectionId,
   getCards,
   getCategories,
+  getCategoryLayouts,
   getCategoryWidths,
   getHiddenSites,
   getLinkOpenMode,
@@ -17,6 +18,7 @@ import {
   saveActiveSectionId,
   saveCards,
   saveCategories,
+  saveCategoryLayouts,
   saveCategoryWidths,
   saveHiddenSites,
   saveLinkOpenMode,
@@ -42,7 +44,7 @@ import {
   type WarehouseCard,
   type WarehouseCategory,
 } from "@/lib/db-warehouse";
-import type { Category, CollectionSection, HiddenSite, LinkOpenMode, PinnedBookmarkItem, RecycleBinItem, WebCard } from "@/lib/types";
+import type { Category, CategoryLayoutPreferences, CollectionSection, HiddenSite, LinkOpenMode, PinnedBookmarkItem, RecycleBinItem, WebCard } from "@/lib/types";
 
 localforage.config({
   name: "WebCollect",
@@ -71,6 +73,7 @@ export interface LocalSnapshotData {
   pinnedCategoryIds: string[];
   pinnedBookmarkItems: PinnedBookmarkItem[];
   categoryWidths: Record<string, number>;
+  categoryLayouts: CategoryLayoutPreferences;
   visualScale: number;
   linkOpenMode: LinkOpenMode;
   sections: CollectionSection[];
@@ -331,6 +334,7 @@ async function readCurrentSnapshotData(): Promise<LocalSnapshotData> {
     pinnedCategoryIds: await getPinnedCategoryIds(),
     pinnedBookmarkItems: await getPinnedBookmarkItems(),
     categoryWidths: await getCategoryWidths(),
+    categoryLayouts: await getCategoryLayouts(),
     visualScale: await getVisualScale(),
     linkOpenMode: await getLinkOpenMode(),
     sections: await getSections(),
@@ -532,6 +536,7 @@ export async function createLocalDataSnapshot(
     pinnedCategoryIds: await getPinnedCategoryIds(),
     pinnedBookmarkItems: await getPinnedBookmarkItems(),
     categoryWidths: await getCategoryWidths(),
+    categoryLayouts: await getCategoryLayouts(),
     visualScale: await getVisualScale(),
     linkOpenMode: await getLinkOpenMode(),
     sections: await getSections(),
@@ -614,6 +619,7 @@ export async function saveVersionAndClearLocalData(): Promise<LocalSnapshotEntry
     await savePinnedCategoryIds([]);
     await savePinnedBookmarkItems([]);
     await saveCategoryWidths({});
+    await saveCategoryLayouts({});
     await saveVisualScale(100);
     await saveLinkOpenMode("new-background-tab");
     await saveSections([defaultSection]);
@@ -639,6 +645,7 @@ export async function restoreSnapshotData(data: LocalSnapshotData): Promise<void
     await savePinnedCategoryIds(data.pinnedCategoryIds);
     await savePinnedBookmarkItems(data.pinnedBookmarkItems || []);
     await saveCategoryWidths(data.categoryWidths);
+    await saveCategoryLayouts(data.categoryLayouts || {});
     await saveVisualScale(data.visualScale);
     await saveLinkOpenMode(data.linkOpenMode);
     await saveSections(data.sections);

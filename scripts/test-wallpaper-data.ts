@@ -6,6 +6,7 @@ import {
   filterZoomWallpapers,
   filterUsableWallpapers,
   getNextWallpaper,
+  getRandomWallpaper,
   isPackagedWallpaper,
   isZoomWallpaperCandidate,
   mergeWallpaperLibrary,
@@ -17,7 +18,7 @@ import type { WallpaperItem } from "../src/lib/wallpaper-types";
 
 assert.equal(DEFAULT_WALLPAPER_PREFS.defaultMode, "wallpaper");
 assert.equal(DEFAULT_WALLPAPER_PREFS.autoUpdate, true);
-assert.equal(DEFAULT_WALLPAPER_PREFS.rotationInterval, "15m");
+assert.equal(DEFAULT_WALLPAPER_PREFS.rotationInterval, "open");
 assert.deepEqual(DEFAULT_WALLPAPER_PREFS.enabledCategories, [
   "landscape",
   "aerial",
@@ -117,5 +118,14 @@ assert.ok(
 
 const next = getNextWallpaper([valid, { ...valid, id: "second" }], "valid");
 assert.equal(next?.id, "second");
+
+const randomPool = [
+  { ...valid, id: "first", imageUrl: "/assets/wallpapers/first.jpg", thumbnailUrl: "/assets/wallpapers/first.jpg" },
+  { ...valid, id: "second", imageUrl: "/assets/wallpapers/second.jpg", thumbnailUrl: "/assets/wallpapers/second.jpg" },
+  { ...valid, id: "third", imageUrl: "/assets/wallpapers/third.jpg", thumbnailUrl: "/assets/wallpapers/third.jpg" },
+];
+assert.equal(getRandomWallpaper(randomPool, "first", () => 0)?.id, "second");
+assert.equal(getRandomWallpaper(randomPool, "first", () => 0.99)?.id, "third");
+assert.equal(getRandomWallpaper(randomPool, "only", () => 0)?.id, "first");
 
 console.log("wallpaper data tests passed");

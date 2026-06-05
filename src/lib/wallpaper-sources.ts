@@ -12,7 +12,7 @@ export const ZOOM_WALLPAPER_MAX_RATIO = 2.4;
 
 export const DEFAULT_WALLPAPER_PREFS: WallpaperPrefs = {
   defaultMode: "wallpaper",
-  rotationInterval: "15m",
+  rotationInterval: "open",
   enabledCategories: [...WALLPAPER_CATEGORIES],
   autoUpdate: true,
   paused: false,
@@ -181,6 +181,21 @@ export function getNextWallpaper(items: WallpaperItem[], currentId: string | nul
   if (displayItems.length === 0) return null;
   const currentIndex = currentId ? displayItems.findIndex((item) => item.id === currentId) : -1;
   return displayItems[(currentIndex + 1) % displayItems.length] || displayItems[0] || null;
+}
+
+export function getRandomWallpaper(
+  items: WallpaperItem[],
+  currentId: string | null,
+  random: () => number = Math.random
+): WallpaperItem | null {
+  const packagedItems = items.filter(isPackagedWallpaper);
+  const displayItems = packagedItems.length > 0 ? packagedItems : items;
+  if (displayItems.length === 0) return null;
+
+  const candidates = displayItems.filter((item) => item.id !== currentId);
+  const pool = candidates.length > 0 ? candidates : displayItems;
+  const index = Math.min(pool.length - 1, Math.floor(Math.max(0, Math.min(0.999999, random())) * pool.length));
+  return pool[index] || pool[0] || null;
 }
 
 export function getRotationMs(interval: WallpaperPrefs["rotationInterval"]): number | null {

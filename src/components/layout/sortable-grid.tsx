@@ -43,6 +43,13 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Category, WebCard } from "@/lib/types";
+import type { CategoryLayoutPreference } from "@/lib/types";
+import {
+  calculateColumnsForWidth,
+  clampLayoutColumns,
+  getDefaultLayoutColumns,
+  getGroupWidthRemForColumns,
+} from "@/lib/category-layouts";
 
 // ============ Type-prefixed ID helpers ============
 const catId = (id: string) => `cat:${id}`;
@@ -76,35 +83,37 @@ export function getSmartParentWidthPercent(rawWidth: number, defaultWidth: numbe
 }
 
 function getDefaultChildBasis(cardCount: number): string {
-  if (cardCount <= 4) return "16.75rem";
-  if (cardCount <= 8) return "32rem";
-  if (cardCount <= 12) return "47.25rem";
-  return "62.5rem";
+  return `${getGroupWidthRemForColumns(getDefaultLayoutColumns(cardCount))}rem`;
 }
 
 function getMaxChildWidth(cardCount: number): string {
-  if (cardCount <= 4) return "77.75rem";
-  if (cardCount <= 6) return "47.25rem";
-  if (cardCount <= 10) return "62.5rem";
-  return "77.75rem";
+  return `${getGroupWidthRemForColumns(Math.min(4, Math.max(1, cardCount)))}rem`;
 }
 
-export function getSmartChildStyle(widthPercent: number | null, cardCount: number): React.CSSProperties {
+export function getSmartChildStyle(
+  widthPercent: number | null,
+  cardCount: number,
+  columns?: number
+): React.CSSProperties {
   const maxWidth = getMaxChildWidth(cardCount);
+  const columnWidth = `${getGroupWidthRemForColumns(clampLayoutColumns(columns, cardCount))}rem`;
 
   if (widthPercent !== null) {
     const minPercent = cardCount <= 4 ? 8 : 14;
     const maxPercent = 100;
     const smartWidth = Math.max(minPercent, Math.min(maxPercent, widthPercent));
+    const preferredWidth = columns
+      ? `min(100%, max(${columnWidth}, calc(${smartWidth}% - 0.75rem)))`
+      : `calc(${smartWidth}% - 0.75rem)`;
     return {
-      flex: `0 1 calc(${smartWidth}% - 0.75rem)`,
-      width: `calc(${smartWidth}% - 0.75rem)`,
-      minWidth: "min(100%, 16.75rem)",
+      flex: `0 1 ${preferredWidth}`,
+      width: preferredWidth,
+      minWidth: columns ? `min(100%, ${columnWidth})` : "min(100%, 16.75rem)",
       maxWidth,
     };
   }
 
-  const basis = getDefaultChildBasis(cardCount);
+  const basis = columns ? columnWidth : getDefaultChildBasis(cardCount);
   return {
     flex: `0 1 ${basis}`,
     width: basis,
@@ -727,7 +736,7 @@ function SortableCategoryBlock({
     isDragging,
   } = useSortable({ id: catId(category.id) });
 
-  const { setCategoryWidth, demoteParentCategory, updateCategory, editMode: globalEditMode, toggleEditMode, softDeleteCategory } = useAppStore();
+  const { setCategoryLayout, demoteParentCategory, updateCategory, editMode: globalEditMode, toggleEditMode, softDeleteCategory } = useAppStore();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [localWidth, setLocalWidth] = useState<number | null>(null);
   const [isHeaderHovered, setIsHeaderHovered] = useState(false);
@@ -769,7 +778,7 @@ function SortableCategoryBlock({
         document.removeEventListener("mousemove", handleMouseMove);
         document.removeEventListener("mouseup", handleMouseUp);
         setLocalWidth((prev) => {
-          if (prev !== null) setCategoryWidth(category.id, prev);
+          if (prev !== null) setCategoryLayout(category.id, { widthPercent: prev });
           return prev;
         });
       };
@@ -777,7 +786,7 @@ function SortableCategoryBlock({
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
     },
-    [category.id, setCategoryWidth]
+    [category.id, setCategoryLayout]
   );
 
   const setRef = useCallback(
@@ -1012,16 +1021,21 @@ function SortableSubGroupBlock({
   } = useSortable({ id: subId(category.id) });
 
   const categoryWidths = useAppStore((s) => s.categoryWidths);
-  const setCategoryWidth = useAppStore((s) => s.setCategoryWidth);
+  const categoryLayouts = useAppStore((s) => s.categoryLayouts);
+  const setCategoryLayout = useAppStore((s) => s.setCategoryLayout);
   const updateCategory = useAppStore((s) => s.updateCategory);
   const globalEditMode = useAppStore((s) => s.editMode);
   const toggleEditMode = useAppStore((s) => s.toggleEditMode);
   const [localWidth, setLocalWidth] = useState<number | null>(null);
+  const [localColumns, setLocalColumns] = useState<number | null>(null);
+  const localColumnsRef = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [isHeaderHovered, setIsHeaderHovered] = useState(false);
 
-  const widthPercent = localWidth ?? categoryWidths[category.id] ?? null;
+  const savedLayout: CategoryLayoutPreference | undefined = categoryLayouts[category.id];
+  const widthPercent = localWidth ?? savedLayout?.widthPercent ?? categoryWidths[category.id] ?? null;
+  const columns = localColumns ?? savedLayout?.columns ?? undefined;
 
   const handleResizeStart = useCallback(
     (e: React.MouseEvent) => {
@@ -1032,19 +1046,28 @@ function SortableSubGroupBlock({
       const startX = e.clientX;
       const startWidth = container.offsetWidth;
       const parentWidth = container.parentElement?.offsetWidth ?? 1;
+      localColumnsRef.current = calculateColumnsForWidth(startWidth, cards.length);
 
       const handleMouseMove = (ev: MouseEvent) => {
         const dx = ev.clientX - startX;
         const newWidth = Math.max(180, startWidth + dx);
         const newPercent = Math.max(8, Math.min(100, (newWidth / parentWidth) * 100));
+        const nextColumns = calculateColumnsForWidth(newWidth, cards.length);
+        localColumnsRef.current = nextColumns;
         setLocalWidth(newPercent);
+        setLocalColumns(nextColumns);
       };
 
       const handleMouseUp = () => {
         document.removeEventListener("mousemove", handleMouseMove);
         document.removeEventListener("mouseup", handleMouseUp);
         setLocalWidth((prev) => {
-          if (prev !== null) setCategoryWidth(category.id, prev);
+          if (prev !== null) {
+            setCategoryLayout(category.id, {
+              widthPercent: prev,
+              columns: localColumnsRef.current ?? calculateColumnsForWidth(startWidth, cards.length),
+            });
+          }
           return prev;
         });
       };
@@ -1052,7 +1075,7 @@ function SortableSubGroupBlock({
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
     },
-    [category.id, setCategoryWidth]
+    [cards.length, category.id, setCategoryLayout]
   );
 
   const setRef = useCallback(
@@ -1079,7 +1102,7 @@ function SortableSubGroupBlock({
     transform: isDragging ? undefined : CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.2 : 1,
-    ...getSmartChildStyle(widthPercent, cards.length),
+    ...getSmartChildStyle(widthPercent, cards.length, columns),
   };
 
   return (
@@ -1243,16 +1266,21 @@ function SortableUngroupedBlock({
   } = useSortable({ id: ungroupId(category.id) });
 
   const categoryWidths = useAppStore((s) => s.categoryWidths);
-  const setCategoryWidth = useAppStore((s) => s.setCategoryWidth);
+  const categoryLayouts = useAppStore((s) => s.categoryLayouts);
+  const setCategoryLayout = useAppStore((s) => s.setCategoryLayout);
   const updateCategory = useAppStore((s) => s.updateCategory);
   const globalEditMode = useAppStore((s) => s.editMode);
   const toggleEditMode = useAppStore((s) => s.toggleEditMode);
   const [localWidth, setLocalWidth] = useState<number | null>(null);
+  const [localColumns, setLocalColumns] = useState<number | null>(null);
+  const localColumnsRef = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [isHeaderHovered, setIsHeaderHovered] = useState(false);
 
-  const widthPercent = localWidth ?? categoryWidths[category.id] ?? null;
+  const savedLayout: CategoryLayoutPreference | undefined = categoryLayouts[category.id];
+  const widthPercent = localWidth ?? savedLayout?.widthPercent ?? categoryWidths[category.id] ?? null;
+  const columns = localColumns ?? savedLayout?.columns ?? undefined;
 
   const handleResizeStart = useCallback(
     (e: React.MouseEvent) => {
@@ -1263,19 +1291,28 @@ function SortableUngroupedBlock({
       const startX = e.clientX;
       const startWidth = container.offsetWidth;
       const parentWidth = container.parentElement?.offsetWidth ?? 1;
+      localColumnsRef.current = calculateColumnsForWidth(startWidth, cards.length);
 
       const handleMouseMove = (ev: MouseEvent) => {
         const dx = ev.clientX - startX;
         const newWidth = Math.max(120, startWidth + dx);
         const newPercent = Math.max(15, Math.min(100, (newWidth / parentWidth) * 100));
+        const nextColumns = calculateColumnsForWidth(newWidth, cards.length);
+        localColumnsRef.current = nextColumns;
         setLocalWidth(newPercent);
+        setLocalColumns(nextColumns);
       };
 
       const handleMouseUp = () => {
         document.removeEventListener("mousemove", handleMouseMove);
         document.removeEventListener("mouseup", handleMouseUp);
         setLocalWidth((prev) => {
-          if (prev !== null) setCategoryWidth(category.id, prev);
+          if (prev !== null) {
+            setCategoryLayout(category.id, {
+              widthPercent: prev,
+              columns: localColumnsRef.current ?? calculateColumnsForWidth(startWidth, cards.length),
+            });
+          }
           return prev;
         });
       };
@@ -1283,7 +1320,7 @@ function SortableUngroupedBlock({
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
     },
-    [category.id, setCategoryWidth]
+    [cards.length, category.id, setCategoryLayout]
   );
 
   const setRef = useCallback(
@@ -1310,7 +1347,7 @@ function SortableUngroupedBlock({
     transform: isDragging ? undefined : CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.2 : 1,
-    ...getSmartChildStyle(widthPercent, cards.length),
+    ...getSmartChildStyle(widthPercent, cards.length, columns),
   };
 
   return (

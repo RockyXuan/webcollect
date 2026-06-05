@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import type { WebCard, Category, HiddenSite, HideDuration, LinkOpenMode, RecycleBinItem, CollectionSection, PinnedBookmarkItem } from "./types";
+import type { WebCard, Category, HiddenSite, HideDuration, LinkOpenMode, RecycleBinItem, CollectionSection, PinnedBookmarkItem, CategoryLayoutPreference, CategoryLayoutPreferences } from "./types";
+import { layoutsToWidths, migrateWidthsToLayouts } from "./category-layouts";
 import {
   getCards,
   saveCards,
@@ -20,6 +21,8 @@ import {
   savePinnedBookmarkItems,
   getCategoryWidths,
   saveCategoryWidths,
+  getCategoryLayouts,
+  saveCategoryLayouts,
   getVisualScale,
   saveVisualScale,
   getLinkOpenMode,
@@ -453,6 +456,8 @@ interface AppState {
   // Category widths
   categoryWidths: Record<string, number>;
   setCategoryWidth: (categoryId: string, widthPercent: number) => void;
+  categoryLayouts: CategoryLayoutPreferences;
+  setCategoryLayout: (categoryId: string, layout: Partial<CategoryLayoutPreference>) => void;
   visualScale: number;
   setVisualScale: (scale: number) => void;
   linkOpenMode: LinkOpenMode;
@@ -484,13 +489,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   pinnedCategoryIds: [] as string[],
   pinnedBookmarkItems: [] as PinnedBookmarkItem[],
   categoryWidths: {} as Record<string, number>,
+  categoryLayouts: {} as CategoryLayoutPreferences,
   visualScale: 100,
   linkOpenMode: "new-background-tab",
 
   loadData: async (options) => {
     const showLoading = options?.showLoading ?? true;
     if (showLoading) set({ isLoading: true });
-    const [storedCards, initCategories, init, hiddenSites, pinnedIds, pinnedBookmarkItems, widths, visualScale, linkOpenMode, storedSections, storedActiveSectionId, workspaceResetAt] = await Promise.all([
+    const [storedCards, initCategories, init, hiddenSites, pinnedIds, pinnedBookmarkItems, widths, storedLayouts, visualScale, linkOpenMode, storedSections, storedActiveSectionId, workspaceResetAt] = await Promise.all([
       getCards(),
       getCategories(),
       isInitialized(),
@@ -498,6 +504,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       getPinnedCategoryIds(),
       getPinnedBookmarkItems(),
       getCategoryWidths(),
+      getCategoryLayouts(),
       getVisualScale(),
       getLinkOpenMode(),
       getSections(),
@@ -571,6 +578,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       await withoutLocalChangeEvents(() => saveHiddenSites(cleanedHidden));
     }
 
+    const categoryLayouts = Object.keys(storedLayouts).length > 0
+      ? storedLayouts
+      : migrateWidthsToLayouts(widths);
+    if (Object.keys(storedLayouts).length === 0 && Object.keys(widths).length > 0) {
+      await withoutLocalChangeEvents(() => saveCategoryLayouts(categoryLayouts));
+    }
+
     set({
       cards,
       categories,
@@ -580,6 +594,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       pinnedCategoryIds: pinnedIds,
       pinnedBookmarkItems: normalizePinnedBookmarkItems(pinnedBookmarkItems),
       categoryWidths: widths,
+      categoryLayouts,
       visualScale,
       linkOpenMode,
       initialized: init,
@@ -1130,7 +1145,33 @@ export const useAppStore = create<AppState>((set, get) => ({
   setCategoryWidth: (categoryId, widthPercent) => {
     const widths = { ...get().categoryWidths, [categoryId]: widthPercent };
     saveCategoryWidths(widths);
-    set({ categoryWidths: widths });
+    const now = Date.now();
+    const categoryLayouts = {
+      ...get().categoryLayouts,
+      [categoryId]: {
+        ...get().categoryLayouts[categoryId],
+        widthPercent,
+        updatedAt: now,
+      },
+    };
+    saveCategoryLayouts(categoryLayouts, now);
+    set({ categoryWidths: widths, categoryLayouts });
+  },
+
+  setCategoryLayout: (categoryId, layout) => {
+    const now = Date.now();
+    const categoryLayouts = {
+      ...get().categoryLayouts,
+      [categoryId]: {
+        ...get().categoryLayouts[categoryId],
+        ...layout,
+        updatedAt: now,
+      },
+    };
+    const widths = layoutsToWidths(categoryLayouts);
+    saveCategoryLayouts(categoryLayouts, now);
+    saveCategoryWidths(widths);
+    set({ categoryLayouts, categoryWidths: widths });
   },
 
   setVisualScale: (scale) => {
