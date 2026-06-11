@@ -14,6 +14,9 @@ export interface CaptureDestination {
   sectionId?: string;
   parentCategoryId?: string;
   groupId?: string;
+  sectionName?: string;
+  parentCategoryName?: string;
+  groupName?: string;
 }
 
 export interface CaptureDraft {
@@ -50,9 +53,13 @@ export interface FloatingCapturePrefs {
 
 export interface CaptureDestinationCache {
   updatedAt: number;
+  activeSectionId?: string;
   sections: Array<Pick<CollectionSection, "id" | "name" | "order">>;
   categories: Array<Pick<Category, "id" | "name" | "icon" | "color" | "order" | "parentId" | "sectionId" | "isParent">>;
 }
+
+type DestinationCategory = CaptureDestinationCache["categories"][number];
+type DestinationSection = CaptureDestinationCache["sections"][number];
 
 export const DEFAULT_FLOATING_CAPTURE_PREFS: FloatingCapturePrefs = {
   enabled: true,
@@ -136,14 +143,120 @@ export async function saveFloatingCapturePrefs(prefs: FloatingCapturePrefs): Pro
   await setChromeStorage({ [CAPTURE_PREFS_KEY]: prefs });
 }
 
-export async function publishCaptureDestinationCache(): Promise<void> {
-  if (!hasExtensionStorage()) return;
-  const { sections, categories } = useAppStore.getState();
-  const cache: CaptureDestinationCache = {
-    updatedAt: Date.now(),
-    sections: sections
-      .map((section) => ({ id: section.id, name: section.name, order: section.order }))
-      .sort((a, b) => a.order - b.order),
+function normalizeDestinationName(value?: string): string {
+  return value?.trim().toLocaleLowerCase() || "";
+}
+
+function buildChildCount(categories: DestinationCategory[]): Map<string, number> {
+  const childCount = new Map<string, number>();
+  for (const category of categories) {
+    if (category.parentId) {
+      childCount.set(category.parentId, (childCount.get(category.parentId) || 0) + 1);
+    }
+  }
+  return childCount;
+}
+
+function categorySort(a: DestinationCategory, b: DestinationCategory): number {
+  return a.order - b.order || a.name.localeCompare(b.name);
+}
+
+function sectionSort(a: DestinationSection, b: DestinationSection): number {
+  return a.order - b.order || a.name.localeCompare(b.name);
+}
+
+function isParentCategory(category: DestinationCategory, childCount: Map<string, number>): boolean {
+  return !category.parentId && (category.isParent === true || childCount.has(category.id));
+}
+
+function isGroupCategory(category: DestinationCategory, childCount: Map<string, number>): boolean {
+  return !!category.parentId || (!category.isParent && !childCount.has(category.id));
+}
+
+function categorySectionId(category: DestinationCategory, categories: DestinationCategory[]): string {
+  if (category.sectionId) return category.sectionId;
+  if (category.parentId) {
+    return categories.find((item) => item.id === category.parentId)?.sectionId || "section-default";
+  }
+  return "section-default";
+}
+
+function findSectionIdByName(sections: DestinationSection[], name?: string): string | undefined {
+  const normalized = normalizeDestinationName(name);
+  if (!normalized) return undefined;
+  return sections.find((section) => normalizeDestinationName(section.name) === normalized)?.id;
+}
+
+function pickCategoryInSection(
+  candidates: DestinationCategory[],
+  categories: DestinationCategory[],
+  sectionId?: string
+): DestinationCategory | undefined {
+  const sorted = [...candidates].sort(categorySort);
+  if (!sectionId) return sorted[0];
+  return sorted.find((category) => categorySectionId(category, categories) === sectionId) || sorted[0];
+}
+
+function findParentByName(
+  categories: DestinationCategory[],
+  parentName?: string,
+  sectionId?: string
+): DestinationCategory | undefined {
+  const normalizedParent = normalizeDestinationName(parentName);
+  if (!normalizedParent) return undefined;
+  const childCount = buildChildCount(categories);
+  return pickCategoryInSection(
+    categories.filter(
+      (category) =>
+        isParentCategory(category, childCount) && normalizeDestinationName(category.name) === normalizedParent
+    ),
+    categories,
+    sectionId
+  );
+}
+
+function findGroupByName(
+  categories: DestinationCategory[],
+  groupName?: string,
+  parentName?: string,
+  sectionId?: string
+): DestinationCategory | undefined {
+  const normalizedGroup = normalizeDestinationName(groupName);
+  if (!normalizedGroup) return undefined;
+  const normalizedParent = normalizeDestinationName(parentName);
+  const childCount = buildChildCount(categories);
+  const candidates = categories.filter((category) => {
+    if (!isGroupCategory(category, childCount)) return false;
+    if (normalizeDestinationName(category.name) !== normalizedGroup) return false;
+    if (sectionId && categorySectionId(category, categories) !== sectionId) return false;
+    if (!normalizedParent) return true;
+    const parent = category.parentId ? categories.find((item) => item.id === category.parentId) : undefined;
+    return normalizeDestinationName(parent?.name) === normalizedParent;
+  });
+  return [...candidates].sort(categorySort)[0];
+}
+
+export function buildCaptureDestinationCache(
+  sections: CollectionSection[],
+  categories: Category[],
+  activeSectionId: string,
+  now = Date.now()
+): CaptureDestinationCache {
+  const sectionItems = sections
+    .map((section) => ({ id: section.id, name: section.name, order: section.order }))
+    .sort(sectionSort);
+  const resolvedActiveSectionId = sectionItems.some((section) => section.id === activeSectionId)
+    ? activeSectionId
+    : sectionItems[0]?.id || activeSectionId || "section-default";
+
+  return {
+    updatedAt: now,
+    activeSectionId: resolvedActiveSectionId,
+    sections: [...sectionItems].sort((a, b) => {
+      if (a.id === resolvedActiveSectionId) return -1;
+      if (b.id === resolvedActiveSectionId) return 1;
+      return sectionSort(a, b);
+    }),
     categories: categories
       .map((category) => ({
         id: category.id,
@@ -155,37 +268,83 @@ export async function publishCaptureDestinationCache(): Promise<void> {
         sectionId: category.sectionId,
         isParent: category.isParent,
       }))
-      .sort((a, b) => a.order - b.order),
+      .sort(categorySort),
   };
-  await setChromeStorage({ [CAPTURE_DESTINATIONS_KEY]: cache });
 }
 
-function resolveCaptureTargetCategoryId(
+export async function publishCaptureDestinationCache(): Promise<void> {
+  if (!hasExtensionStorage()) return;
+  const { sections, categories, activeSectionId } = useAppStore.getState();
+  await setChromeStorage({
+    [CAPTURE_DESTINATIONS_KEY]: buildCaptureDestinationCache(sections, categories, activeSectionId),
+  });
+}
+
+export function resolveCaptureTargetCategoryId(
   draft: CaptureDraft,
   categories: Category[],
   sections: CollectionSection[],
   activeSectionId: string
 ): string | null {
   const destination = draft.destination;
-  if (destination?.groupId && categories.some((category) => category.id === destination.groupId)) {
-    return destination.groupId;
+  const childCount = buildChildCount(categories);
+  const sectionItems = sections.map((section) => ({ id: section.id, name: section.name, order: section.order }));
+  const knownSectionIds = new Set(sectionItems.map((section) => section.id));
+  const fallbackSectionId = knownSectionIds.has(activeSectionId)
+    ? activeSectionId
+    : sectionItems.sort(sectionSort)[0]?.id || activeSectionId || "section-default";
+
+  const groupById = destination?.groupId
+    ? categories.find((category) => category.id === destination.groupId)
+    : undefined;
+  if (groupById && isGroupCategory(groupById, childCount)) {
+    return groupById.id;
   }
 
-  const targetSectionId = destination?.sectionId && sections.some((section) => section.id === destination.sectionId)
-    ? destination.sectionId
-    : activeSectionId;
+  const parentById = destination?.parentCategoryId
+    ? categories.find((category) => category.id === destination.parentCategoryId)
+    : undefined;
 
-  if (destination?.parentCategoryId) {
+  let targetSectionId = destination?.sectionId && knownSectionIds.has(destination.sectionId)
+    ? destination.sectionId
+    : undefined;
+  targetSectionId ||= findSectionIdByName(sectionItems, destination?.sectionName);
+  targetSectionId ||= groupById ? categorySectionId(groupById, categories) : undefined;
+  targetSectionId ||= parentById ? categorySectionId(parentById, categories) : undefined;
+
+  const namedParentForSection = !targetSectionId
+    ? findParentByName(categories, destination?.parentCategoryName)
+    : undefined;
+  targetSectionId ||= namedParentForSection ? categorySectionId(namedParentForSection, categories) : undefined;
+
+  const namedGroupForSection = !targetSectionId
+    ? findGroupByName(categories, destination?.groupName, destination?.parentCategoryName)
+    : undefined;
+  targetSectionId ||= namedGroupForSection ? categorySectionId(namedGroupForSection, categories) : undefined;
+  targetSectionId ||= fallbackSectionId;
+
+  const namedGroup = findGroupByName(
+    categories,
+    destination?.groupName,
+    destination?.parentCategoryName,
+    targetSectionId
+  );
+  if (namedGroup) return namedGroup.id;
+
+  const parentTarget = parentById && categorySectionId(parentById, categories) === targetSectionId
+    ? parentById
+    : findParentByName(categories, destination?.parentCategoryName, targetSectionId);
+  if (parentTarget) {
     const children = categories
-      .filter((category) => category.parentId === destination.parentCategoryId)
-      .sort((a, b) => a.order - b.order);
+      .filter((category) => category.parentId === parentTarget.id)
+      .sort(categorySort);
     if (children[0]) return children[0].id;
   }
 
   const sectionInbox = categories.find(
     (category) =>
-      (category.sectionId || "section-default") === targetSectionId &&
-      category.name.trim() === "收集箱"
+      categorySectionId(category, categories) === targetSectionId &&
+      normalizeDestinationName(category.name) === "收集箱"
   );
   if (sectionInbox) return sectionInbox.id;
 
@@ -194,7 +353,7 @@ function resolveCaptureTargetCategoryId(
 
   return categories
     .filter((category) => !category.isParent)
-    .sort((a, b) => a.order - b.order)[0]?.id || null;
+    .sort(categorySort)[0]?.id || null;
 }
 
 export async function drainFloatingCaptureQueue(): Promise<{ imported: number; skipped: number; failed: number }> {

@@ -13,6 +13,9 @@
     sectionId?: string;
     parentCategoryId?: string;
     groupId?: string;
+    sectionName?: string;
+    parentCategoryName?: string;
+    groupName?: string;
   }
 
   interface CaptureDraft {
@@ -62,6 +65,7 @@
 
   interface CaptureDestinationCache {
     updatedAt: number;
+    activeSectionId?: string;
     sections: DestinationSection[];
     categories: DestinationCategory[];
   }
@@ -92,7 +96,12 @@
   };
 
   let prefs: FloatingCapturePrefs = defaultPrefs;
-  let destinationCache: CaptureDestinationCache = { updatedAt: 0, sections: [], categories: [] };
+  let destinationCache: CaptureDestinationCache = {
+    updatedAt: 0,
+    activeSectionId: "section-default",
+    sections: [],
+    categories: [],
+  };
   let dockState: FloatingDockState = loadDockState();
   let hoveredDraft: CaptureDraft | null = null;
   let hoverDelayTimer: number | null = null;
@@ -729,9 +738,17 @@
     return [...destinationCache.sections].sort((a, b) => a.order - b.order);
   }
 
+  function categorySectionId(category: DestinationCategory): string {
+    if (category.sectionId) return category.sectionId;
+    if (category.parentId) {
+      return destinationCache.categories.find((item) => item.id === category.parentId)?.sectionId || "section-default";
+    }
+    return "section-default";
+  }
+
   function categoriesInSection(sectionId: string): DestinationCategory[] {
     return destinationCache.categories
-      .filter((category) => (category.sectionId || "section-default") === sectionId)
+      .filter((category) => categorySectionId(category) === sectionId)
       .sort((a, b) => a.order - b.order);
   }
 
@@ -777,7 +794,10 @@
       option.textContent = "默认主页";
       sectionSelect.appendChild(option);
     }
-    sectionSelect.value = destination?.sectionId || sections[0]?.id || "";
+    sectionSelect.value = destination?.sectionId || destinationCache.activeSectionId || sections[0]?.id || "";
+    if (sectionSelect.selectedIndex < 0 && sections[0]) {
+      sectionSelect.value = sections[0].id;
+    }
     renderParentSelect(destination);
     renderGroupSelect(destination);
   }
@@ -799,6 +819,9 @@
       parentSelect.appendChild(option);
     }
     parentSelect.value = destination?.parentCategoryId || "";
+    if (parentSelect.selectedIndex < 0) {
+      parentSelect.value = "";
+    }
   }
 
   function renderGroupSelect(destination?: CaptureDestination) {
@@ -823,6 +846,9 @@
       groupSelect.appendChild(option);
     }
     groupSelect.value = destination?.groupId || "";
+    if (groupSelect.selectedIndex < 0) {
+      groupSelect.value = "";
+    }
   }
 
   async function enrichDraft(draft: CaptureDraft) {
@@ -873,10 +899,31 @@
 
   function getSelectedDestination(): CaptureDestination | undefined {
     const destination: CaptureDestination = {};
-    if (sectionSelect.value) destination.sectionId = sectionSelect.value;
-    if (parentSelect.value) destination.parentCategoryId = parentSelect.value;
-    if (groupSelect.value) destination.groupId = groupSelect.value;
-    return destination.sectionId || destination.parentCategoryId || destination.groupId ? destination : undefined;
+    const selectedGroup = groupSelect.value
+      ? destinationCache.categories.find((category) => category.id === groupSelect.value)
+      : undefined;
+    const selectedParent = parentSelect.value
+      ? destinationCache.categories.find((category) => category.id === parentSelect.value)
+      : selectedGroup?.parentId
+        ? destinationCache.categories.find((category) => category.id === selectedGroup.parentId)
+        : undefined;
+    const selectedSectionId = sectionSelect.value ||
+      (selectedGroup ? categorySectionId(selectedGroup) : undefined) ||
+      (selectedParent ? categorySectionId(selectedParent) : undefined);
+    const selectedSection = selectedSectionId
+      ? destinationCache.sections.find((section) => section.id === selectedSectionId)
+      : undefined;
+
+    if (selectedSectionId) destination.sectionId = selectedSectionId;
+    if (selectedSection?.name) destination.sectionName = selectedSection.name;
+    if (selectedParent?.id) destination.parentCategoryId = selectedParent.id;
+    if (selectedParent?.name) destination.parentCategoryName = selectedParent.name;
+    if (selectedGroup?.id) destination.groupId = selectedGroup.id;
+    if (selectedGroup?.name) destination.groupName = selectedGroup.name;
+
+    return destination.sectionId || destination.parentCategoryId || destination.groupId || destination.sectionName
+      ? destination
+      : undefined;
   }
 
   async function saveDraft() {
