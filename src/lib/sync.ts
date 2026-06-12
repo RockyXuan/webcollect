@@ -33,6 +33,8 @@ import {
   savePinnedBookmarkItems,
   getCategoryWidths,
   saveCategoryWidths,
+  getCategoryLayouts,
+  saveCategoryLayouts,
   getVisualScale,
   saveVisualScale,
   getLinkOpenMode,
@@ -64,7 +66,7 @@ import {
 import { createLocalDataSnapshot, getLocalDataSnapshots } from "@/lib/local-snapshots";
 import { normalizePinnedBookmarkItems } from "@/lib/pinned-bookmarks";
 import { allDefaultCategories } from "@/lib/seed";
-import type { WebCard, Category, HiddenSite, LinkOpenMode, CollectionSection, RecycleBinItem, PinnedBookmarkItem } from "@/lib/types";
+import type { WebCard, Category, HiddenSite, LinkOpenMode, CollectionSection, RecycleBinItem, PinnedBookmarkItem, CategoryLayoutPreference } from "@/lib/types";
 
 // 鈹€鈹€ Types 鈹€鈹€
 
@@ -1130,6 +1132,7 @@ export async function syncData(userId: string): Promise<void> {
     localPinnedBookmarkItems,
     localPinnedBookmarkItemsUpdatedAt,
     localWidths,
+    localLayouts,
     localVisualScale,
     localLinkOpenMode,
     localSections,
@@ -1149,6 +1152,7 @@ export async function syncData(userId: string): Promise<void> {
     getPinnedBookmarkItems(),
     getPinnedBookmarkItemsUpdatedAt(),
     getCategoryWidths(),
+    getCategoryLayouts(),
     getVisualScale(),
     getLinkOpenMode(),
     getSections(),
@@ -1403,6 +1407,7 @@ export async function syncData(userId: string): Promise<void> {
     localPinnedBookmarkItems,
     localPinnedBookmarkItemsUpdatedAt,
     localWidths,
+    localLayouts,
     localVisualScale,
     localLinkOpenMode,
     localSections,
@@ -1438,6 +1443,7 @@ export async function pushLocalSnapshotToCloud(
     localPinnedBookmarkItems,
     localPinnedBookmarkItemsUpdatedAt,
     localWidths,
+    localLayouts,
     localVisualScale,
     localLinkOpenMode,
     localSections,
@@ -1457,6 +1463,7 @@ export async function pushLocalSnapshotToCloud(
     getPinnedBookmarkItems(),
     getPinnedBookmarkItemsUpdatedAt(),
     getCategoryWidths(),
+    getCategoryLayouts(),
     getVisualScale(),
     getLinkOpenMode(),
     getSections(),
@@ -1637,6 +1644,7 @@ export async function pushLocalSnapshotToCloud(
     pinnedBookmarkItems: localPinnedBookmarkItems,
     pinnedBookmarkItemsUpdatedAt: localPinnedBookmarkItemsUpdatedAt,
     categoryWidths: localWidths,
+    categoryLayouts: localLayouts,
     visualScale: localVisualScale,
     linkOpenMode: localLinkOpenMode,
     collectionSections: localSections,
@@ -1656,6 +1664,43 @@ export async function pushLocalSnapshotToCloud(
 
 // 鈹€鈹€ Sync preferences 鈹€鈹€
 
+function isCategoryLayoutPreference(value: unknown): value is CategoryLayoutPreference {
+  if (!value || typeof value !== "object") return false;
+  const raw = value as Record<string, unknown>;
+  const hasWidth = typeof raw.widthPercent === "number" && Number.isFinite(raw.widthPercent);
+  const hasColumns = typeof raw.columns === "number" && Number.isFinite(raw.columns);
+  const hasUpdatedAt = typeof raw.updatedAt === "number" && Number.isFinite(raw.updatedAt);
+  return (hasWidth || hasColumns) && hasUpdatedAt;
+}
+
+function normalizeCategoryLayouts(value: unknown): Record<string, CategoryLayoutPreference> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const layouts: Record<string, CategoryLayoutPreference> = {};
+  for (const [categoryId, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (!isCategoryLayoutPreference(raw)) continue;
+    layouts[categoryId] = {
+      widthPercent: typeof raw.widthPercent === "number" ? Math.max(8, Math.min(100, raw.widthPercent)) : undefined,
+      columns: typeof raw.columns === "number" ? Math.max(1, Math.min(8, Math.round(raw.columns))) : undefined,
+      updatedAt: raw.updatedAt,
+    };
+  }
+  return layouts;
+}
+
+export function mergeCategoryLayouts(
+  localLayouts: Record<string, CategoryLayoutPreference>,
+  cloudLayouts: Record<string, CategoryLayoutPreference>
+): Record<string, CategoryLayoutPreference> {
+  const merged: Record<string, CategoryLayoutPreference> = { ...cloudLayouts };
+  for (const [categoryId, localLayout] of Object.entries(localLayouts)) {
+    const cloudLayout = merged[categoryId];
+    if (!cloudLayout || (localLayout.updatedAt || 0) >= (cloudLayout.updatedAt || 0)) {
+      merged[categoryId] = localLayout;
+    }
+  }
+  return merged;
+}
+
 async function syncPreferences(
   client: SupabaseClient,
   userId: string,
@@ -1664,6 +1709,7 @@ async function syncPreferences(
   localPinnedBookmarkItems: PinnedBookmarkItem[],
   localPinnedBookmarkItemsUpdatedAt: number,
   localWidths: Record<string, number>,
+  localLayouts: Record<string, CategoryLayoutPreference>,
   localVisualScale: number,
   localLinkOpenMode: LinkOpenMode,
   localSections: CollectionSection[],
@@ -1748,6 +1794,17 @@ async function syncPreferences(
   if (mergedWidths !== localWidths) {
     await withoutLocalChangeEvents(async () => {
       await saveCategoryWidths(mergedWidths);
+    });
+  }
+
+  const cloudLayouts = shouldIgnoreCloudPreference(cloudPrefsMap, "categoryLayouts", workspaceResetAt)
+    ? {}
+    : normalizeCategoryLayouts(cloudPrefsMap.categoryLayouts?.value);
+  const localLayoutsForMerge = cloudResetIsNewerThanLocal ? {} : localLayouts;
+  const mergedLayouts = mergeCategoryLayouts(localLayoutsForMerge, cloudLayouts);
+  if (JSON.stringify(mergedLayouts) !== JSON.stringify(localLayouts)) {
+    await withoutLocalChangeEvents(async () => {
+      await saveCategoryLayouts(mergedLayouts);
     });
   }
 
@@ -1884,6 +1941,7 @@ async function syncPreferences(
     pinnedBookmarkItems: mergedPinnedBookmarkItems,
     pinnedBookmarkItemsUpdatedAt: mergedPinnedBookmarkUpdatedAt || Date.now(),
     categoryWidths: mergedWidths,
+    categoryLayouts: mergedLayouts,
     visualScale: mergedVisualScale,
     linkOpenMode: mergedLinkOpenMode,
     collectionSections: mergedSections,

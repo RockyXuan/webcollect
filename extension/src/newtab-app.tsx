@@ -39,7 +39,7 @@ export function NewTabApp() {
   const returnToWallpaper = useWallpaperStore((state) => state.returnToWallpaper);
 
   // 鈹€鈹€ Main page state 鈹€鈹€
-  const { loadData, isLoading, softDeleteCard, updateCard, categories, sections } = useAppStore();
+  const { loadData, isLoading, softDeleteCard, updateCard, categories, sections, activeSectionId } = useAppStore();
 
   const [cardDialogOpen, setCardDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -132,7 +132,7 @@ export function NewTabApp() {
 
   useEffect(() => {
     void publishCaptureDestinationCache();
-  }, [categories, sections]);
+  }, [categories, sections, activeSectionId]);
 
   useEffect(() => {
     if (!isChromeExtension() || typeof chrome === "undefined" || !chrome.runtime?.onMessage) return;

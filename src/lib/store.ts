@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { WebCard, Category, HiddenSite, HideDuration, LinkOpenMode, RecycleBinItem, CollectionSection, PinnedBookmarkItem } from "./types";
+import type { WebCard, Category, HiddenSite, HideDuration, LinkOpenMode, RecycleBinItem, CollectionSection, PinnedBookmarkItem, CategoryLayoutPreference } from "./types";
 import {
   getCards,
   saveCards,
@@ -20,6 +20,8 @@ import {
   savePinnedBookmarkItems,
   getCategoryWidths,
   saveCategoryWidths,
+  getCategoryLayouts,
+  saveCategoryLayouts,
   getVisualScale,
   saveVisualScale,
   getLinkOpenMode,
@@ -450,9 +452,10 @@ interface AppState {
   reorderPinnedBookmarks: (orderedIds: string[]) => void;
   isBookmarkPinned: (cardId: string) => boolean;
 
-  // Category widths
+  // Category widths and layout intent
   categoryWidths: Record<string, number>;
-  setCategoryWidth: (categoryId: string, widthPercent: number) => void;
+  categoryLayouts: Record<string, CategoryLayoutPreference>;
+  setCategoryWidth: (categoryId: string, widthPercent: number, columns?: number) => void;
   visualScale: number;
   setVisualScale: (scale: number) => void;
   linkOpenMode: LinkOpenMode;
@@ -484,13 +487,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   pinnedCategoryIds: [] as string[],
   pinnedBookmarkItems: [] as PinnedBookmarkItem[],
   categoryWidths: {} as Record<string, number>,
+  categoryLayouts: {} as Record<string, CategoryLayoutPreference>,
   visualScale: 100,
   linkOpenMode: "new-background-tab",
 
   loadData: async (options) => {
     const showLoading = options?.showLoading ?? true;
     if (showLoading) set({ isLoading: true });
-    const [storedCards, initCategories, init, hiddenSites, pinnedIds, pinnedBookmarkItems, widths, visualScale, linkOpenMode, storedSections, storedActiveSectionId, workspaceResetAt] = await Promise.all([
+    const [storedCards, initCategories, init, hiddenSites, pinnedIds, pinnedBookmarkItems, widths, layouts, visualScale, linkOpenMode, storedSections, storedActiveSectionId, workspaceResetAt] = await Promise.all([
       getCards(),
       getCategories(),
       isInitialized(),
@@ -498,6 +502,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       getPinnedCategoryIds(),
       getPinnedBookmarkItems(),
       getCategoryWidths(),
+      getCategoryLayouts(),
       getVisualScale(),
       getLinkOpenMode(),
       getSections(),
@@ -580,6 +585,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       pinnedCategoryIds: pinnedIds,
       pinnedBookmarkItems: normalizePinnedBookmarkItems(pinnedBookmarkItems),
       categoryWidths: widths,
+      categoryLayouts: layouts,
       visualScale,
       linkOpenMode,
       initialized: init,
@@ -1127,10 +1133,25 @@ export const useAppStore = create<AppState>((set, get) => ({
     return get().pinnedBookmarkItems.some((item) => item.cardId === cardId);
   },
 
-  setCategoryWidth: (categoryId, widthPercent) => {
-    const widths = { ...get().categoryWidths, [categoryId]: widthPercent };
-    saveCategoryWidths(widths);
-    set({ categoryWidths: widths });
+  setCategoryWidth: (categoryId, widthPercent, columns) => {
+    const now = Date.now();
+    const safeWidth = Math.max(8, Math.min(100, widthPercent));
+    const safeColumns = typeof columns === "number" && Number.isFinite(columns)
+      ? Math.max(1, Math.min(8, Math.round(columns)))
+      : get().categoryLayouts[categoryId]?.columns;
+    const widths = { ...get().categoryWidths, [categoryId]: safeWidth };
+    const layouts = {
+      ...get().categoryLayouts,
+      [categoryId]: {
+        ...get().categoryLayouts[categoryId],
+        widthPercent: safeWidth,
+        columns: safeColumns,
+        updatedAt: now,
+      },
+    };
+    void saveCategoryWidths(widths);
+    void saveCategoryLayouts(layouts);
+    set({ categoryWidths: widths, categoryLayouts: layouts });
   },
 
   setVisualScale: (scale) => {

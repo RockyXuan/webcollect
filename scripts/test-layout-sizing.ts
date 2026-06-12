@@ -17,7 +17,7 @@ const stretchedParentWidth = getSmartParentWidthPercent(96, 50);
 assert.equal(stretchedParentWidth, 96, "manual parent resize should allow near-full-row widths");
 
 const compactFourCardStyle = getSmartChildStyle(null, 4);
-assert.equal(compactFourCardStyle.width, "16.75rem");
+assert.equal(compactFourCardStyle.width, "32rem");
 assert.equal(compactFourCardStyle.maxWidth, "77.75rem");
 
 const stretchedFourCardStyle = getSmartChildStyle(72, 4);

@@ -1,5 +1,5 @@
 import localforage from "localforage";
-import type { WebCard, Category, HiddenSite, LinkOpenMode, RecycleBinItem, CollectionSection, PinnedBookmarkItem } from "./types";
+import type { WebCard, Category, HiddenSite, LinkOpenMode, RecycleBinItem, CollectionSection, PinnedBookmarkItem, CategoryLayoutPreference } from "./types";
 import {
   DEFAULT_VISUAL_SCALE,
   VISUAL_SCALE_BASELINE_MIGRATION_KEY,
@@ -217,6 +217,7 @@ export async function savePinnedBookmarkItems(items: PinnedBookmarkItem[], updat
 }
 
 const CATEGORY_WIDTHS_KEY = "categoryWidths";
+const CATEGORY_LAYOUTS_KEY = "categoryLayouts";
 const VISUAL_SCALE_KEY = "visualScale";
 const LINK_OPEN_MODE_KEY = "linkOpenMode";
 
@@ -226,6 +227,46 @@ export async function getCategoryWidths(): Promise<Record<string, number>> {
 
 export async function saveCategoryWidths(widths: Record<string, number>): Promise<void> {
   await localforage.setItem(CATEGORY_WIDTHS_KEY, widths);
+  await touchLocalSnapshot();
+}
+
+function normalizeCategoryLayout(value: unknown): CategoryLayoutPreference | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const widthPercent = typeof raw.widthPercent === "number" && Number.isFinite(raw.widthPercent)
+    ? Math.max(8, Math.min(100, raw.widthPercent))
+    : undefined;
+  const columns = typeof raw.columns === "number" && Number.isFinite(raw.columns)
+    ? Math.max(1, Math.min(8, Math.round(raw.columns)))
+    : undefined;
+  const updatedAt = typeof raw.updatedAt === "number" && Number.isFinite(raw.updatedAt)
+    ? raw.updatedAt
+    : 0;
+  if (widthPercent === undefined && columns === undefined) return null;
+  return { widthPercent, columns, updatedAt };
+}
+
+export async function getCategoryLayouts(): Promise<Record<string, CategoryLayoutPreference>> {
+  const stored = await localforage.getItem<Record<string, unknown>>(CATEGORY_LAYOUTS_KEY);
+  const layouts: Record<string, CategoryLayoutPreference> = {};
+  if (stored && typeof stored === "object" && !Array.isArray(stored)) {
+    for (const [categoryId, raw] of Object.entries(stored)) {
+      const layout = normalizeCategoryLayout(raw);
+      if (layout) layouts[categoryId] = layout;
+    }
+  }
+
+  const widths = await getCategoryWidths();
+  for (const [categoryId, widthPercent] of Object.entries(widths)) {
+    if (!layouts[categoryId] && typeof widthPercent === "number" && Number.isFinite(widthPercent)) {
+      layouts[categoryId] = { widthPercent, updatedAt: 0 };
+    }
+  }
+  return layouts;
+}
+
+export async function saveCategoryLayouts(layouts: Record<string, CategoryLayoutPreference>): Promise<void> {
+  await localforage.setItem(CATEGORY_LAYOUTS_KEY, layouts);
   await touchLocalSnapshot();
 }
 

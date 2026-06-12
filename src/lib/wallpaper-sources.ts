@@ -176,6 +176,17 @@ export function getNextWallpaper(items: WallpaperItem[], currentId: string | nul
   return items[(currentIndex + 1) % items.length] || items[0] || null;
 }
 
+export function getRandomWallpaper(items: WallpaperItem[], currentId: string | null): WallpaperItem | null {
+  if (items.length === 0) return null;
+  const candidates = items.filter((item) => item.id !== currentId);
+  const pool = candidates.length > 0 ? candidates : items;
+  return pool[Math.floor(Math.random() * pool.length)] || null;
+}
+
+export function isPackagedWallpaper(item: WallpaperItem): boolean {
+  return item.imageUrl.startsWith("/assets/wallpapers/");
+}
+
 export function getRotationMs(interval: WallpaperPrefs["rotationInterval"]): number | null {
   if (interval === "5m") return 5 * 60 * 1000;
   if (interval === "15m") return 15 * 60 * 1000;

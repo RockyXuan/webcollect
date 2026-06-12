@@ -76,10 +76,11 @@ export function getSmartParentWidthPercent(rawWidth: number, defaultWidth: numbe
 }
 
 function getDefaultChildBasis(cardCount: number): string {
-  if (cardCount <= 4) return "16.75rem";
-  if (cardCount <= 8) return "32rem";
-  if (cardCount <= 12) return "47.25rem";
-  return "62.5rem";
+  if (cardCount <= 2) return "16.75rem";
+  if (cardCount <= 4) return "32rem";
+  if (cardCount <= 8) return "47.25rem";
+  if (cardCount <= 12) return "62.5rem";
+  return "77.75rem";
 }
 
 function getMaxChildWidth(cardCount: number): string {
@@ -87,6 +88,15 @@ function getMaxChildWidth(cardCount: number): string {
   if (cardCount <= 6) return "47.25rem";
   if (cardCount <= 10) return "62.5rem";
   return "77.75rem";
+}
+
+export function inferLayoutColumns(widthPercent: number | null, cardCount: number): number {
+  const cappedCardCount = Math.max(1, Math.min(8, cardCount || 1));
+  if (widthPercent === null) return Math.min(cappedCardCount, cardCount <= 4 ? 2 : 3);
+  if (widthPercent >= 86) return Math.min(cappedCardCount, 4);
+  if (widthPercent >= 64) return Math.min(cappedCardCount, 3);
+  if (widthPercent >= 38) return Math.min(cappedCardCount, 2);
+  return 1;
 }
 
 export function getSmartChildStyle(widthPercent: number | null, cardCount: number): React.CSSProperties {
@@ -769,7 +779,7 @@ function SortableCategoryBlock({
         document.removeEventListener("mousemove", handleMouseMove);
         document.removeEventListener("mouseup", handleMouseUp);
         setLocalWidth((prev) => {
-          if (prev !== null) setCategoryWidth(category.id, prev);
+          if (prev !== null) setCategoryWidth(category.id, prev, inferLayoutColumns(prev, 1));
           return prev;
         });
       };
@@ -1044,7 +1054,7 @@ function SortableSubGroupBlock({
         document.removeEventListener("mousemove", handleMouseMove);
         document.removeEventListener("mouseup", handleMouseUp);
         setLocalWidth((prev) => {
-          if (prev !== null) setCategoryWidth(category.id, prev);
+          if (prev !== null) setCategoryWidth(category.id, prev, inferLayoutColumns(prev, cards.length));
           return prev;
         });
       };
@@ -1052,7 +1062,7 @@ function SortableSubGroupBlock({
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
     },
-    [category.id, setCategoryWidth]
+    [cards.length, category.id, setCategoryWidth]
   );
 
   const setRef = useCallback(
@@ -1275,7 +1285,7 @@ function SortableUngroupedBlock({
         document.removeEventListener("mousemove", handleMouseMove);
         document.removeEventListener("mouseup", handleMouseUp);
         setLocalWidth((prev) => {
-          if (prev !== null) setCategoryWidth(category.id, prev);
+          if (prev !== null) setCategoryWidth(category.id, prev, inferLayoutColumns(prev, cards.length));
           return prev;
         });
       };
@@ -1283,7 +1293,7 @@ function SortableUngroupedBlock({
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
     },
-    [category.id, setCategoryWidth]
+    [cards.length, category.id, setCategoryWidth]
   );
 
   const setRef = useCallback(

@@ -76,6 +76,12 @@ export type HideDuration = "1w" | "2w" | "1m" | "permanent";
 
 export type LinkOpenMode = "new-background-tab" | "new-active-tab" | "current-tab";
 
+export interface CategoryLayoutPreference {
+  widthPercent?: number;
+  columns?: number;
+  updatedAt: number;
+}
+
 /** A site hidden by the user from recommendations */
 export interface HiddenSite {
   siteId: string;

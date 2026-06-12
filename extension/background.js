@@ -57,7 +57,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === 'CAPTURE_GET_DESTINATIONS') {
-    getStorageValue(CAPTURE_DESTINATIONS_KEY, { updatedAt: 0, sections: [], categories: [] })
+    getStorageValue(CAPTURE_DESTINATIONS_KEY, { updatedAt: 0, activeSectionId: 'section-default', sections: [], categories: [] })
       .then(cache => sendResponse({ success: true, cache }))
       .catch(err => sendResponse({ success: false, error: err.message }));
     return true;
