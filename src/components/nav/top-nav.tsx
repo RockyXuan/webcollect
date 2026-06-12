@@ -9,6 +9,7 @@ import {
   Folder,
   Globe2,
   Home,
+  ImageIcon,
   Layers,
   Pencil,
   Plus,
@@ -36,6 +37,7 @@ interface TopNavProps {
   onAddCategory?: () => void;
   onRecycleBin?: () => void;
   onWarehouse?: () => void;
+  onShowWallpaper?: () => void;
 }
 
 type SearchPanelItem = {
@@ -82,6 +84,7 @@ export function TopNav({
   onAddCategory,
   onRecycleBin,
   onWarehouse,
+  onShowWallpaper,
 }: TopNavProps) {
   const {
     searchQuery,
@@ -427,6 +430,18 @@ export function TopNav({
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
               <span>刷新</span>
             </Button>
+            {onShowWallpaper && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onShowWallpaper}
+                className="wc-header-tool wc-header-tool-quiet"
+                title="进入壁纸模式"
+              >
+                <ImageIcon className="h-4 w-4" />
+                <span>壁纸</span>
+              </Button>
+            )}
             <Button
               variant="default"
               size="sm"

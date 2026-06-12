@@ -993,6 +993,183 @@
   color: #2563eb;
 }
 
+.wc-direct-edit-trigger {
+  border: 1px solid rgba(147, 197, 253, 0.38);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.10);
+}
+
+.wc-wallpaper-stage {
+  position: fixed;
+  inset: 0;
+  min-height: 100vh;
+  overflow: hidden;
+  background: #0b1220;
+  color: white;
+  outline: none;
+}
+
+.wc-wallpaper-image {
+  position: absolute;
+  inset: 0;
+  background-color: #0b1220;
+  background-position: center;
+  background-size: cover;
+  transform: scale(1.012);
+}
+
+.wc-wallpaper-vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(5, 10, 20, 0.10), rgba(5, 10, 20, 0.36)),
+    linear-gradient(90deg, rgba(5, 10, 20, 0.40), transparent 36%, rgba(5, 10, 20, 0.32));
+  pointer-events: none;
+}
+
+.wc-wallpaper-meta {
+  position: absolute;
+  left: clamp(1.25rem, 4vw, 4rem);
+  bottom: clamp(1.5rem, 5vw, 5rem);
+  z-index: 2;
+  max-width: min(42rem, calc(100vw - 2.5rem));
+  text-shadow: 0 2px 28px rgba(0, 0, 0, 0.45);
+}
+
+.wc-wallpaper-kicker {
+  display: inline-flex;
+  margin-bottom: 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.34);
+  padding: 0.3rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  backdrop-filter: blur(14px);
+}
+
+.wc-wallpaper-meta h1 {
+  display: -webkit-box;
+  overflow: hidden;
+  max-width: 100%;
+  font-family: var(--font-serif);
+  font-size: clamp(1.55rem, 3.6vw, 3.4rem);
+  font-weight: 900;
+  line-height: 1.02;
+  letter-spacing: 0;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.wc-wallpaper-meta p {
+  margin-top: 0.8rem;
+  max-width: 38rem;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: clamp(0.86rem, 1.4vw, 1rem);
+  font-weight: 600;
+}
+
+.wc-wallpaper-controls {
+  position: absolute;
+  right: clamp(1rem, 3vw, 2.5rem);
+  bottom: clamp(1rem, 3vw, 2.5rem);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.42);
+  padding: 0.45rem;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(20px);
+}
+
+.wc-wallpaper-control {
+  height: 2.35rem;
+  width: 2.35rem;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.wc-wallpaper-control:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: white;
+}
+
+.wc-wallpaper-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0f172a;
+  font-weight: 800;
+  box-shadow: 0 14px 42px rgba(15, 23, 42, 0.18);
+}
+
+.wc-wallpaper-primary:hover {
+  background: white;
+}
+
+.wc-wallpaper-collection-shell {
+  min-height: 100vh;
+}
+
+.wc-wallpaper-floating-return {
+  position: fixed;
+  right: 1.15rem;
+  bottom: 1.15rem;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  border: 1px solid rgba(147, 197, 253, 0.50);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 0.65rem 0.85rem;
+  color: #2563eb;
+  font-size: 0.8rem;
+  font-weight: 800;
+  box-shadow: 0 16px 42px rgba(37, 99, 235, 0.16);
+  backdrop-filter: blur(16px);
+}
+
+.wc-wallpaper-floating-return:hover {
+  background: rgba(239, 246, 255, 0.95);
+}
+
+.wc-wallpaper-setting-chip {
+  border: 1px solid rgba(203, 213, 225, 0.85);
+  border-radius: 1rem;
+  background: rgba(248, 250, 252, 0.86);
+  padding: 0.7rem 0.85rem;
+  color: #475569;
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.wc-wallpaper-setting-chip-active {
+  border-color: rgba(37, 99, 235, 0.45);
+  background: rgba(219, 234, 254, 0.86);
+  color: #1d4ed8;
+}
+
+.wc-wallpaper-select {
+  width: 100%;
+  border: 1px solid rgba(203, 213, 225, 0.86);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0.68rem 0.8rem;
+  color: #0f172a;
+  font-size: 0.9rem;
+  font-weight: 700;
+  outline: none;
+}
+
 .wc-edit-exit-chip {
   position: absolute;
   right: 1rem;

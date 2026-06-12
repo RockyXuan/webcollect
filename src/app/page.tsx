@@ -9,14 +9,19 @@ import { RecycleBinDialog } from "@/components/dialogs/recycle-bin-dialog";
 import { SectionShipDialog } from "@/components/dialogs/section-ship-dialog";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { HotRecommendation } from "@/components/hot-recommendation";
+import { WallpaperShell } from "@/components/wallpaper/wallpaper-shell";
 import { useAppStore } from "@/lib/store";
 import { useAuthStore } from "@/lib/auth-store";
-import { saveCards, saveCategories, setInitialized } from "@/lib/db";
+import { saveCards, saveCategories, setInitialized, withoutLocalChangeEvents } from "@/lib/db";
 import { restoreLatestHealthyWorkspaceIfNeeded } from "@/lib/emergency-restore";
+import { useWallpaperStore } from "@/lib/wallpaper-store";
 import type { WebCard, Category } from "@/lib/types";
 
 export default function HomePage() {
   const { loadData, isLoading, softDeleteCard, updateCard } = useAppStore();
+  const wallpaperMode = useWallpaperStore((state) => state.mode);
+  const enterCollection = useWallpaperStore((state) => state.enterCollection);
+  const returnToWallpaper = useWallpaperStore((state) => state.returnToWallpaper);
 
   const [cardDialogOpen, setCardDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -43,32 +48,29 @@ export default function HomePage() {
       }
 
       try {
-        await useAuthStore.getState().initialize();
-      } catch (error) {
-        console.error("[WebCollect] Auth initialization failed", error);
-      }
-
-      try {
         await loadData();
         const state = useAppStore.getState();
         if (!state.initialized) {
-          await setInitialized();
           if (state.cards.length === 0 && state.categories.length === 0) {
-            await saveCategories([
-              {
-                id: "cat-inbox",
-                name: "\u6536\u96c6\u7bb1",
-                icon: "inbox",
-                color: "#888888",
-                order: 99,
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-                sectionId: state.activeSectionId,
-              },
-            ]);
-            await saveCards([]);
+            await withoutLocalChangeEvents(async () => {
+              await setInitialized();
+              await saveCategories([
+                {
+                  id: "cat-inbox",
+                  name: "\u6536\u96c6\u7bb1",
+                  icon: "inbox",
+                  color: "#888888",
+                  order: 99,
+                  createdAt: Date.now(),
+                  updatedAt: Date.now(),
+                  sectionId: state.activeSectionId,
+                },
+              ]);
+              await saveCards([]);
+            });
             await loadData();
           } else {
+            await withoutLocalChangeEvents(() => setInitialized());
             useAppStore.setState({ initialized: true });
           }
         }
@@ -76,6 +78,10 @@ export default function HomePage() {
         console.error("[WebCollect] Local data initialization failed", error);
         useAppStore.setState({ isLoading: false });
       }
+
+      void useAuthStore.getState().initialize().catch((error) => {
+        console.error("[WebCollect] Auth initialization failed", error);
+      });
     };
     init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -113,24 +119,54 @@ export default function HomePage() {
     setCategoryDialogOpen(true);
   }, []);
 
+  const handleEnterCollection = useCallback(() => {
+    enterCollection();
+  }, [enterCollection]);
+
+  const handleReturnToWallpaper = useCallback(() => {
+    returnToWallpaper();
+  }, [returnToWallpaper]);
+
+  if (wallpaperMode === "wallpaper") {
+    return (
+      <WallpaperShell
+        mode={wallpaperMode}
+        onEnterCollection={handleEnterCollection}
+        onReturnToWallpaper={handleReturnToWallpaper}
+      />
+    );
+  }
+
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <WallpaperShell
+        mode={wallpaperMode}
+        onEnterCollection={handleEnterCollection}
+        onReturnToWallpaper={handleReturnToWallpaper}
+      >
+        <div className="flex min-h-screen items-center justify-center">
         <div className="wc-glass flex flex-col items-center gap-4 rounded-[28px] px-10 py-8">
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
           <p className="text-sm font-medium text-slate-500">正在整理收藏夹...</p>
         </div>
-      </div>
+        </div>
+      </WallpaperShell>
     );
   }
 
   return (
+    <WallpaperShell
+      mode={wallpaperMode}
+      onEnterCollection={handleEnterCollection}
+      onReturnToWallpaper={handleReturnToWallpaper}
+    >
     <div className="min-h-screen">
       <TopNav
         onAddCard={handleAddCard}
         onAddGroup={handleAddGroup}
         onAddCategory={handleAddCategory}
         onRecycleBin={() => setRecycleBinOpen(true)}
+        onShowWallpaper={handleReturnToWallpaper}
       />
 
       <main className="wc-shell wc-page-main space-y-7 px-5 py-7">
@@ -195,5 +231,6 @@ export default function HomePage() {
         />
       </ErrorBoundary>
     </div>
+    </WallpaperShell>
   );
 }

@@ -402,7 +402,7 @@ interface AppState {
   editMode: boolean;
 
   // Actions
-  loadData: () => Promise<void>;
+  loadData: (options?: { showLoading?: boolean }) => Promise<void>;
   setSearchQuery: (q: string) => void;
   setActiveCategory: (id: string) => void;
   setActiveSection: (id: string) => Promise<void>;
@@ -487,8 +487,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   visualScale: 100,
   linkOpenMode: "new-background-tab",
 
-  loadData: async () => {
-    set({ isLoading: true });
+  loadData: async (options) => {
+    const showLoading = options?.showLoading ?? true;
+    if (showLoading) set({ isLoading: true });
     const [storedCards, initCategories, init, hiddenSites, pinnedIds, pinnedBookmarkItems, widths, visualScale, linkOpenMode, storedSections, storedActiveSectionId, workspaceResetAt] = await Promise.all([
       getCards(),
       getCategories(),
