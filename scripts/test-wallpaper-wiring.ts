@@ -21,8 +21,13 @@ assert.ok(topNavSource.includes("壁纸"), "TopNav should show a visible wallpap
 
 assert.ok(shellSource.includes("LONG_PRESS_MS = 700"), "WallpaperShell should use the planned 700ms long press");
 assert.ok(shellSource.includes("onEnterCollection"), "WallpaperShell should enter the bookmark wall");
-assert.ok(shellSource.includes("onReturnToWallpaper"), "WallpaperShell should support long-press return from the wall");
-assert.ok(shellSource.includes("mousemove"), "WallpaperShell should wire mouse movement gestures");
+assert.ok(pageSource.includes("onShowWallpaper={handleReturnToWallpaper}"), "Web page should expose the top-nav wallpaper button");
+assert.ok(extensionSource.includes("onShowWallpaper={handleReturnToWallpaper}"), "Extension newtab should expose the top-nav wallpaper button");
+assert.equal(shellSource.includes("handleCollectionMouseMove"), false, "Collection mode must not wire mouse fling gestures");
+assert.equal(shellSource.includes("onReturnToWallpaper"), false, "WallpaperShell must not provide collection-to-Zoom gesture/button entry points");
+assert.equal(shellSource.includes("长按进入 Zoom 模式"), false, "Collection mode must not show a long-press Zoom hint");
+assert.equal(shellSource.includes("wc-zoom-idle-hint-collection"), false, "Collection mode must not show Zoom-entry idle hints");
+assert.equal(shellSource.includes("wc-wallpaper-floating-return"), false, "Collection mode must not render an extra floating wallpaper button");
 assert.ok(shellSource.includes("Space") && shellSource.includes("Enter"), "WallpaperShell should support keyboard entry");
 
 console.log("wallpaper wiring tests passed");

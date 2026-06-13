@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from "react";
-import { ImageIcon } from "lucide-react";
 import { getWallpaperQuote } from "@/lib/wallpaper-quotes";
 import { getRotationMs, selectCurrentWallpaper, useWallpaperStore } from "@/lib/wallpaper-store";
 import type { WallpaperMode, WallpaperPrefs } from "@/lib/wallpaper-types";
@@ -10,14 +9,12 @@ const LONG_PRESS_MS = 700;
 const IDLE_HINT_MS = 2000;
 const FLING_WINDOW_MS = 650;
 const FLING_DISTANCE_PX = 420;
-const FLING_EVENT_NAME = "mousemove";
 const WIKIMEDIA_PREVIEW_WIDTH = 1600;
 
 interface WallpaperShellProps {
   mode: WallpaperMode;
   children?: ReactNode;
   onEnterCollection: () => void;
-  onReturnToWallpaper: () => void;
 }
 
 type MouseSample = {
@@ -87,7 +84,6 @@ export function WallpaperShell({
   mode,
   children,
   onEnterCollection,
-  onReturnToWallpaper,
 }: WallpaperShellProps) {
   const wallpaper = useWallpaperStore(selectCurrentWallpaper);
   const prefs = useWallpaperStore((state) => state.prefs);
@@ -188,6 +184,11 @@ export function WallpaperShell({
   }, [clearIdleHint, prefs.showZoomHints]);
 
   useEffect(() => {
+    if (mode !== "wallpaper") {
+      clearIdleHint();
+      setHintVisible(false);
+      return clearIdleHint;
+    }
     scheduleIdleHint();
     return clearIdleHint;
   }, [clearIdleHint, mode, scheduleIdleHint, wallpaper.id]);
@@ -230,25 +231,6 @@ export function WallpaperShell({
     }
   }, [onEnterCollection, scheduleIdleHint]);
 
-  const handleCollectionMouseMove = useCallback((event: MouseEvent<HTMLDivElement>) => {
-    scheduleIdleHint();
-    if (event.buttons !== 0 || isInteractiveTarget(event.target)) return;
-    const now = performance.now();
-    const samples = [...mouseSamplesRef.current, { x: event.clientX, at: now }]
-      .filter((sample) => now - sample.at <= FLING_WINDOW_MS)
-      .slice(-12);
-    mouseSamplesRef.current = samples;
-
-    if (now - lastFlingAtRef.current < 1400 || samples.length < 5) return;
-    const xs = samples.map((sample) => sample.x);
-    const span = Math.max(...xs) - Math.min(...xs);
-    if (span >= FLING_DISTANCE_PX && countDirectionChanges(samples) >= 2) {
-      lastFlingAtRef.current = now;
-      mouseSamplesRef.current = [];
-      onReturnToWallpaper();
-    }
-  }, [onReturnToWallpaper, scheduleIdleHint]);
-
   const handlePrefsUpdate = useCallback((updates: Partial<WallpaperPrefs>) => {
     void updatePrefs(updates);
   }, [updatePrefs]);
@@ -259,7 +241,7 @@ export function WallpaperShell({
     handlePrefsUpdate({ showZoomHints: false });
   }, [handlePrefsUpdate]);
 
-  const hintText = mode === "wallpaper" ? "长按或左右滑动进入网页墙" : "长按进入 Zoom 模式";
+  const hintText = "长按或左右滑动进入网页墙";
 
   if (mode === "wallpaper") {
     return (
@@ -300,34 +282,8 @@ export function WallpaperShell({
   }
 
   return (
-    <div
-      className="wc-wallpaper-collection-shell"
-      data-gesture-event={FLING_EVENT_NAME}
-      onMouseMove={handleCollectionMouseMove}
-      onPointerDown={(event) => startLongPress(event, onReturnToWallpaper)}
-      onPointerCancel={clearLongPress}
-      onPointerLeave={clearLongPress}
-      onPointerUp={clearLongPress}
-    >
+    <div className="wc-wallpaper-collection-shell">
       {children}
-      {prefs.showZoomHints ? (
-        <div
-          className={`wc-zoom-idle-hint wc-zoom-idle-hint-collection ${hintVisible ? "wc-zoom-idle-hint-visible" : ""}`}
-          data-wallpaper-control
-        >
-          <span>{hintText}</span>
-          <button type="button" onClick={handleDismissHint}>不再提示</button>
-        </div>
-      ) : null}
-      <button
-        type="button"
-        className="wc-wallpaper-floating-return"
-        onClick={onReturnToWallpaper}
-        title="返回壁纸模式"
-      >
-        <ImageIcon className="h-4 w-4" />
-        <span>壁纸</span>
-      </button>
     </div>
   );
 }

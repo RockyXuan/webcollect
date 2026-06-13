@@ -202,7 +202,6 @@ export function NewTabApp() {
       <WallpaperShell
         mode={wallpaperMode}
         onEnterCollection={handleEnterCollection}
-        onReturnToWallpaper={handleReturnToWallpaper}
       />
     );
   }
@@ -212,7 +211,6 @@ export function NewTabApp() {
       <WallpaperShell
         mode={wallpaperMode}
         onEnterCollection={handleEnterCollection}
-        onReturnToWallpaper={handleReturnToWallpaper}
       >
         <div className="flex min-h-screen items-center justify-center">
           <div className="wc-glass flex flex-col items-center gap-4 rounded-[28px] px-10 py-8">
@@ -228,7 +226,6 @@ export function NewTabApp() {
     <WallpaperShell
       mode={wallpaperMode}
       onEnterCollection={handleEnterCollection}
-      onReturnToWallpaper={handleReturnToWallpaper}
     >
     <div className="min-h-screen">
       {view === "main" ? (
