@@ -1,5 +1,17 @@
 # WebCollect Task Plan
 
+## Current Task: 2026-06-14 Thread Handoff And Release Continuity
+
+- [x] Identify the correct latest source -> Verification: latest clean copy is `/private/tmp/webcollect-main-docs-rules-copy`, with `main` at `80e1d90`; old `/Users/rockyx/Documents/webcollect` is stale and dirty.
+- [x] Record the latest successful Release -> Verification: `webcollect-2026-06-13-80e1d90` has a Chrome extension asset named `WebCollect-Chrome-Extension-webcollect-2026-06-13-80e1d90.zip`.
+- [x] Record GitHub environment risk -> Verification: ordinary Terminal showed repaired auth, but Codex shell still observed token/DNS failures; next thread must preflight and stop on failure.
+- [x] Update handoff prompt for the next thread -> Verification: `HANDOFF.md` and `NEXT_THREAD_PROMPT.md` now describe latest main, Release, browser workspace rules, and next validation priorities.
+- [ ] Next thread should verify Windows install and continue product fixes -> Verification pending in new thread.
+
+## Review
+
+This task is documentation-only. It prepares a clean stage handoff so the next Codex thread does not continue from stale local code or old Release assumptions. It does not change app behavior, user data, sync logic, IndexedDB, Supabase rows, or Chrome extension runtime code.
+
 Use this file for every non-trivial task before implementation.
 
 ## Current Task: Cloud Account Snapshot Archive

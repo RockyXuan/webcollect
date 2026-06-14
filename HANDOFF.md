@@ -1,5 +1,76 @@
 # Project Handoff
 
+## 2026-06-14 Current Thread Handoff Update
+
+This update supersedes the older 2026-05-25 handoff notes when there is a conflict.
+
+### Current Known-Good Source
+
+- Remote repository: `https://github.com/RockyXuan/webcollect`
+- Correct branch for the next thread: `main`
+- Latest verified main commit at handoff time: `80e1d90 ci: fix Chrome extension release workflow`
+- Latest verified Release tag: `webcollect-2026-06-13-80e1d90`
+- Latest Chrome extension asset:
+  `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-06-13-80e1d90/WebCollect-Chrome-Extension-webcollect-2026-06-13-80e1d90.zip`
+
+Important local workspace warning:
+
+- Do not continue from `/Users/rockyx/Documents/webcollect` without first protecting its uncommitted changes. That local directory was observed to be stale and dirty: it was ahead of its old `origin/main`, missing the latest Zoom/Release commits, and had uncommitted changes in extension/auth/build files.
+- The clean copy used for the latest successful release was `/private/tmp/webcollect-main-docs-rules-copy`, with `main` aligned to `origin/main` at `80e1d90`.
+- For a new thread, the safest path is to clone or fetch a fresh copy of `main` into a new clean directory, then read this handoff and `NEXT_THREAD_PROMPT.md`.
+
+### What This Thread Completed
+
+- Merged the Zoom wallpaper/new-tab mode into the main product line.
+- Added local bundled high-quality wallpaper assets for Chrome extension startup so the new tab does not depend on a remote image before first paint.
+- Added bilingual calm quote text over Zoom mode and improved Zoom visual presentation.
+- Fixed the Chrome extension OAuth contract by stabilizing the extension ID and documenting the fixed Supabase redirect URL.
+- Fixed the Chrome extension Release workflow so GitHub Actions now produces a real `WebCollect-Chrome-Extension-*.zip` asset instead of leaving users with only GitHub's automatic Source code archives.
+- Removed accidental mouse/long-press/swing entry from the bookmark wall into Zoom mode. The only intended wall-to-Zoom entry is the explicit top/right Zoom or wallpaper button.
+- Added or preserved tests for wallpaper wiring, layout preferences, layout sizing, floating capture targets, and auth contract checks.
+
+### Current GitHub / Release Status
+
+- A GitHub Actions workflow named `WebCollect Chrome Extension Release` exists and triggers on tags matching `webcollect-*`.
+- The previous Release failure root cause was `pnpm/action-setup@v4` receiving a hardcoded `version: 10.25.0` while `package.json` declares `packageManager: pnpm@9.0.0`. The workflow was fixed by removing the hardcoded pnpm version.
+- The latest known successful workflow run produced the Release `webcollect-2026-06-13-80e1d90` with a Chrome extension zip asset.
+- The user attempted to repair GitHub CLI auth on the Mac. Terminal showed success with `repo` and `workflow` scopes stored in `/Users/rockyx/.config/gh/hosts.yml`, but Codex's sandboxed command environment still intermittently reported invalid token and DNS failures. Treat Codex GitHub/DNS status as a known environment risk and run a preflight before any GitHub work.
+
+### Required Preflight For Next Thread
+
+Run these before making code changes:
+
+```bash
+git status -sb
+git log --oneline --decorate -8
+gh auth status
+git ls-remote --heads origin main
+gh release view webcollect-2026-06-13-80e1d90 --repo RockyXuan/webcollect --json name,url,tagName,assets
+```
+
+If `gh` or DNS fails inside Codex, do not keep retrying. Report that the GitHub environment is blocked and ask the user to verify from ordinary Terminal, or use the GitHub connector only if it is clearly available.
+
+### Browser Workspace Rule
+
+- For local development previews, prefer the Codex in-app Browser / `@Browser`.
+- If Chrome is required, use the Chrome secondary window and the `Codex Workbench` tab group.
+- Do not use the user's primary Chrome window or current active tab as the task workspace.
+- If the browser context is occupied or changed by the user, return to `@Browser`, Safari, the Chrome secondary window, or `Codex Workbench`; do not repeatedly open new tabs in the user's main browser.
+
+### Recommended Next Steps
+
+1. Start from a fresh `main` checkout at or after `80e1d90`.
+2. Confirm the latest Release asset can be downloaded and loaded as an unpacked Chrome extension.
+3. On Windows, install the latest Release and retest:
+   - Zoom wallpaper randomization across multiple new tabs.
+   - Local bundled wallpaper startup speed and image clarity.
+   - Bilingual quote rendering and idle hints.
+   - Only explicit button entry from bookmark wall into Zoom mode.
+   - 2x2 / 1x4 group layout resizing and cross-device layout memory.
+   - Floating capture destination accuracy, especially saving to the selected section/group instead of the inbox.
+   - Google login and Supabase sync stability on Windows and Mac.
+4. Keep user data safety first: do not clear, reseed, overwrite, or push default/empty data over cloud data unless the user explicitly chooses the destructive reset flow.
+
 Generated on 2026-05-25 for the WebCollect handoff from the Windows Codex thread to a new development thread.
 
 ## 1. Project Snapshot

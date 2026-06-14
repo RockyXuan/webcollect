@@ -1,15 +1,40 @@
-这是一个新的 Codex 线程，请继续开发 RockyXuan/webcollect。
+这是一个新的 Codex 线程，请继续开发 RockyXuan/webcollect。请先完成接手检查，再决定是否继续开发。
 
-请先阅读仓库里的 `HANDOFF.md`，再检查当前代码状态，不要只依赖旧聊天记忆。请至少先运行 `git status -sb`，确认当前分支、未提交改动、远端和最近提交；如果 `HANDOFF.md` 和实际代码或 git 状态冲突，以当前代码和 git 状态为准。
+第一步必须做：
 
-请注意：
+1. 先阅读 `HANDOFF.md`、`NEXT_THREAD_PROMPT.md`、`AGENTS.md`、`tasks/lessons.md`、`tasks/todo.md`。
+2. 运行并汇报：`git status -sb`、`git log --oneline --decorate -8`。
+3. 确认当前目录是否是最新 `main`。不要从旧的 `/Users/rockyx/Documents/webcollect` 脏目录直接继续，除非已经保护并理解其中未提交改动。
+4. 检查最新 Release：`webcollect-2026-06-13-80e1d90`。Chrome 扩展 zip 应为：
+   `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-06-13-80e1d90/WebCollect-Chrome-Extension-webcollect-2026-06-13-80e1d90.zip`
+5. 运行 GitHub 预检：`gh auth status`、`git ls-remote --heads origin main`。如果 Codex 内部出现 token invalid 或 DNS 解析失败，不要反复重试；直接告诉用户 GitHub 环境被阻塞。
 
-- 不要覆盖、回滚或删除用户未提交改动。
-- 不要提交真实密钥、token、cookie、`.env*`、浏览器资料、旧线程导出文件或 `tmp/` 草稿。
-- 开始大改前先确认当前项目状态，尤其是同步、快照、Supabase schema、扩展构建和 UI 样式是否仍一致。
-- 优先阅读 `AGENTS.md`、`tasks/lessons.md`、`tasks/todo.md`，再按 `HANDOFF.md` 的 `Recommended Next Steps` 接着做。
-- 数据安全优先：不要把默认/空/错乱本地数据覆盖到云端；不要把 Homely 旧导入数据当成 WebCollect 最新恢复源，除非用户明确要求。
-- Web 端重要 `wc-*` 样式改动通常也要同步到 `extension/src/extension.css`。
-- 做完改动后至少运行：`corepack pnpm ts-check`、`corepack pnpm lint`、`corepack pnpm build:ext`、`corepack pnpm exec next build --webpack`、`git diff --check`。不要假装运行过未运行的验证。
+浏览器工作区规则：
 
-当前接手建议：先确认 `ai-next-fixes` 分支是否已拉到最新，再验证搜索、全局收藏栏、编辑模式果冻浮层、悬浮采集按钮、云端手动保存/版本回档和扩展新标签页。
+- 本地开发和 localhost 预览优先使用 `@Browser` / Codex in-app Browser。
+- 必须使用 Chrome 时，优先使用 Chrome 辅窗口中的 `Codex Workbench` 标签组。
+- 不要把用户主用 Chrome 窗口或当前活动标签页当作任务现场。
+- 如果浏览器上下文被用户切换或占用，不要连续打开新标签页恢复；回到 `@Browser`、Safari、Chrome 辅窗口或 `Codex Workbench`。
+
+当前已知状态：
+
+- 最新远端主线：`main` at `80e1d90 ci: fix Chrome extension release workflow`。
+- 最新成功 Release：`webcollect-2026-06-13-80e1d90`。
+- Release workflow 的关键修复：删除 `pnpm/action-setup@v4` 中硬编码的 `version: 10.25.0`，让它使用 `package.json` 的 `pnpm@9.0.0`。
+- Zoom 模式已合入主线，且从收藏墙进入 Zoom 模式应只通过显式按钮，不再通过长按、鼠标甩动或墙面鼠标操作触发。
+
+下一阶段优先事项：
+
+1. Windows 安装最新 Release 后复测 Chrome 扩展。
+2. 验证 Zoom 壁纸是否多图随机，而不是每次同一张。
+3. 验证本地高清壁纸秒开、文字/提示完整、图片不再黑框慢加载。
+4. 修复或验证分组布局：4 张卡片默认 2x2，拉宽可 1x4，布局偏好可跨 Mac/Windows 记忆。
+5. 排查悬浮采集保存目标错误：用户选择的目标组必须被尊重，不能默认落入截流收集箱/收集箱。
+6. 继续把同步稳定性当作底线：任何改动都不能让默认/空/旧数据覆盖用户云端真实数据。
+
+开发与交付规则：
+
+- 数据安全第一，不删除、不覆盖用户收藏、分类、IndexedDB、Supabase 数据。
+- 每次修改后直接同步到 `main`，不要让用户理解分支细节。
+- 涉及 Chrome 扩展可测试版本时，必须给用户最新 Release 页面和 Chrome 扩展 zip 直链。
+- 如果 GitHub / Release / Actions 无法验证，必须明确说明卡点，不要把旧 Release 当新版交付。
