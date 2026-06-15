@@ -5,11 +5,6 @@ import { useAppStore } from "@/lib/store";
 import { InlineEditableText } from "@/components/ui/inline-editable-text";
 import { EditActionDock, type EditAction } from "@/components/ui/edit-action-dock";
 import { WebCardItem } from "@/components/card/web-card";
-import {
-  getSearchMatchedCardIds,
-  getSearchMatchedCategoryIds,
-  searchWorkspace,
-} from "@/lib/workspace-search";
 import { Pencil, PencilOff, Plus, GripVertical, ArrowUpFromLine, ArrowDownFromLine, Folder, Layers, Trash2, Send, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -123,27 +118,6 @@ export function getSmartChildStyle(widthPercent: number | null, cardCount: numbe
   };
 }
 
-function DirectEditButton({
-  label,
-  onClick,
-}: {
-  label: string;
-  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
-}) {
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className="wc-direct-edit-trigger h-7 w-7 shrink-0 rounded-full p-0 text-slate-500 hover:bg-white/80 hover:text-blue-600 animate-in fade-in duration-200"
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-    >
-      <Pencil className="w-2.5 h-2.5" />
-    </Button>
-  );
-}
-
 // ============ Props ============
 interface SortableGridProps {
   onAddCard?: (categoryId?: string) => void;
@@ -169,10 +143,8 @@ export function SortableGrid({
   const {
     cards,
     categories,
-    sections,
     activeSectionId,
     editMode,
-    searchQuery,
     moveCard,
     moveCategoryToParent,
     detachCategoryFromParent,
@@ -193,77 +165,35 @@ export function SortableGrid({
     return categories.filter((c) => (c.sectionId || "section-default") === activeSectionId);
   }, [categories, activeSectionId]);
 
-  const trimmedSearchQuery = searchQuery.trim();
-  const searchResults = useMemo(
-    () => (
-      trimmedSearchQuery
-        ? searchWorkspace({ cards, categories, sections }, trimmedSearchQuery)
-        : null
-    ),
-    [cards, categories, sections, trimmedSearchQuery]
-  );
-  const matchedCardIds = useMemo(
-    () => (searchResults ? getSearchMatchedCardIds(searchResults) : new Set<string>()),
-    [searchResults]
-  );
-  const matchedCategoryIds = useMemo(
-    () => (searchResults ? getSearchMatchedCategoryIds(searchResults) : new Set<string>()),
-    [searchResults]
-  );
-
-  const categoryHasSearchMatch = useCallback(
-    (category: Category) => {
-      if (!searchResults) return true;
-      if (matchedCategoryIds.has(category.id)) return true;
-      if (cards.some((card) => card.categoryId === category.id && matchedCardIds.has(card.id))) return true;
-      return visibleCategories.some(
-        (child) =>
-          child.parentId === category.id &&
-          (matchedCategoryIds.has(child.id) ||
-            cards.some((card) => card.categoryId === child.id && matchedCardIds.has(card.id)))
-      );
-    },
-    [cards, matchedCardIds, matchedCategoryIds, searchResults, visibleCategories]
-  );
-
   // Build hierarchy
   // Parent categories: explicitly marked isParent OR has sub-groups
   const parentCategories = useMemo(() => {
     return visibleCategories
       .filter((c) => !c.parentId && (c.isParent || visibleCategories.some((sg) => sg.parentId === c.id)))
-      .filter(categoryHasSearchMatch)
       .sort((a, b) => a.order - b.order);
-  }, [categoryHasSearchMatch, visibleCategories]);
+  }, [visibleCategories]);
 
   // Standalone (ungrouped): no parentId, not a parent, no sub-groups
   const standaloneCategories = useMemo(() => {
     return visibleCategories
       .filter((c) => !c.parentId && !c.isParent && !visibleCategories.some((sg) => sg.parentId === c.id))
-      .filter(categoryHasSearchMatch)
       .sort((a, b) => a.order - b.order);
-  }, [categoryHasSearchMatch, visibleCategories]);
+  }, [visibleCategories]);
 
   const getSubGroups = useCallback(
     (parentId: string) =>
       visibleCategories
         .filter((c) => c.parentId === parentId)
-        .filter((category) => !searchResults || matchedCategoryIds.has(parentId) || categoryHasSearchMatch(category))
         .sort((a, b) => a.order - b.order),
-    [categoryHasSearchMatch, matchedCategoryIds, searchResults, visibleCategories]
+    [visibleCategories]
   );
 
   const getCardsForCategory = useCallback(
-    (categoryId: string) => {
-      const filtered = cards
+    (categoryId: string) =>
+      cards
         .filter((c) => c.categoryId === categoryId)
-        .sort((a, b) => a.order - b.order);
-      if (!searchResults) return filtered;
-      if (matchedCategoryIds.has(categoryId)) return filtered;
-      const category = categories.find((item) => item.id === categoryId);
-      if (category?.parentId && matchedCategoryIds.has(category.parentId)) return filtered;
-      return filtered.filter((card) => matchedCardIds.has(card.id));
-    },
-    [cards, categories, matchedCardIds, matchedCategoryIds, searchResults]
+        .sort((a, b) => a.order - b.order),
+    [cards]
   );
 
   const parentSortableIds = useMemo(
@@ -582,6 +512,7 @@ export function SortableGrid({
                           editMode={editMode}
                           onEditCategory={onEditCategory}
                           onAddCard={onAddCard}
+                          onAddGroup={onAddGroup}
                           onEditCard={onEditCard}
                           onDeleteCard={onDeleteCard}
                           onDetach={() => detachCategoryFromParent(sub.id)}
@@ -658,6 +589,7 @@ export function SortableGrid({
                       editMode={editMode}
                       onEditCategory={onEditCategory}
                       onAddCard={onAddCard}
+                      onAddGroup={onAddGroup}
                       onEditCard={onEditCard}
                       onDeleteCard={onDeleteCard}
                       onPromoteToParent={promoteToParent}
@@ -799,6 +731,15 @@ function SortableCategoryBlock({
   );
 
   const categoryActions: EditAction[] = [
+    {
+      id: "edit",
+      label: "编辑分类",
+      icon: Pencil,
+      onSelect: () => {
+        if (!globalEditMode) toggleEditMode();
+        onEditCategory?.(category);
+      },
+    },
     ...(isParent ? [{ id: "add-group", label: "添加分组", icon: Layers, onSelect: () => onAddGroup?.(category.id) }] : []),
     { id: "add-card", label: "添加网页", icon: Plus, onSelect: () => onAddCard?.() },
     { id: "ship", label: "飞到其他分项", icon: Send, onSelect: () => onShipCategory?.(category) },
@@ -808,7 +749,6 @@ function SortableCategoryBlock({
 
   const handleDockTriggerClick = (event: React.MouseEvent) => {
     event.stopPropagation();
-    if (!globalEditMode) toggleEditMode();
   };
 
   return (
@@ -850,15 +790,6 @@ function SortableCategoryBlock({
           editMode={editMode}
           onSave={(newName) => updateCategory({ ...category, name: newName })}
         />
-        {(isHeaderHovered || globalEditMode) && (
-          <DirectEditButton
-            label="编辑分类"
-            onClick={(event) => {
-              event.stopPropagation();
-              onEditCategory?.(category);
-            }}
-          />
-        )}
         {(isHeaderHovered || globalEditMode) && (
           <EditActionDock
             actions={categoryActions}
@@ -991,6 +922,7 @@ interface SortableSubGroupBlockProps {
   editMode: boolean;
   onEditCategory?: (category: Category) => void;
   onAddCard?: (categoryId?: string) => void;
+  onAddGroup?: (parentId?: string) => void;
   onEditCard?: (card: WebCard) => void;
   onDeleteCard?: (card: WebCard) => void;
   onDetach?: () => void;
@@ -1005,6 +937,7 @@ function SortableSubGroupBlock({
   editMode,
   onEditCategory,
   onAddCard,
+  onAddGroup,
   onEditCard,
   onDeleteCard,
   onDetach,
@@ -1074,6 +1007,15 @@ function SortableSubGroupBlock({
   );
 
   const groupActions: EditAction[] = [
+    {
+      id: "edit",
+      label: "编辑分组",
+      icon: Pencil,
+      onSelect: () => {
+        if (!globalEditMode) toggleEditMode();
+        onEditCategory?.(category);
+      },
+    },
     { id: "add-card", label: "添加网页", icon: Plus, onSelect: () => onAddCard?.(category.id) },
     { id: "promote", label: "升级为分类", icon: ArrowUpFromLine, onSelect: () => onDetach?.() },
     { id: "ship", label: "飞到其他分项", icon: Send, onSelect: () => onShipCategory?.(category) },
@@ -1082,7 +1024,6 @@ function SortableSubGroupBlock({
 
   const handleDockTriggerClick = (event: React.MouseEvent) => {
     event.stopPropagation();
-    if (!globalEditMode) toggleEditMode();
   };
 
   const style: React.CSSProperties = {
@@ -1130,15 +1071,6 @@ function SortableSubGroupBlock({
         <span className="shrink-0 text-xs text-slate-400">
           ({cards.length})
         </span>
-        {(isHeaderHovered || globalEditMode) && (
-          <DirectEditButton
-            label="编辑分组"
-            onClick={(event) => {
-              event.stopPropagation();
-              onEditCategory?.(category);
-            }}
-          />
-        )}
 
         {(isHeaderHovered || globalEditMode) && (
           <EditActionDock
@@ -1175,6 +1107,7 @@ function SortableSubGroupBlock({
               onDelete={() => onDeleteCard?.(card)}
               onUpdateCard={onUpdateCard}
               onShip={() => onShipCard?.(card)}
+              onCreateGroup={() => onAddGroup?.(category.parentId)}
             />
           ))}
           {cards.length === 0 && (
@@ -1222,6 +1155,7 @@ interface SortableUngroupedBlockProps {
   editMode: boolean;
   onEditCategory?: (category: Category) => void;
   onAddCard?: (categoryId?: string) => void;
+  onAddGroup?: (parentId?: string) => void;
   onEditCard?: (card: WebCard) => void;
   onDeleteCard?: (card: WebCard) => void;
   onPromoteToParent?: (categoryId: string) => void;
@@ -1236,6 +1170,7 @@ function SortableUngroupedBlock({
   editMode,
   onEditCategory,
   onAddCard,
+  onAddGroup,
   onEditCard,
   onDeleteCard,
   onPromoteToParent,
@@ -1305,6 +1240,15 @@ function SortableUngroupedBlock({
   );
 
   const groupActions: EditAction[] = [
+    {
+      id: "edit",
+      label: "编辑分组",
+      icon: Pencil,
+      onSelect: () => {
+        if (!globalEditMode) toggleEditMode();
+        onEditCategory?.(category);
+      },
+    },
     { id: "add-card", label: "添加网页", icon: Plus, onSelect: () => onAddCard?.(category.id) },
     { id: "promote", label: "升级为分类", icon: ArrowUpFromLine, onSelect: () => onPromoteToParent?.(category.id) },
     { id: "ship", label: "飞到其他分项", icon: Send, onSelect: () => onShipCategory?.(category) },
@@ -1313,7 +1257,6 @@ function SortableUngroupedBlock({
 
   const handleDockTriggerClick = (event: React.MouseEvent) => {
     event.stopPropagation();
-    if (!globalEditMode) toggleEditMode();
   };
 
   const style: React.CSSProperties = {
@@ -1361,15 +1304,6 @@ function SortableUngroupedBlock({
         <span className="shrink-0 text-xs text-slate-400">
           ({cards.length})
         </span>
-        {(isHeaderHovered || globalEditMode) && (
-          <DirectEditButton
-            label="编辑分组"
-            onClick={(event) => {
-              event.stopPropagation();
-              onEditCategory?.(category);
-            }}
-          />
-        )}
 
         {(isHeaderHovered || globalEditMode) && (
           <EditActionDock
@@ -1406,6 +1340,7 @@ function SortableUngroupedBlock({
               onDelete={() => onDeleteCard?.(card)}
               onUpdateCard={onUpdateCard}
               onShip={() => onShipCard?.(card)}
+              onCreateGroup={() => onAddGroup?.()}
             />
           ))}
           {cards.length === 0 && (
@@ -1455,6 +1390,7 @@ interface SortableCardProps {
   onDelete: () => void;
   onUpdateCard?: (card: WebCard) => void;
   onShip?: () => void;
+  onCreateGroup?: () => void;
 }
 
 function SortableCard({
@@ -1465,6 +1401,7 @@ function SortableCard({
   onDelete,
   onUpdateCard,
   onShip,
+  onCreateGroup,
 }: SortableCardProps) {
   const {
     attributes,
@@ -1492,6 +1429,7 @@ function SortableCard({
         onShip={onShip}
         onUpdateCard={onUpdateCard}
         dragListeners={{ ...attributes, ...listeners }}
+        onCreateGroup={onCreateGroup}
       />
     </div>
   );

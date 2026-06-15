@@ -20,6 +20,8 @@ import {
   LayoutGrid,
   Mail,
   MapPinned,
+  ArrowUpFromLine,
+  MoreHorizontal,
   Pencil,
   Puzzle,
   Search as SearchIcon,
@@ -32,7 +34,7 @@ import {
 import type { WebCard } from "@/lib/types";
 import { openWebCollectUrl } from "@/lib/platform";
 import { useAppStore } from "@/lib/store";
-import type { EditAction } from "@/components/ui/edit-action-dock";
+import { EditActionDock, type EditAction } from "@/components/ui/edit-action-dock";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
 interface WebCardItemProps {
@@ -42,6 +44,7 @@ interface WebCardItemProps {
   onEdit: () => void;
   onDelete: () => void;
   onShip?: () => void;
+  onCreateGroup?: () => void;
   dragListeners?: React.HTMLAttributes<HTMLElement> | null;
   onUpdateCard?: (card: WebCard) => void;
 }
@@ -242,6 +245,7 @@ export function WebCardItem({
   onEdit,
   onDelete,
   onShip,
+  onCreateGroup,
   dragListeners,
   onUpdateCard,
 }: WebCardItemProps) {
@@ -334,6 +338,7 @@ export function WebCardItem({
 
   const cardActions: EditAction[] = [
     { id: "edit", label: "编辑详情", icon: Pencil, onSelect: onEdit },
+    ...(onCreateGroup ? [{ id: "create-group", label: "新建分组", icon: ArrowUpFromLine, onSelect: onCreateGroup }] : []),
     ...(onShip ? [{ id: "ship", label: "飞到其他编组", icon: Send, onSelect: onShip }] : []),
     { id: "delete", label: "删除网页", icon: Trash2, tone: "danger" as const, onSelect: onDelete },
   ];
@@ -424,55 +429,38 @@ export function WebCardItem({
         )}
       </div>
 
-      {/* Floating action dock in edit mode */}
-      {editMode && (
-        <div
-          className="wc-site-action-dock"
-          role="toolbar"
-          aria-label="网页操作"
-          onClick={(event) => event.stopPropagation()}
-          onPointerDown={(event) => event.stopPropagation()}
-        >
-          {cardActions.map((action) => {
-            const Icon = action.icon;
-            return (
-              <button
-                key={action.id}
-                type="button"
-                className={`wc-edit-dock-button ${action.tone === "danger" ? "wc-edit-dock-button-danger" : ""}`}
-                disabled={action.disabled}
-                title={action.label}
-                aria-label={action.label}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  action.onSelect();
-                }}
-              >
-                <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-              </button>
-            );
-          })}
-        </div>
-      )}
+      <EditActionDock
+        actions={cardActions}
+        align="card"
+        trigger={
+          <button
+            type="button"
+            className="wc-site-edit-trigger"
+            onClick={(event) => event.stopPropagation()}
+            title="网页更多操作"
+            aria-label="网页更多操作"
+          >
+            <MoreHorizontal className="h-3.5 w-3.5" />
+          </button>
+        }
+      />
 
       {/* External link icon on hover (non-edit mode) */}
       {!editMode && (
-        <>
-          <ExternalLink className="h-3 w-3 flex-shrink-0 text-slate-300/0 transition-colors group-hover:text-blue-400/80" />
-          <button
-            type="button"
-            className={`wc-site-pin ${isPinnedBookmark ? "wc-site-pin-active" : ""}`}
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              togglePinBookmark(card.id);
-            }}
-            title={isPinnedBookmark ? "取消固定到顶部收藏栏" : "固定到顶部收藏栏"}
-          >
-            <Star className={`h-3.5 w-3.5 ${isPinnedBookmark ? "fill-current" : ""}`} />
-          </button>
-        </>
+        <ExternalLink className="h-3 w-3 flex-shrink-0 text-slate-300/0 transition-colors group-hover:text-blue-400/80" />
       )}
+      <button
+        type="button"
+        className={`wc-site-pin ${isPinnedBookmark ? "wc-site-pin-active" : ""}`}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          togglePinBookmark(card.id);
+        }}
+        title={isPinnedBookmark ? "取消固定到顶部收藏栏" : "固定到顶部收藏栏"}
+      >
+        <Star className={`h-3.5 w-3.5 ${isPinnedBookmark ? "fill-current" : ""}`} />
+      </button>
     </div>
   );
 

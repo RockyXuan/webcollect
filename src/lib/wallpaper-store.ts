@@ -7,10 +7,11 @@ import {
   FALLBACK_WALLPAPERS,
   cacheWallpaperImages,
   fetchRemoteWallpapers,
+  getWallpaperCacheBatch,
   getRandomWallpaper,
   getRotationMs,
-  isPackagedWallpaper,
   mergeWallpaperLibrary,
+  pickWallpaperAfterRefresh,
   pruneWallpaperLibrary,
   shouldRefreshWallpapers,
 } from "./wallpaper-sources";
@@ -29,7 +30,7 @@ interface WallpaperState {
   nextWallpaper: () => Promise<void>;
   togglePaused: () => Promise<void>;
   updatePrefs: (prefs: Partial<WallpaperPrefs>) => Promise<void>;
-  refreshOnlineWallpapers: (options?: { force?: boolean }) => Promise<void>;
+  refreshOnlineWallpapers: (options?: { force?: boolean; selectFresh?: boolean }) => Promise<void>;
   cacheCurrentAndNext: () => Promise<void>;
 }
 
@@ -58,12 +59,9 @@ export const useWallpaperStore = create<WallpaperState>((set, get) => ({
     const wallpapers = pruneWallpaperLibrary(mergeWallpaperLibrary(FALLBACK_WALLPAPERS, storedLibrary));
     const preferredCurrent = getRandomWallpaper(wallpapers, prefs.currentWallpaperId)
       || getCurrentWallpaper(wallpapers, prefs.currentWallpaperId);
-    const current = preferredCurrent && isPackagedWallpaper(preferredCurrent)
-      ? preferredCurrent
-      : FALLBACK_WALLPAPERS.find(isPackagedWallpaper) || FALLBACK_WALLPAPERS[0];
     const nextPrefs = {
       ...prefs,
-      currentWallpaperId: current?.id || FALLBACK_WALLPAPERS[0]?.id || null,
+      currentWallpaperId: preferredCurrent?.id || FALLBACK_WALLPAPERS[0]?.id || null,
     };
 
     set({
@@ -118,6 +116,7 @@ export const useWallpaperStore = create<WallpaperState>((set, get) => ({
 
   refreshOnlineWallpapers: async (options) => {
     const state = get();
+    if (state.isRefreshing) return;
     if (!options?.force && !shouldRefreshWallpapers(state.prefs)) return;
     if (!state.prefs.autoUpdate && !options?.force) return;
 
@@ -125,7 +124,14 @@ export const useWallpaperStore = create<WallpaperState>((set, get) => ({
     try {
       const remote = await fetchRemoteWallpapers(state.prefs.enabledCategories);
       const wallpapers = pruneWallpaperLibrary(mergeWallpaperLibrary(state.wallpapers, remote));
-      const prefs = { ...state.prefs, lastRemoteRefreshAt: Date.now() };
+      const refreshedCurrent = remote.length > 0 && (options?.force || options?.selectFresh || state.mode === "wallpaper")
+        ? pickWallpaperAfterRefresh(wallpapers, state.prefs.currentWallpaperId, remote)
+        : null;
+      const prefs = {
+        ...state.prefs,
+        currentWallpaperId: refreshedCurrent?.id || state.prefs.currentWallpaperId,
+        lastRemoteRefreshAt: Date.now(),
+      };
       set({ wallpapers, prefs, isRefreshing: false, error: null });
       await Promise.all([
         saveWallpaperLibrary(wallpapers),
@@ -140,9 +146,7 @@ export const useWallpaperStore = create<WallpaperState>((set, get) => ({
 
   cacheCurrentAndNext: async () => {
     const state = get();
-    const current = getCurrentWallpaper(state.wallpapers, state.prefs.currentWallpaperId);
-    const next = getRandomWallpaper(state.wallpapers, current.id);
-    await cacheWallpaperImages(next ? [current, next] : [current]);
+    await cacheWallpaperImages(getWallpaperCacheBatch(state.wallpapers, state.prefs.currentWallpaperId));
   },
 }));
 

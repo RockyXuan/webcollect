@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from "react";
 import { getWallpaperQuote } from "@/lib/wallpaper-quotes";
 import { getRotationMs, selectCurrentWallpaper, useWallpaperStore } from "@/lib/wallpaper-store";
+import { WALLPAPER_BACKGROUND_CHECK_MS } from "@/lib/wallpaper-sources";
 import type { WallpaperMode, WallpaperPrefs } from "@/lib/wallpaper-types";
 
 const LONG_PRESS_MS = 700;
@@ -90,6 +91,7 @@ export function WallpaperShell({
   const initialize = useWallpaperStore((state) => state.initialize);
   const nextWallpaper = useWallpaperStore((state) => state.nextWallpaper);
   const updatePrefs = useWallpaperStore((state) => state.updatePrefs);
+  const refreshOnlineWallpapers = useWallpaperStore((state) => state.refreshOnlineWallpapers);
   const [fullImageLoaded, setFullImageLoaded] = useState(false);
   const [hintVisible, setHintVisible] = useState(false);
   const longPressTimerRef = useRef<number | null>(null);
@@ -102,6 +104,31 @@ export function WallpaperShell({
   useEffect(() => {
     void initialize();
   }, [initialize]);
+
+  useEffect(() => {
+    if (mode !== "wallpaper") return;
+
+    const refreshIfOnline = () => {
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+      void refreshOnlineWallpapers({ selectFresh: true });
+    };
+
+    refreshIfOnline();
+    const interval = window.setInterval(refreshIfOnline, WALLPAPER_BACKGROUND_CHECK_MS);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") refreshIfOnline();
+    };
+
+    window.addEventListener("focus", refreshIfOnline);
+    window.addEventListener("online", refreshIfOnline);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshIfOnline);
+      window.removeEventListener("online", refreshIfOnline);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [mode, refreshOnlineWallpapers]);
 
   useEffect(() => {
     if (mode !== "wallpaper" || prefs.paused) return;

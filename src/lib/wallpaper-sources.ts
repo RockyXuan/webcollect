@@ -4,7 +4,9 @@ import { WALLPAPER_CATEGORIES, type WallpaperCategory, type WallpaperItem, type 
 export const WALLPAPER_REMOTE_LIMIT = 24;
 export const WALLPAPER_CURATED_MIN = 12;
 export const WALLPAPER_LIBRARY_LIMIT = WALLPAPER_REMOTE_LIMIT + WALLPAPER_CURATED_MIN;
-export const WALLPAPER_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
+export const WALLPAPER_REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000;
+export const WALLPAPER_BACKGROUND_CHECK_MS = 30 * 60 * 1000;
+export const WALLPAPER_CACHE_LIMIT = 8;
 export const ZOOM_WALLPAPER_MIN_WIDTH = 3000;
 export const ZOOM_WALLPAPER_MIN_HEIGHT = 1600;
 export const ZOOM_WALLPAPER_MIN_RATIO = 1.45;
@@ -183,6 +185,34 @@ export function getRandomWallpaper(items: WallpaperItem[], currentId: string | n
   return pool[Math.floor(Math.random() * pool.length)] || null;
 }
 
+export function pickWallpaperAfterRefresh(
+  items: WallpaperItem[],
+  currentId: string | null,
+  incoming: WallpaperItem[]
+): WallpaperItem | null {
+  const incomingIds = new Set(incoming.map((item) => item.id));
+  const freshPool = items.filter((item) => incomingIds.has(item.id));
+  return getRandomWallpaper(freshPool.length > 0 ? freshPool : items, currentId);
+}
+
+export function getWallpaperCacheBatch(
+  items: WallpaperItem[],
+  currentId: string | null,
+  limit = WALLPAPER_CACHE_LIMIT
+): WallpaperItem[] {
+  if (items.length === 0 || limit <= 0) return [];
+  const current = currentId ? items.find((item) => item.id === currentId) : null;
+  const ordered = current
+    ? [current, ...items.filter((item) => item.id !== current.id)]
+    : items;
+  const seen = new Set<string>();
+  return ordered.filter((item) => {
+    if (seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  }).slice(0, limit);
+}
+
 export function isPackagedWallpaper(item: WallpaperItem): boolean {
   return item.imageUrl.startsWith("/assets/wallpapers/");
 }
@@ -259,7 +289,7 @@ function mapNasaItem(rawItem: unknown, now: number): WallpaperItem[] {
     category: inferCategory(title),
     quality: "remote",
     sourceCollection: "NASA Image and Video Library",
-    quoteId: "quiet-horizon",
+    quoteId: inferQuoteId(title, "NASA Image and Video Library"),
     fetchedAt: now,
   }];
 }
@@ -301,6 +331,7 @@ function mapWikimediaPage(page: unknown, now: number): WallpaperItem[] {
   const imageUrl = normalizeUrl(asString(imageInfo.url));
   const thumbUrl = normalizeUrl(asString(imageInfo.thumburl) || imageUrl);
   if (!imageUrl) return [];
+  const sourceCollection = inferSourceCollection(imageInfo);
   return [{
     id: `wikimedia-${asString(page.pageid) || title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 64)}`,
     title,
@@ -314,8 +345,8 @@ function mapWikimediaPage(page: unknown, now: number): WallpaperItem[] {
     height: asNumber(imageInfo.height),
     category: inferCategory(title),
     quality: inferQuality(imageInfo),
-    sourceCollection: inferSourceCollection(imageInfo),
-    quoteId: "quiet-horizon",
+    sourceCollection,
+    quoteId: inferQuoteId(title, sourceCollection),
     fetchedAt: now,
   }];
 }
@@ -333,6 +364,19 @@ function inferCategory(value: string): WallpaperCategory {
   if (/(storm|cloud|volcano|lava|weather|lightning)/.test(text)) return "weather";
   if (/(animal|bird|deer|gazelle|eagle|ibex|lion|wolf|wildlife|serengeti)/.test(text)) return "animals";
   return "landscape";
+}
+
+export function inferQuoteId(value: string, sourceCollection = ""): string {
+  const titleText = value.toLowerCase();
+  const collectionText = sourceCollection.toLowerCase();
+  if (/(ocean|sea|coast|lake|river|bay|fjord|island|fisherman|reflection)/.test(titleText)) return "water-still";
+  if (/(animal|bird|deer|gazelle|eagle|ibex|lion|wolf|jackal|wildlife|serengeti|flamingo|turaco|roller)/.test(titleText)) return "patient-life";
+  if (/(city|market|church|temple|palace|bridge|tower|munich|taipei|monument)/.test(titleText)) return "city-dawn";
+  if (/(volcano|lava|fire|kilauea|storm|lightning)/.test(titleText) || /(usgs|noaa)/.test(collectionText)) return "earth-fire";
+  if (/(satellite|earth|aerial|glacier|blue marble|greenland)/.test(titleText)) return "single-earth";
+  if (/(galaxy|nebula|space|milky|hubble|webb|cosmic|carina)/.test(titleText) || /(nasa|esa|hubble)/.test(collectionText)) return "cosmic-patience";
+  if (/(mountain|stone|cliff|gorge|geopark|valley|piana|tarn|lofoten|forest)/.test(titleText)) return "mountain-rain";
+  return "quiet-horizon";
 }
 
 function inferQuality(imageInfo: Record<string, unknown>): WallpaperItem["quality"] {
@@ -362,7 +406,7 @@ export async function cacheWallpaperImages(items: WallpaperItem[]): Promise<void
   try {
     const cache = await caches.open("webcollect-wallpapers-v1");
     await Promise.allSettled(
-      items.slice(0, 2).map(async (item) => {
+      items.slice(0, WALLPAPER_CACHE_LIMIT).map(async (item) => {
         const response = await fetch(item.imageUrl, { mode: "no-cors", cache: "force-cache" });
         if (response.ok || response.type === "opaque") {
           await cache.put(item.imageUrl, response);

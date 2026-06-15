@@ -1,5 +1,38 @@
 # WebCollect Task Plan
 
+## Current Task: Expand Wallpaper Library And Background Refresh
+
+- [x] Preserve current wallpaper/bookmark behavior boundaries -> Verification: this task only adds wallpaper store/shell/data/test/asset changes on top of the existing uncommitted UI search/menu work.
+- [x] Fix refresh root causes -> Verification: remote/curated wallpapers can become the current wallpaper, refresh checks run from wallpaper mode on startup/focus/online/interval, and cached local image coverage increases beyond current+next.
+- [x] Expand local packaged fallback set -> Verification: 8 files exist in `public/assets/wallpapers` and `extension/dist/assets/wallpapers`; the curated registry points those packaged entries to local `/assets/wallpapers/...` URLs.
+- [x] Improve quote/image matching -> Verification: additional quote IDs exist and curated/remote inference maps space, water, mountain, city, animal, and earth/fire scenes to more fitting bilingual quotes.
+- [x] Run focused tests and rendered verification -> Verification: wallpaper data/wiring tests, `ts-check`, `lint`, `build:ext`, `git diff --check`, and Browser smoke check pass.
+
+## Review
+
+Wallpaper rotation is no longer restricted to packaged images on startup, so remote curated/fetched images can become the active wallpaper. Online refresh now checks from wallpaper mode on startup, focus, visibility return, network return, and a 30-minute background cadence while respecting a 6-hour refresh gate. Successful remote refreshes prefer a newly fetched wallpaper, and local browser caching now covers up to 8 images instead of only current+next. Two curated Wikimedia/USGS images were downloaded into `public/assets/wallpapers`, bringing the packaged fallback and extension build output to 8 images. Quote matching now includes additional bilingual quote IDs and uses title-first inference so source names such as “Wiki Loves Earth” do not misclassify animal photos. Verified with focused wallpaper scripts, static checks, extension build, diff check, and an in-app Browser wallpaper smoke check showing a remote NASA wallpaper with no console errors.
+
+## Current Task: Keep Header Search From Filtering Wall
+
+- [x] Remove wall-level search filtering from `SortableGrid` -> Verification: typing in the header search no longer changes which categories, groups, or cards render in the wall.
+- [x] Preserve the header search panel behavior -> Verification: `TopNav` still uses `searchWorkspace` for dropdown suggestions and target navigation.
+- [x] Run static and rendered verification -> Verification: type/lint/build checks pass and Browser confirms wall counts stay stable while search results open.
+
+## Review
+
+Header search now only drives the floating search panel. The dashboard wall no longer reads `searchQuery`, so categories, groups, and cards stay rendered while the user types. `TopNav` still runs `searchWorkspace` for dropdown suggestions and target navigation. Verified with `corepack pnpm ts-check`, `corepack pnpm lint`, `corepack pnpm build:ext`, `git diff --check`, and an in-app Browser interaction where typing `Pendle` kept the wall at 1 category and 1 card while showing the search panel.
+
+## Current Task: Unify Group And Card Action Menus
+
+- [x] Move group/category edit controls back into the three-dot action menu -> Verification: group and category headers no longer show a separate pencil button; the first menu action is the pencil edit action.
+- [x] Make website cards use the same hover three-dot action pattern -> Verification: card hover shows a three-dot trigger with edit, create/group, ship, and delete actions while preserving the star pin button.
+- [x] Mirror styling in Web and Chrome extension CSS -> Verification: `src/app/globals.css` and `extension/src/extension.css` keep card action trigger and star positions consistent.
+- [x] Run focused verification -> Verification: `corepack pnpm ts-check`, `corepack pnpm lint`, and `corepack pnpm build:ext`.
+
+## Review
+
+This task only changes UI action presentation. Group/category edit actions are folded back into the existing three-dot dock, website cards now use the same three-dot dock pattern, and the star pin button remains available. No sync, IndexedDB, Supabase, seed data, drag IDs, or card/category mutation logic was changed.
+
 ## Current Task: 2026-06-14 Thread Handoff And Release Continuity
 
 - [x] Identify the correct latest source -> Verification: latest clean copy is `/private/tmp/webcollect-main-docs-rules-copy`, with `main` at `80e1d90`; old `/Users/rockyx/Documents/webcollect` is stale and dirty.

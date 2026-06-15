@@ -21,6 +21,10 @@ assert.ok(topNavSource.includes("壁纸"), "TopNav should show a visible wallpap
 
 assert.ok(shellSource.includes("LONG_PRESS_MS = 700"), "WallpaperShell should use the planned 700ms long press");
 assert.ok(shellSource.includes("onEnterCollection"), "WallpaperShell should enter the bookmark wall");
+assert.ok(shellSource.includes("refreshOnlineWallpapers({ selectFresh: true })"), "WallpaperShell should opportunistically refresh online wallpapers in the background");
+assert.ok(shellSource.includes("WALLPAPER_BACKGROUND_CHECK_MS"), "WallpaperShell should use the shared background refresh cadence");
+assert.ok(shellSource.includes('window.addEventListener("online", refreshIfOnline)'), "WallpaperShell should retry wallpaper refresh when network returns");
+assert.ok(shellSource.includes('window.addEventListener("focus", refreshIfOnline)'), "WallpaperShell should refresh-check when the wallpaper page regains focus");
 assert.ok(pageSource.includes("onShowWallpaper={handleReturnToWallpaper}"), "Web page should expose the top-nav wallpaper button");
 assert.ok(extensionSource.includes("onShowWallpaper={handleReturnToWallpaper}"), "Extension newtab should expose the top-nav wallpaper button");
 assert.equal(shellSource.includes("handleCollectionMouseMove"), false, "Collection mode must not wire mouse fling gestures");

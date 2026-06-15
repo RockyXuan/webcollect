@@ -806,10 +806,21 @@
 
 .wc-edit-dock-trigger-wrap-card {
   position: absolute;
-  right: 0.55rem;
+  right: 2.35rem;
   top: 50%;
   z-index: 12;
+  opacity: 0;
+  pointer-events: none;
   transform: translateY(-50%);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.wc-site-tile:hover .wc-edit-dock-trigger-wrap-card,
+.wc-edit-dock-trigger-wrap-card:focus-within,
+.wc-edit-dock-trigger-wrap-card[data-state="open"] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%) scale(1);
 }
 
 .wc-site-edit-trigger {

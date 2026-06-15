@@ -60,6 +60,24 @@ export const WALLPAPER_QUOTES: WallpaperQuote[] = [
     en: "Ceaseless becoming is what change means.",
     source: "《周易·系辞》 / I Ching",
   },
+  {
+    id: "mountain-rain",
+    zh: "空山新雨后，天气晚来秋。",
+    en: "After fresh rain in empty mountains, evening air carries autumn.",
+    source: "王维《山居秋暝》 / Wang Wei",
+  },
+  {
+    id: "sea-moon",
+    zh: "海上生明月，天涯共此时。",
+    en: "The bright moon rises over the sea; far apart, we share this moment.",
+    source: "张九龄《望月怀远》 / Zhang Jiuling",
+  },
+  {
+    id: "hundred-journeys",
+    zh: "千里之行，始于足下。",
+    en: "A journey of a thousand miles begins beneath one's feet.",
+    source: "《道德经》 / Tao Te Ching",
+  },
 ];
 
 export function getWallpaperQuote(id: string): WallpaperQuote {

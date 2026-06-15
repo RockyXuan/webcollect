@@ -4,18 +4,26 @@ import {
   FALLBACK_WALLPAPERS,
   filterZoomWallpapers,
   filterUsableWallpapers,
+  getWallpaperCacheBatch,
   getNextWallpaper,
+  inferQuoteId,
   isZoomWallpaperCandidate,
   mergeWallpaperLibrary,
+  pickWallpaperAfterRefresh,
   pruneWallpaperLibrary,
   scoreZoomWallpaper,
+  WALLPAPER_CACHE_LIMIT,
+  WALLPAPER_REFRESH_INTERVAL_MS,
 } from "../src/lib/wallpaper-sources";
 import { ZOOM_CURATED_WALLPAPERS } from "../src/lib/zoom-curated-wallpapers";
+import { WALLPAPER_QUOTES } from "../src/lib/wallpaper-quotes";
 import type { WallpaperItem } from "../src/lib/wallpaper-types";
 
 assert.equal(DEFAULT_WALLPAPER_PREFS.defaultMode, "wallpaper");
 assert.equal(DEFAULT_WALLPAPER_PREFS.autoUpdate, true);
 assert.equal(DEFAULT_WALLPAPER_PREFS.rotationInterval, "15m");
+assert.equal(WALLPAPER_CACHE_LIMIT, 8);
+assert.equal(WALLPAPER_REFRESH_INTERVAL_MS, 6 * 60 * 60 * 1000);
 assert.deepEqual(DEFAULT_WALLPAPER_PREFS.enabledCategories, [
   "landscape",
   "aerial",
@@ -28,6 +36,10 @@ assert.deepEqual(DEFAULT_WALLPAPER_PREFS.enabledCategories, [
 
 assert.ok(FALLBACK_WALLPAPERS.length >= 30, "fallback library should include at least thirty curated wallpapers");
 assert.equal(FALLBACK_WALLPAPERS, ZOOM_CURATED_WALLPAPERS, "fallback library should use the curated Zoom registry");
+assert.ok(
+  FALLBACK_WALLPAPERS.filter((item) => item.imageUrl.startsWith("/assets/wallpapers/")).length >= 8,
+  "packaged wallpaper fallback should include at least eight local images"
+);
 assert.ok(
   FALLBACK_WALLPAPERS.every((item) => {
     const aspectRatio = item.width / item.height;
@@ -52,6 +64,16 @@ assert.ok(
   sourceCollections.size >= 3,
   "curated Zoom registry should cover at least three award, featured, or official source collections"
 );
+
+const quoteIds = new Set(WALLPAPER_QUOTES.map((quote) => quote.id));
+assert.ok(FALLBACK_WALLPAPERS.every((item) => quoteIds.has(item.quoteId)), "all wallpapers should reference a known bilingual quote");
+assert.equal(inferQuoteId("Milky Way Carina Nebula", "NASA"), "cosmic-patience");
+assert.equal(inferQuoteId("Lake reflection and ocean coast", "Wikimedia"), "water-still");
+assert.equal(inferQuoteId("African wolf in Serengeti", "Wiki Loves Earth"), "patient-life");
+assert.equal(inferQuoteId("Taipei sunrise panorama", "Wikimedia Featured"), "city-dawn");
+assert.equal(inferQuoteId("Kilauea lava wildfire", "USGS"), "earth-fire");
+assert.equal(inferQuoteId("Blue Marble satellite earth", "NASA"), "single-earth");
+assert.equal(inferQuoteId("Calanche de Piana cliffs", "Wikimedia"), "mountain-rain");
 
 const valid: WallpaperItem = {
   id: "valid",
@@ -109,5 +131,19 @@ assert.ok(
 
 const next = getNextWallpaper([valid, { ...valid, id: "second" }], "valid");
 assert.equal(next?.id, "second");
+
+const refreshed = pickWallpaperAfterRefresh(
+  [valid, { ...valid, id: "fresh", fetchedAt: 10 }],
+  "valid",
+  [{ ...valid, id: "fresh", fetchedAt: 10 }]
+);
+assert.equal(refreshed?.id, "fresh", "refresh should prefer newly fetched wallpapers when available");
+
+const cacheBatch = getWallpaperCacheBatch(
+  Array.from({ length: 12 }, (_, index) => ({ ...valid, id: `cache-${index}` })),
+  "cache-5"
+);
+assert.equal(cacheBatch.length, 8);
+assert.equal(cacheBatch[0]?.id, "cache-5", "cache batch should start with the current wallpaper");
 
 console.log("wallpaper data tests passed");
