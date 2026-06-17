@@ -456,6 +456,7 @@ interface AppState {
   categoryWidths: Record<string, number>;
   categoryLayouts: Record<string, CategoryLayoutPreference>;
   setCategoryWidth: (categoryId: string, widthPercent: number, columns?: number) => void;
+  setCategoryLayoutLocked: (categoryId: string, locked: boolean, widthPercent?: number, columns?: number) => void;
   visualScale: number;
   setVisualScale: (scale: number) => void;
   linkOpenMode: LinkOpenMode;
@@ -1150,6 +1151,34 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
     };
     void saveCategoryWidths(widths);
+    void saveCategoryLayouts(layouts);
+    set({ categoryWidths: widths, categoryLayouts: layouts });
+  },
+
+  setCategoryLayoutLocked: (categoryId, locked, widthPercent, columns) => {
+    const now = Date.now();
+    const existing = get().categoryLayouts[categoryId];
+    const safeWidth = typeof widthPercent === "number" && Number.isFinite(widthPercent)
+      ? Math.max(8, Math.min(100, widthPercent))
+      : existing?.widthPercent ?? get().categoryWidths[categoryId];
+    const safeColumns = typeof columns === "number" && Number.isFinite(columns)
+      ? Math.max(1, Math.min(8, Math.round(columns)))
+      : existing?.columns;
+    const nextLayout: CategoryLayoutPreference = {
+      ...existing,
+      widthPercent: safeWidth,
+      columns: safeColumns,
+      locked,
+      updatedAt: now,
+    };
+    const layouts = {
+      ...get().categoryLayouts,
+      [categoryId]: nextLayout,
+    };
+    const widths = typeof safeWidth === "number" && Number.isFinite(safeWidth)
+      ? { ...get().categoryWidths, [categoryId]: safeWidth }
+      : get().categoryWidths;
+    if (widths !== get().categoryWidths) void saveCategoryWidths(widths);
     void saveCategoryLayouts(layouts);
     set({ categoryWidths: widths, categoryLayouts: layouts });
   },

@@ -335,6 +335,7 @@ export function WebCardItem({
   const hasHoverDetails = Boolean(card.title || card.shortDesc || card.fullDesc || card.note || card.url);
   const detailDescription = card.fullDesc || card.shortDesc;
   const shouldShowHoverDetails = !editMode && !editingField && hasHoverDetails;
+  const { title: dragTitle, ...dragHandleProps } = dragListeners || {};
 
   const cardActions: EditAction[] = [
     { id: "edit", label: "编辑详情", icon: Pencil, onSelect: onEdit },
@@ -358,8 +359,8 @@ export function WebCardItem({
       {dragListeners && (
         <span
           className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-blue-500 transition-colors"
-          {...dragListeners}
-          title="拖动排序"
+          {...dragHandleProps}
+          title={typeof dragTitle === "string" ? dragTitle : "拖动排序"}
         >
           <GripVertical className="h-3.5 w-3.5" />
         </span>

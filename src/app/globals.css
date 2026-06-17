@@ -178,6 +178,21 @@
   margin-top: 1.25rem;
 }
 
+.wc-resolution-viewport {
+  display: flex;
+  min-height: 100vh;
+  justify-content: center;
+  overflow-x: hidden;
+}
+
+.wc-resolution-canvas {
+  width: var(--wc-resolution-width, 2048px);
+  min-width: var(--wc-resolution-width, 2048px);
+  max-width: var(--wc-resolution-width, 2048px);
+  min-height: var(--wc-resolution-min-height, 1152px);
+  zoom: var(--wc-resolution-scale, 1);
+}
+
 .wc-app-header {
   position: sticky;
   top: 0;
@@ -1243,12 +1258,24 @@
 }
 
 .wc-category-body {
-  min-height: clamp(8.5rem, 12vw, 14rem);
+  min-height: 0;
 }
 
 .wc-group-flow {
   align-content: flex-start;
   gap: 0.75rem;
+}
+
+.wc-layout-lock-trigger {
+  opacity: 0.82;
+  transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+}
+
+.wc-layout-lock-trigger:hover,
+.wc-layout-lock-trigger-active {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.12);
 }
 
 .wc-group-panel {
@@ -1969,6 +1996,87 @@
   .wc-discover-orbit {
     min-height: 150px;
   }
+}
+
+.wc-resolution-canvas {
+  --wc-site-tile-width: 14.75rem;
+  --wc-site-tile-edit-width: var(--wc-site-tile-width);
+}
+
+.wc-resolution-canvas .wc-app-header {
+  position: sticky;
+}
+
+.wc-resolution-canvas .wc-header-main-shell {
+  padding: 20px 24px;
+}
+
+.wc-resolution-canvas .wc-header-tabs-shell {
+  padding: 0 24px 12px;
+}
+
+.wc-resolution-canvas .wc-page-main {
+  padding-top: 1.25rem;
+}
+
+.wc-resolution-canvas .wc-header-grid {
+  grid-template-columns: minmax(190px, 270px) minmax(300px, 520px) minmax(0, 1fr);
+  gap: 18px;
+}
+
+.wc-resolution-canvas .wc-logo-mark {
+  width: 52px;
+  height: 52px;
+  font-size: 2.35rem;
+}
+
+.wc-resolution-canvas .wc-brand {
+  gap: 14px;
+}
+
+.wc-resolution-canvas .wc-brand-title {
+  font-size: 1.5rem;
+  letter-spacing: -0.04em;
+}
+
+.wc-resolution-canvas .wc-header-search {
+  height: 50px;
+  gap: 12px;
+  padding-inline: 16px;
+}
+
+.wc-resolution-canvas .wc-header-actions {
+  grid-column: auto;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 8px;
+  overflow: visible;
+  padding-bottom: 0;
+}
+
+.wc-resolution-canvas .wc-header-actions .wc-header-tool span,
+.wc-resolution-canvas .wc-header-tool-quiet span {
+  display: inline;
+}
+
+.wc-resolution-canvas .wc-header-tool,
+.wc-resolution-canvas .wc-header-primary {
+  height: 44px;
+  min-width: 0;
+  border-radius: 16px;
+  padding-inline: 13px;
+  font-size: 0.88rem;
+}
+
+.wc-resolution-canvas .wc-section-tabs {
+  gap: 12px;
+}
+
+.wc-resolution-canvas .wc-section-tab {
+  height: 42px;
+  border-radius: 16px;
+  padding-inline: 18px;
+  font-size: 0.9rem;
 }
 
 /* Category block resize handles */

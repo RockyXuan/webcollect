@@ -10,12 +10,12 @@ assert.equal(inferLayoutColumns(50, 4), 2, "medium resize should remember 2-colu
 assert.equal(inferLayoutColumns(92, 4), 4, "wide resize should remember 4-column intent");
 
 const merged = mergeCategoryLayouts(
-  { chrome: { widthPercent: 46, columns: 2, updatedAt: 200 }, zmt: { widthPercent: 96, columns: 4, updatedAt: 100 } },
-  { chrome: { widthPercent: 24, columns: 1, updatedAt: 100 }, work: { widthPercent: 50, columns: 2, updatedAt: 300 } }
+  { chrome: { widthPercent: 46, columns: 2, locked: true, updatedAt: 200 }, zmt: { widthPercent: 96, columns: 4, updatedAt: 100 } },
+  { chrome: { widthPercent: 24, columns: 1, locked: false, updatedAt: 100 }, work: { widthPercent: 50, columns: 2, locked: true, updatedAt: 300 } }
 );
 
-assert.deepEqual(merged.chrome, { widthPercent: 46, columns: 2, updatedAt: 200 });
+assert.deepEqual(merged.chrome, { widthPercent: 46, columns: 2, locked: true, updatedAt: 200 });
 assert.deepEqual(merged.zmt, { widthPercent: 96, columns: 4, updatedAt: 100 });
-assert.deepEqual(merged.work, { widthPercent: 50, columns: 2, updatedAt: 300 });
+assert.deepEqual(merged.work, { widthPercent: 50, columns: 2, locked: true, updatedAt: 300 });
 
 console.log("layout preference tests passed");

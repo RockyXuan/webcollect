@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode, type WheelEvent } from "react";
 import { getWallpaperQuote } from "@/lib/wallpaper-quotes";
 import { getRotationMs, selectCurrentWallpaper, useWallpaperStore } from "@/lib/wallpaper-store";
 import { WALLPAPER_BACKGROUND_CHECK_MS } from "@/lib/wallpaper-sources";
@@ -10,6 +10,8 @@ const LONG_PRESS_MS = 700;
 const IDLE_HINT_MS = 2000;
 const FLING_WINDOW_MS = 650;
 const FLING_DISTANCE_PX = 420;
+const WHEEL_WALLPAPER_DELTA = 70;
+const WHEEL_WALLPAPER_COOLDOWN_MS = 720;
 const WIKIMEDIA_PREVIEW_WIDTH = 1600;
 
 interface WallpaperShellProps {
@@ -100,6 +102,8 @@ export function WallpaperShell({
   const pointerStartedAtRef = useRef(0);
   const mouseSamplesRef = useRef<MouseSample[]>([]);
   const lastFlingAtRef = useRef(0);
+  const wheelDeltaRef = useRef(0);
+  const lastWheelSwitchAtRef = useRef(0);
 
   useEffect(() => {
     void initialize();
@@ -258,6 +262,22 @@ export function WallpaperShell({
     }
   }, [onEnterCollection, scheduleIdleHint]);
 
+  const handleWallpaperWheel = useCallback((event: WheelEvent<HTMLDivElement>) => {
+    if (isInteractiveTarget(event.target)) return;
+    event.preventDefault();
+    scheduleIdleHint();
+
+    const now = performance.now();
+    if (now - lastWheelSwitchAtRef.current < WHEEL_WALLPAPER_COOLDOWN_MS) return;
+
+    wheelDeltaRef.current += event.deltaY;
+    if (Math.abs(wheelDeltaRef.current) < WHEEL_WALLPAPER_DELTA) return;
+
+    wheelDeltaRef.current = 0;
+    lastWheelSwitchAtRef.current = now;
+    void nextWallpaper();
+  }, [nextWallpaper, scheduleIdleHint]);
+
   const handlePrefsUpdate = useCallback((updates: Partial<WallpaperPrefs>) => {
     void updatePrefs(updates);
   }, [updatePrefs]);
@@ -268,7 +288,7 @@ export function WallpaperShell({
     handlePrefsUpdate({ showZoomHints: false });
   }, [handlePrefsUpdate]);
 
-  const hintText = "长按或左右滑动进入网页墙";
+  const hintText = "滚轮换壁纸，长按或左右滑动进入网页墙";
 
   if (mode === "wallpaper") {
     return (
@@ -276,6 +296,7 @@ export function WallpaperShell({
         className="wc-wallpaper-stage"
         tabIndex={0}
         onMouseMove={handleWallpaperMouseMove}
+        onWheel={handleWallpaperWheel}
         onPointerDown={(event) => startLongPress(event, onEnterCollection)}
         onPointerCancel={clearLongPress}
         onPointerLeave={clearLongPress}

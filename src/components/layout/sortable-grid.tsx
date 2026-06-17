@@ -5,7 +5,7 @@ import { useAppStore } from "@/lib/store";
 import { InlineEditableText } from "@/components/ui/inline-editable-text";
 import { EditActionDock, type EditAction } from "@/components/ui/edit-action-dock";
 import { WebCardItem } from "@/components/card/web-card";
-import { Pencil, PencilOff, Plus, GripVertical, ArrowUpFromLine, ArrowDownFromLine, Folder, Layers, Trash2, Send, MoreHorizontal } from "lucide-react";
+import { Pencil, PencilOff, Plus, GripVertical, ArrowUpFromLine, ArrowDownFromLine, Folder, Layers, Trash2, Send, MoreHorizontal, Lock, Unlock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -37,7 +37,7 @@ import {
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { Category, WebCard } from "@/lib/types";
+import type { Category, CategoryLayoutPreference, WebCard } from "@/lib/types";
 
 // ============ Type-prefixed ID helpers ============
 const catId = (id: string) => `cat:${id}`;
@@ -55,19 +55,41 @@ const collisionDetection: CollisionDetection = (args) => {
 // ============ Default width calculation ============
 function getDefaultWidthPercent(cardCount: number, groupCount: number): number {
   if (groupCount <= 1) {
+    if (cardCount <= 2) return 30;
     if (cardCount <= 4) return 33;
-    if (cardCount <= 12) return 50;
-    return 66;
+    if (cardCount <= 12) return 40;
+    return 52;
   }
-  if (cardCount <= 2) return 33;
-  if (cardCount <= 8) return 50;
-  if (cardCount <= 16) return 66;
-  return 100;
+  if (groupCount <= 2) {
+    if (cardCount <= 4) return 33;
+    if (cardCount <= 8) return 40;
+    if (cardCount <= 16) return 48;
+    return 60;
+  }
+  if (groupCount <= 3) {
+    if (cardCount <= 12) return 56;
+    if (cardCount <= 20) return 66;
+    return 76;
+  }
+  if (cardCount <= 16) return 72;
+  return 88;
 }
 
 export function getSmartParentWidthPercent(rawWidth: number, defaultWidth: number): number {
   const safeWidth = Number.isFinite(rawWidth) ? rawWidth : defaultWidth;
   return Math.max(30, Math.min(100, safeWidth));
+}
+
+function alertLayoutLocked() {
+  if (typeof window !== "undefined") {
+    window.alert("这个分类布局已经固定。请先点击右上角的固定按钮解除固定，再调整布局。");
+  }
+}
+
+function handleLockedLayoutPointerDown(event: React.PointerEvent<HTMLElement>) {
+  event.preventDefault();
+  event.stopPropagation();
+  alertLayoutLocked();
 }
 
 function getDefaultChildBasis(cardCount: number): string {
@@ -150,6 +172,7 @@ export function SortableGrid({
     detachCategoryFromParent,
     promoteToParent,
     categoryWidths,
+    categoryLayouts,
     toggleEditMode,
   } = useAppStore();
 
@@ -493,6 +516,7 @@ export function SortableGrid({
                 isHovered={hoveredParentId === parent.id}
                 isDraggingActive={activeId !== null}
                 widthPercent={categoryWidths[parent.id]}
+                layoutPreference={categoryLayouts[parent.id]}
                 defaultWidthPercent={getDefaultWidthPercent(totalCards, subGroups.length)}
                 onEditCategory={onEditCategory}
                 onAddCard={onAddCard}
@@ -501,7 +525,7 @@ export function SortableGrid({
               >
                 {/* Sub-groups in flex-wrap so they can sit side by side */}
                 <SortableSubGroupContainer parentId={parent.id}>
-                  <div className="wc-group-flow flex flex-wrap items-start gap-4">
+                  <div className="wc-group-flow flex flex-wrap items-start gap-3">
                     {subGroups.map((sub) => {
                       const subCards = getCardsForCategory(sub.id);
                       return (
@@ -510,6 +534,7 @@ export function SortableGrid({
                           category={sub}
                           cards={subCards}
                           editMode={editMode}
+                          parentLayoutLocked={categoryLayouts[parent.id]?.locked === true}
                           onEditCategory={onEditCategory}
                           onAddCard={onAddCard}
                           onAddGroup={onAddGroup}
@@ -578,7 +603,7 @@ export function SortableGrid({
                 </Button>
               </div>
               <SortableContext items={standaloneSortableIds} strategy={rectSortingStrategy}>
-              <div className="wc-group-flow flex flex-wrap items-start gap-4 p-5">
+              <div className="wc-group-flow flex flex-wrap items-start gap-3 p-4">
                 {standaloneCategories.map((cat) => {
                   const catCards = getCardsForCategory(cat.id);
                   return (
@@ -638,6 +663,7 @@ interface SortableCategoryBlockProps {
   isHovered?: boolean;
   isDraggingActive?: boolean;
   widthPercent?: number;
+  layoutPreference?: CategoryLayoutPreference;
   defaultWidthPercent: number;
   onEditCategory?: (category: Category) => void;
   onAddCard?: (categoryId?: string) => void;
@@ -653,6 +679,7 @@ function SortableCategoryBlock({
   isHovered,
   isDraggingActive,
   widthPercent: storedWidth,
+  layoutPreference,
   defaultWidthPercent,
   onEditCategory,
   onAddCard,
@@ -660,6 +687,7 @@ function SortableCategoryBlock({
   onShipCategory,
   children,
 }: SortableCategoryBlockProps) {
+  const isLayoutLocked = layoutPreference?.locked === true;
   const {
     attributes,
     listeners,
@@ -667,9 +695,9 @@ function SortableCategoryBlock({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: catId(category.id) });
+  } = useSortable({ id: catId(category.id), disabled: isLayoutLocked });
 
-  const { setCategoryWidth, demoteParentCategory, updateCategory, editMode: globalEditMode, toggleEditMode, softDeleteCategory } = useAppStore();
+  const { setCategoryWidth, setCategoryLayoutLocked, demoteParentCategory, updateCategory, editMode: globalEditMode, toggleEditMode, softDeleteCategory } = useAppStore();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [localWidth, setLocalWidth] = useState<number | null>(null);
   const [isHeaderHovered, setIsHeaderHovered] = useState(false);
@@ -694,6 +722,10 @@ function SortableCategoryBlock({
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      if (isLayoutLocked) {
+        alertLayoutLocked();
+        return;
+      }
       const container = containerRef.current;
       if (!container) return;
       const startX = e.clientX;
@@ -719,7 +751,15 @@ function SortableCategoryBlock({
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
     },
-    [category.id, setCategoryWidth]
+    [category.id, isLayoutLocked, setCategoryWidth]
+  );
+
+  const handleToggleLayoutLock = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+      setCategoryLayoutLocked(category.id, !isLayoutLocked, widthPercent, inferLayoutColumns(widthPercent, 1));
+    },
+    [category.id, isLayoutLocked, setCategoryLayoutLocked, widthPercent]
   );
 
   const setRef = useCallback(
@@ -769,10 +809,15 @@ function SortableCategoryBlock({
         onMouseLeave={() => setIsHeaderHovered(false)}
       >
         <span
-          className="cursor-grab active:cursor-grabbing text-slate-400/70 hover:text-blue-600 transition-colors"
-          {...attributes}
-          {...listeners}
-          title="拖动排序"
+          className={`transition-colors ${
+            isLayoutLocked
+              ? "cursor-not-allowed text-slate-300"
+              : "cursor-grab active:cursor-grabbing text-slate-400/70 hover:text-blue-600"
+          }`}
+          {...(isLayoutLocked ? {} : attributes)}
+          {...(isLayoutLocked ? {} : listeners)}
+          onPointerDown={isLayoutLocked ? handleLockedLayoutPointerDown : undefined}
+          title={isLayoutLocked ? "布局已固定，先点击右上角固定按钮解除固定" : "拖动排序"}
         >
           <GripVertical className="w-4 h-4" />
         </span>
@@ -790,6 +835,21 @@ function SortableCategoryBlock({
           editMode={editMode}
           onSave={(newName) => updateCategory({ ...category, name: newName })}
         />
+        <Button
+          variant="ghost"
+          size="sm"
+          className={`wc-layout-lock-trigger h-7 w-7 shrink-0 rounded-full p-0 ${
+            isLayoutLocked
+              ? "wc-layout-lock-trigger-active text-blue-600"
+              : "text-slate-400 hover:bg-white/80 hover:text-blue-600"
+          }`}
+          onClick={handleToggleLayoutLock}
+          title={isLayoutLocked ? "解除固定布局" : "固定当前布局"}
+          aria-label={isLayoutLocked ? "解除固定布局" : "固定当前布局"}
+          aria-pressed={isLayoutLocked}
+        >
+          {isLayoutLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+        </Button>
         {(isHeaderHovered || globalEditMode) && (
           <EditActionDock
             actions={categoryActions}
@@ -834,12 +894,16 @@ function SortableCategoryBlock({
       </div>
 
       {/* Category body */}
-      <div className="wc-category-body relative z-10 p-5">{children}</div>
+      <div className="wc-category-body relative z-10 p-4">{children}</div>
 
       {/* Resize handle - right edge, always available */}
       <div
-        className="absolute right-0 top-0 bottom-0 z-20 w-2 cursor-col-resize
-          rounded-r-[28px] transition-colors hover:bg-blue-400/20 active:bg-blue-500/25"
+        className={`absolute right-0 top-0 bottom-0 z-20 w-2 rounded-r-[28px] transition-colors ${
+          isLayoutLocked
+            ? "cursor-not-allowed hover:bg-amber-300/20"
+            : "cursor-col-resize hover:bg-blue-400/20 active:bg-blue-500/25"
+        }`}
+        title={isLayoutLocked ? "布局已固定，先点击右上角固定按钮解除固定" : "拖动调整分类宽度"}
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={handleResizeStart}
       />
@@ -920,6 +984,7 @@ interface SortableSubGroupBlockProps {
   category: Category;
   cards: WebCard[];
   editMode: boolean;
+  parentLayoutLocked?: boolean;
   onEditCategory?: (category: Category) => void;
   onAddCard?: (categoryId?: string) => void;
   onAddGroup?: (parentId?: string) => void;
@@ -935,6 +1000,7 @@ function SortableSubGroupBlock({
   category,
   cards,
   editMode,
+  parentLayoutLocked = false,
   onEditCategory,
   onAddCard,
   onAddGroup,
@@ -952,7 +1018,7 @@ function SortableSubGroupBlock({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: subId(category.id) });
+  } = useSortable({ id: subId(category.id), disabled: parentLayoutLocked });
 
   const categoryWidths = useAppStore((s) => s.categoryWidths);
   const setCategoryWidth = useAppStore((s) => s.setCategoryWidth);
@@ -970,6 +1036,10 @@ function SortableSubGroupBlock({
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      if (parentLayoutLocked) {
+        alertLayoutLocked();
+        return;
+      }
       const container = containerRef.current;
       if (!container) return;
       const startX = e.clientX;
@@ -995,7 +1065,7 @@ function SortableSubGroupBlock({
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
     },
-    [cards.length, category.id, setCategoryWidth]
+    [cards.length, category.id, parentLayoutLocked, setCategoryWidth]
   );
 
   const setRef = useCallback(
@@ -1047,10 +1117,15 @@ function SortableSubGroupBlock({
         onMouseLeave={() => setIsHeaderHovered(false)}
       >
         <span
-          className="cursor-grab active:cursor-grabbing text-slate-400/70 hover:text-blue-600 transition-colors"
-          {...attributes}
-          {...listeners}
-          title="拖动排序"
+          className={`transition-colors ${
+            parentLayoutLocked
+              ? "cursor-not-allowed text-slate-300"
+              : "cursor-grab active:cursor-grabbing text-slate-400/70 hover:text-blue-600"
+          }`}
+          {...(parentLayoutLocked ? {} : attributes)}
+          {...(parentLayoutLocked ? {} : listeners)}
+          onPointerDown={parentLayoutLocked ? handleLockedLayoutPointerDown : undefined}
+          title={parentLayoutLocked ? "所属分类布局已固定，先点击分类右上角固定按钮解除固定" : "拖动排序"}
         >
           <GripVertical className="h-3.5 w-3.5" />
         </span>
@@ -1103,6 +1178,7 @@ function SortableSubGroupBlock({
               card={card}
               categoryColor={category.color}
               editMode={editMode}
+              layoutLocked={parentLayoutLocked}
               onEdit={() => onEditCard?.(card)}
               onDelete={() => onDeleteCard?.(card)}
               onUpdateCard={onUpdateCard}
@@ -1118,8 +1194,12 @@ function SortableSubGroupBlock({
 
       {/* Resize handle - right edge, always available */}
       <div
-        className="absolute right-0 top-0 bottom-0 z-20 w-3 cursor-col-resize
-          rounded-r-2xl transition-colors hover:bg-blue-400/20 active:bg-blue-500/25"
+        className={`absolute right-0 top-0 bottom-0 z-20 w-3 rounded-r-2xl transition-colors ${
+          parentLayoutLocked
+            ? "cursor-not-allowed hover:bg-amber-300/20"
+            : "cursor-col-resize hover:bg-blue-400/20 active:bg-blue-500/25"
+        }`}
+        title={parentLayoutLocked ? "所属分类布局已固定，先点击分类右上角固定按钮解除固定" : "拖动调整分组宽度"}
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={handleResizeStart}
       />
@@ -1386,6 +1466,7 @@ interface SortableCardProps {
   card: WebCard;
   categoryColor: string;
   editMode: boolean;
+  layoutLocked?: boolean;
   onEdit: () => void;
   onDelete: () => void;
   onUpdateCard?: (card: WebCard) => void;
@@ -1397,6 +1478,7 @@ function SortableCard({
   card,
   categoryColor,
   editMode,
+  layoutLocked = false,
   onEdit,
   onDelete,
   onUpdateCard,
@@ -1410,7 +1492,7 @@ function SortableCard({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: cardId(card.id) });
+  } = useSortable({ id: cardId(card.id), disabled: layoutLocked });
 
   const style: React.CSSProperties = {
     transform: isDragging ? undefined : CSS.Transform.toString(transform),
@@ -1428,7 +1510,13 @@ function SortableCard({
         onDelete={onDelete}
         onShip={onShip}
         onUpdateCard={onUpdateCard}
-        dragListeners={{ ...attributes, ...listeners }}
+        dragListeners={layoutLocked
+          ? {
+              className: "cursor-not-allowed text-slate-300 transition-colors",
+              onPointerDown: handleLockedLayoutPointerDown,
+              title: "所属分类布局已固定，先点击分类右上角固定按钮解除固定",
+            }
+          : { ...attributes, ...listeners }}
         onCreateGroup={onCreateGroup}
       />
     </div>

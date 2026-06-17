@@ -16,10 +16,16 @@ Keep this WebCollect thread moving until the current implementation pass is genu
 - Packaged wallpaper fallback grew from 6 to 8 local files, and extension build output also contains 8 packaged wallpapers.
 - Wallpaper quote matching has additional bilingual quote IDs and title-first inference to avoid source-name misclassification.
 - `tasks/todo.md` records the completed action-menu, search, and wallpaper tasks.
+- Category panels now use tighter default width and inner spacing to reduce unused right-side blank space.
+- Parent categories now have a fixed layout lock button in the top-right header; locked categories block parent/category drag, subgroup drag/resize, card drag, and category resize with an unlock prompt.
+- Category layout lock state is persisted in local storage, snapshots, and sync preference merging.
+- Wallpaper mode now supports mouse-wheel switching with threshold and cooldown so wallpapers can be reviewed manually.
+- Collection mode now renders inside a fixed 2048x1152 logical canvas and scales the canvas to the current viewport, so external monitors and laptop screens keep the same layout proportions.
+- The fixed canvas overrides small-screen header media-query changes, preventing header/actions from switching into a different layout on laptop-sized windows.
 
 ## Unfinished
 
-- No active implementation task is pending from the recent user requests.
+- No active implementation task is pending after the latest responsive canvas pass.
 - There are older historical checklist entries in `tasks/todo.md` from previous sessions, such as Windows install verification and old package rebuild notes. They are not part of this current local implementation pass.
 - Changes are not committed; the working tree intentionally contains the accumulated uncommitted implementation work.
 
@@ -27,15 +33,35 @@ Keep this WebCollect thread moving until the current implementation pass is genu
 
 - No user decision is currently required.
 - No account/login permission is currently required.
-- Shell `curl` cannot reach the Browser-served local preview from this sandbox namespace, but in-app Browser verification can access `http://localhost:5001/`.
+- Shell `curl` cannot reach the existing host-side local preview from this sandbox namespace.
+- No current browser verification blocker. A temporary elevated 127.0.0.1 dev server plus headless Chrome verified the responsive canvas pass.
 
 ## Next Step
 
 - If the user asks to continue product work, the next highest-value step is a final integrated review pass across the accumulated UI/search/wallpaper diff, followed by any requested commit/package/release workflow.
-- If no new user request arrives, avoid inventing unrelated product changes.
+- Current next step is commit, push, and create a downloadable GitHub release zip as requested.
 
 ## Latest Verification
 
+- 2026-06-17 CST implemented fixed-resolution collection canvas scaling.
+- `node --import tsx scripts/test-resolution-layout.ts` passed.
+- `git diff --check` passed.
+- `corepack pnpm ts-check` passed with the explicit Node v20.20.2 PATH.
+- `corepack pnpm lint` passed with 6 existing warnings and 0 errors.
+- `corepack pnpm build:ext` passed with the existing Vite large-chunk/dynamic-import warnings.
+- Browser QA used temporary `http://127.0.0.1:5001` via `corepack pnpm exec next dev -H 127.0.0.1 -p 5001` and headless Chrome.
+- Viewport `2048x1152`: `.wc-resolution-canvas` scale `1`, CSS width `2048px`, rendered width `2048`, desktop header grid retained.
+- Viewport `1366x768`: `.wc-resolution-canvas` scale `0.667`, CSS width `2048px`, rendered width `1366`, same desktop header grid retained.
+- 2026-06-16 15:30 CST implemented category spacing, category layout locking, and wallpaper wheel switching.
+- `git diff --check` passed.
+- `/Users/rockyx/.nvm/versions/node/v20.20.2/bin/node --import tsx scripts/test-layout-preferences.ts` passed.
+- `/Users/rockyx/.nvm/versions/node/v20.20.2/bin/node --import tsx scripts/test-layout-sizing.ts` passed.
+- `/Users/rockyx/.nvm/versions/node/v20.20.2/bin/node --import tsx scripts/test-wallpaper-data.ts` passed.
+- `/Users/rockyx/.nvm/versions/node/v20.20.2/bin/node --import tsx scripts/test-wallpaper-wiring.ts` passed.
+- `corepack pnpm ts-check` passed with the explicit Node v20.20.2 PATH.
+- `corepack pnpm lint` passed with 6 existing warnings and 0 errors.
+- `corepack pnpm build:ext` passed with the existing Vite large-chunk/dynamic-import warnings.
+- Browser verification attempt: in-app Browser/Chrome tools were not exposed by tool discovery; sandbox blocked `PORT=5001 corepack pnpm tsx watch src/server.ts` with `listen EPERM` on the tsx IPC pipe; escalation approval timed out twice; bundled Playwright had no browser binary; system Chrome headless launch was terminated with process permission errors.
 - 2026-06-15 07:41 CST heartbeat reran continuity checks.
 - `git status -sb` still shows only the known uncommitted implementation files plus `CODEX_GO_MODE_STATUS.md` and two wallpaper image assets.
 - `rg` found only older historical pending notes, not a new active implementation task from recent requests.

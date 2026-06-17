@@ -1669,8 +1669,9 @@ function isCategoryLayoutPreference(value: unknown): value is CategoryLayoutPref
   const raw = value as Record<string, unknown>;
   const hasWidth = typeof raw.widthPercent === "number" && Number.isFinite(raw.widthPercent);
   const hasColumns = typeof raw.columns === "number" && Number.isFinite(raw.columns);
+  const hasLocked = typeof raw.locked === "boolean";
   const hasUpdatedAt = typeof raw.updatedAt === "number" && Number.isFinite(raw.updatedAt);
-  return (hasWidth || hasColumns) && hasUpdatedAt;
+  return (hasWidth || hasColumns || hasLocked) && hasUpdatedAt;
 }
 
 function normalizeCategoryLayouts(value: unknown): Record<string, CategoryLayoutPreference> {
@@ -1681,6 +1682,7 @@ function normalizeCategoryLayouts(value: unknown): Record<string, CategoryLayout
     layouts[categoryId] = {
       widthPercent: typeof raw.widthPercent === "number" ? Math.max(8, Math.min(100, raw.widthPercent)) : undefined,
       columns: typeof raw.columns === "number" ? Math.max(1, Math.min(8, Math.round(raw.columns))) : undefined,
+      locked: typeof raw.locked === "boolean" ? raw.locked : undefined,
       updatedAt: raw.updatedAt,
     };
   }

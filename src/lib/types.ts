@@ -79,6 +79,7 @@ export type LinkOpenMode = "new-background-tab" | "new-active-tab" | "current-ta
 export interface CategoryLayoutPreference {
   widthPercent?: number;
   columns?: number;
+  locked?: boolean;
   updatedAt: number;
 }
 

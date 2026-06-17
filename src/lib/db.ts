@@ -239,11 +239,12 @@ function normalizeCategoryLayout(value: unknown): CategoryLayoutPreference | nul
   const columns = typeof raw.columns === "number" && Number.isFinite(raw.columns)
     ? Math.max(1, Math.min(8, Math.round(raw.columns)))
     : undefined;
+  const locked = typeof raw.locked === "boolean" ? raw.locked : undefined;
   const updatedAt = typeof raw.updatedAt === "number" && Number.isFinite(raw.updatedAt)
     ? raw.updatedAt
     : 0;
-  if (widthPercent === undefined && columns === undefined) return null;
-  return { widthPercent, columns, updatedAt };
+  if (widthPercent === undefined && columns === undefined && locked === undefined) return null;
+  return { widthPercent, columns, locked, updatedAt };
 }
 
 export async function getCategoryLayouts(): Promise<Record<string, CategoryLayoutPreference>> {

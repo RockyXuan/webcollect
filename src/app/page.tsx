@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, type CSSProperties } from "react";
 import { TopNav } from "@/components/nav/top-nav";
 import { SortableGrid } from "@/components/layout/sortable-grid";
 import { CardDialog } from "@/components/dialogs/card-dialog";
@@ -14,6 +14,11 @@ import { useAppStore } from "@/lib/store";
 import { useAuthStore } from "@/lib/auth-store";
 import { saveCards, saveCategories, setInitialized, withoutLocalChangeEvents } from "@/lib/db";
 import { restoreLatestHealthyWorkspaceIfNeeded } from "@/lib/emergency-restore";
+import {
+  COLLECTION_CANVAS_HEIGHT,
+  COLLECTION_CANVAS_WIDTH,
+  getCollectionViewportScale,
+} from "@/lib/resolution-layout";
 import { useWallpaperStore } from "@/lib/wallpaper-store";
 import type { WebCard, Category } from "@/lib/types";
 
@@ -35,6 +40,7 @@ export default function HomePage() {
   const [defaultCategoryId, setDefaultCategoryId] = useState<string>("");
   const [defaultParentId, setDefaultParentId] = useState<string | undefined>();
   const [isCreatingParent, setIsCreatingParent] = useState(false);
+  const [collectionViewportScale, setCollectionViewportScale] = useState(1);
 
   useEffect(() => {
     const init = async () => {
@@ -127,6 +133,28 @@ export default function HomePage() {
     returnToWallpaper();
   }, [returnToWallpaper]);
 
+  useEffect(() => {
+    const updateCollectionViewportScale = () => {
+      const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      setCollectionViewportScale(getCollectionViewportScale(viewportWidth, viewportHeight));
+    };
+
+    updateCollectionViewportScale();
+    window.addEventListener("resize", updateCollectionViewportScale);
+    window.visualViewport?.addEventListener("resize", updateCollectionViewportScale);
+    return () => {
+      window.removeEventListener("resize", updateCollectionViewportScale);
+      window.visualViewport?.removeEventListener("resize", updateCollectionViewportScale);
+    };
+  }, []);
+
+  const collectionResolutionStyle = {
+    "--wc-resolution-scale": String(collectionViewportScale),
+    "--wc-resolution-width": `${COLLECTION_CANVAS_WIDTH}px`,
+    "--wc-resolution-min-height": `${COLLECTION_CANVAS_HEIGHT}px`,
+  } as CSSProperties;
+
   if (wallpaperMode === "wallpaper") {
     return (
       <WallpaperShell
@@ -157,7 +185,8 @@ export default function HomePage() {
       mode={wallpaperMode}
       onEnterCollection={handleEnterCollection}
     >
-    <div className="min-h-screen">
+    <div className="wc-resolution-viewport" style={collectionResolutionStyle}>
+    <div className="wc-resolution-canvas min-h-screen">
       <TopNav
         onAddCard={handleAddCard}
         onAddGroup={handleAddGroup}
@@ -227,6 +256,7 @@ export default function HomePage() {
           item={sectionShipItem}
         />
       </ErrorBoundary>
+    </div>
     </div>
     </WallpaperShell>
   );
