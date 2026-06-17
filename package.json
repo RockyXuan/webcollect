@@ -5,8 +5,10 @@
   "scripts": {
     "build": "bash ./scripts/build.sh",
     "dev": "bash ./scripts/dev.sh",
+    "gh:status": "bash ./scripts/gh-proxy.sh auth status",
     "preinstall": "npx only-allow pnpm",
     "lint": "eslint",
+    "release:extension": "bash ./scripts/release-extension.sh",
     "start": "bash ./scripts/start.sh",
     "ts-check": "tsc -p tsconfig.json",
     "build:ext": "node ./extension/build.mjs"

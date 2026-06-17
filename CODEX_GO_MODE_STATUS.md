@@ -22,6 +22,9 @@ Keep this WebCollect thread moving until the current implementation pass is genu
 - Wallpaper mode now supports mouse-wheel switching with threshold and cooldown so wallpapers can be reviewed manually.
 - Collection mode now renders inside a fixed 2048x1152 logical canvas and scales the canvas to the current viewport, so external monitors and laptop screens keep the same layout proportions.
 - The fixed canvas overrides small-screen header media-query changes, preventing header/actions from switching into a different layout on laptop-sized windows.
+- GitHub CLI release instability root cause was narrowed down: plain `gh auth login` timed out while posting to GitHub's device-code endpoint, but the same flow immediately received a device code when forced through the local Clash proxy at `127.0.0.1:7897`.
+- Added `scripts/gh-proxy.sh` so project GitHub CLI calls can consistently use `HTTPS_PROXY`/`HTTP_PROXY` without changing system network settings or storing tokens in plaintext.
+- Added `scripts/release-extension.sh` and package scripts `gh:status` / `release:extension` so future release checks/uploads use the proxy wrapper instead of ad hoc `gh` commands.
 
 ## Unfinished
 
@@ -32,14 +35,14 @@ Keep this WebCollect thread moving until the current implementation pass is genu
 ## Current Blockers
 
 - No user decision is currently required.
-- No account/login permission is currently required.
+- GitHub CLI account login is still required before creating the GitHub Release. The latest device code expired before the browser authorization completed.
 - Shell `curl` cannot reach the existing host-side local preview from this sandbox namespace.
 - No current browser verification blocker. A temporary elevated 127.0.0.1 dev server plus headless Chrome verified the responsive canvas pass.
 
 ## Next Step
 
-- If the user asks to continue product work, the next highest-value step is a final integrated review pass across the accumulated UI/search/wallpaper diff, followed by any requested commit/package/release workflow.
-- Current next step is commit, push, and create a downloadable GitHub release zip as requested.
+- Commit and push the GitHub CLI proxy/release script stabilization.
+- Ask the user to complete one GitHub device authorization while `scripts/gh-proxy.sh auth login ...` is actively waiting, then run `pnpm gh:status` and `pnpm release:extension`.
 
 ## Latest Verification
 
@@ -52,6 +55,9 @@ Keep this WebCollect thread moving until the current implementation pass is genu
 - Browser QA used temporary `http://127.0.0.1:5001` via `corepack pnpm exec next dev -H 127.0.0.1 -p 5001` and headless Chrome.
 - Viewport `2048x1152`: `.wc-resolution-canvas` scale `1`, CSS width `2048px`, rendered width `2048`, desktop header grid retained.
 - Viewport `1366x768`: `.wc-resolution-canvas` scale `0.667`, CSS width `2048px`, rendered width `1366`, same desktop header grid retained.
+- 2026-06-17 CST diagnosed GitHub CLI auth instability: stale `RockyXuan` gh login was removed; unproxied `gh auth login` failed with a GitHub device-code timeout; proxied login obtained code `21B8-2ADE`, but the code expired before browser authorization completed.
+- `bash -n scripts/gh-proxy.sh` passed.
+- `bash -n scripts/release-extension.sh` passed.
 - 2026-06-16 15:30 CST implemented category spacing, category layout locking, and wallpaper wheel switching.
 - `git diff --check` passed.
 - `/Users/rockyx/.nvm/versions/node/v20.20.2/bin/node --import tsx scripts/test-layout-preferences.ts` passed.
