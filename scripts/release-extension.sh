@@ -7,6 +7,29 @@ cd "${ROOT_DIR}"
 REPO="${GITHUB_REPOSITORY:-RockyXuan/webcollect}"
 TAG="${1:-}"
 
+find_corepack() {
+  if command -v corepack >/dev/null 2>&1; then
+    command -v corepack
+    return
+  fi
+
+  local candidate
+  for candidate in \
+    "/Users/rockyx/.nvm/versions/node/v20.20.2/bin/corepack" \
+    "/opt/homebrew/bin/corepack"; do
+    if [[ -x "${candidate}" ]]; then
+      echo "${candidate}"
+      return
+    fi
+  done
+
+  echo "corepack was not found. Install Node.js/Corepack before releasing." >&2
+  exit 127
+}
+
+COREPACK_BIN="${COREPACK_BIN:-$(find_corepack)}"
+export PATH="$(dirname "${COREPACK_BIN}"):${PATH}"
+
 if [[ -z "${TAG}" ]]; then
   TAG="$(git tag --points-at HEAD | grep '^webcollect-' | sort | tail -n 1 || true)"
 fi
@@ -21,7 +44,7 @@ echo "Using release tag: ${TAG}"
 echo "Using GitHub repo: ${REPO}"
 echo "Using extension zip: ${ZIP_PATH}"
 
-corepack pnpm build:ext
+"${COREPACK_BIN}" pnpm build:ext
 
 rm -f "${ZIP_PATH}"
 (cd public/extension-dist && zip -qr "${ZIP_PATH}" .)

@@ -25,6 +25,7 @@ Keep this WebCollect thread moving until the current implementation pass is genu
 - GitHub CLI release instability root cause was narrowed down: plain `gh auth login` timed out while posting to GitHub's device-code endpoint, but the same flow immediately received a device code when forced through the local Clash proxy at `127.0.0.1:7897`.
 - Added `scripts/gh-proxy.sh` so project GitHub CLI calls can consistently use `HTTPS_PROXY`/`HTTP_PROXY` without changing system network settings or storing tokens in plaintext.
 - Added `scripts/release-extension.sh` and package scripts `gh:status` / `release:extension` so future release checks/uploads use the proxy wrapper instead of ad hoc `gh` commands.
+- Hardened `scripts/release-extension.sh` so it can find the local Corepack binary even when the current shell has not loaded the user's nvm PATH.
 
 ## Unfinished
 
@@ -58,6 +59,7 @@ Keep this WebCollect thread moving until the current implementation pass is genu
 - 2026-06-17 CST diagnosed GitHub CLI auth instability: stale `RockyXuan` gh login was removed; unproxied `gh auth login` failed with a GitHub device-code timeout; proxied login obtained code `21B8-2ADE`, but the code expired before browser authorization completed.
 - `bash -n scripts/gh-proxy.sh` passed.
 - `bash -n scripts/release-extension.sh` passed.
+- `scripts/gh-proxy.sh auth status` reached GitHub through the proxy wrapper and returned the expected "not logged in" state instead of timing out.
 - 2026-06-16 15:30 CST implemented category spacing, category layout locking, and wallpaper wheel switching.
 - `git diff --check` passed.
 - `/Users/rockyx/.nvm/versions/node/v20.20.2/bin/node --import tsx scripts/test-layout-preferences.ts` passed.
