@@ -12,6 +12,25 @@ git_with_proxy() {
   git -c "http.https://github.com.proxy=${GITHUB_PROXY}" "$@"
 }
 
+require_github_proxy() {
+  if [[ ! "${GITHUB_PROXY}" =~ ^http://([^:/]+):([0-9]+)$ ]]; then
+    return
+  fi
+
+  local proxy_host="${BASH_REMATCH[1]}"
+  local proxy_port="${BASH_REMATCH[2]}"
+
+  if ! command -v nc >/dev/null 2>&1; then
+    return
+  fi
+
+  if ! nc -z "${proxy_host}" "${proxy_port}" >/dev/null 2>&1; then
+    echo "GitHub proxy ${GITHUB_PROXY} is not listening." >&2
+    echo "Open Clash Verge and make sure the Mihomo core is running on ${proxy_host}:${proxy_port}." >&2
+    exit 69
+  fi
+}
+
 find_corepack() {
   if command -v corepack >/dev/null 2>&1; then
     command -v corepack
@@ -48,6 +67,8 @@ ZIP_PATH="${WEB_COLLECT_EXTENSION_ZIP:-/private/tmp/WebCollect-Chrome-Extension-
 echo "Using release tag: ${TAG}"
 echo "Using GitHub repo: ${REPO}"
 echo "Using extension zip: ${ZIP_PATH}"
+
+require_github_proxy
 
 "${COREPACK_BIN}" pnpm build:ext
 
