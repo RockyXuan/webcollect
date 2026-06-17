@@ -6,6 +6,11 @@ cd "${ROOT_DIR}"
 
 REPO="${GITHUB_REPOSITORY:-RockyXuan/webcollect}"
 TAG="${1:-}"
+GITHUB_PROXY="${GITHUB_PROXY:-http://127.0.0.1:7897}"
+
+git_with_proxy() {
+  git -c "http.https://github.com.proxy=${GITHUB_PROXY}" "$@"
+}
 
 find_corepack() {
   if command -v corepack >/dev/null 2>&1; then
@@ -53,8 +58,8 @@ if ! git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
   git tag "${TAG}"
 fi
 
-git push origin main
-git push origin "${TAG}"
+git_with_proxy push origin main
+git_with_proxy push origin "${TAG}"
 
 if scripts/gh-proxy.sh release view "${TAG}" --repo "${REPO}" >/dev/null 2>&1; then
   scripts/gh-proxy.sh release upload "${TAG}" "${ZIP_PATH}" --repo "${REPO}" --clobber

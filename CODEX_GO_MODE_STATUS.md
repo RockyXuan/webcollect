@@ -26,6 +26,7 @@ Keep this WebCollect thread moving until the current implementation pass is genu
 - Added `scripts/gh-proxy.sh` so project GitHub CLI calls can consistently use `HTTPS_PROXY`/`HTTP_PROXY` without changing system network settings or storing tokens in plaintext.
 - Added `scripts/release-extension.sh` and package scripts `gh:status` / `release:extension` so future release checks/uploads use the proxy wrapper instead of ad hoc `gh` commands.
 - Hardened `scripts/release-extension.sh` so it can find the local Corepack binary even when the current shell has not loaded the user's nvm PATH.
+- Hardened `scripts/release-extension.sh` so its internal `git push` calls also use the same GitHub proxy setting instead of falling back to direct GitHub connections.
 
 ## Unfinished
 
@@ -60,6 +61,7 @@ Keep this WebCollect thread moving until the current implementation pass is genu
 - `bash -n scripts/gh-proxy.sh` passed.
 - `bash -n scripts/release-extension.sh` passed.
 - `scripts/gh-proxy.sh auth status` reached GitHub through the proxy wrapper and returned the expected "not logged in" state instead of timing out.
+- Plain `git push origin main` timed out against GitHub, then succeeded after adding the repository-local Git proxy config `http.https://github.com.proxy=http://127.0.0.1:7897`.
 - 2026-06-16 15:30 CST implemented category spacing, category layout locking, and wallpaper wheel switching.
 - `git diff --check` passed.
 - `/Users/rockyx/.nvm/versions/node/v20.20.2/bin/node --import tsx scripts/test-layout-preferences.ts` passed.
