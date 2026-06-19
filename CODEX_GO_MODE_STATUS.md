@@ -23,7 +23,7 @@
 
 - Pexels/Pixabay/TMDb 这类需要 API key 或后端代理的可选 provider 尚未接入；当前实现保持关闭，不在前端硬编码密钥。
 - Cinema/Art 目前先作为模式策略入口和过滤路径存在，尚未接入专门的电影/艺术外部图库。没有 API key 时，功能仍以本地精选和合规 Wikimedia 图库兜底。
-- GitHub Release 尚未发布为新的可下载版本。
+- GitHub Release `webcollect-2026-06-19-wallpaper` 已发布，包含可下载的 Chrome 扩展 zip。
 
 ## Current Blockers
 
@@ -34,7 +34,7 @@
 
 ## Next Step
 
-- 若要发布给用户安装，下一步是按现有 release 脚本重新打包/发布扩展。
+- 若要让用户试用，下一步是下载并解压 `WebCollect-Chrome-Extension-webcollect-2026-06-19-wallpaper.zip`，在 Chrome 扩展程序页面加载解压后的文件夹。
 - 后续增强可以单独接入安全的后端代理 provider：Pexels/Pixabay/TMDb，并为 Cinema/Art 增补专门精选库。
 
 ## Latest Verification
@@ -49,3 +49,6 @@
 - `corepack pnpm exec tsup src/server.ts --format esm --outDir dist --target node20 --external next --external react --external react-dom` passed.
 - In-app Browser verified `http://127.0.0.1:5010/`: wallpaper stage loads; settings button opens the wallpaper settings dialog; Auto Mix/Nature/Cinema/Art/Space options are present; attribution renders; default visible wallpaper is a Wikimedia nature scene, not NASA/Blue Marble/satellite/science imagery.
 - Packaged image hashes were checked and are unique after replacing the duplicated/mismapped local files.
+- 2026-06-19 CST pushed tag `webcollect-2026-06-19-wallpaper`; GitHub Actions run `27812564439` completed with `success`.
+- Release URL: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-06-19-wallpaper`.
+- Release asset: `WebCollect-Chrome-Extension-webcollect-2026-06-19-wallpaper.zip`, size `40647760`, sha256 `6c2f58ffc9e99fb1ab7ee7f1f516b4c9ff1475fe1b64bcd4e1343ea2ad41d1e1`.
