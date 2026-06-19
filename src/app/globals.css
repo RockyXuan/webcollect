@@ -1048,6 +1048,16 @@
   font-weight: 500;
 }
 
+.wc-zoom-quote cite {
+  display: block;
+  margin-top: 0.28rem;
+  color: rgba(255, 255, 255, 0.46);
+  font-size: 0.66rem;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
 .wc-wallpaper-controls {
   position: absolute;
   right: clamp(1rem, 3vw, 2.5rem);

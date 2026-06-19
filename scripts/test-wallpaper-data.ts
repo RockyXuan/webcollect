@@ -1,12 +1,18 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import {
   DEFAULT_WALLPAPER_PREFS,
+  DEFAULT_WALLPAPER_ENABLED_CATEGORIES,
   FALLBACK_WALLPAPERS,
   filterZoomWallpapers,
   filterUsableWallpapers,
+  filterWallpapersForTheme,
   getWallpaperCacheBatch,
   getNextWallpaper,
   inferQuoteId,
+  isAutoMixWallpaper,
+  isScienceWallpaperSource,
   isZoomWallpaperCandidate,
   mergeWallpaperLibrary,
   pickWallpaperAfterRefresh,
@@ -20,25 +26,34 @@ import { WALLPAPER_QUOTES } from "../src/lib/wallpaper-quotes";
 import type { WallpaperItem } from "../src/lib/wallpaper-types";
 
 assert.equal(DEFAULT_WALLPAPER_PREFS.defaultMode, "wallpaper");
+assert.equal(DEFAULT_WALLPAPER_PREFS.themeMode, "auto");
 assert.equal(DEFAULT_WALLPAPER_PREFS.autoUpdate, true);
 assert.equal(DEFAULT_WALLPAPER_PREFS.rotationInterval, "15m");
 assert.equal(WALLPAPER_CACHE_LIMIT, 8);
 assert.equal(WALLPAPER_REFRESH_INTERVAL_MS, 6 * 60 * 60 * 1000);
-assert.deepEqual(DEFAULT_WALLPAPER_PREFS.enabledCategories, [
+assert.deepEqual(DEFAULT_WALLPAPER_ENABLED_CATEGORIES, [
   "landscape",
-  "aerial",
   "landmark",
-  "space",
   "animals",
   "ocean",
-  "weather",
 ]);
+assert.deepEqual(DEFAULT_WALLPAPER_PREFS.enabledCategories, DEFAULT_WALLPAPER_ENABLED_CATEGORIES);
 
 assert.ok(FALLBACK_WALLPAPERS.length >= 30, "fallback library should include at least thirty curated wallpapers");
 assert.equal(FALLBACK_WALLPAPERS, ZOOM_CURATED_WALLPAPERS, "fallback library should use the curated Zoom registry");
 assert.ok(
   FALLBACK_WALLPAPERS.filter((item) => item.imageUrl.startsWith("/assets/wallpapers/")).length >= 8,
   "packaged wallpaper fallback should include at least eight local images"
+);
+const packagedWallpaperHashes = FALLBACK_WALLPAPERS
+  .filter((item) => item.imageUrl.startsWith("/assets/wallpapers/"))
+  .map((item) => createHash("sha256")
+    .update(readFileSync(`public${item.imageUrl}`))
+    .digest("hex"));
+assert.equal(
+  new Set(packagedWallpaperHashes).size,
+  packagedWallpaperHashes.length,
+  "packaged wallpaper fallback files should not be duplicated under different metadata"
 );
 assert.ok(
   FALLBACK_WALLPAPERS.every((item) => {
@@ -67,6 +82,22 @@ assert.ok(
 
 const quoteIds = new Set(WALLPAPER_QUOTES.map((quote) => quote.id));
 assert.ok(FALLBACK_WALLPAPERS.every((item) => quoteIds.has(item.quoteId)), "all wallpapers should reference a known bilingual quote");
+assert.ok(
+  filterWallpapersForTheme(FALLBACK_WALLPAPERS, "auto").length >= 8,
+  "Auto Mix should always have a healthy local fallback pool"
+);
+assert.ok(
+  filterWallpapersForTheme(FALLBACK_WALLPAPERS, "auto").every(isAutoMixWallpaper),
+  "Auto Mix should only use aesthetic non-science wallpapers"
+);
+assert.ok(
+  filterWallpapersForTheme(FALLBACK_WALLPAPERS, "auto").every((item) => !isScienceWallpaperSource(item)),
+  "Auto Mix must not include NASA, ESA, USGS, or NOAA sources"
+);
+assert.ok(
+  filterWallpapersForTheme(FALLBACK_WALLPAPERS, "space").some((item) => item.source === "nasa" || /nasa|esa/i.test(item.sourceCollection)),
+  "Space mode should keep curated NASA/ESA imagery available"
+);
 assert.equal(inferQuoteId("Milky Way Carina Nebula", "NASA"), "cosmic-patience");
 assert.equal(inferQuoteId("Lake reflection and ocean coast", "Wikimedia"), "water-still");
 assert.equal(inferQuoteId("African wolf in Serengeti", "Wiki Loves Earth"), "patient-life");

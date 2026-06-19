@@ -2,112 +2,50 @@
 
 ## Final Goal
 
-Keep this WebCollect thread moving until the current implementation pass is genuinely complete: the fresh clean clone is used, the recent UI action-menu/search/wallpaper fixes are implemented, important checks pass, and any remaining blockers or risks are explicit.
+修复 WebCollect 壁纸系统：普通模式不再默认抓取 NASA、卫星、科研或技术图，改为高质量精选壁纸和合规来源优先；支持本地 fallback、后台刷新、质量过滤、模式切换、滚轮换壁纸、双语引用和来源署名，并用测试、构建和浏览器验证证明可用。
 
 ## Completed
 
-- Fresh clean working folder is `/Users/rockyx/Documents/Codex/2026-06-14/webcollect-main-clean`; old `/Users/rockyx/Documents/webcollect` is not used.
-- Group/category edit actions are folded back into the three-dot menu.
-- Website cards use the same hover three-dot action pattern while keeping the star favorite button.
-- Header search no longer filters or reshapes the dashboard wall; it only drives the floating search panel.
-- Wallpaper rotation is no longer restricted to packaged images at startup.
-- Wallpaper background refresh now checks from wallpaper mode on startup, focus, visibility return, network return, and a 30-minute cadence with a 6-hour network refresh gate.
-- Wallpaper image caching now covers up to 8 images.
-- Packaged wallpaper fallback grew from 6 to 8 local files, and extension build output also contains 8 packaged wallpapers.
-- Wallpaper quote matching has additional bilingual quote IDs and title-first inference to avoid source-name misclassification.
-- `tasks/todo.md` records the completed action-menu, search, and wallpaper tasks.
-- Category panels now use tighter default width and inner spacing to reduce unused right-side blank space.
-- Parent categories now have a fixed layout lock button in the top-right header; locked categories block parent/category drag, subgroup drag/resize, card drag, and category resize with an unlock prompt.
-- Category layout lock state is persisted in local storage, snapshots, and sync preference merging.
-- Wallpaper mode now supports mouse-wheel switching with threshold and cooldown so wallpapers can be reviewed manually.
-- Collection mode now renders inside a fixed 2048x1152 logical canvas and scales the canvas to the current viewport, so external monitors and laptop screens keep the same layout proportions.
-- The fixed canvas overrides small-screen header media-query changes, preventing header/actions from switching into a different layout on laptop-sized windows.
-- GitHub CLI release instability root cause was narrowed down: plain `gh auth login` timed out while posting to GitHub's device-code endpoint, but the same flow immediately received a device code when forced through the local Clash proxy at `127.0.0.1:7897`.
-- Added `scripts/gh-proxy.sh` so project GitHub CLI calls can consistently use `HTTPS_PROXY`/`HTTP_PROXY` without changing system network settings or storing tokens in plaintext.
-- Added `scripts/release-extension.sh` and package scripts `gh:status` / `release:extension` so future release checks/uploads use the proxy wrapper instead of ad hoc `gh` commands.
-- Hardened `scripts/release-extension.sh` so it can find the local Corepack binary even when the current shell has not loaded the user's nvm PATH.
-- Hardened `scripts/release-extension.sh` so its internal `git push` calls also use the same GitHub proxy setting instead of falling back to direct GitHub connections.
-- Added an early release-script preflight for the GitHub proxy port so a stopped Clash/mihomo core fails with a clear message instead of a long GitHub timeout.
+- 默认壁纸偏好改为 `themeMode: auto`，默认启用自然/地标/动物/海洋类审美图库，不再默认启用 `space/aerial/weather`。
+- NASA/ESA/USGS/NOAA 等科研来源从 Auto Mix 默认池剥离；NASA 仅允许在用户显式选择 Space 模式时进入远程抓取。
+- 增加技术图负面关键词过滤，拒绝 satellite、map、heatmap、thermal、diagram、instrument、radar、chart、graph、mission、launch、Blue Marble 等明显科研/工具图。
+- 壁纸评分取消对 NASA/ESA/USGS/NOAA 的奖励，并对科研来源和技术图进行降权/过滤。
+- 增加 `WallpaperThemeMode`、`provider`、`tags`、`attribution`、`modes` 等兼容字段，保留现有数据结构和旧数据迁移路径。
+- 壁纸缓存、当前选择、下一张切换、后台刷新都按当前模式过滤；远程失败时仍回落到本地精选库。
+- 壁纸设置面板增加 Auto Mix / Nature / Cinema / Art / Space 模式入口。
+- 新标签页角落保留刷新和设置按钮，壁纸说明增加来源/授权署名。
+- 保留并验证滚轮换壁纸功能。
+- 修复 3 个打包本地壁纸素材错配/重复问题：Madygen、Fusine Lake、Cosmic Cliffs 现在分别是正确图片，不再和 Blue Marble 或其他图片重复。
+- 新增壁纸策略测试 `scripts/test-wallpaper-policy.ts`，覆盖默认抓取类别、技术图过滤、Auto Mix 排除科研来源、Space 可使用 NASA。
+- 更新壁纸数据和 wiring 测试，覆盖默认图库数量、图片哈希唯一性、模式 UI、设置入口和署名渲染。
 
 ## Unfinished
 
-- No active implementation task is pending after the latest responsive canvas pass.
-- There are older historical checklist entries in `tasks/todo.md` from previous sessions, such as Windows install verification and old package rebuild notes. They are not part of this current local implementation pass.
-- Changes are not committed; the working tree intentionally contains the accumulated uncommitted implementation work.
+- Pexels/Pixabay/TMDb 这类需要 API key 或后端代理的可选 provider 尚未接入；当前实现保持关闭，不在前端硬编码密钥。
+- Cinema/Art 目前先作为模式策略入口和过滤路径存在，尚未接入专门的电影/艺术外部图库。没有 API key 时，功能仍以本地精选和合规 Wikimedia 图库兜底。
+- GitHub Release 尚未发布为新的可下载版本。
 
 ## Current Blockers
 
-- No user decision is currently required.
-- GitHub CLI account login is still required before creating the GitHub Release. The latest device code expired before the browser authorization completed.
-- Shell `curl` cannot reach the existing host-side local preview from this sandbox namespace.
-- No current browser verification blocker. A temporary elevated 127.0.0.1 dev server plus headless Chrome verified the responsive canvas pass.
+- 无必须由用户决策的代码阻塞。
+- 外部付费/授权 API provider 需要用户以后明确提供 key 或后端代理方案，当前阶段按计划不启用。
+- `corepack pnpm build` 的顶层脚本会直接调用 `pnpm`，在当前 shell PATH 下报 `pnpm: command not found`；已拆分运行核心验证命令。
+- `corepack pnpm exec next build` 在本机当前环境长时间停在 Turbopack production build，无错误输出，已作为环境/构建耗时风险记录。
 
 ## Next Step
 
-- Commit and push the GitHub CLI proxy/release script stabilization.
-- Ask the user to complete one GitHub device authorization while `scripts/gh-proxy.sh auth login ...` is actively waiting, then run `pnpm gh:status` and `pnpm release:extension`.
+- 若要发布给用户安装，下一步是按现有 release 脚本重新打包/发布扩展。
+- 后续增强可以单独接入安全的后端代理 provider：Pexels/Pixabay/TMDb，并为 Cinema/Art 增补专门精选库。
 
 ## Latest Verification
 
-- 2026-06-17 CST implemented fixed-resolution collection canvas scaling.
-- `node --import tsx scripts/test-resolution-layout.ts` passed.
-- `git diff --check` passed.
-- `corepack pnpm ts-check` passed with the explicit Node v20.20.2 PATH.
+- 2026-06-19 CST 完成壁纸默认策略、质量过滤、模式 UI、素材修复和浏览器验收。
+- `node --import tsx scripts/test-wallpaper-data.ts` passed.
+- `node --import tsx scripts/test-wallpaper-policy.ts` passed.
+- `node --import tsx scripts/test-wallpaper-wiring.ts` passed.
+- `corepack pnpm ts-check` passed.
 - `corepack pnpm lint` passed with 6 existing warnings and 0 errors.
-- `corepack pnpm build:ext` passed with the existing Vite large-chunk/dynamic-import warnings.
-- Browser QA used temporary `http://127.0.0.1:5001` via `corepack pnpm exec next dev -H 127.0.0.1 -p 5001` and headless Chrome.
-- Viewport `2048x1152`: `.wc-resolution-canvas` scale `1`, CSS width `2048px`, rendered width `2048`, desktop header grid retained.
-- Viewport `1366x768`: `.wc-resolution-canvas` scale `0.667`, CSS width `2048px`, rendered width `1366`, same desktop header grid retained.
-- 2026-06-17 CST diagnosed GitHub CLI auth instability: stale `RockyXuan` gh login was removed; unproxied `gh auth login` failed with a GitHub device-code timeout; proxied login obtained code `21B8-2ADE`, but the code expired before browser authorization completed.
-- `bash -n scripts/gh-proxy.sh` passed.
-- `bash -n scripts/release-extension.sh` passed.
-- `scripts/gh-proxy.sh auth status` reached GitHub through the proxy wrapper and returned the expected "not logged in" state instead of timing out.
-- Plain `git push origin main` timed out against GitHub, then succeeded after adding the repository-local Git proxy config `http.https://github.com.proxy=http://127.0.0.1:7897`.
-- A later preflight found `127.0.0.1:7897` was no longer listening, confirming that Clash/mihomo port availability remains the external dependency for GitHub operations.
-- 2026-06-16 15:30 CST implemented category spacing, category layout locking, and wallpaper wheel switching.
-- `git diff --check` passed.
-- `/Users/rockyx/.nvm/versions/node/v20.20.2/bin/node --import tsx scripts/test-layout-preferences.ts` passed.
-- `/Users/rockyx/.nvm/versions/node/v20.20.2/bin/node --import tsx scripts/test-layout-sizing.ts` passed.
-- `/Users/rockyx/.nvm/versions/node/v20.20.2/bin/node --import tsx scripts/test-wallpaper-data.ts` passed.
-- `/Users/rockyx/.nvm/versions/node/v20.20.2/bin/node --import tsx scripts/test-wallpaper-wiring.ts` passed.
-- `corepack pnpm ts-check` passed with the explicit Node v20.20.2 PATH.
-- `corepack pnpm lint` passed with 6 existing warnings and 0 errors.
-- `corepack pnpm build:ext` passed with the existing Vite large-chunk/dynamic-import warnings.
-- Browser verification attempt: in-app Browser/Chrome tools were not exposed by tool discovery; sandbox blocked `PORT=5001 corepack pnpm tsx watch src/server.ts` with `listen EPERM` on the tsx IPC pipe; escalation approval timed out twice; bundled Playwright had no browser binary; system Chrome headless launch was terminated with process permission errors.
-- 2026-06-15 07:41 CST heartbeat reran continuity checks.
-- `git status -sb` still shows only the known uncommitted implementation files plus `CODEX_GO_MODE_STATUS.md` and two wallpaper image assets.
-- `rg` found only older historical pending notes, not a new active implementation task from recent requests.
-- `git diff --check` passed.
-- `/Users/rockyx/.nvm/versions/node/v20.20.2/bin/node --import tsx scripts/test-wallpaper-data.ts` passed.
-- `/Users/rockyx/.nvm/versions/node/v20.20.2/bin/node --import tsx scripts/test-wallpaper-wiring.ts` passed.
-- `corepack pnpm ts-check` passed with the explicit Node v20.20.2 PATH.
-- `corepack pnpm lint` passed with 6 pre-existing warnings and 0 errors.
-- 2026-06-15 06:41 CST heartbeat reran continuity checks.
-- `git status -sb` still shows only the known uncommitted implementation files plus `CODEX_GO_MODE_STATUS.md` and two wallpaper image assets.
-- `rg` found only older historical pending notes, not a new active implementation task from recent requests.
-- `git diff --check` passed.
-- `/Users/rockyx/.nvm/versions/node/v20.20.2/bin/node --import tsx scripts/test-wallpaper-data.ts` passed.
-- `/Users/rockyx/.nvm/versions/node/v20.20.2/bin/node --import tsx scripts/test-wallpaper-wiring.ts` passed.
-- `corepack pnpm ts-check` passed with the explicit Node v20.20.2 PATH.
-- `corepack pnpm build:ext` passed with the existing Vite large-chunk/dynamic-import warnings.
-- 2026-06-15 05:40 CST heartbeat reran continuity checks.
-- `git status -sb` still shows only the known uncommitted implementation files plus `CODEX_GO_MODE_STATUS.md` and two wallpaper image assets.
-- `git diff --check` passed.
-- `/Users/rockyx/.nvm/versions/node/v20.20.2/bin/node --import tsx scripts/test-wallpaper-data.ts` passed.
-- `/Users/rockyx/.nvm/versions/node/v20.20.2/bin/node --import tsx scripts/test-wallpaper-wiring.ts` passed.
-- `corepack pnpm ts-check` passed with the explicit Node v20.20.2 PATH.
-- `corepack pnpm lint` passed with 6 pre-existing warnings and 0 errors.
-- 2026-06-15 04:38 CST heartbeat reran lightweight checks.
-- `git diff --check` passed.
-- `/Users/rockyx/.nvm/versions/node/v20.20.2/bin/node --import tsx scripts/test-wallpaper-data.ts` passed.
-- `/Users/rockyx/.nvm/versions/node/v20.20.2/bin/node --import tsx scripts/test-wallpaper-wiring.ts` passed.
-- `corepack pnpm ts-check` passed with the explicit Node v20.20.2 PATH.
-- 2026-06-15 03:38 CST heartbeat reran focused checks.
-- `git diff --check` passed.
-- `/Users/rockyx/.nvm/versions/node/v20.20.2/bin/node --import tsx scripts/test-wallpaper-data.ts` passed.
-- `/Users/rockyx/.nvm/versions/node/v20.20.2/bin/node --import tsx scripts/test-wallpaper-wiring.ts` passed.
-- `corepack pnpm ts-check` passed with the explicit Node v20.20.2 PATH.
-- `corepack pnpm lint` passed with 6 pre-existing warnings and 0 errors.
-- `corepack pnpm build:ext` passed with the existing Vite large-chunk/dynamic-import warnings.
-- In-app Browser smoke check loaded `http://localhost:5001/`, showed a wallpaper stage with a remote NASA image, bilingual quote text, no framework overlay, and no console error/warn logs.
-- Previous Browser interaction verified typing `Pendle` in header search kept wall counts stable while opening the search panel.
+- `corepack pnpm build:ext` passed with existing Vite large-chunk/dynamic-import warnings.
+- `corepack pnpm exec tsup src/server.ts --format esm --outDir dist --target node20 --external next --external react --external react-dom` passed.
+- In-app Browser verified `http://127.0.0.1:5010/`: wallpaper stage loads; settings button opens the wallpaper settings dialog; Auto Mix/Nature/Cinema/Art/Space options are present; attribution renders; default visible wallpaper is a Wikimedia nature scene, not NASA/Blue Marble/satellite/science imagery.
+- Packaged image hashes were checked and are unique after replacing the duplicated/mismapped local files.

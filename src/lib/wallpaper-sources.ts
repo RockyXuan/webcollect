@@ -1,5 +1,11 @@
 import { ZOOM_CURATED_WALLPAPERS } from "./zoom-curated-wallpapers";
-import { WALLPAPER_CATEGORIES, type WallpaperCategory, type WallpaperItem, type WallpaperPrefs } from "./wallpaper-types";
+import {
+  type WallpaperCategory,
+  type WallpaperItem,
+  type WallpaperPrefs,
+  type WallpaperSource,
+  type WallpaperThemeMode,
+} from "./wallpaper-types";
 
 export const WALLPAPER_REMOTE_LIMIT = 24;
 export const WALLPAPER_CURATED_MIN = 12;
@@ -11,11 +17,19 @@ export const ZOOM_WALLPAPER_MIN_WIDTH = 3000;
 export const ZOOM_WALLPAPER_MIN_HEIGHT = 1600;
 export const ZOOM_WALLPAPER_MIN_RATIO = 1.45;
 export const ZOOM_WALLPAPER_MAX_RATIO = 2.4;
+export const DEFAULT_WALLPAPER_ENABLED_CATEGORIES: WallpaperCategory[] = [
+  "landscape",
+  "landmark",
+  "animals",
+  "ocean",
+];
+export const SCIENCE_WALLPAPER_SOURCES: WallpaperSource[] = ["nasa", "esa", "usgs", "noaa"];
 
 export const DEFAULT_WALLPAPER_PREFS: WallpaperPrefs = {
   defaultMode: "wallpaper",
+  themeMode: "auto",
   rotationInterval: "15m",
-  enabledCategories: [...WALLPAPER_CATEGORIES],
+  enabledCategories: [...DEFAULT_WALLPAPER_ENABLED_CATEGORIES],
   autoUpdate: true,
   paused: false,
   showZoomHints: true,
@@ -32,8 +46,8 @@ const CATEGORY_SEARCH_TERMS: Record<WallpaperCategory, string[]> = {
     'incategory:"Winners of Wiki Loves Earth" landscape panorama',
   ],
   aerial: [
-    "NASA Earth Observatory satellite earth",
-    "aerial glacier coastline featured",
+    "aerial coastline featured panorama",
+    "aerial glacier coastline featured -satellite",
   ],
   landmark: [
     "Wiki Loves Monuments featured panorama",
@@ -49,13 +63,37 @@ const CATEGORY_SEARCH_TERMS: Record<WallpaperCategory, string[]> = {
   ],
   ocean: [
     "featured coastline ocean dawn panorama",
-    "NASA Earth Observatory ocean island",
+    "featured island coast panorama",
   ],
   weather: [
-    "USGS volcano lava public domain high resolution",
-    "NOAA storm satellite public domain high resolution",
+    "featured storm clouds landscape panorama",
+    "featured lightning landscape high resolution",
   ],
 };
+
+const TECHNICAL_WALLPAPER_TERMS = [
+  "satellite",
+  "heatmap",
+  "thermal",
+  "diagram",
+  "instrument",
+  "radar",
+  "chart",
+  "graph",
+  "schematic",
+  "mission",
+  "launch",
+  "observatory",
+  "earth observatory",
+  "visible earth",
+  "weather map",
+  "blue marble",
+];
+
+const AUTO_MIX_CATEGORIES = new Set<WallpaperCategory>(DEFAULT_WALLPAPER_ENABLED_CATEGORIES);
+const NATURE_CATEGORIES = new Set<WallpaperCategory>(["landscape", "animals", "ocean"]);
+const CINEMA_CATEGORIES = new Set<WallpaperCategory>(["landscape", "landmark", "ocean"]);
+const ART_CATEGORIES = new Set<WallpaperCategory>(["landscape", "landmark", "ocean"]);
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -95,6 +133,35 @@ function hasUsableLicense(item: WallpaperItem): boolean {
     || license.includes("noaa");
 }
 
+function getWallpaperSearchText(item: WallpaperItem): string {
+  return [
+    item.title,
+    item.author,
+    item.source,
+    item.sourceCollection,
+    item.license,
+    item.sourceUrl,
+    ...(item.tags || []),
+  ].join(" ").toLowerCase();
+}
+
+export function isScienceWallpaperSource(item: WallpaperItem): boolean {
+  const text = getWallpaperSearchText(item);
+  return SCIENCE_WALLPAPER_SOURCES.includes(item.source)
+    || /\b(nasa|esa|usgs|noaa|hubble|webb|earth observatory|visible earth)\b/i.test(text);
+}
+
+export function isTechnicalWallpaper(item: WallpaperItem): boolean {
+  const text = getWallpaperSearchText(item);
+  return TECHNICAL_WALLPAPER_TERMS.some((term) => text.includes(term));
+}
+
+export function isAutoMixWallpaper(item: WallpaperItem): boolean {
+  return AUTO_MIX_CATEGORIES.has(item.category)
+    && !isScienceWallpaperSource(item)
+    && !isTechnicalWallpaper(item);
+}
+
 export function isZoomWallpaperCandidate(item: WallpaperItem): boolean {
   if (!item.id || !item.title || !item.author) return false;
   if (!item.imageUrl || !item.thumbnailUrl || !item.sourceUrl) return false;
@@ -102,6 +169,7 @@ export function isZoomWallpaperCandidate(item: WallpaperItem): boolean {
   if (!isOriginalSizedImageUrl(item.imageUrl)) return false;
   if (!hasUsableLicense(item)) return false;
   if (!item.quality || !item.sourceCollection || !item.quoteId) return false;
+  if (isTechnicalWallpaper(item)) return false;
   if (item.width < ZOOM_WALLPAPER_MIN_WIDTH || item.height < ZOOM_WALLPAPER_MIN_HEIGHT) return false;
   const aspectRatio = item.width / item.height;
   return aspectRatio >= ZOOM_WALLPAPER_MIN_RATIO && aspectRatio <= ZOOM_WALLPAPER_MAX_RATIO;
@@ -120,13 +188,14 @@ export function scoreZoomWallpaper(item: WallpaperItem): number {
     collection.includes("wiki loves monuments") ? 80 : 0,
     collection.includes("picture of the year") || collection.includes("poty") ? 70 : 0,
     collection.includes("featured") ? 60 : 0,
-    collection.includes("nasa") || collection.includes("esa") || collection.includes("usgs") || collection.includes("noaa") ? 45 : 0,
   ].reduce((sum, value) => sum + value, 0);
   const aspectRatio = item.width / item.height;
   const aspectScore = Math.max(0, 80 - Math.abs(aspectRatio - 16 / 9) * 80);
   const megapixels = Math.min(90, (item.width * item.height) / 1_000_000);
   const recencyScore = Math.min(30, item.fetchedAt > 0 ? item.fetchedAt / 1_000_000_000_000 : 0);
-  return qualityScore + collectionScore + aspectScore + megapixels + recencyScore;
+  const sciencePenalty = isScienceWallpaperSource(item) ? 140 : 0;
+  const technicalPenalty = isTechnicalWallpaper(item) ? 300 : 0;
+  return qualityScore + collectionScore + aspectScore + megapixels + recencyScore - sciencePenalty - technicalPenalty;
 }
 
 export function filterZoomWallpapers(items: WallpaperItem[]): WallpaperItem[] {
@@ -143,6 +212,42 @@ export function filterZoomWallpapers(items: WallpaperItem[]): WallpaperItem[] {
 
 export function filterUsableWallpapers(items: WallpaperItem[]): WallpaperItem[] {
   return filterZoomWallpapers(items);
+}
+
+function getThemeCategorySet(themeMode: WallpaperThemeMode): Set<WallpaperCategory> {
+  if (themeMode === "nature") return NATURE_CATEGORIES;
+  if (themeMode === "cinema") return CINEMA_CATEGORIES;
+  if (themeMode === "art") return ART_CATEGORIES;
+  if (themeMode === "space") return new Set<WallpaperCategory>(["space"]);
+  return AUTO_MIX_CATEGORIES;
+}
+
+export function filterWallpapersForTheme(
+  items: WallpaperItem[],
+  themeMode: WallpaperThemeMode = "auto"
+): WallpaperItem[] {
+  const candidates = filterZoomWallpapers(items);
+  if (themeMode === "space") {
+    return candidates.filter((item) => item.category === "space");
+  }
+  const categories = getThemeCategorySet(themeMode);
+  const filtered = candidates.filter((item) =>
+    categories.has(item.category)
+    && !isScienceWallpaperSource(item)
+    && !isTechnicalWallpaper(item)
+  );
+  if (filtered.length > 0) return filtered;
+  return candidates.filter(isAutoMixWallpaper);
+}
+
+export function getWallpaperFetchCategories(prefs: WallpaperPrefs): WallpaperCategory[] {
+  if (prefs.themeMode === "space") return ["space"];
+  const categories = prefs.enabledCategories.length > 0
+    ? prefs.enabledCategories
+    : DEFAULT_WALLPAPER_ENABLED_CATEGORIES;
+  const allowed = getThemeCategorySet(prefs.themeMode);
+  const filtered = categories.filter((category) => allowed.has(category));
+  return filtered.length > 0 ? filtered : [...DEFAULT_WALLPAPER_ENABLED_CATEGORIES];
 }
 
 export function mergeWallpaperLibrary(existing: WallpaperItem[], incoming: WallpaperItem[]): WallpaperItem[] {
@@ -234,8 +339,9 @@ export async function fetchRemoteWallpapers(
   fetchImpl: FetchLike = fetch
 ): Promise<WallpaperItem[]> {
   const enabled = categories.length > 0 ? categories : DEFAULT_WALLPAPER_PREFS.enabledCategories;
+  const includeNasa = enabled.includes("space");
   const [nasa, wikimedia] = await Promise.allSettled([
-    fetchNasaWallpapers(enabled, now, fetchImpl),
+    includeNasa ? fetchNasaWallpapers(enabled, now, fetchImpl) : Promise.resolve([]),
     fetchWikimediaWallpapers(enabled, now, fetchImpl),
   ]);
 
@@ -250,7 +356,11 @@ async function fetchNasaWallpapers(
   now: number,
   fetchImpl: FetchLike
 ): Promise<WallpaperItem[]> {
-  const terms = categories.flatMap((category) => CATEGORY_SEARCH_TERMS[category]).slice(0, 3);
+  const terms = categories
+    .filter((category) => category === "space")
+    .flatMap((category) => CATEGORY_SEARCH_TERMS[category])
+    .slice(0, 3);
+  if (terms.length === 0) return [];
   const results = await Promise.allSettled(
     terms.map(async (term) => {
       const url = `https://images-api.nasa.gov/search?media_type=image&page_size=6&q=${encodeURIComponent(term)}`;
@@ -274,6 +384,9 @@ function mapNasaItem(rawItem: unknown, now: number): WallpaperItem[] {
   const imageUrl = normalizeUrl(asString(firstImage.href));
   if (!imageUrl || !isOriginalSizedImageUrl(imageUrl) || !isStaticImageUrl(imageUrl)) return [];
   const title = asString(data.title) || "NASA image";
+  const width = asNumber(firstImage.width) || asNumber(data.width);
+  const height = asNumber(firstImage.height) || asNumber(data.height);
+  if (width < ZOOM_WALLPAPER_MIN_WIDTH || height < ZOOM_WALLPAPER_MIN_HEIGHT) return [];
   const id = `nasa-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 64)}`;
   return [{
     id,
@@ -284,13 +397,15 @@ function mapNasaItem(rawItem: unknown, now: number): WallpaperItem[] {
     imageUrl,
     thumbnailUrl: imageUrl,
     license: "NASA media guidelines",
-    width: 3840,
-    height: 2160,
+    width,
+    height,
     category: inferCategory(title),
     quality: "remote",
     sourceCollection: "NASA Image and Video Library",
     quoteId: inferQuoteId(title, "NASA Image and Video Library"),
     fetchedAt: now,
+    provider: "nasa",
+    attribution: "NASA Image and Video Library",
   }];
 }
 
@@ -348,6 +463,8 @@ function mapWikimediaPage(page: unknown, now: number): WallpaperItem[] {
     sourceCollection,
     quoteId: inferQuoteId(title, sourceCollection),
     fetchedAt: now,
+    provider: "wikimedia",
+    attribution: `${artist || "Wikimedia Commons"} / ${licenseShort || "Wikimedia Commons"}`,
   }];
 }
 

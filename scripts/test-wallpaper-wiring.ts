@@ -5,6 +5,8 @@ const pageSource = readFileSync("src/app/page.tsx", "utf8");
 const extensionSource = readFileSync("extension/src/newtab-app.tsx", "utf8");
 const topNavSource = readFileSync("src/components/nav/top-nav.tsx", "utf8");
 const shellSource = readFileSync("src/components/wallpaper/wallpaper-shell.tsx", "utf8");
+const settingsSource = readFileSync("src/components/wallpaper/wallpaper-settings-dialog.tsx", "utf8");
+const storeSource = readFileSync("src/lib/wallpaper-store.ts", "utf8");
 
 for (const [label, source] of [
   ["web page", pageSource],
@@ -23,8 +25,17 @@ assert.ok(shellSource.includes("LONG_PRESS_MS = 700"), "WallpaperShell should us
 assert.ok(shellSource.includes("onEnterCollection"), "WallpaperShell should enter the bookmark wall");
 assert.ok(shellSource.includes("refreshOnlineWallpapers({ selectFresh: true })"), "WallpaperShell should opportunistically refresh online wallpapers in the background");
 assert.ok(shellSource.includes("WALLPAPER_BACKGROUND_CHECK_MS"), "WallpaperShell should use the shared background refresh cadence");
+assert.ok(shellSource.includes("<cite>{attribution}</cite>"), "WallpaperShell should show wallpaper attribution below the quote");
+assert.ok(shellSource.includes("WallpaperSettingsDialog"), "WallpaperShell should mount the wallpaper settings dialog");
+assert.ok(shellSource.includes("wc-wallpaper-controls"), "WallpaperShell should render wallpaper controls");
+assert.ok(shellSource.includes("aria-label=\"壁纸设置\""), "WallpaperShell should expose a settings control");
 assert.ok(shellSource.includes('window.addEventListener("online", refreshIfOnline)'), "WallpaperShell should retry wallpaper refresh when network returns");
 assert.ok(shellSource.includes('window.addEventListener("focus", refreshIfOnline)'), "WallpaperShell should refresh-check when the wallpaper page regains focus");
+assert.ok(settingsSource.includes("THEME_OPTIONS"), "Wallpaper settings should expose theme mode choices");
+assert.ok(settingsSource.includes("Auto Mix"), "Wallpaper settings should include Auto Mix");
+assert.ok(settingsSource.includes("Space"), "Wallpaper settings should include the opt-in Space mode");
+assert.ok(storeSource.includes("filterWallpapersForTheme"), "Wallpaper store should select wallpapers through the theme filter");
+assert.ok(storeSource.includes("getWallpaperFetchCategories"), "Wallpaper refresh should use theme-aware fetch categories");
 assert.ok(pageSource.includes("onShowWallpaper={handleReturnToWallpaper}"), "Web page should expose the top-nav wallpaper button");
 assert.ok(extensionSource.includes("onShowWallpaper={handleReturnToWallpaper}"), "Extension newtab should expose the top-nav wallpaper button");
 assert.equal(shellSource.includes("handleCollectionMouseMove"), false, "Collection mode must not wire mouse fling gestures");

@@ -1,10 +1,12 @@
 "use client";
 
+import { RefreshCw, Settings } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode, type WheelEvent } from "react";
 import { getWallpaperQuote } from "@/lib/wallpaper-quotes";
 import { getRotationMs, selectCurrentWallpaper, useWallpaperStore } from "@/lib/wallpaper-store";
 import { WALLPAPER_BACKGROUND_CHECK_MS } from "@/lib/wallpaper-sources";
 import type { WallpaperMode, WallpaperPrefs } from "@/lib/wallpaper-types";
+import { WallpaperSettingsDialog } from "./wallpaper-settings-dialog";
 
 const LONG_PRESS_MS = 700;
 const IDLE_HINT_MS = 2000;
@@ -94,8 +96,10 @@ export function WallpaperShell({
   const nextWallpaper = useWallpaperStore((state) => state.nextWallpaper);
   const updatePrefs = useWallpaperStore((state) => state.updatePrefs);
   const refreshOnlineWallpapers = useWallpaperStore((state) => state.refreshOnlineWallpapers);
+  const isRefreshing = useWallpaperStore((state) => state.isRefreshing);
   const [fullImageLoaded, setFullImageLoaded] = useState(false);
   const [hintVisible, setHintVisible] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const longPressTimerRef = useRef<number | null>(null);
   const idleHintTimerRef = useRef<number | null>(null);
   const longPressTriggeredRef = useRef(false);
@@ -170,6 +174,10 @@ export function WallpaperShell({
   }), [wallpaper.imageUrl]);
 
   const quote = useMemo(() => getWallpaperQuote(wallpaper.quoteId), [wallpaper.quoteId]);
+  const attribution = useMemo(() => (
+    wallpaper.attribution
+    || `${wallpaper.author} · ${wallpaper.sourceCollection} · ${wallpaper.license}`
+  ), [wallpaper.attribution, wallpaper.author, wallpaper.license, wallpaper.sourceCollection]);
 
   useEffect(() => {
     let active = true;
@@ -288,6 +296,10 @@ export function WallpaperShell({
     handlePrefsUpdate({ showZoomHints: false });
   }, [handlePrefsUpdate]);
 
+  const handleManualRefresh = useCallback(() => {
+    void refreshOnlineWallpapers({ force: true, selectFresh: true });
+  }, [refreshOnlineWallpapers]);
+
   const hintText = "滚轮换壁纸，长按或左右滑动进入网页墙";
 
   if (mode === "wallpaper") {
@@ -314,7 +326,39 @@ export function WallpaperShell({
           <blockquote>{quote.zh}</blockquote>
           <p>{quote.en}</p>
           <figcaption>{quote.source}</figcaption>
+          <cite>{attribution}</cite>
         </figure>
+
+        <div className="wc-wallpaper-controls" data-wallpaper-control>
+          <button
+            type="button"
+            className="wc-wallpaper-control inline-flex items-center justify-center"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            aria-label="立即更新壁纸"
+            title="立即更新壁纸"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+          </button>
+          <button
+            type="button"
+            className="wc-wallpaper-control inline-flex items-center justify-center"
+            onClick={() => setSettingsOpen(true)}
+            aria-label="壁纸设置"
+            title="壁纸设置"
+          >
+            <Settings className="h-4 w-4" />
+          </button>
+        </div>
+
+        <WallpaperSettingsDialog
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          prefs={prefs}
+          isRefreshing={isRefreshing}
+          onUpdatePrefs={handlePrefsUpdate}
+          onRefresh={handleManualRefresh}
+        />
 
         {prefs.showZoomHints ? (
           <div

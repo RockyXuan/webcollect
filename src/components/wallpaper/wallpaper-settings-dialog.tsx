@@ -10,7 +10,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { WallpaperCategory, WallpaperPrefs, WallpaperRotationInterval } from "@/lib/wallpaper-types";
+import type {
+  WallpaperCategory,
+  WallpaperPrefs,
+  WallpaperRotationInterval,
+  WallpaperThemeMode,
+} from "@/lib/wallpaper-types";
 
 const CATEGORY_OPTIONS: Array<{ id: WallpaperCategory; label: string }> = [
   { id: "landscape", label: "风景" },
@@ -28,6 +33,14 @@ const ROTATION_OPTIONS: Array<{ id: WallpaperRotationInterval; label: string }> 
   { id: "15m", label: "每 15 分钟" },
   { id: "1h", label: "每 1 小时" },
   { id: "open", label: "每次打开换一张" },
+];
+
+const THEME_OPTIONS: Array<{ id: WallpaperThemeMode; label: string }> = [
+  { id: "auto", label: "Auto Mix" },
+  { id: "nature", label: "Nature" },
+  { id: "cinema", label: "Cinema" },
+  { id: "art", label: "Art" },
+  { id: "space", label: "Space" },
 ];
 
 interface WallpaperSettingsDialogProps {
@@ -68,6 +81,25 @@ export function WallpaperSettingsDialog({
         </DialogHeader>
 
         <div className="space-y-5 py-2">
+          <section className="space-y-2">
+            <p className="text-sm font-bold text-slate-800">壁纸模式</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+              {THEME_OPTIONS.map((option) => {
+                const active = prefs.themeMode === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={`wc-wallpaper-setting-chip ${active ? "wc-wallpaper-setting-chip-active" : ""}`}
+                    onClick={() => onUpdatePrefs({ themeMode: option.id })}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
           <section className="space-y-2">
             <p className="text-sm font-bold text-slate-800">壁纸分类</p>
             <div className="grid grid-cols-2 gap-2">

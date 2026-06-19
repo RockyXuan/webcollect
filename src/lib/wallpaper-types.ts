@@ -12,9 +12,26 @@ export type WallpaperCategory = typeof WALLPAPER_CATEGORIES[number];
 
 export type WallpaperSource = "fallback" | "nasa" | "wikimedia" | "esa" | "usgs" | "noaa";
 
+export type WallpaperProvider =
+  | "curated"
+  | "fallback"
+  | "wikimedia"
+  | "nasa"
+  | "esa"
+  | "usgs"
+  | "noaa"
+  | "pexels"
+  | "pixabay"
+  | "tmdb"
+  | "met"
+  | "artic"
+  | "smithsonian";
+
 export type WallpaperQuality = "curated" | "award" | "featured" | "remote";
 
 export type WallpaperMode = "wallpaper" | "collection";
+
+export type WallpaperThemeMode = "auto" | "nature" | "cinema" | "art" | "space";
 
 export type WallpaperRotationInterval = "off" | "5m" | "15m" | "1h" | "open";
 
@@ -34,10 +51,15 @@ export interface WallpaperItem {
   sourceCollection: string;
   quoteId: string;
   fetchedAt: number;
+  provider?: WallpaperProvider;
+  tags?: string[];
+  attribution?: string;
+  modes?: WallpaperThemeMode[];
 }
 
 export interface WallpaperPrefs {
   defaultMode: WallpaperMode;
+  themeMode: WallpaperThemeMode;
   rotationInterval: WallpaperRotationInterval;
   enabledCategories: WallpaperCategory[];
   autoUpdate: boolean;

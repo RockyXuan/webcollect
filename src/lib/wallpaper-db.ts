@@ -1,5 +1,11 @@
 import localforage from "localforage";
-import { WALLPAPER_CATEGORIES, type WallpaperCategory, type WallpaperItem, type WallpaperPrefs } from "./wallpaper-types";
+import {
+  WALLPAPER_CATEGORIES,
+  type WallpaperCategory,
+  type WallpaperItem,
+  type WallpaperPrefs,
+  type WallpaperThemeMode,
+} from "./wallpaper-types";
 import { DEFAULT_WALLPAPER_PREFS, FALLBACK_WALLPAPERS, filterUsableWallpapers, mergeWallpaperLibrary, pruneWallpaperLibrary } from "./wallpaper-sources";
 
 const wallpaperDb = localforage.createInstance({
@@ -9,6 +15,7 @@ const wallpaperDb = localforage.createInstance({
 
 const WALLPAPER_PREFS_KEY = "wallpaperPrefs";
 const WALLPAPER_LIBRARY_KEY = "wallpaperLibrary";
+const WALLPAPER_THEME_MODES: WallpaperThemeMode[] = ["auto", "nature", "cinema", "art", "space"];
 
 function normalizePrefs(value: Partial<WallpaperPrefs> | null | undefined): WallpaperPrefs {
   const enabledCategories = Array.isArray(value?.enabledCategories)
@@ -23,6 +30,9 @@ function normalizePrefs(value: Partial<WallpaperPrefs> | null | undefined): Wall
   return {
     ...DEFAULT_WALLPAPER_PREFS,
     ...value,
+    themeMode: WALLPAPER_THEME_MODES.includes(value?.themeMode as WallpaperThemeMode)
+      ? value!.themeMode as WallpaperThemeMode
+      : DEFAULT_WALLPAPER_PREFS.themeMode,
     enabledCategories: safeEnabledCategories,
     showZoomHints: typeof value?.showZoomHints === "boolean" ? value.showZoomHints : true,
     updatedAt: typeof value?.updatedAt === "number" ? value.updatedAt : 0,
