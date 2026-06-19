@@ -73,7 +73,7 @@ require_github_proxy
 "${COREPACK_BIN}" pnpm build:ext
 
 rm -f "${ZIP_PATH}"
-(cd public/extension-dist && zip -qr "${ZIP_PATH}" .)
+(cd extension/dist && zip -qr "${ZIP_PATH}" .)
 
 if ! git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
   git tag "${TAG}"
