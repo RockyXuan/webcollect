@@ -44,4 +44,4 @@
 - 2026-06-21 CST committed `d68ba0c` and pushed to `origin/main`.
 - 2026-06-21 CST published release `webcollect-2026-06-21-wallpaper-refresh-cache`.
 - Release URL: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-06-21-wallpaper-refresh-cache`.
-- Release asset: `WebCollect-Chrome-Extension-webcollect-2026-06-21-wallpaper-refresh-cache.zip`, size `58511169`, sha256 `db785f041b03f0fc38d72956c9a73df497835410cf79995fbb50313a6d4d58a6`.
+- Release asset: `WebCollect-Chrome-Extension-webcollect-2026-06-21-wallpaper-refresh-cache.zip`, size `58511169`, sha256 `e20fe6b4c50e6a15113ae7b11dc43877c68d2658628455f43d49a3640cb29f82`.
