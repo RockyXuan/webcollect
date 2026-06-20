@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   buildCaptureDestinationCache,
+  resolveOrCreateCaptureTargetCategory,
   resolveCaptureTargetCategoryId,
   type CaptureDraft,
 } from "../src/lib/floating-capture";
 import type { Category, CollectionSection } from "../src/lib/types";
 
 const now = 1_777_000_000_000;
+const floatingCaptureSource = readFileSync("extension/src/content/floating-capture.ts", "utf8");
 
 const sections: CollectionSection[] = [
   { id: "section-home", name: "主页", order: 0, createdAt: now, updatedAt: now },
@@ -87,5 +90,98 @@ assert.notEqual(
   "jieliu-inbox",
   "a missing home group must not fall into another section inbox"
 );
+
+const createdSection = resolveOrCreateCaptureTargetCategory(
+  draft({ createSectionName: "新世界" }),
+  categories,
+  sections,
+  "section-home",
+  now + 1
+);
+assert.equal(createdSection.changed, true);
+assert.equal(createdSection.sections.some((section) => section.name === "新世界"), true);
+assert.equal(
+  createdSection.categories.find((category) => category.id === createdSection.categoryId)?.name,
+  "收集箱",
+  "creating a section should place the card in that section's inbox"
+);
+
+const createdParent = resolveOrCreateCaptureTargetCategory(
+  draft({ sectionId: "section-jieliu", createParentCategoryName: "AI 工具" }),
+  categories,
+  sections,
+  "section-home",
+  now + 2
+);
+const aiParent = createdParent.categories.find((category) => category.name === "AI 工具");
+assert.equal(createdParent.changed, true);
+assert.equal(aiParent?.isParent, true);
+assert.equal(aiParent?.sectionId, "section-jieliu");
+assert.equal(
+  createdParent.categories.find((category) => category.id === createdParent.categoryId)?.parentId,
+  aiParent?.id,
+  "creating only a parent category should create/use its inbox child as the target"
+);
+
+const createdGroup = resolveOrCreateCaptureTargetCategory(
+  draft({
+    sectionName: "主页",
+    parentCategoryName: "常用",
+    createGroupName: "临时研究",
+  }),
+  categories,
+  sections,
+  "section-home",
+  now + 3
+);
+const tempResearch = createdGroup.categories.find((category) => category.name === "临时研究");
+assert.equal(createdGroup.changed, true);
+assert.equal(createdGroup.categoryId, tempResearch?.id);
+assert.equal(tempResearch?.parentId, "home-parent-common");
+
+const createdPath = resolveOrCreateCaptureTargetCategory(
+  draft({
+    createSectionName: "工作台",
+    createParentCategoryName: "项目",
+    createGroupName: "X 流量情报台",
+  }),
+  categories,
+  sections,
+  "section-home",
+  now + 4
+);
+const workbench = createdPath.sections.find((section) => section.name === "工作台");
+const project = createdPath.categories.find((category) => category.name === "项目");
+const xReport = createdPath.categories.find((category) => category.name === "X 流量情报台");
+assert.equal(createdPath.changed, true);
+assert.equal(project?.sectionId, workbench?.id);
+assert.equal(project?.isParent, true);
+assert.equal(xReport?.parentId, project?.id);
+assert.equal(createdPath.categoryId, xReport?.id);
+
+const reusedExisting = resolveOrCreateCaptureTargetCategory(
+  draft({
+    createSectionName: "主页",
+    createParentCategoryName: "常用",
+    createGroupName: "ZMT",
+  }),
+  categories,
+  sections,
+  "section-jieliu",
+  now + 5
+);
+assert.equal(reusedExisting.categoryId, "home-group-zmt");
+assert.equal(
+  reusedExisting.categories.filter((category) => category.name === "ZMT").length,
+  1,
+  "create-by-name should reuse an existing destination instead of duplicating it"
+);
+
+assert.ok(floatingCaptureSource.includes("＋ 新建分项"), "floating capture UI should expose section creation");
+assert.ok(floatingCaptureSource.includes("＋ 新建分类"), "floating capture UI should expose parent category creation");
+assert.ok(floatingCaptureSource.includes("＋ 新建分组"), "floating capture UI should expose group creation");
+assert.ok(floatingCaptureSource.includes("createSectionName"), "floating capture draft should preserve new section names");
+assert.ok(floatingCaptureSource.includes("createParentCategoryName"), "floating capture draft should preserve new parent category names");
+assert.ok(floatingCaptureSource.includes("createGroupName"), "floating capture draft should preserve new group names");
 
 console.log("Floating capture destination tests passed.");

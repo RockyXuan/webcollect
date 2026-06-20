@@ -16,6 +16,9 @@
     sectionName?: string;
     parentCategoryName?: string;
     groupName?: string;
+    createSectionName?: string;
+    createParentCategoryName?: string;
+    createGroupName?: string;
   }
 
   interface CaptureDraft {
@@ -112,6 +115,9 @@
   let suppressNextButtonClick = false;
   const HOVER_DELAY_MS = 700;
   const HOVER_MOVE_TOLERANCE_PX = 8;
+  const CREATE_SECTION_VALUE = "__webcollect_create_section__";
+  const CREATE_PARENT_VALUE = "__webcollect_create_parent__";
+  const CREATE_GROUP_VALUE = "__webcollect_create_group__";
 
   const host = document.createElement("div");
   host.id = "webcollect-floating-capture-host";
@@ -409,6 +415,13 @@
         border-color: rgba(96, 165, 250, 0.68);
         box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.13);
       }
+      .wc-create-input {
+        display: none;
+        margin-top: 5px;
+      }
+      .wc-create-input[data-open="true"] {
+        display: block;
+      }
       .wc-textarea { min-height: 62px; resize: vertical; }
       .wc-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
       .wc-actions {
@@ -489,10 +502,22 @@
           <label class="wc-label"><span>地址 *</span><input class="wc-input" data-field="url" /></label>
           <label class="wc-label"><span>简介</span><textarea class="wc-textarea" data-field="description"></textarea></label>
           <div class="wc-row">
-            <label class="wc-label"><span>分项</span><select class="wc-select" data-field="section"></select></label>
-            <label class="wc-label"><span>分类</span><select class="wc-select" data-field="parent"></select></label>
+            <label class="wc-label">
+              <span>分项</span>
+              <select class="wc-select" data-field="section"></select>
+              <input class="wc-input wc-create-input" data-create-field="section" placeholder="新分项名称" />
+            </label>
+            <label class="wc-label">
+              <span>分类</span>
+              <select class="wc-select" data-field="parent"></select>
+              <input class="wc-input wc-create-input" data-create-field="parent" placeholder="新分类名称" />
+            </label>
           </div>
-          <label class="wc-label"><span>分组</span><select class="wc-select" data-field="group"></select></label>
+          <label class="wc-label">
+            <span>分组</span>
+            <select class="wc-select" data-field="group"></select>
+            <input class="wc-input wc-create-input" data-create-field="group" placeholder="新分组名称" />
+          </label>
         </div>
         <p class="wc-quick-note">WebCollect 浮窗栏可以在当前网页快速收集链接，保存后会进入 WebCollect，未选目标时默认进入主页收集箱。</p>
         <div class="wc-quick">
@@ -520,6 +545,9 @@
   const sectionSelect = shadow.querySelector<HTMLSelectElement>('[data-field="section"]')!;
   const parentSelect = shadow.querySelector<HTMLSelectElement>('[data-field="parent"]')!;
   const groupSelect = shadow.querySelector<HTMLSelectElement>('[data-field="group"]')!;
+  const sectionCreateInput = shadow.querySelector<HTMLInputElement>('[data-create-field="section"]')!;
+  const parentCreateInput = shadow.querySelector<HTMLInputElement>('[data-create-field="parent"]')!;
+  const groupCreateInput = shadow.querySelector<HTMLInputElement>('[data-create-field="group"]')!;
 
   function clamp(value: number, min: number, max: number) {
     return Math.min(Math.max(value, min), max);
@@ -794,17 +822,23 @@
       option.textContent = "默认主页";
       sectionSelect.appendChild(option);
     }
+    const createOption = document.createElement("option");
+    createOption.value = CREATE_SECTION_VALUE;
+    createOption.textContent = "＋ 新建分项...";
+    sectionSelect.appendChild(createOption);
     sectionSelect.value = destination?.sectionId || destinationCache.activeSectionId || sections[0]?.id || "";
     if (sectionSelect.selectedIndex < 0 && sections[0]) {
       sectionSelect.value = sections[0].id;
     }
+    sectionCreateInput.value = destination?.createSectionName || "";
     renderParentSelect(destination);
     renderGroupSelect(destination);
+    updateCreateInputs();
   }
 
   function renderParentSelect(destination?: CaptureDestination) {
     const sectionId = sectionSelect.value || "section-default";
-    const sectionCategories = categoriesInSection(sectionId);
+    const sectionCategories = sectionSelect.value === CREATE_SECTION_VALUE ? [] : categoriesInSection(sectionId);
     const childCount = childCountMap(sectionCategories);
     const parents = sectionCategories.filter((category) => isParentCategory(category, childCount));
     parentSelect.innerHTML = "";
@@ -818,18 +852,26 @@
       option.textContent = parent.name;
       parentSelect.appendChild(option);
     }
+    const createOption = document.createElement("option");
+    createOption.value = CREATE_PARENT_VALUE;
+    createOption.textContent = "＋ 新建分类...";
+    parentSelect.appendChild(createOption);
     parentSelect.value = destination?.parentCategoryId || "";
     if (parentSelect.selectedIndex < 0) {
       parentSelect.value = "";
     }
+    parentCreateInput.value = destination?.createParentCategoryName || "";
+    updateCreateInputs();
   }
 
   function renderGroupSelect(destination?: CaptureDestination) {
     const sectionId = sectionSelect.value || "section-default";
     const parentId = parentSelect.value;
-    const sectionCategories = categoriesInSection(sectionId);
+    const sectionCategories = sectionSelect.value === CREATE_SECTION_VALUE ? [] : categoriesInSection(sectionId);
     const childCount = childCountMap(sectionCategories);
-    const groups = parentId
+    const groups = sectionSelect.value === CREATE_SECTION_VALUE || parentId === CREATE_PARENT_VALUE
+      ? []
+      : parentId
       ? sectionCategories.filter((category) => category.parentId === parentId)
       : sectionCategories.filter((category) => isGroupCandidate(category, childCount));
     groupSelect.innerHTML = "";
@@ -845,10 +887,22 @@
         : group.name;
       groupSelect.appendChild(option);
     }
+    const createOption = document.createElement("option");
+    createOption.value = CREATE_GROUP_VALUE;
+    createOption.textContent = "＋ 新建分组...";
+    groupSelect.appendChild(createOption);
     groupSelect.value = destination?.groupId || "";
     if (groupSelect.selectedIndex < 0) {
       groupSelect.value = "";
     }
+    groupCreateInput.value = destination?.createGroupName || "";
+    updateCreateInputs();
+  }
+
+  function updateCreateInputs() {
+    sectionCreateInput.dataset.open = sectionSelect.value === CREATE_SECTION_VALUE ? "true" : "false";
+    parentCreateInput.dataset.open = parentSelect.value === CREATE_PARENT_VALUE ? "true" : "false";
+    groupCreateInput.dataset.open = groupSelect.value === CREATE_GROUP_VALUE ? "true" : "false";
   }
 
   async function enrichDraft(draft: CaptureDraft) {
@@ -899,29 +953,48 @@
 
   function getSelectedDestination(): CaptureDestination | undefined {
     const destination: CaptureDestination = {};
-    const selectedGroup = groupSelect.value
+    const sectionCreateName = sectionCreateInput.value.trim();
+    const parentCreateName = parentCreateInput.value.trim();
+    const groupCreateName = groupCreateInput.value.trim();
+    const selectedGroup = groupSelect.value && groupSelect.value !== CREATE_GROUP_VALUE
       ? destinationCache.categories.find((category) => category.id === groupSelect.value)
       : undefined;
-    const selectedParent = parentSelect.value
+    const selectedParent = parentSelect.value && parentSelect.value !== CREATE_PARENT_VALUE
       ? destinationCache.categories.find((category) => category.id === parentSelect.value)
       : selectedGroup?.parentId
         ? destinationCache.categories.find((category) => category.id === selectedGroup.parentId)
         : undefined;
-    const selectedSectionId = sectionSelect.value ||
-      (selectedGroup ? categorySectionId(selectedGroup) : undefined) ||
-      (selectedParent ? categorySectionId(selectedParent) : undefined);
+    const selectedSectionId = (
+      sectionSelect.value && sectionSelect.value !== CREATE_SECTION_VALUE
+        ? sectionSelect.value
+        : undefined
+    ) || (selectedGroup ? categorySectionId(selectedGroup) : undefined)
+      || (selectedParent ? categorySectionId(selectedParent) : undefined);
     const selectedSection = selectedSectionId
       ? destinationCache.sections.find((section) => section.id === selectedSectionId)
       : undefined;
 
     if (selectedSectionId) destination.sectionId = selectedSectionId;
     if (selectedSection?.name) destination.sectionName = selectedSection.name;
+    if (sectionSelect.value === CREATE_SECTION_VALUE && sectionCreateName) {
+      destination.createSectionName = sectionCreateName;
+      destination.sectionName = sectionCreateName;
+    }
     if (selectedParent?.id) destination.parentCategoryId = selectedParent.id;
     if (selectedParent?.name) destination.parentCategoryName = selectedParent.name;
+    if (parentSelect.value === CREATE_PARENT_VALUE && parentCreateName) {
+      destination.createParentCategoryName = parentCreateName;
+      destination.parentCategoryName = parentCreateName;
+    }
     if (selectedGroup?.id) destination.groupId = selectedGroup.id;
     if (selectedGroup?.name) destination.groupName = selectedGroup.name;
+    if (groupSelect.value === CREATE_GROUP_VALUE && groupCreateName) {
+      destination.createGroupName = groupCreateName;
+      destination.groupName = groupCreateName;
+    }
 
-    return destination.sectionId || destination.parentCategoryId || destination.groupId || destination.sectionName
+    return destination.sectionId || destination.parentCategoryId || destination.groupId || destination.sectionName ||
+      destination.createSectionName || destination.createParentCategoryName || destination.createGroupName
       ? destination
       : undefined;
   }
@@ -936,6 +1009,21 @@
     if (!title) {
       setStatus("名称不能为空。", "error");
       titleInput.focus();
+      return;
+    }
+    if (sectionSelect.value === CREATE_SECTION_VALUE && !sectionCreateInput.value.trim()) {
+      setStatus("请填写新分项名称。", "error");
+      sectionCreateInput.focus();
+      return;
+    }
+    if (parentSelect.value === CREATE_PARENT_VALUE && !parentCreateInput.value.trim()) {
+      setStatus("请填写新分类名称。", "error");
+      parentCreateInput.focus();
+      return;
+    }
+    if (groupSelect.value === CREATE_GROUP_VALUE && !groupCreateInput.value.trim()) {
+      setStatus("请填写新分组名称。", "error");
+      groupCreateInput.focus();
       return;
     }
 
@@ -1048,8 +1136,13 @@
   sectionSelect.addEventListener("change", () => {
     renderParentSelect();
     renderGroupSelect();
+    updateCreateInputs();
   });
-  parentSelect.addEventListener("change", () => renderGroupSelect());
+  parentSelect.addEventListener("change", () => {
+    renderGroupSelect();
+    updateCreateInputs();
+  });
+  groupSelect.addEventListener("change", updateCreateInputs);
   button.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) return;
     dragState = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, moved: false };
