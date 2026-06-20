@@ -12,8 +12,23 @@ if [[ -z "${GH_BIN}" ]]; then
   fi
 fi
 
-export HTTPS_PROXY="${HTTPS_PROXY:-${GITHUB_PROXY}}"
-export HTTP_PROXY="${HTTP_PROXY:-${GITHUB_PROXY}}"
-export NO_PROXY="${NO_PROXY:-localhost,127.0.0.1,::1}"
+proxy_is_listening() {
+  if [[ ! "${GITHUB_PROXY}" =~ ^http://([^:/]+):([0-9]+)$ ]]; then
+    return 1
+  fi
+
+  local proxy_host="${BASH_REMATCH[1]}"
+  local proxy_port="${BASH_REMATCH[2]}"
+
+  command -v nc >/dev/null 2>&1 && nc -z "${proxy_host}" "${proxy_port}" >/dev/null 2>&1
+}
+
+if proxy_is_listening; then
+  export HTTPS_PROXY="${HTTPS_PROXY:-${GITHUB_PROXY}}"
+  export HTTP_PROXY="${HTTP_PROXY:-${GITHUB_PROXY}}"
+  export NO_PROXY="${NO_PROXY:-localhost,127.0.0.1,::1}"
+else
+  unset HTTPS_PROXY HTTP_PROXY ALL_PROXY
+fi
 
 exec "${GH_BIN}" "$@"

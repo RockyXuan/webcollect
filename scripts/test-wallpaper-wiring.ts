@@ -7,6 +7,8 @@ const topNavSource = readFileSync("src/components/nav/top-nav.tsx", "utf8");
 const shellSource = readFileSync("src/components/wallpaper/wallpaper-shell.tsx", "utf8");
 const settingsSource = readFileSync("src/components/wallpaper/wallpaper-settings-dialog.tsx", "utf8");
 const storeSource = readFileSync("src/lib/wallpaper-store.ts", "utf8");
+const wallpaperSourcesSource = readFileSync("src/lib/wallpaper-sources.ts", "utf8");
+const extensionHtmlSource = readFileSync("extension/src/newtab.html", "utf8");
 
 for (const [label, source] of [
   ["web page", pageSource],
@@ -36,6 +38,15 @@ assert.ok(settingsSource.includes("Auto Mix"), "Wallpaper settings should includ
 assert.ok(settingsSource.includes("Space"), "Wallpaper settings should include the opt-in Space mode");
 assert.ok(storeSource.includes("filterWallpapersForTheme"), "Wallpaper store should select wallpapers through the theme filter");
 assert.ok(storeSource.includes("getWallpaperFetchCategories"), "Wallpaper refresh should use theme-aware fetch categories");
+assert.ok(storeSource.includes("INITIAL_WALLPAPER"), "Wallpaper store should avoid a science-image first paint before async preferences load");
+assert.ok(storeSource.includes("const fallbackCurrent = shouldSelectFresh"), "Wallpaper store should optimistically rotate to a local fallback during manual refresh");
+assert.ok(storeSource.includes("set({ prefs: optimisticPrefs, isRefreshing: true, error: null })"), "Wallpaper store should render the optimistic local refresh before remote providers finish");
+assert.ok(storeSource.includes("currentWallpaperId: refreshedCurrent?.id || optimisticPrefs.currentWallpaperId"), "Wallpaper store should keep the local refresh result when remote providers return no usable wallpaper");
+assert.equal(storeSource.includes("currentWallpaperId: FALLBACK_WALLPAPERS[0]"), false, "Wallpaper store must not default first paint to the first curated item");
+assert.ok(wallpaperSourcesSource.includes("WALLPAPER_CACHE_NAME"), "Wallpaper cache should use a named versioned cache");
+assert.ok(wallpaperSourcesSource.includes("WALLPAPER_LEGACY_CACHE_NAMES"), "Wallpaper cache should delete legacy wallpaper caches");
+assert.equal(wallpaperSourcesSource.includes('caches.open("webcollect-wallpapers-v1")'), false, "Wallpaper cache must not keep writing the stale v1 cache");
+assert.equal(extensionHtmlSource.includes("zoom-nasa-cosmic-cliffs"), false, "Extension newtab must not preload a NASA wallpaper in Auto Mix");
 assert.ok(pageSource.includes("onShowWallpaper={handleReturnToWallpaper}"), "Web page should expose the top-nav wallpaper button");
 assert.ok(extensionSource.includes("onShowWallpaper={handleReturnToWallpaper}"), "Extension newtab should expose the top-nav wallpaper button");
 assert.equal(shellSource.includes("handleCollectionMouseMove"), false, "Collection mode must not wire mouse fling gestures");

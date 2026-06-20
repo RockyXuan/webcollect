@@ -8,11 +8,13 @@ import {
 } from "./wallpaper-types";
 
 export const WALLPAPER_REMOTE_LIMIT = 24;
-export const WALLPAPER_CURATED_MIN = 12;
+export const WALLPAPER_CURATED_MIN = 18;
 export const WALLPAPER_LIBRARY_LIMIT = WALLPAPER_REMOTE_LIMIT + WALLPAPER_CURATED_MIN;
 export const WALLPAPER_REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000;
 export const WALLPAPER_BACKGROUND_CHECK_MS = 30 * 60 * 1000;
 export const WALLPAPER_CACHE_LIMIT = 8;
+export const WALLPAPER_CACHE_NAME = "webcollect-wallpapers-v2";
+export const WALLPAPER_LEGACY_CACHE_NAMES = ["webcollect-wallpapers-v1"];
 export const ZOOM_WALLPAPER_MIN_WIDTH = 3000;
 export const ZOOM_WALLPAPER_MIN_HEIGHT = 1600;
 export const ZOOM_WALLPAPER_MIN_RATIO = 1.45;
@@ -269,11 +271,15 @@ export function pruneWallpaperLibrary(items: WallpaperItem[], limit = WALLPAPER_
     storedFallbacks.find((item) => item.id === fallback.id) || fallback
   );
   const remote = sorted.filter((item) => !fallbackIds.has(item.id));
-  const curatedCount = Math.min(WALLPAPER_CURATED_MIN, fallbacks.length, limit);
+  const preferredFallbacks = [
+    ...fallbacks.filter(isPackagedWallpaper),
+    ...fallbacks.filter((item) => !isPackagedWallpaper(item)),
+  ];
+  const curatedCount = Math.min(WALLPAPER_CURATED_MIN, preferredFallbacks.length, limit);
   const remoteCount = Math.min(WALLPAPER_REMOTE_LIMIT, Math.max(0, limit - curatedCount));
   return [
     ...remote.slice(0, remoteCount),
-    ...fallbacks.slice(0, curatedCount),
+    ...preferredFallbacks.slice(0, curatedCount),
   ].slice(0, limit);
 }
 
@@ -521,10 +527,11 @@ function inferSourceCollection(imageInfo: Record<string, unknown>): string {
 export async function cacheWallpaperImages(items: WallpaperItem[]): Promise<void> {
   if (typeof caches === "undefined") return;
   try {
-    const cache = await caches.open("webcollect-wallpapers-v1");
+    await Promise.allSettled(WALLPAPER_LEGACY_CACHE_NAMES.map((cacheName) => caches.delete(cacheName)));
+    const cache = await caches.open(WALLPAPER_CACHE_NAME);
     await Promise.allSettled(
       items.slice(0, WALLPAPER_CACHE_LIMIT).map(async (item) => {
-        const response = await fetch(item.imageUrl, { mode: "no-cors", cache: "force-cache" });
+        const response = await fetch(item.imageUrl, { mode: "no-cors", cache: "reload" });
         if (response.ok || response.type === "opaque") {
           await cache.put(item.imageUrl, response);
         }

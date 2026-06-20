@@ -272,7 +272,6 @@ export function WallpaperShell({
 
   const handleWallpaperWheel = useCallback((event: WheelEvent<HTMLDivElement>) => {
     if (isInteractiveTarget(event.target)) return;
-    event.preventDefault();
     scheduleIdleHint();
 
     const now = performance.now();

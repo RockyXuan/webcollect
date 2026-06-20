@@ -2,53 +2,42 @@
 
 ## Final Goal
 
-修复 WebCollect 壁纸系统：普通模式不再默认抓取 NASA、卫星、科研或技术图，改为高质量精选壁纸和合规来源优先；支持本地 fallback、后台刷新、质量过滤、模式切换、滚轮换壁纸、双语引用和来源署名，并用测试、构建和浏览器验证证明可用。
+修复 WebCollect 壁纸质量与刷新缓存问题：刷新按钮、滚轮和后台刷新必须能跳出旧本地小池，优先使用合格高质量图库；Auto Mix 不再反复显示 NASA、卫星、科研或旧重复图；通过专项测试、类型检查、扩展构建和浏览器新标签页验证证明可用。
 
 ## Completed
 
-- 默认壁纸偏好改为 `themeMode: auto`，默认启用自然/地标/动物/海洋类审美图库，不再默认启用 `space/aerial/weather`。
-- NASA/ESA/USGS/NOAA 等科研来源从 Auto Mix 默认池剥离；NASA 仅允许在用户显式选择 Space 模式时进入远程抓取。
-- 增加技术图负面关键词过滤，拒绝 satellite、map、heatmap、thermal、diagram、instrument、radar、chart、graph、mission、launch、Blue Marble 等明显科研/工具图。
-- 壁纸评分取消对 NASA/ESA/USGS/NOAA 的奖励，并对科研来源和技术图进行降权/过滤。
-- 增加 `WallpaperThemeMode`、`provider`、`tags`、`attribution`、`modes` 等兼容字段，保留现有数据结构和旧数据迁移路径。
-- 壁纸缓存、当前选择、下一张切换、后台刷新都按当前模式过滤；远程失败时仍回落到本地精选库。
-- 壁纸设置面板增加 Auto Mix / Nature / Cinema / Art / Space 模式入口。
-- 新标签页角落保留刷新和设置按钮，壁纸说明增加来源/授权署名。
-- 保留并验证滚轮换壁纸功能。
-- 修复 3 个打包本地壁纸素材错配/重复问题：Madygen、Fusine Lake、Cosmic Cliffs 现在分别是正确图片，不再和 Blue Marble 或其他图片重复。
-- 新增壁纸策略测试 `scripts/test-wallpaper-policy.ts`，覆盖默认抓取类别、技术图过滤、Auto Mix 排除科研来源、Space 可使用 NASA。
-- 更新壁纸数据和 wiring 测试，覆盖默认图库数量、图片哈希唯一性、模式 UI、设置入口和署名渲染。
+- 找到本轮根因：手动刷新在远程 provider 返回空或失败时不会可靠切换当前图，旧缓存仍写入 `webcollect-wallpapers-v1`，新标签页首屏还预载 NASA 图，本地 Auto Mix 打包图数量偏少。
+- `refreshOnlineWallpapers({ force/selectFresh })` 现在会先乐观切到当前主题的本地合格图，并立即保存 prefs；远程返回合格新图时再替换，否则保留本地切换结果。
+- 壁纸缓存升级为 `webcollect-wallpapers-v2`，刷新时删除 `webcollect-wallpapers-v1`，图片缓存请求改为 `cache: "reload"`，避免继续吃旧缓存。
+- 默认首屏从 Auto Mix 的本地非科研图里选，不再用 `FALLBACK_WALLPAPERS[0]`；扩展 `newtab.html` 也不再预载 NASA Cosmic Cliffs。
+- 新增 6 张 CC0/public-domain 4K 本地壁纸，Auto Mix 打包非科研图达到 10 张，离线/远程失败时也有足够可切换池。
+- `pruneWallpaperLibrary` 优先保留打包本地图，防止远程图库或旧数据把本地兜底池挤掉。
+- 保留并验证滚轮换壁纸功能，同时移除 passive wheel listener 下的 `preventDefault` 控制台错误。
+- 更新壁纸数据、策略和 wiring 测试，锁定：默认非科研、旧缓存删除、首屏不 NASA、手动刷新先切本地图、远程无图时不退回旧图。
+- GitHub CLI/Release 脚本改为只在代理端口可用时使用代理；代理未监听时自动直连，减少反复授权/代理卡住的问题。
 
 ## Unfinished
 
-- Pexels/Pixabay/TMDb 这类需要 API key 或后端代理的可选 provider 尚未接入；当前实现保持关闭，不在前端硬编码密钥。
-- Cinema/Art 目前先作为模式策略入口和过滤路径存在，尚未接入专门的电影/艺术外部图库。没有 API key 时，功能仍以本地精选和合规 Wikimedia 图库兜底。
-- GitHub Release `webcollect-2026-06-19-wallpaper` 已发布，包含可下载的 Chrome 扩展 zip。
+- 当前代码和扩展构建已完成验证，但本轮修复尚未提交、推送和发布新的 GitHub Release。
+- Pexels/Pixabay/TMDb 等需要 API key 或后端代理的 provider 仍保持关闭；当前阶段不在前端硬编码密钥。
 
 ## Current Blockers
 
-- 无必须由用户决策的代码阻塞。
-- 外部付费/授权 API provider 需要用户以后明确提供 key 或后端代理方案，当前阶段按计划不启用。
-- `corepack pnpm build` 的顶层脚本会直接调用 `pnpm`，在当前 shell PATH 下报 `pnpm: command not found`；已拆分运行核心验证命令。
-- `corepack pnpm exec next build` 在本机当前环境长时间停在 Turbopack production build，无错误输出，已作为环境/构建耗时风险记录。
+- 无需要用户决策的代码阻塞。
+- 外部图库 provider 需要后续明确 API key/后端代理方案，当前目标先用本地高质量池和合规 Wikimedia/curated provider 解决质量与刷新问题。
 
 ## Next Step
 
-- 若要让用户试用，下一步是下载并解压 `WebCollect-Chrome-Extension-webcollect-2026-06-19-wallpaper.zip`，在 Chrome 扩展程序页面加载解压后的文件夹。
-- 后续增强可以单独接入安全的后端代理 provider：Pexels/Pixabay/TMDb，并为 Cinema/Art 增补专门精选库。
+- 提交当前改动，推送到 GitHub。
+- 发布新的 Chrome 扩展 zip，让用户下载并重新加载后验证刷新按钮、滚轮切换和默认壁纸质量。
 
 ## Latest Verification
 
-- 2026-06-19 CST 完成壁纸默认策略、质量过滤、模式 UI、素材修复和浏览器验收。
-- `node --import tsx scripts/test-wallpaper-data.ts` passed.
-- `node --import tsx scripts/test-wallpaper-policy.ts` passed.
-- `node --import tsx scripts/test-wallpaper-wiring.ts` passed.
-- `corepack pnpm ts-check` passed.
-- `corepack pnpm lint` passed with 6 existing warnings and 0 errors.
-- `corepack pnpm build:ext` passed with existing Vite large-chunk/dynamic-import warnings.
-- `corepack pnpm exec tsup src/server.ts --format esm --outDir dist --target node20 --external next --external react --external react-dom` passed.
-- In-app Browser verified `http://127.0.0.1:5010/`: wallpaper stage loads; settings button opens the wallpaper settings dialog; Auto Mix/Nature/Cinema/Art/Space options are present; attribution renders; default visible wallpaper is a Wikimedia nature scene, not NASA/Blue Marble/satellite/science imagery.
-- Packaged image hashes were checked and are unique after replacing the duplicated/mismapped local files.
-- 2026-06-19 CST pushed tag `webcollect-2026-06-19-wallpaper`; GitHub Actions run `27812564439` completed with `success`.
-- Release URL: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-06-19-wallpaper`.
-- Release asset: `WebCollect-Chrome-Extension-webcollect-2026-06-19-wallpaper.zip`, size `40647760`, sha256 `6c2f58ffc9e99fb1ab7ee7f1f516b4c9ff1475fe1b64bcd4e1343ea2ad41d1e1`.
+- 2026-06-21 CST `node --import tsx scripts/test-wallpaper-data.ts` passed.
+- 2026-06-21 CST `node --import tsx scripts/test-wallpaper-policy.ts` passed.
+- 2026-06-21 CST `node --import tsx scripts/test-wallpaper-wiring.ts` passed.
+- 2026-06-21 CST `./node_modules/.bin/tsc -p tsconfig.json` passed.
+- 2026-06-21 CST `./node_modules/.bin/eslint` passed with 0 errors and 6 existing warnings.
+- 2026-06-21 CST `node ./extension/build.mjs` passed; `extension/dist` contains all 6 new `zoom-cc0-*` wallpaper assets.
+- 2026-06-21 CST local dev server `http://127.0.0.1:5010/` verified in an isolated headless Chrome via DevTools Protocol: initial Auto Mix showed Peter Ducai CC0 local art, clicking `立即更新壁纸` changed from `zoom-cc0-golden-church.jpg` to `zoom-cc0-water-lake.jpg`, and dispatching wheel on `.wc-wallpaper-stage` changed from `zoom-cc0-forest-path.jpg` to `zoom-featured-calanche-piana.jpg`.
+- Dev server and temporary headless Chrome were stopped after verification.

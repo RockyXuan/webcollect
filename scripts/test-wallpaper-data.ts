@@ -12,13 +12,17 @@ import {
   getNextWallpaper,
   inferQuoteId,
   isAutoMixWallpaper,
+  isPackagedWallpaper,
   isScienceWallpaperSource,
   isZoomWallpaperCandidate,
   mergeWallpaperLibrary,
   pickWallpaperAfterRefresh,
   pruneWallpaperLibrary,
   scoreZoomWallpaper,
+  WALLPAPER_CURATED_MIN,
+  WALLPAPER_CACHE_NAME,
   WALLPAPER_CACHE_LIMIT,
+  WALLPAPER_LEGACY_CACHE_NAMES,
   WALLPAPER_REFRESH_INTERVAL_MS,
 } from "../src/lib/wallpaper-sources";
 import { ZOOM_CURATED_WALLPAPERS } from "../src/lib/zoom-curated-wallpapers";
@@ -29,7 +33,10 @@ assert.equal(DEFAULT_WALLPAPER_PREFS.defaultMode, "wallpaper");
 assert.equal(DEFAULT_WALLPAPER_PREFS.themeMode, "auto");
 assert.equal(DEFAULT_WALLPAPER_PREFS.autoUpdate, true);
 assert.equal(DEFAULT_WALLPAPER_PREFS.rotationInterval, "15m");
+assert.equal(WALLPAPER_CURATED_MIN, 18);
 assert.equal(WALLPAPER_CACHE_LIMIT, 8);
+assert.equal(WALLPAPER_CACHE_NAME, "webcollect-wallpapers-v2");
+assert.ok(WALLPAPER_LEGACY_CACHE_NAMES.includes("webcollect-wallpapers-v1"));
 assert.equal(WALLPAPER_REFRESH_INTERVAL_MS, 6 * 60 * 60 * 1000);
 assert.deepEqual(DEFAULT_WALLPAPER_ENABLED_CATEGORIES, [
   "landscape",
@@ -85,6 +92,10 @@ assert.ok(FALLBACK_WALLPAPERS.every((item) => quoteIds.has(item.quoteId)), "all 
 assert.ok(
   filterWallpapersForTheme(FALLBACK_WALLPAPERS, "auto").length >= 8,
   "Auto Mix should always have a healthy local fallback pool"
+);
+assert.ok(
+  filterWallpapersForTheme(FALLBACK_WALLPAPERS, "auto").filter(isPackagedWallpaper).length >= 8,
+  "Auto Mix should ship at least eight packaged non-science wallpapers for offline refresh"
 );
 assert.ok(
   filterWallpapersForTheme(FALLBACK_WALLPAPERS, "auto").every(isAutoMixWallpaper),
@@ -153,11 +164,15 @@ assert.equal(merged.find((item) => item.id === "valid")?.title, "Updated");
 const pruned = pruneWallpaperLibrary(
   Array.from({ length: 15 }, (_, index) => ({ ...valid, id: `item-${index}`, fetchedAt: index }))
 );
-assert.equal(pruned.length, 27);
+assert.equal(pruned.length, 33);
 assert.equal(pruned[0].id, "item-14");
 assert.ok(
-  pruned.filter((item) => FALLBACK_WALLPAPERS.some((fallback) => fallback.id === item.id)).length >= 12,
-  "pruned library should preserve at least twelve curated fallbacks"
+  pruned.filter((item) => FALLBACK_WALLPAPERS.some((fallback) => fallback.id === item.id)).length >= WALLPAPER_CURATED_MIN,
+  "pruned library should preserve the curated fallback floor"
+);
+assert.ok(
+  pruned.filter((item) => FALLBACK_WALLPAPERS.some((fallback) => fallback.id === item.id) && isPackagedWallpaper(item)).length >= 8,
+  "pruned library should prioritize packaged fallbacks so offline refresh remains diverse"
 );
 
 const next = getNextWallpaper([valid, { ...valid, id: "second" }], "valid");
@@ -169,6 +184,12 @@ const refreshed = pickWallpaperAfterRefresh(
   [{ ...valid, id: "fresh", fetchedAt: 10 }]
 );
 assert.equal(refreshed?.id, "fresh", "refresh should prefer newly fetched wallpapers when available");
+const refreshedFallback = pickWallpaperAfterRefresh(
+  [valid, { ...valid, id: "fallback-refresh", fetchedAt: 2 }],
+  "valid",
+  []
+);
+assert.equal(refreshedFallback?.id, "fallback-refresh", "manual refresh should still rotate when remote providers return no usable wallpapers");
 
 const cacheBatch = getWallpaperCacheBatch(
   Array.from({ length: 12 }, (_, index) => ({ ...valid, id: `cache-${index}` })),

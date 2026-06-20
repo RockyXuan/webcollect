@@ -40,16 +40,21 @@ function getWallpaperPool(items: WallpaperItem[], prefs: WallpaperPrefs): Wallpa
   return filterWallpapersForTheme(items, prefs.themeMode);
 }
 
+const INITIAL_WALLPAPER = filterWallpapersForTheme(FALLBACK_WALLPAPERS, DEFAULT_WALLPAPER_PREFS.themeMode)
+  .find((item) => item.imageUrl.startsWith("/assets/wallpapers/"))
+  || filterWallpapersForTheme(FALLBACK_WALLPAPERS, DEFAULT_WALLPAPER_PREFS.themeMode)[0]
+  || FALLBACK_WALLPAPERS[0];
+
 function getCurrentWallpaper(items: WallpaperItem[], currentId: string | null, prefs: WallpaperPrefs): WallpaperItem {
   const pool = getWallpaperPool(items, prefs);
-  return pool.find((item) => item.id === currentId) || pool[0] || FALLBACK_WALLPAPERS[0];
+  return pool.find((item) => item.id === currentId) || pool[0] || INITIAL_WALLPAPER || FALLBACK_WALLPAPERS[0];
 }
 
 export const useWallpaperStore = create<WallpaperState>((set, get) => ({
   mode: "wallpaper",
   prefs: {
     ...DEFAULT_WALLPAPER_PREFS,
-    currentWallpaperId: FALLBACK_WALLPAPERS[0]?.id || null,
+    currentWallpaperId: INITIAL_WALLPAPER?.id || null,
   },
   wallpapers: FALLBACK_WALLPAPERS,
   isReady: false,
@@ -134,18 +139,31 @@ export const useWallpaperStore = create<WallpaperState>((set, get) => ({
     if (!options?.force && !shouldRefreshWallpapers(state.prefs)) return;
     if (!state.prefs.autoUpdate && !options?.force) return;
 
-    set({ isRefreshing: true, error: null });
+    const shouldSelectFresh = Boolean(options?.force || options?.selectFresh || state.mode === "wallpaper");
+    const fallbackCurrent = shouldSelectFresh
+      ? getRandomWallpaper(getWallpaperPool(state.wallpapers, state.prefs), state.prefs.currentWallpaperId)
+      : null;
+    const optimisticPrefs = fallbackCurrent
+      ? { ...state.prefs, currentWallpaperId: fallbackCurrent.id }
+      : state.prefs;
+
+    set({ prefs: optimisticPrefs, isRefreshing: true, error: null });
+    if (fallbackCurrent) {
+      void saveWallpaperPrefs(optimisticPrefs);
+      void get().cacheCurrentAndNext();
+    }
+
     try {
       const remote = await fetchRemoteWallpapers(getWallpaperFetchCategories(state.prefs));
       const wallpapers = pruneWallpaperLibrary(mergeWallpaperLibrary(state.wallpapers, remote));
       const pool = getWallpaperPool(wallpapers, state.prefs);
       const themeRemote = filterWallpapersForTheme(remote, state.prefs.themeMode);
-      const refreshedCurrent = themeRemote.length > 0 && (options?.force || options?.selectFresh || state.mode === "wallpaper")
+      const refreshedCurrent = themeRemote.length > 0 && shouldSelectFresh
         ? pickWallpaperAfterRefresh(pool, state.prefs.currentWallpaperId, themeRemote)
         : null;
       const prefs = {
-        ...state.prefs,
-        currentWallpaperId: refreshedCurrent?.id || state.prefs.currentWallpaperId,
+        ...optimisticPrefs,
+        currentWallpaperId: refreshedCurrent?.id || optimisticPrefs.currentWallpaperId,
         lastRemoteRefreshAt: Date.now(),
       };
       set({ wallpapers, prefs, isRefreshing: false, error: null });
@@ -156,7 +174,10 @@ export const useWallpaperStore = create<WallpaperState>((set, get) => ({
       void get().cacheCurrentAndNext();
     } catch (error) {
       const message = error instanceof Error ? error.message : "壁纸更新失败";
-      set({ isRefreshing: false, error: message });
+      set({ prefs: optimisticPrefs, isRefreshing: false, error: message });
+      if (fallbackCurrent) {
+        await saveWallpaperPrefs(optimisticPrefs);
+      }
     }
   },
 
