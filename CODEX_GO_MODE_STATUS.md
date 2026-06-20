@@ -18,8 +18,8 @@
 
 ## Unfinished
 
-- 当前代码和扩展构建已完成验证，但本轮修复尚未提交、推送和发布新的 GitHub Release。
-- Pexels/Pixabay/TMDb 等需要 API key 或后端代理的 provider 仍保持关闭；当前阶段不在前端硬编码密钥。
+- 当前壁纸质量与刷新缓存修复目标已完成，并已发布新的 Chrome 扩展 zip。
+- Pexels/Pixabay/TMDb 等需要 API key 或后端代理的 provider 仍保持关闭；这是后续增强，不属于本轮阻塞项。
 
 ## Current Blockers
 
@@ -28,8 +28,8 @@
 
 ## Next Step
 
-- 提交当前改动，推送到 GitHub。
-- 发布新的 Chrome 扩展 zip，让用户下载并重新加载后验证刷新按钮、滚轮切换和默认壁纸质量。
+- 用户下载并重新加载 `webcollect-2026-06-21-wallpaper-refresh-cache` 扩展包，重点验证刷新按钮是否立刻换图、滚轮是否换图、是否不再总是旧壁纸/NASA/科研图。
+- 若后续要继续扩充 Cinema/Art 外部图库，再单独接入安全后端代理 provider。
 
 ## Latest Verification
 
@@ -41,3 +41,7 @@
 - 2026-06-21 CST `node ./extension/build.mjs` passed; `extension/dist` contains all 6 new `zoom-cc0-*` wallpaper assets.
 - 2026-06-21 CST local dev server `http://127.0.0.1:5010/` verified in an isolated headless Chrome via DevTools Protocol: initial Auto Mix showed Peter Ducai CC0 local art, clicking `立即更新壁纸` changed from `zoom-cc0-golden-church.jpg` to `zoom-cc0-water-lake.jpg`, and dispatching wheel on `.wc-wallpaper-stage` changed from `zoom-cc0-forest-path.jpg` to `zoom-featured-calanche-piana.jpg`.
 - Dev server and temporary headless Chrome were stopped after verification.
+- 2026-06-21 CST committed `d68ba0c` and pushed to `origin/main`.
+- 2026-06-21 CST published release `webcollect-2026-06-21-wallpaper-refresh-cache`.
+- Release URL: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-06-21-wallpaper-refresh-cache`.
+- Release asset: `WebCollect-Chrome-Extension-webcollect-2026-06-21-wallpaper-refresh-cache.zip`, size `58511169`, sha256 `db785f041b03f0fc38d72956c9a73df497835410cf79995fbb50313a6d4d58a6`.
