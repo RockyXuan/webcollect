@@ -18,8 +18,7 @@
 
 ## Unfinished
 
-- 当前功能代码、测试和扩展构建已完成。
-- 仍需提交、推送并发布新的 Chrome 扩展 zip，供用户下载验证。
+- 当前浮窗新建目标功能已完成，并已发布新的 Chrome 扩展 zip。
 
 ## Current Blockers
 
@@ -27,9 +26,8 @@
 
 ## Next Step
 
-- 提交并推送当前修改。
-- 发布新的扩展 release。
-- 给用户 release 链接和本轮验证结果。
+- 用户下载并重新加载 `webcollect-2026-06-21-floating-capture-create-targets` 扩展包。
+- 重点验证浮窗添加网页时，分项、分类、分组三处下拉都可以直接新建；保存后打开 WebCollect 能看到新节点和新网页；联网登录状态下能继续自动云同步。
 
 ## Latest Verification
 
@@ -38,3 +36,7 @@
 - 2026-06-21 CST `./node_modules/.bin/eslint` passed with 0 errors and 6 existing warnings.
 - 2026-06-21 CST `node ./extension/build.mjs` passed.
 - 2026-06-21 CST `extension/dist/assets/floating-capture.js` contains `新建分项`、`新建分类`、`新建分组` and the three create destination fields.
+- 2026-06-21 CST committed `c2b1125` and pushed to `origin/main`.
+- 2026-06-21 CST published release `webcollect-2026-06-21-floating-capture-create-targets`.
+- Release URL: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-06-21-floating-capture-create-targets`.
+- Release asset: `WebCollect-Chrome-Extension-webcollect-2026-06-21-floating-capture-create-targets.zip`, size `58512326`, sha256 `1c91d4fc2da1e9c889cd3164d0a927886998b7a1caff74167b5f5996ca60461a`.
