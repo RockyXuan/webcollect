@@ -10,14 +10,19 @@ import {
   filterWallpapersForTheme,
   getWallpaperFetchCategories,
   getWallpaperCacheBatch,
-  getRandomWallpaper,
   getRotationMs,
   mergeWallpaperLibrary,
+  pickWallpaperAvoidingRecent,
   pickWallpaperAfterRefresh,
   pruneWallpaperLibrary,
   shouldRefreshWallpapers,
 } from "./wallpaper-sources";
+import { selectWallpaperQuote } from "./wallpaper-quotes";
 import type { WallpaperItem, WallpaperMode, WallpaperPrefs } from "./wallpaper-types";
+
+const RECENT_QUOTE_LIMIT = 50;
+const RECENT_ASSET_LIMIT = 30;
+const RECENT_MEDIA_LIMIT = 20;
 
 interface WallpaperState {
   mode: WallpaperMode;
@@ -50,11 +55,48 @@ function getCurrentWallpaper(items: WallpaperItem[], currentId: string | null, p
   return pool.find((item) => item.id === currentId) || pool[0] || INITIAL_WALLPAPER || FALLBACK_WALLPAPERS[0];
 }
 
+function getVisibleWallpaperId(items: WallpaperItem[], prefs: WallpaperPrefs): string | null {
+  return getCurrentWallpaper(items, prefs.currentWallpaperId, prefs)?.id || prefs.currentWallpaperId;
+}
+
+function addRecent(value: string | null | undefined, existing: string[], limit: number): string[] {
+  if (!value) return existing.slice(0, limit);
+  return [value, ...existing.filter((item) => item !== value)].slice(0, limit);
+}
+
+function getWallpaperMediaKey(wallpaper: WallpaperItem): string | null {
+  const mediaTag = wallpaper.tags?.find((tag) =>
+    tag.startsWith("tmdb:")
+    || tag.startsWith("tmdb-tv:")
+    || tag.startsWith("tvdb:")
+    || tag.startsWith("media:")
+  );
+  if (mediaTag) return mediaTag;
+  return null;
+}
+
+function applyWallpaperDisplay(prefs: WallpaperPrefs, wallpaper: WallpaperItem): WallpaperPrefs {
+  const selection = selectWallpaperQuote({
+    wallpaper,
+    themeMode: prefs.themeMode,
+    recentQuoteIds: prefs.recentQuoteIds,
+  });
+  return {
+    ...prefs,
+    currentWallpaperId: wallpaper.id,
+    currentQuoteId: selection.quote.id,
+    recentQuoteIds: addRecent(selection.quote.id, prefs.recentQuoteIds, RECENT_QUOTE_LIMIT),
+    recentAssetIds: addRecent(wallpaper.id, prefs.recentAssetIds, RECENT_ASSET_LIMIT),
+    recentMediaIds: addRecent(getWallpaperMediaKey(wallpaper), prefs.recentMediaIds, RECENT_MEDIA_LIMIT),
+  };
+}
+
 export const useWallpaperStore = create<WallpaperState>((set, get) => ({
   mode: "wallpaper",
   prefs: {
     ...DEFAULT_WALLPAPER_PREFS,
     currentWallpaperId: INITIAL_WALLPAPER?.id || null,
+    currentQuoteId: INITIAL_WALLPAPER?.quoteId || null,
   },
   wallpapers: FALLBACK_WALLPAPERS,
   isReady: false,
@@ -70,12 +112,10 @@ export const useWallpaperStore = create<WallpaperState>((set, get) => ({
     ]);
     const wallpapers = pruneWallpaperLibrary(mergeWallpaperLibrary(FALLBACK_WALLPAPERS, storedLibrary));
     const pool = getWallpaperPool(wallpapers, prefs);
-    const preferredCurrent = getRandomWallpaper(pool, prefs.currentWallpaperId)
+    const preferredCurrent = pool.find((item) => item.id === prefs.currentWallpaperId)
+      || pickWallpaperAvoidingRecent(pool, prefs.currentWallpaperId, prefs.recentAssetIds)
       || getCurrentWallpaper(wallpapers, prefs.currentWallpaperId, prefs);
-    const nextPrefs = {
-      ...prefs,
-      currentWallpaperId: preferredCurrent?.id || FALLBACK_WALLPAPERS[0]?.id || null,
-    };
+    const nextPrefs = applyWallpaperDisplay(prefs, preferredCurrent || getCurrentWallpaper(wallpapers, prefs.currentWallpaperId, prefs));
 
     set({
       prefs: nextPrefs,
@@ -101,9 +141,14 @@ export const useWallpaperStore = create<WallpaperState>((set, get) => ({
 
   nextWallpaper: async () => {
     const state = get();
-    const next = getRandomWallpaper(getWallpaperPool(state.wallpapers, state.prefs), state.prefs.currentWallpaperId);
+    const currentId = getVisibleWallpaperId(state.wallpapers, state.prefs);
+    const next = pickWallpaperAvoidingRecent(
+      getWallpaperPool(state.wallpapers, state.prefs),
+      currentId,
+      state.prefs.recentAssetIds
+    );
     if (!next) return;
-    const prefs = { ...state.prefs, currentWallpaperId: next.id };
+    const prefs = applyWallpaperDisplay(state.prefs, next);
     set({ prefs });
     await saveWallpaperPrefs(prefs);
     void get().cacheCurrentAndNext();
@@ -125,26 +170,49 @@ export const useWallpaperStore = create<WallpaperState>((set, get) => ({
         : get().prefs.enabledCategories,
     };
     const pool = getWallpaperPool(current.wallpapers, prefs);
-    if (!pool.some((item) => item.id === prefs.currentWallpaperId)) {
-      prefs.currentWallpaperId = getRandomWallpaper(pool, prefs.currentWallpaperId)?.id || pool[0]?.id || FALLBACK_WALLPAPERS[0]?.id || null;
-    }
-    set({ prefs });
-    await saveWallpaperPrefs(prefs);
+    const selectedWallpaper = pool.find((item) => item.id === prefs.currentWallpaperId)
+      || pickWallpaperAvoidingRecent(pool, prefs.currentWallpaperId, prefs.recentAssetIds)
+      || pool[0]
+      || FALLBACK_WALLPAPERS[0];
+    const nextPrefs = selectedWallpaper ? applyWallpaperDisplay(prefs, selectedWallpaper) : prefs;
+    set({ prefs: nextPrefs });
+    await saveWallpaperPrefs(nextPrefs);
     void get().cacheCurrentAndNext();
   },
 
   refreshOnlineWallpapers: async (options) => {
     const state = get();
-    if (state.isRefreshing) return;
+    if (state.isRefreshing) {
+      if (options?.force || options?.selectFresh) {
+        const currentId = getVisibleWallpaperId(state.wallpapers, state.prefs);
+        const fallbackCurrent = pickWallpaperAvoidingRecent(
+          getWallpaperPool(state.wallpapers, state.prefs),
+          currentId,
+          state.prefs.recentAssetIds
+        );
+        if (fallbackCurrent) {
+          const prefs = applyWallpaperDisplay(state.prefs, fallbackCurrent);
+          set({ prefs });
+          await saveWallpaperPrefs(prefs);
+          void get().cacheCurrentAndNext();
+        }
+      }
+      return;
+    }
     if (!options?.force && !shouldRefreshWallpapers(state.prefs)) return;
     if (!state.prefs.autoUpdate && !options?.force) return;
 
     const shouldSelectFresh = Boolean(options?.force || options?.selectFresh || state.mode === "wallpaper");
+    const currentId = getVisibleWallpaperId(state.wallpapers, state.prefs);
     const fallbackCurrent = shouldSelectFresh
-      ? getRandomWallpaper(getWallpaperPool(state.wallpapers, state.prefs), state.prefs.currentWallpaperId)
+      ? pickWallpaperAvoidingRecent(
+        getWallpaperPool(state.wallpapers, state.prefs),
+        currentId,
+        state.prefs.recentAssetIds
+      )
       : null;
     const optimisticPrefs = fallbackCurrent
-      ? { ...state.prefs, currentWallpaperId: fallbackCurrent.id }
+      ? applyWallpaperDisplay(state.prefs, fallbackCurrent)
       : state.prefs;
 
     set({ prefs: optimisticPrefs, isRefreshing: true, error: null });
@@ -159,13 +227,17 @@ export const useWallpaperStore = create<WallpaperState>((set, get) => ({
       const pool = getWallpaperPool(wallpapers, state.prefs);
       const themeRemote = filterWallpapersForTheme(remote, state.prefs.themeMode);
       const refreshedCurrent = themeRemote.length > 0 && shouldSelectFresh
-        ? pickWallpaperAfterRefresh(pool, state.prefs.currentWallpaperId, themeRemote)
+        ? pickWallpaperAfterRefresh(pool, optimisticPrefs.currentWallpaperId, themeRemote, optimisticPrefs.recentAssetIds)
         : null;
-      const prefs = {
-        ...optimisticPrefs,
-        currentWallpaperId: refreshedCurrent?.id || optimisticPrefs.currentWallpaperId,
-        lastRemoteRefreshAt: Date.now(),
-      };
+      const prefs = refreshedCurrent
+        ? {
+          ...applyWallpaperDisplay(optimisticPrefs, refreshedCurrent),
+          lastRemoteRefreshAt: Date.now(),
+        }
+        : {
+          ...optimisticPrefs,
+          lastRemoteRefreshAt: Date.now(),
+        };
       set({ wallpapers, prefs, isRefreshing: false, error: null });
       await Promise.all([
         saveWallpaperLibrary(wallpapers),

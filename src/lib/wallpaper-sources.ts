@@ -36,6 +36,10 @@ export const DEFAULT_WALLPAPER_PREFS: WallpaperPrefs = {
   paused: false,
   showZoomHints: true,
   currentWallpaperId: null,
+  currentQuoteId: null,
+  recentQuoteIds: [],
+  recentAssetIds: [],
+  recentMediaIds: [],
   lastRemoteRefreshAt: 0,
   updatedAt: 0,
 };
@@ -95,6 +99,8 @@ const TECHNICAL_WALLPAPER_TERMS = [
 const AUTO_MIX_CATEGORIES = new Set<WallpaperCategory>(DEFAULT_WALLPAPER_ENABLED_CATEGORIES);
 const NATURE_CATEGORIES = new Set<WallpaperCategory>(["landscape", "animals", "ocean"]);
 const CINEMA_CATEGORIES = new Set<WallpaperCategory>(["landscape", "landmark", "ocean"]);
+const TV_CATEGORIES = new Set<WallpaperCategory>(["landscape", "landmark", "ocean"]);
+const PETS_CATEGORIES = new Set<WallpaperCategory>(["animals"]);
 const ART_CATEGORIES = new Set<WallpaperCategory>(["landscape", "landmark", "ocean"]);
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
@@ -219,6 +225,8 @@ export function filterUsableWallpapers(items: WallpaperItem[]): WallpaperItem[] 
 function getThemeCategorySet(themeMode: WallpaperThemeMode): Set<WallpaperCategory> {
   if (themeMode === "nature") return NATURE_CATEGORIES;
   if (themeMode === "cinema") return CINEMA_CATEGORIES;
+  if (themeMode === "tv") return TV_CATEGORIES;
+  if (themeMode === "pets") return PETS_CATEGORIES;
   if (themeMode === "art") return ART_CATEGORIES;
   if (themeMode === "space") return new Set<WallpaperCategory>(["space"]);
   return AUTO_MIX_CATEGORIES;
@@ -296,14 +304,32 @@ export function getRandomWallpaper(items: WallpaperItem[], currentId: string | n
   return pool[Math.floor(Math.random() * pool.length)] || null;
 }
 
+export function pickWallpaperAvoidingRecent(
+  items: WallpaperItem[],
+  currentId: string | null,
+  recentIds: string[] = []
+): WallpaperItem | null {
+  if (items.length === 0) return null;
+  const recent = new Set(recentIds);
+  const currentIndex = currentId ? items.findIndex((item) => item.id === currentId) : -1;
+  for (let offset = 1; offset <= items.length; offset += 1) {
+    const index = currentIndex >= 0 ? (currentIndex + offset) % items.length : offset - 1;
+    const candidate = items[index];
+    if (!candidate || candidate.id === currentId || recent.has(candidate.id)) continue;
+    return candidate;
+  }
+  return getNextWallpaper(items, currentId);
+}
+
 export function pickWallpaperAfterRefresh(
   items: WallpaperItem[],
   currentId: string | null,
-  incoming: WallpaperItem[]
+  incoming: WallpaperItem[],
+  recentIds: string[] = []
 ): WallpaperItem | null {
   const incomingIds = new Set(incoming.map((item) => item.id));
   const freshPool = items.filter((item) => incomingIds.has(item.id));
-  return getRandomWallpaper(freshPool.length > 0 ? freshPool : items, currentId);
+  return pickWallpaperAvoidingRecent(freshPool.length > 0 ? freshPool : items, currentId, recentIds);
 }
 
 export function getWallpaperCacheBatch(

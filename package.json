@@ -11,6 +11,7 @@
     "release:extension": "bash ./scripts/release-extension.sh",
     "start": "bash ./scripts/start.sh",
     "ts-check": "tsc -p tsconfig.json",
+    "validate:quotes": "node --import tsx scripts/test-wallpaper-quotes.ts",
     "build:ext": "node ./extension/build.mjs"
   },
   "dependencies": {

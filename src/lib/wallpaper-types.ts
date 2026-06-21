@@ -31,7 +31,7 @@ export type WallpaperQuality = "curated" | "award" | "featured" | "remote";
 
 export type WallpaperMode = "wallpaper" | "collection";
 
-export type WallpaperThemeMode = "auto" | "nature" | "cinema" | "art" | "space";
+export type WallpaperThemeMode = "auto" | "nature" | "cinema" | "tv" | "pets" | "art" | "space";
 
 export type WallpaperRotationInterval = "off" | "5m" | "15m" | "1h" | "open";
 
@@ -66,6 +66,10 @@ export interface WallpaperPrefs {
   paused: boolean;
   showZoomHints: boolean;
   currentWallpaperId: string | null;
+  currentQuoteId: string | null;
+  recentQuoteIds: string[];
+  recentAssetIds: string[];
+  recentMediaIds: string[];
   lastRemoteRefreshAt: number;
   updatedAt: number;
 }

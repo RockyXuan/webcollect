@@ -15,7 +15,20 @@ const wallpaperDb = localforage.createInstance({
 
 const WALLPAPER_PREFS_KEY = "wallpaperPrefs";
 const WALLPAPER_LIBRARY_KEY = "wallpaperLibrary";
-const WALLPAPER_THEME_MODES: WallpaperThemeMode[] = ["auto", "nature", "cinema", "art", "space"];
+const WALLPAPER_THEME_MODES: WallpaperThemeMode[] = ["auto", "nature", "cinema", "tv", "pets", "art", "space"];
+
+function normalizeStringArray(value: unknown, limit: number): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  return value
+    .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    .filter((item) => {
+      if (seen.has(item)) return false;
+      seen.add(item);
+      return true;
+    })
+    .slice(0, limit);
+}
 
 function normalizePrefs(value: Partial<WallpaperPrefs> | null | undefined): WallpaperPrefs {
   const enabledCategories = Array.isArray(value?.enabledCategories)
@@ -38,6 +51,10 @@ function normalizePrefs(value: Partial<WallpaperPrefs> | null | undefined): Wall
     updatedAt: typeof value?.updatedAt === "number" ? value.updatedAt : 0,
     lastRemoteRefreshAt: typeof value?.lastRemoteRefreshAt === "number" ? value.lastRemoteRefreshAt : 0,
     currentWallpaperId: typeof value?.currentWallpaperId === "string" ? value.currentWallpaperId : null,
+    currentQuoteId: typeof value?.currentQuoteId === "string" ? value.currentQuoteId : null,
+    recentQuoteIds: normalizeStringArray(value?.recentQuoteIds, 50),
+    recentAssetIds: normalizeStringArray(value?.recentAssetIds, 30),
+    recentMediaIds: normalizeStringArray(value?.recentMediaIds, 20),
   };
 }
 

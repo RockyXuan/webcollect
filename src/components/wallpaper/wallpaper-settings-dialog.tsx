@@ -39,6 +39,8 @@ const THEME_OPTIONS: Array<{ id: WallpaperThemeMode; label: string }> = [
   { id: "auto", label: "Auto Mix" },
   { id: "nature", label: "Nature" },
   { id: "cinema", label: "Cinema" },
+  { id: "tv", label: "TV" },
+  { id: "pets", label: "Pets" },
   { id: "art", label: "Art" },
   { id: "space", label: "Space" },
 ];
@@ -83,7 +85,7 @@ export function WallpaperSettingsDialog({
         <div className="space-y-5 py-2">
           <section className="space-y-2">
             <p className="text-sm font-bold text-slate-800">壁纸模式</p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {THEME_OPTIONS.map((option) => {
                 const active = prefs.themeMode === option.id;
                 return (
@@ -165,7 +167,7 @@ export function WallpaperSettingsDialog({
             variant="outline"
             className="gap-2"
             onClick={onRefresh}
-            disabled={isRefreshing}
+            aria-busy={isRefreshing}
           >
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
             立即更新

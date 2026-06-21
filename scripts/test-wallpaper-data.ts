@@ -16,6 +16,7 @@ import {
   isScienceWallpaperSource,
   isZoomWallpaperCandidate,
   mergeWallpaperLibrary,
+  pickWallpaperAvoidingRecent,
   pickWallpaperAfterRefresh,
   pruneWallpaperLibrary,
   scoreZoomWallpaper,
@@ -26,13 +27,17 @@ import {
   WALLPAPER_REFRESH_INTERVAL_MS,
 } from "../src/lib/wallpaper-sources";
 import { ZOOM_CURATED_WALLPAPERS } from "../src/lib/zoom-curated-wallpapers";
-import { WALLPAPER_QUOTES } from "../src/lib/wallpaper-quotes";
+import { WALLPAPER_QUOTES, getWallpaperQuoteCounts } from "../src/lib/wallpaper-quotes";
 import type { WallpaperItem } from "../src/lib/wallpaper-types";
 
 assert.equal(DEFAULT_WALLPAPER_PREFS.defaultMode, "wallpaper");
 assert.equal(DEFAULT_WALLPAPER_PREFS.themeMode, "auto");
 assert.equal(DEFAULT_WALLPAPER_PREFS.autoUpdate, true);
 assert.equal(DEFAULT_WALLPAPER_PREFS.rotationInterval, "15m");
+assert.equal(DEFAULT_WALLPAPER_PREFS.currentQuoteId, null);
+assert.deepEqual(DEFAULT_WALLPAPER_PREFS.recentQuoteIds, []);
+assert.deepEqual(DEFAULT_WALLPAPER_PREFS.recentAssetIds, []);
+assert.deepEqual(DEFAULT_WALLPAPER_PREFS.recentMediaIds, []);
 assert.equal(WALLPAPER_CURATED_MIN, 18);
 assert.equal(WALLPAPER_CACHE_LIMIT, 8);
 assert.equal(WALLPAPER_CACHE_NAME, "webcollect-wallpapers-v2");
@@ -88,6 +93,12 @@ assert.ok(
 );
 
 const quoteIds = new Set(WALLPAPER_QUOTES.map((quote) => quote.id));
+const quoteCounts = getWallpaperQuoteCounts();
+assert.ok(WALLPAPER_QUOTES.length >= 400, "quote library should not regress to a tiny hardcoded list");
+assert.ok(quoteCounts.general >= 150, "general quote library should have enough variety");
+assert.ok(quoteCounts.pet >= 80, "pet quote library should have enough variety");
+assert.ok(quoteCounts.movie >= 80, "cinema quote library should have enough variety");
+assert.ok(quoteCounts.tv >= 60, "TV quote library should have enough variety");
 assert.ok(FALLBACK_WALLPAPERS.every((item) => quoteIds.has(item.quoteId)), "all wallpapers should reference a known bilingual quote");
 assert.ok(
   filterWallpapersForTheme(FALLBACK_WALLPAPERS, "auto").length >= 8,
@@ -108,6 +119,18 @@ assert.ok(
 assert.ok(
   filterWallpapersForTheme(FALLBACK_WALLPAPERS, "space").some((item) => item.source === "nasa" || /nasa|esa/i.test(item.sourceCollection)),
   "Space mode should keep curated NASA/ESA imagery available"
+);
+assert.ok(
+  filterWallpapersForTheme(FALLBACK_WALLPAPERS, "pets").every((item) => item.category === "animals"),
+  "Pets mode should only draw from animal-tagged fallback wallpapers until dedicated pet providers are enabled"
+);
+assert.ok(
+  filterWallpapersForTheme(FALLBACK_WALLPAPERS, "pets").length > 0,
+  "Pets mode should have a fallback pool"
+);
+assert.ok(
+  filterWallpapersForTheme(FALLBACK_WALLPAPERS, "tv").length > 0,
+  "TV mode should have an interim fallback pool before TMDb TV provider is configured"
 );
 assert.equal(inferQuoteId("Milky Way Carina Nebula", "NASA"), "cosmic-patience");
 assert.equal(inferQuoteId("Lake reflection and ocean coast", "Wikimedia"), "water-still");
@@ -178,6 +201,19 @@ assert.ok(
 const next = getNextWallpaper([valid, { ...valid, id: "second" }], "valid");
 assert.equal(next?.id, "second");
 
+const avoidingRecent = pickWallpaperAvoidingRecent(
+  [valid, { ...valid, id: "recent-a" }, { ...valid, id: "fresh-choice" }],
+  "valid",
+  ["recent-a"]
+);
+assert.equal(avoidingRecent?.id, "fresh-choice", "manual wallpaper rotation should skip recently viewed assets");
+const avoidingRecentFallback = pickWallpaperAvoidingRecent(
+  [valid, { ...valid, id: "recent-a" }],
+  "valid",
+  ["recent-a"]
+);
+assert.equal(avoidingRecentFallback?.id, "recent-a", "rotation should still return a wallpaper after the recent pool is exhausted");
+
 const refreshed = pickWallpaperAfterRefresh(
   [valid, { ...valid, id: "fresh", fetchedAt: 10 }],
   "valid",
@@ -190,6 +226,13 @@ const refreshedFallback = pickWallpaperAfterRefresh(
   []
 );
 assert.equal(refreshedFallback?.id, "fallback-refresh", "manual refresh should still rotate when remote providers return no usable wallpapers");
+const refreshedAvoidingRecent = pickWallpaperAfterRefresh(
+  [valid, { ...valid, id: "fresh-a", fetchedAt: 11 }, { ...valid, id: "fresh-b", fetchedAt: 12 }],
+  "valid",
+  [{ ...valid, id: "fresh-a", fetchedAt: 11 }, { ...valid, id: "fresh-b", fetchedAt: 12 }],
+  ["fresh-a"]
+);
+assert.equal(refreshedAvoidingRecent?.id, "fresh-b", "refresh should avoid recently viewed fresh remote assets when possible");
 
 const cacheBatch = getWallpaperCacheBatch(
   Array.from({ length: 12 }, (_, index) => ({ ...valid, id: `cache-${index}` })),
