@@ -13,6 +13,9 @@ assert.equal(
   "baseline canvas should render at 1x"
 );
 
+assert.equal(COLLECTION_CANVAS_WIDTH, 2048, "collection layout should keep a fixed baseline width");
+assert.equal(COLLECTION_CANVAS_HEIGHT, 1152, "collection layout should keep a fixed baseline height");
+
 assert.equal(
   getCollectionViewportScale(COLLECTION_CANVAS_WIDTH * 2, COLLECTION_CANVAS_HEIGHT * 2),
   MAX_COLLECTION_VIEWPORT_SCALE,
@@ -22,7 +25,7 @@ assert.equal(
 assert.equal(
   getCollectionViewportScale(1536, 864),
   0.75,
-  "smaller laptop-like viewports should scale the whole layout down proportionally"
+  "smaller laptop-like viewports should scale the fixed layout down proportionally"
 );
 
 assert.equal(

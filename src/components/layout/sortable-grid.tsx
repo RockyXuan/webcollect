@@ -44,6 +44,10 @@ const catId = (id: string) => `cat:${id}`;
 const cardId = (id: string) => `card:${id}`;
 const ungroupId = (id: string) => `ungrouped:${id}`;
 const subId = (id: string) => `sub:${id}`;
+const MAX_RENDERED_CARD_COLUMNS = 4;
+const SITE_TILE_WIDTH_REM = 14.75;
+const SITE_TILE_GAP_REM = 0.5;
+const GROUP_HORIZONTAL_PADDING_REM = 2;
 
 // ============ Custom collision detection ============
 const collisionDetection: CollisionDetection = (args) => {
@@ -92,12 +96,22 @@ function handleLockedLayoutPointerDown(event: React.PointerEvent<HTMLElement>) {
   alertLayoutLocked();
 }
 
-function getDefaultChildBasis(cardCount: number): string {
-  if (cardCount <= 2) return "16.75rem";
-  if (cardCount <= 4) return "32rem";
-  if (cardCount <= 8) return "47.25rem";
-  if (cardCount <= 12) return "62.5rem";
-  return "77.75rem";
+function formatRem(value: number): string {
+  const rounded = Math.round(value * 100) / 100;
+  return `${rounded}rem`;
+}
+
+function normalizeRenderedColumns(columns: number): number {
+  if (!Number.isFinite(columns)) return 1;
+  return Math.max(1, Math.min(MAX_RENDERED_CARD_COLUMNS, Math.round(columns)));
+}
+
+function getChildBasisForColumns(columns: number): string {
+  const safeColumns = normalizeRenderedColumns(columns);
+  const width = safeColumns * SITE_TILE_WIDTH_REM
+    + Math.max(0, safeColumns - 1) * SITE_TILE_GAP_REM
+    + GROUP_HORIZONTAL_PADDING_REM;
+  return formatRem(width);
 }
 
 function getMaxChildWidth(cardCount: number): string {
@@ -116,7 +130,29 @@ export function inferLayoutColumns(widthPercent: number | null, cardCount: numbe
   return 1;
 }
 
-export function getSmartChildStyle(widthPercent: number | null, cardCount: number): React.CSSProperties {
+export function getStableLayoutColumns(
+  layoutPreference: CategoryLayoutPreference | undefined,
+  widthPercent: number | null,
+  cardCount: number
+): number {
+  if (typeof layoutPreference?.columns === "number" && Number.isFinite(layoutPreference.columns)) {
+    return normalizeRenderedColumns(layoutPreference.columns);
+  }
+  return inferLayoutColumns(widthPercent ?? layoutPreference?.widthPercent ?? null, cardCount);
+}
+
+export function getCardGridStyle(columns: number): React.CSSProperties {
+  return {
+    "--wc-card-columns": String(normalizeRenderedColumns(columns)),
+  } as React.CSSProperties;
+}
+
+export function getSmartChildStyle(
+  widthPercent: number | null,
+  cardCount: number,
+  columns = inferLayoutColumns(widthPercent, cardCount)
+): React.CSSProperties {
+  const columnBasis = getChildBasisForColumns(columns);
   const maxWidth = getMaxChildWidth(cardCount);
 
   if (widthPercent !== null) {
@@ -124,18 +160,17 @@ export function getSmartChildStyle(widthPercent: number | null, cardCount: numbe
     const maxPercent = 100;
     const smartWidth = Math.max(minPercent, Math.min(maxPercent, widthPercent));
     return {
-      flex: `0 1 calc(${smartWidth}% - 0.75rem)`,
+      flex: `0 0 calc(${smartWidth}% - 0.75rem)`,
       width: `calc(${smartWidth}% - 0.75rem)`,
-      minWidth: "min(100%, 16.75rem)",
-      maxWidth,
+      minWidth: columnBasis,
+      maxWidth: "none",
     };
   }
 
-  const basis = getDefaultChildBasis(cardCount);
   return {
-    flex: `0 1 ${basis}`,
-    width: basis,
-    minWidth: "min(100%, 16.75rem)",
+    flex: `0 0 ${columnBasis}`,
+    width: columnBasis,
+    minWidth: columnBasis,
     maxWidth,
   };
 }
@@ -704,17 +739,17 @@ function SortableCategoryBlock({
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [confirmDemoteOpen, setConfirmDemoteOpen] = useState(false);
 
-  const rawWidthPercent = localWidth ?? storedWidth ?? defaultWidthPercent;
+  const rawWidthPercent = localWidth ?? storedWidth ?? layoutPreference?.widthPercent ?? defaultWidthPercent;
   const widthPercent = getSmartParentWidthPercent(rawWidthPercent, defaultWidthPercent);
 
   const style: React.CSSProperties = {
     transform: isDragging ? undefined : CSS.Transform.toString(transform),
     transition: isDragging ? transition : `${transition}, min-height 0.3s ease-out`,
     opacity: isDragging ? 0.2 : 1,
-    flex: `0 1 calc(${widthPercent}% - 1rem)`,
+    flex: `0 0 calc(${widthPercent}% - 1rem)`,
     width: `calc(${widthPercent}% - 1rem)`,
-    minWidth: "min(100%, 360px)",
-    maxWidth: "100%",
+    minWidth: "360px",
+    maxWidth: "none",
     minHeight: isDraggingActive ? '60px' : undefined,
   };
 
@@ -1021,6 +1056,7 @@ function SortableSubGroupBlock({
   } = useSortable({ id: subId(category.id), disabled: parentLayoutLocked });
 
   const categoryWidths = useAppStore((s) => s.categoryWidths);
+  const categoryLayouts = useAppStore((s) => s.categoryLayouts);
   const setCategoryWidth = useAppStore((s) => s.setCategoryWidth);
   const updateCategory = useAppStore((s) => s.updateCategory);
   const globalEditMode = useAppStore((s) => s.editMode);
@@ -1030,7 +1066,11 @@ function SortableSubGroupBlock({
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [isHeaderHovered, setIsHeaderHovered] = useState(false);
 
-  const widthPercent = localWidth ?? categoryWidths[category.id] ?? null;
+  const layoutPreference = categoryLayouts[category.id];
+  const widthPercent = localWidth ?? categoryWidths[category.id] ?? layoutPreference?.widthPercent ?? null;
+  const cardColumns = localWidth !== null
+    ? inferLayoutColumns(localWidth, cards.length)
+    : getStableLayoutColumns(layoutPreference, widthPercent, cards.length);
 
   const handleResizeStart = useCallback(
     (e: React.MouseEvent) => {
@@ -1100,7 +1140,8 @@ function SortableSubGroupBlock({
     transform: isDragging ? undefined : CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.2 : 1,
-    ...getSmartChildStyle(widthPercent, cards.length),
+    ...getSmartChildStyle(widthPercent, cards.length, cardColumns),
+    ...getCardGridStyle(cardColumns),
   };
 
   return (
@@ -1171,7 +1212,7 @@ function SortableSubGroupBlock({
         items={cards.map((c) => cardId(c.id))}
         strategy={rectSortingStrategy}
       >
-        <div className={`wc-group-card-list flex flex-wrap gap-2 px-4 pb-4 ${editMode ? "wc-group-card-list-editing" : ""}`}>
+        <div className={`wc-group-card-list gap-2 px-4 pb-4 ${editMode ? "wc-group-card-list-editing" : ""}`}>
           {cards.map((card) => (
             <SortableCard
               key={card.id}
@@ -1268,6 +1309,7 @@ function SortableUngroupedBlock({
   } = useSortable({ id: ungroupId(category.id) });
 
   const categoryWidths = useAppStore((s) => s.categoryWidths);
+  const categoryLayouts = useAppStore((s) => s.categoryLayouts);
   const setCategoryWidth = useAppStore((s) => s.setCategoryWidth);
   const updateCategory = useAppStore((s) => s.updateCategory);
   const globalEditMode = useAppStore((s) => s.editMode);
@@ -1277,7 +1319,11 @@ function SortableUngroupedBlock({
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [isHeaderHovered, setIsHeaderHovered] = useState(false);
 
-  const widthPercent = localWidth ?? categoryWidths[category.id] ?? null;
+  const layoutPreference = categoryLayouts[category.id];
+  const widthPercent = localWidth ?? categoryWidths[category.id] ?? layoutPreference?.widthPercent ?? null;
+  const cardColumns = localWidth !== null
+    ? inferLayoutColumns(localWidth, cards.length)
+    : getStableLayoutColumns(layoutPreference, widthPercent, cards.length);
 
   const handleResizeStart = useCallback(
     (e: React.MouseEvent) => {
@@ -1343,7 +1389,8 @@ function SortableUngroupedBlock({
     transform: isDragging ? undefined : CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.2 : 1,
-    ...getSmartChildStyle(widthPercent, cards.length),
+    ...getSmartChildStyle(widthPercent, cards.length, cardColumns),
+    ...getCardGridStyle(cardColumns),
   };
 
   return (
@@ -1409,7 +1456,7 @@ function SortableUngroupedBlock({
         items={cards.map((c) => cardId(c.id))}
         strategy={rectSortingStrategy}
       >
-        <div className={`wc-group-card-list flex flex-wrap gap-2 px-4 pb-4 ${editMode ? "wc-group-card-list-editing" : ""}`}>
+        <div className={`wc-group-card-list gap-2 px-4 pb-4 ${editMode ? "wc-group-card-list-editing" : ""}`}>
           {cards.map((card) => (
             <SortableCard
               key={card.id}
