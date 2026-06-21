@@ -16,8 +16,7 @@
 
 ## Unfinished
 
-- 代码实现和本地验证已完成。
-- 待提交、推送并发布新的 Chrome 扩展包：`webcollect-2026-06-21-resolution-layout`。
+- 当前分辨率一致布局修复已完成，并已发布新的 Chrome 扩展 zip。
 
 ## Current Blockers
 
@@ -26,8 +25,6 @@
 
 ## Next Step
 
-- 提交并推送当前布局修复。
-- 运行发布脚本生成并上传 `WebCollect-Chrome-Extension-webcollect-2026-06-21-resolution-layout.zip`。
 - 用户下载并重新加载新版扩展后，重点验证同一套真实收藏数据在外接显示器和笔记本屏幕下分类、分组、卡片列数一致，只发生整体缩放。
 
 ## Latest Verification
@@ -40,3 +37,7 @@
 - 2026-06-21 CST Browser verification on `http://127.0.0.1:5012/` used the in-app Browser workspace, not the user's Chrome profile.
 - 2026-06-21 CST Browser dual-viewport DOM/CSS check passed: at `2048x1035`, first test group used `--wc-card-columns: 2`, `gridColumnCount: 2`, `--wc-resolution-scale: 0.898`; at `1540x900`, the same group used `--wc-card-columns: 2`, `gridColumnCount: 2`, `--wc-resolution-scale: 0.745`.
 - 2026-06-21 CST Browser console check passed with no warning/error logs.
+- 2026-06-21 CST committed `f3564e8` and pushed to `origin/main`.
+- 2026-06-21 CST published release `webcollect-2026-06-21-resolution-layout`.
+- Release URL: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-06-21-resolution-layout`.
+- Release asset: `WebCollect-Chrome-Extension-webcollect-2026-06-21-resolution-layout.zip`, size `58512463`, sha256 `3f52e4d4b3f9daee1442a63ea08e9a115944592f7f39c93b9e08e9c0782374e6`.
