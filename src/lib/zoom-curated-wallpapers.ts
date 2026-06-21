@@ -1,10 +1,65 @@
-import type { WallpaperItem } from "./wallpaper-types";
+import type { WallpaperItem, WallpaperThemeMode } from "./wallpaper-types";
 
 type CuratedWallpaper = Omit<WallpaperItem, "fetchedAt">;
+
+function unique<T>(items: T[]): T[] {
+  return Array.from(new Set(items));
+}
+
+function textFor(item: CuratedWallpaper): string {
+  return [
+    item.id,
+    item.title,
+    item.author,
+    item.source,
+    item.sourceCollection,
+    item.sourceUrl,
+    ...(item.tags || []),
+  ].join(" ").toLowerCase();
+}
+
+function isScienceOrTechnicalAsset(item: CuratedWallpaper): boolean {
+  const text = textFor(item);
+  return item.source === "nasa"
+    || item.source === "esa"
+    || item.source === "usgs"
+    || item.source === "noaa"
+    || /\b(nasa|esa|usgs|noaa|hubble|webb|visible earth|blue marble|satellite|glacier|lava|volcano|kilauea)\b/.test(text);
+}
+
+function inferCuratedModes(item: CuratedWallpaper): WallpaperThemeMode[] {
+  if (item.modes?.length) return item.modes;
+  if (item.category === "space") return ["space"];
+  if (isScienceOrTechnicalAsset(item)) return [];
+
+  const modes: WallpaperThemeMode[] = [];
+  if (["landscape", "landmark", "animals", "ocean"].includes(item.category)) modes.push("auto");
+  if (["landscape", "animals", "ocean"].includes(item.category)) modes.push("nature");
+  if (item.category === "animals") modes.push("pets");
+  if (["landscape", "landmark", "ocean"].includes(item.category)) modes.push("cinema", "tv", "art");
+  return unique(modes);
+}
+
+function inferCuratedTags(item: CuratedWallpaper): string[] {
+  const text = textFor(item);
+  const tags = [...(item.tags || [])];
+  for (const [tag, pattern] of [
+    ["cinema", /\b(dawn|dusk|sunset|golden|panorama|bridge|city|market|church|lake|sea|ocean|coast|forest|cliff|gorge|valley|mountain)\b/],
+    ["tv", /\b(city|market|church|bridge|forest|lake|fisherman|wildlife|serengeti|park|port|autumn)\b/],
+    ["pet", /\b(swans?|deer|eagle|ibex|jackal|turaco|roller|gazelle|flamingo|lioness|wolf|animal|wildlife|bird)\b/],
+    ["art", /\b(public domain|national archives|featured|monuments|church|market|piana|lake|panorama)\b/],
+    ["nature", /\b(forest|lake|sea|ocean|coast|mountain|valley|gorge|wildlife|animal|bird|serengeti|park)\b/],
+  ] as const) {
+    if (pattern.test(text)) tags.push(tag);
+  }
+  return unique(tags);
+}
 
 function curated(item: CuratedWallpaper): WallpaperItem {
   return {
     ...item,
+    tags: inferCuratedTags(item),
+    modes: inferCuratedModes(item),
     fetchedAt: 0,
   };
 }
@@ -219,6 +274,63 @@ export const ZOOM_CURATED_WALLPAPERS: WallpaperItem[] = [
     provider: "curated",
     attribution: "Peter Ducai / CC0 public domain",
     tags: ["swans", "lake", "animals", "cc0"],
+  }),
+  curated({
+    id: "zoom-cc0-peruvian-guineapig",
+    title: "Peruvian guinea pig",
+    author: "Peter Ducai",
+    source: "fallback",
+    sourceUrl: "https://github.com/peterducai/free_art/blob/master/4k/peruvian_guineapig.jpg",
+    imageUrl: "/assets/wallpapers/zoom-cc0-peruvian-guineapig.jpg",
+    thumbnailUrl: "/assets/wallpapers/zoom-cc0-peruvian-guineapig.jpg",
+    license: "Creative Commons Zero / Public domain",
+    width: 4096,
+    height: 2731,
+    category: "animals",
+    quality: "curated",
+    sourceCollection: "peterducai/free_art CC0 4K",
+    quoteId: "patient-life",
+    provider: "curated",
+    attribution: "Peter Ducai / CC0 public domain",
+    tags: ["guinea pig", "pet", "animals", "cc0"],
+  }),
+  curated({
+    id: "zoom-cc0-swan-shore",
+    title: "Swan on the shore",
+    author: "Peter Ducai",
+    source: "fallback",
+    sourceUrl: "https://github.com/peterducai/free_art/blob/master/4k/swan_shore.jpg",
+    imageUrl: "/assets/wallpapers/zoom-cc0-swan-shore.jpg",
+    thumbnailUrl: "/assets/wallpapers/zoom-cc0-swan-shore.jpg",
+    license: "Creative Commons Zero / Public domain",
+    width: 4096,
+    height: 2731,
+    category: "animals",
+    quality: "curated",
+    sourceCollection: "peterducai/free_art CC0 4K",
+    quoteId: "patient-life",
+    provider: "curated",
+    attribution: "Peter Ducai / CC0 public domain",
+    tags: ["swan", "shore", "animals", "cc0"],
+  }),
+  curated({
+    id: "zoom-cc0-seabird",
+    title: "Seabird over open water",
+    author: "Peter Ducai",
+    source: "fallback",
+    sourceUrl: "https://github.com/peterducai/free_art/blob/master/4k/seabird.jpg",
+    imageUrl: "/assets/wallpapers/zoom-cc0-seabird.jpg",
+    thumbnailUrl: "/assets/wallpapers/zoom-cc0-seabird.jpg",
+    license: "Creative Commons Zero / Public domain",
+    width: 4096,
+    height: 2731,
+    category: "animals",
+    quality: "curated",
+    sourceCollection: "peterducai/free_art CC0 4K",
+    quoteId: "patient-life",
+    provider: "curated",
+    attribution: "Peter Ducai / CC0 public domain",
+    tags: ["seabird", "bird", "animals", "cc0"],
   }),
   curated({
     id: "zoom-wle-karynzharyk-valley",

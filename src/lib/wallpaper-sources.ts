@@ -232,19 +232,35 @@ function getThemeCategorySet(themeMode: WallpaperThemeMode): Set<WallpaperCatego
   return AUTO_MIX_CATEGORIES;
 }
 
+function isNonScienceThemeWallpaper(item: WallpaperItem): boolean {
+  return !isScienceWallpaperSource(item) && !isTechnicalWallpaper(item);
+}
+
+function isExplicitThemeWallpaper(item: WallpaperItem, themeMode: WallpaperThemeMode): boolean {
+  return item.modes?.includes(themeMode) === true;
+}
+
 export function filterWallpapersForTheme(
   items: WallpaperItem[],
   themeMode: WallpaperThemeMode = "auto"
 ): WallpaperItem[] {
   const candidates = filterZoomWallpapers(items);
   if (themeMode === "space") {
+    const explicitSpace = candidates.filter((item) => isExplicitThemeWallpaper(item, "space"));
+    if (explicitSpace.length > 0) return explicitSpace;
     return candidates.filter((item) => item.category === "space");
+  }
+  const explicitTheme = candidates.filter((item) =>
+    isExplicitThemeWallpaper(item, themeMode)
+    && isNonScienceThemeWallpaper(item)
+  );
+  if (explicitTheme.length > 0) {
+    return explicitTheme;
   }
   const categories = getThemeCategorySet(themeMode);
   const filtered = candidates.filter((item) =>
     categories.has(item.category)
-    && !isScienceWallpaperSource(item)
-    && !isTechnicalWallpaper(item)
+    && isNonScienceThemeWallpaper(item)
   );
   if (filtered.length > 0) return filtered;
   return candidates.filter(isAutoMixWallpaper);

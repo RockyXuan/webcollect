@@ -23,41 +23,58 @@
 
 ## Current Counts
 
-- Quote entries: 12 in `WALLPAPER_QUOTES`.
-- Curated/fallback wallpaper entries: 39 in `ZOOM_CURATED_WALLPAPERS`.
-- Packaged local wallpaper files: 14 under `public/assets/wallpapers`.
-- Current theme modes: `auto`, `nature`, `cinema`, `art`, `space`.
+- Quote entries: 412 in `WALLPAPER_QUOTES`.
+  - General: 159
+  - Pet: 81
+  - Cinema/movie-mode original captions: 80
+  - TV-mode original captions: 60
+  - Space: 2
+  - Fallback: 30
+- Curated/fallback wallpaper entries: 42 in `ZOOM_CURATED_WALLPAPERS`.
+- Packaged local wallpaper files: 17 under `public/assets/wallpapers`.
+- Current theme modes: `auto`, `nature`, `cinema`, `tv`, `pets`, `art`, `space`.
 - Current wallpaper categories: `landscape`, `aerial`, `landmark`, `space`, `animals`, `ocean`, `weather`.
 - Current remote providers in code: Wikimedia Commons and NASA Images, with NASA only fetched when `space` is enabled.
+- Current explicit mode pools:
+  - Auto Mix: 33 total, 13 packaged, 0 science-source items
+  - Nature: 28 total, 12 packaged, 0 science-source items
+  - Cinema: 18 total, 9 packaged, 0 science-source items
+  - TV: 18 total, 9 packaged, 0 science-source items
+  - Pets: 15 total, 4 packaged, 0 science-source items
+  - Art: 18 total, 9 packaged, 0 science-source items
+  - Space: 4 total, 2 packaged, NASA/ESA allowed by explicit opt-in
 
 ## Current Quote Logic
 
 The UI calls:
 
 ```ts
-const quote = getWallpaperQuote(wallpaper.quoteId);
+const quote = getWallpaperQuote(prefs.currentQuoteId || wallpaper.quoteId);
 ```
 
-`getWallpaperQuote` does a direct lookup in a 12-item array and falls back to the first quote. There is no quote kind, mode, author/speaker split, media binding, recent quote history, or match reason.
+`getWallpaperQuote` preserves legacy direct lookup, while the store now calls `selectWallpaperQuote` when a wallpaper is selected. The quote engine can choose by exact asset id, media tags, source title, theme kind, wallpaper category, asset tags, and recent quote history. It falls back to safe bilingual entries instead of collapsing everything to the same few ids.
 
-Remote wallpapers call `inferQuoteId(title, sourceCollection)`, which maps image keywords to one of the existing 12 quote ids. This is why many unrelated images converge onto the same few ids such as `patient-life`, `water-still`, `mountain-rain`, and `city-dawn`.
+Remote wallpapers still call `inferQuoteId(title, sourceCollection)` for backward-compatible asset metadata, but visible display uses `currentQuoteId` from the quote engine so repeated remote assets can still receive varied, mode-appropriate bilingual lines.
 
 ## Current Wallpaper Mode Logic
 
 - `auto` uses landscape, landmark, animals, and ocean while excluding science/technical items.
 - `nature` uses landscape, animals, and ocean.
-- `cinema` currently uses landscape, landmark, and ocean. It does not fetch movie backdrops, does not store movie metadata, and does not bind quotes to a film.
-- `art` currently uses landscape, landmark, and ocean. It does not fetch museum/public-domain art yet.
+- `cinema` prefers curated assets with explicit `modes: ["cinema"]` metadata and falls back to landscape, landmark, and ocean if remote results do not carry modes.
+- `tv` prefers curated assets with explicit `modes: ["tv"]` metadata and falls back to landscape, landmark, and ocean if remote results do not carry modes.
+- `pets` prefers curated assets with explicit `modes: ["pets"]` metadata and uses animal-tagged fallbacks; it now includes several packaged local CC0 animal/pet images for offline refresh.
+- `art` prefers curated assets with explicit `modes: ["art"]` metadata and falls back to aesthetic non-science landscape, landmark, and ocean imagery.
 - `space` is the only mode that allows NASA/space imagery.
 
 ## Why The User Still Sees Repetition
 
-- The visible quote library is only 12 entries.
-- Many curated wallpapers reference the same quote ids.
-- `inferQuoteId` collapses broad categories into a handful of ids.
-- There is no recent quote history preventing repetition.
-- There is no separate pet, cinema, TV, art, or fallback quote library.
-- There is no quote engine that can choose by asset metadata, mode, tags, or media identity.
+This was addressed in stages:
+
+- Quote library expanded from 12 to 412 entries.
+- The store persists `currentQuoteId`, `recentQuoteIds`, `recentAssetIds`, and `recentMediaIds`.
+- Rolling the mouse wheel and clicking `立即更新壁纸` now choose via `pickWallpaperAvoidingRecent`, so recent assets are skipped while there are alternatives.
+- Manual refresh remains clickable while a background refresh is in flight and first performs a visible local rotation before remote providers finish.
+- Curated assets now carry inferred `modes` and tags so Cinema/TV/Pets/Art are not merely accidental category matches.
 
 ## Mouse Exit Bug
 
@@ -65,24 +82,11 @@ Remote wallpapers call `inferQuoteId(title, sourceCollection)`, which maps image
 
 This has been fixed in the current working tree by removing the mousemove/fling/long-press entry path and adding a wiring test that rejects those gestures.
 
-## Missing Pieces
+## Remaining Boundaries
 
-- Quote data model with `kind`, `tone`, `speaker`, `sourceTitle`, `mediaType`, `tmdbId`, `tvId`, `exactAssetId`, validation, and production filtering.
-- Quote engine with priority:
-  1. exact asset
-  2. same movie `tmdbId`
-  3. same TV `tvId`
-  4. same normalized source title
-  5. same mode/kind
-  6. tag/tone match
-  7. general fallback
-  8. emergency fallback
-- Recent history for quote ids, asset ids, and media ids.
-- Pets mode with pet/healing quotes and pet-safe asset selection.
-- TV mode.
-- Real Cinema/TV asset metadata. Without a configured TMDb proxy/API key, this must start as curated metadata and local/remote-safe placeholders, not hard-coded frontend secrets.
-- Validation scripts for quote counts, duplicate text, missing translations, placeholder text, and media binding.
-- Browser verification that mouse movement no longer exits wallpaper mode.
+- Cinema/TV entries are currently clearly marked as WebCollect original mode captions, not fabricated quotes from real films or shows.
+- Real film/TV stills or production quotes should only be added from a legal curated source or a configured backend provider such as TMDb. No frontend API key should be hard-coded.
+- Pets mode has a real local CC0 guinea pig image plus local bird/swan animal images, but a larger true companion-animal library can still improve quality later.
 
 ## External Provider Boundaries
 

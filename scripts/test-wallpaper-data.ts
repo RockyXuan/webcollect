@@ -57,6 +57,10 @@ assert.ok(
   FALLBACK_WALLPAPERS.filter((item) => item.imageUrl.startsWith("/assets/wallpapers/")).length >= 8,
   "packaged wallpaper fallback should include at least eight local images"
 );
+assert.ok(
+  FALLBACK_WALLPAPERS.filter((item) => item.modes?.length).length >= 30,
+  "curated wallpapers should carry explicit mode metadata for stable theme selection"
+);
 const packagedWallpaperHashes = FALLBACK_WALLPAPERS
   .filter((item) => item.imageUrl.startsWith("/assets/wallpapers/"))
   .map((item) => createHash("sha256")
@@ -120,6 +124,20 @@ assert.ok(
   filterWallpapersForTheme(FALLBACK_WALLPAPERS, "space").some((item) => item.source === "nasa" || /nasa|esa/i.test(item.sourceCollection)),
   "Space mode should keep curated NASA/ESA imagery available"
 );
+for (const mode of ["cinema", "tv", "pets", "art"] as const) {
+  assert.ok(
+    filterWallpapersForTheme(FALLBACK_WALLPAPERS, mode).every((item) => item.modes?.includes(mode)),
+    `${mode} mode should be driven by explicit curated asset mode metadata`
+  );
+}
+assert.ok(
+  filterWallpapersForTheme(FALLBACK_WALLPAPERS, "cinema").length >= 12,
+  "Cinema mode should have a stable curated asset pool"
+);
+assert.ok(
+  filterWallpapersForTheme(FALLBACK_WALLPAPERS, "tv").length >= 12,
+  "TV mode should have a stable curated asset pool"
+);
 assert.ok(
   filterWallpapersForTheme(FALLBACK_WALLPAPERS, "pets").every((item) => item.category === "animals"),
   "Pets mode should only draw from animal-tagged fallback wallpapers until dedicated pet providers are enabled"
@@ -127,6 +145,10 @@ assert.ok(
 assert.ok(
   filterWallpapersForTheme(FALLBACK_WALLPAPERS, "pets").length > 0,
   "Pets mode should have a fallback pool"
+);
+assert.ok(
+  filterWallpapersForTheme(FALLBACK_WALLPAPERS, "pets").filter(isPackagedWallpaper).length >= 4,
+  "Pets mode should include several packaged local animal or pet wallpapers for offline refresh"
 );
 assert.ok(
   filterWallpapersForTheme(FALLBACK_WALLPAPERS, "tv").length > 0,
