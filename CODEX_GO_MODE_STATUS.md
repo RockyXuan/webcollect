@@ -15,7 +15,7 @@
 
 ## Unfinished
 
-- 当前图标稳定性修复已完成，待提交、推送并发布新版 Chrome 扩展包。
+- 当前图标稳定性修复已完成，并已发布新的 Chrome 扩展包。
 
 ## Current Blockers
 
@@ -23,8 +23,6 @@
 
 ## Next Step
 
-- 提交并推送当前图标修复。
-- 发布新的 Chrome 扩展包：`webcollect-2026-06-21-stable-site-icons`。
 - 用户下载并重新加载新版扩展后，重点验证顶部收藏栏里的 Gmail、B站、小众网站刷新/新建页面后不再变成空白或随机丢图。
 
 ## Latest Verification
@@ -36,3 +34,7 @@
 - 2026-06-21 CST Browser verification on `http://127.0.0.1:5013/` used the in-app Browser workspace, not the user's Chrome profile.
 - 2026-06-21 CST Browser icon QA passed: fixed a test card into the top bookmark bar; `.wc-bookmark-icon` rendered a non-empty image, `naturalWidth: 48`, `naturalHeight: 48`, `emptyIcons: 0`, `brokenImages: 0`.
 - 2026-06-21 CST Browser console check passed with no app warning/error logs.
+- 2026-06-21 CST committed `a091aa4` and pushed to `origin/main`.
+- 2026-06-21 CST published release `webcollect-2026-06-21-stable-site-icons`.
+- Release URL: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-06-21-stable-site-icons`.
+- Release asset: `WebCollect-Chrome-Extension-webcollect-2026-06-21-stable-site-icons.zip`, size `58513948`, sha256 `bd17b8987c8ec463467297fa85c0a5ff3053ef505c547c446873a2e09d0a285a`.
