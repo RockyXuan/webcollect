@@ -7,6 +7,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Check, GripVertical, Pencil, Star } from "lucide-react";
 import { getPinnedBookmarkLabel, resolvePinnedBookmarkCards } from "@/lib/pinned-bookmarks";
 import { openWebCollectUrl } from "@/lib/platform";
+import { getSemanticSiteIcon, getSiteIconCandidates, shouldPersistSiteIcon } from "@/lib/site-icons";
 import { useAppStore } from "@/lib/store";
 import type { PinnedBookmarkDisplayMode, PinnedBookmarkItem, WebCard } from "@/lib/types";
 
@@ -16,6 +17,7 @@ export function BookmarkBar() {
   const pinnedBookmarkItems = useAppStore((state) => state.pinnedBookmarkItems);
   const reorderPinnedBookmarks = useAppStore((state) => state.reorderPinnedBookmarks);
   const updatePinnedBookmark = useAppStore((state) => state.updatePinnedBookmark);
+  const updateCard = useAppStore((state) => state.updateCard);
   const togglePinBookmark = useAppStore((state) => state.togglePinBookmark);
   const linkOpenMode = useAppStore((state) => state.linkOpenMode);
 
@@ -71,6 +73,7 @@ export function BookmarkBar() {
                       editMode={editMode}
                       onOpen={() => openWebCollectUrl(card.url, linkOpenMode)}
                       onUpdate={updatePinnedBookmark}
+                      onUpdateCard={updateCard}
                       onRemove={() => togglePinBookmark(card.id)}
                     />
                   ))}
@@ -90,17 +93,22 @@ interface SortableBookmarkProps {
   editMode: boolean;
   onOpen: () => void;
   onUpdate: (item: PinnedBookmarkItem) => void;
+  onUpdateCard: (card: WebCard) => void;
   onRemove: () => void;
 }
 
-function SortableBookmark({ item, card, editMode, onOpen, onUpdate, onRemove }: SortableBookmarkProps) {
-  const [imgError, setImgError] = useState(false);
+function SortableBookmark({ item, card, editMode, onOpen, onUpdate, onUpdateCard, onRemove }: SortableBookmarkProps) {
+  const [imageCandidateIndex, setImageCandidateIndex] = useState(0);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
     disabled: !editMode,
   });
   const label = getPinnedBookmarkLabel(item, card);
-  const faviconUrl = useMemo(() => getFaviconUrl(card.url), [card.url]);
+  const iconCandidates = useMemo(() => getSiteIconCandidates(card), [card]);
+  const imageUrl = iconCandidates[imageCandidateIndex] || "";
+  const semanticIcon = useMemo(() => getSemanticSiteIcon(card), [card]);
+  const SemanticIcon = semanticIcon?.Icon;
+  const shouldUseSemanticIcon = Boolean(semanticIcon && (semanticIcon.prefer || !imageUrl));
   const showIcon = item.displayMode === "icon" || item.displayMode === "both";
   const showLabel = item.displayMode === "label" || item.displayMode === "both";
 
@@ -119,6 +127,20 @@ function SortableBookmark({ item, card, editMode, onOpen, onUpdate, onRemove }: 
       modeInput === "label" || modeInput === "both" || modeInput === "icon" ? modeInput : item.displayMode;
     onUpdate({ ...item, customLabel: nextLabel.trim() || undefined, displayMode });
   };
+
+  const handleImageError = () => {
+    setImageCandidateIndex((current) => current + 1);
+  };
+
+  const handleImageLoad = () => {
+    if (shouldPersistSiteIcon(card.imageUrl, imageUrl)) {
+      onUpdateCard({ ...card, imageUrl, updatedAt: Date.now() });
+    }
+  };
+
+  React.useEffect(() => {
+    setImageCandidateIndex(0);
+  }, [card.id, card.imageUrl, card.url]);
 
   return (
     <button
@@ -141,9 +163,20 @@ function SortableBookmark({ item, card, editMode, onOpen, onUpdate, onRemove }: 
       </span>
       )}
       {showIcon && (
-        <span className="wc-bookmark-icon">
-          {faviconUrl && !imgError ? (
-            <img src={faviconUrl} alt="" className="h-full w-full rounded-lg object-cover" onError={() => setImgError(true)} />
+        <span
+          className="wc-bookmark-icon"
+          style={shouldUseSemanticIcon && semanticIcon ? { background: semanticIcon.background, color: semanticIcon.color } : undefined}
+        >
+          {shouldUseSemanticIcon && SemanticIcon ? (
+            <SemanticIcon className="h-4 w-4" strokeWidth={2.35} />
+          ) : imageUrl ? (
+            <img
+              src={imageUrl}
+              alt=""
+              className="h-full w-full rounded-lg object-cover"
+              onError={handleImageError}
+              onLoad={handleImageLoad}
+            />
           ) : (
             <span>{label.slice(0, 2)}</span>
           )}
@@ -193,13 +226,4 @@ function SortableBookmark({ item, card, editMode, onOpen, onUpdate, onRemove }: 
       )}
     </button>
   );
-}
-
-function getFaviconUrl(url: string): string {
-  try {
-    const hostname = new URL(url).hostname;
-    return `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`;
-  } catch {
-    return "";
-  }
 }

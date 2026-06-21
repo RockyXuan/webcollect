@@ -2,37 +2,18 @@
 
 import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
-  AppWindow,
-  BookOpen,
-  Bookmark,
-  Bot,
-  Chrome,
-  Clapperboard,
-  Cloud,
-  Download,
-  ExternalLink,
-  FileText,
-  Flag,
-  FlaskConical,
-  Globe2,
-  GripVertical,
-  History,
-  LayoutGrid,
-  Mail,
-  MapPinned,
   ArrowUpFromLine,
+  ExternalLink,
+  GripVertical,
   MoreHorizontal,
   Pencil,
-  Puzzle,
-  Search as SearchIcon,
   Send,
-  Settings,
   Star,
   Trash2,
-  type LucideIcon,
 } from "lucide-react";
 import type { WebCard } from "@/lib/types";
 import { openWebCollectUrl } from "@/lib/platform";
+import { getSemanticSiteIcon, getSiteIconCandidates, shouldPersistSiteIcon } from "@/lib/site-icons";
 import { useAppStore } from "@/lib/store";
 import { EditActionDock, type EditAction } from "@/components/ui/edit-action-dock";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -49,195 +30,6 @@ interface WebCardItemProps {
   onUpdateCard?: (card: WebCard) => void;
 }
 
-type SemanticIconMatch = {
-  Icon: LucideIcon;
-  prefer: boolean;
-  background: string;
-  color: string;
-};
-
-const semanticIconRules: Array<SemanticIconMatch & { terms: string[] }> = [
-  {
-    terms: ["settings", "setting", "preferences", "config", "配置", "设置"],
-    Icon: Settings,
-    prefer: true,
-    background: "linear-gradient(135deg, rgba(219,234,254,0.96), rgba(255,255,255,0.82))",
-    color: "#2563eb",
-  },
-  {
-    terms: ["extensions", "extension", "plugin", "plugins", "addon", "addons", "扩展", "插件"],
-    Icon: Puzzle,
-    prefer: true,
-    background: "linear-gradient(135deg, rgba(237,233,254,0.98), rgba(255,255,255,0.84))",
-    color: "#7c3aed",
-  },
-  {
-    terms: ["flags", "flag", "实验", "开关"],
-    Icon: Flag,
-    prefer: true,
-    background: "linear-gradient(135deg, rgba(254,243,199,0.96), rgba(255,255,255,0.84))",
-    color: "#d97706",
-  },
-  {
-    terms: ["applications", "application", "apps", "app", "应用"],
-    Icon: AppWindow,
-    prefer: true,
-    background: "linear-gradient(135deg, rgba(207,250,254,0.95), rgba(255,255,255,0.84))",
-    color: "#0891b2",
-  },
-  {
-    terms: ["bookmarks", "bookmark", "favorites", "favorite", "书签", "收藏"],
-    Icon: Bookmark,
-    prefer: true,
-    background: "linear-gradient(135deg, rgba(220,252,231,0.96), rgba(255,255,255,0.84))",
-    color: "#16a34a",
-  },
-  {
-    terms: ["downloads", "download", "下载"],
-    Icon: Download,
-    prefer: true,
-    background: "linear-gradient(135deg, rgba(224,242,254,0.98), rgba(255,255,255,0.84))",
-    color: "#0284c7",
-  },
-  {
-    terms: ["history", "历史", "记录"],
-    Icon: History,
-    prefer: true,
-    background: "linear-gradient(135deg, rgba(241,245,249,0.98), rgba(255,255,255,0.86))",
-    color: "#475569",
-  },
-  {
-    terms: ["experiments", "experiment", "labs", "lab"],
-    Icon: FlaskConical,
-    prefer: true,
-    background: "linear-gradient(135deg, rgba(250,232,255,0.98), rgba(255,255,255,0.84))",
-    color: "#c026d3",
-  },
-  {
-    terms: ["chrome", "web store", "browser", "浏览器"],
-    Icon: Chrome,
-    prefer: false,
-    background: "linear-gradient(135deg, rgba(219,234,254,0.96), rgba(255,255,255,0.82))",
-    color: "#2563eb",
-  },
-  {
-    terms: ["mail", "gmail", "email", "邮箱", "邮件"],
-    Icon: Mail,
-    prefer: false,
-    background: "linear-gradient(135deg, rgba(254,226,226,0.96), rgba(255,255,255,0.84))",
-    color: "#dc2626",
-  },
-  {
-    terms: ["map", "maps", "地图", "导航"],
-    Icon: MapPinned,
-    prefer: false,
-    background: "linear-gradient(135deg, rgba(220,252,231,0.96), rgba(255,255,255,0.84))",
-    color: "#059669",
-  },
-  {
-    terms: ["search", "find", "搜索", "查询"],
-    Icon: SearchIcon,
-    prefer: false,
-    background: "linear-gradient(135deg, rgba(219,234,254,0.96), rgba(255,255,255,0.82))",
-    color: "#2563eb",
-  },
-  {
-    terms: ["book", "books", "read", "reading", "library", "阅读", "读书", "图书"],
-    Icon: BookOpen,
-    prefer: false,
-    background: "linear-gradient(135deg, rgba(220,252,231,0.96), rgba(255,255,255,0.84))",
-    color: "#15803d",
-  },
-  {
-    terms: ["ai", "gpt", "chat", "bot", "assistant", "智能"],
-    Icon: Bot,
-    prefer: false,
-    background: "linear-gradient(135deg, rgba(237,233,254,0.98), rgba(255,255,255,0.84))",
-    color: "#6d28d9",
-  },
-  {
-    terms: ["drive", "cloud", "盘", "网盘", "云"],
-    Icon: Cloud,
-    prefer: false,
-    background: "linear-gradient(135deg, rgba(224,242,254,0.98), rgba(255,255,255,0.84))",
-    color: "#0284c7",
-  },
-  {
-    terms: ["video", "movie", "youtube", "film", "影视", "电影", "视频"],
-    Icon: Clapperboard,
-    prefer: false,
-    background: "linear-gradient(135deg, rgba(254,226,226,0.96), rgba(255,255,255,0.84))",
-    color: "#e11d48",
-  },
-  {
-    terms: ["docs", "doc", "document", "file", "文档", "文件"],
-    Icon: FileText,
-    prefer: false,
-    background: "linear-gradient(135deg, rgba(241,245,249,0.98), rgba(255,255,255,0.86))",
-    color: "#475569",
-  },
-  {
-    terms: ["tools", "tool", "workspace", "dashboard", "平台", "工具"],
-    Icon: LayoutGrid,
-    prefer: false,
-    background: "linear-gradient(135deg, rgba(219,234,254,0.96), rgba(255,255,255,0.82))",
-    color: "#2563eb",
-  },
-];
-
-function getUrlProtocol(url: string) {
-  try {
-    return new URL(url).protocol;
-  } catch {
-    return "";
-  }
-}
-
-function getCardTokens(text: string) {
-  return text.toLowerCase().split(/[^a-z0-9\u4e00-\u9fa5]+/).filter(Boolean);
-}
-
-function hasSemanticTerm(text: string, tokens: string[], term: string) {
-  const normalizedTerm = term.toLowerCase();
-  if (normalizedTerm.includes(" ")) return text.includes(normalizedTerm);
-  if (/^[a-z0-9]+$/.test(normalizedTerm)) return tokens.includes(normalizedTerm);
-  return text.includes(normalizedTerm);
-}
-
-function getSemanticIcon(card: WebCard): SemanticIconMatch | null {
-  const haystack = [
-    card.title,
-    card.shortDesc,
-    card.fullDesc,
-    card.note,
-    card.url,
-    card.abbreviation,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-  const tokens = getCardTokens(haystack);
-  const protocol = getUrlProtocol(card.url);
-  const isBrowserInternal = ["chrome:", "edge:", "about:", "brave:"].includes(protocol);
-
-  for (const rule of semanticIconRules) {
-    if (rule.terms.some((term) => hasSemanticTerm(haystack, tokens, term))) {
-      return { ...rule, prefer: rule.prefer || isBrowserInternal };
-    }
-  }
-
-  if (isBrowserInternal) {
-    return {
-      Icon: Globe2,
-      prefer: true,
-      background: "linear-gradient(135deg, rgba(219,234,254,0.96), rgba(255,255,255,0.82))",
-      color: "#2563eb",
-    };
-  }
-
-  return null;
-}
-
 export function WebCardItem({
   card,
   categoryColor,
@@ -249,7 +41,7 @@ export function WebCardItem({
   dragListeners,
   onUpdateCard,
 }: WebCardItemProps) {
-  const [imgError, setImgError] = useState(false);
+  const [imageCandidateIndex, setImageCandidateIndex] = useState(0);
   const [editingField, setEditingField] = useState<"title" | "shortDesc" | null>(null);
   const [editValue, setEditValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -257,20 +49,11 @@ export function WebCardItem({
   const isPinnedBookmark = useAppStore((s) => s.pinnedBookmarkItems.some((item) => item.cardId === card.id));
   const togglePinBookmark = useAppStore((s) => s.togglePinBookmark);
 
-  // Resolve the best image URL: prefer card.imageUrl, fallback to Google Favicon API
-  const faviconUrl = React.useMemo(() => {
-    if (!card.url) return "";
-    try {
-      const hostname = new URL(card.url).hostname;
-      return `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`;
-    } catch {
-      return "";
-    }
-  }, [card.url]);
-  const displayImageUrl = card.imageUrl || faviconUrl;
-  const semanticIcon = React.useMemo(() => getSemanticIcon(card), [card]);
+  const iconCandidates = React.useMemo(() => getSiteIconCandidates(card), [card]);
+  const displayImageUrl = iconCandidates[imageCandidateIndex] || "";
+  const semanticIcon = React.useMemo(() => getSemanticSiteIcon(card), [card]);
   const shouldUseSemanticIcon = Boolean(
-    semanticIcon && (semanticIcon.prefer || imgError || !displayImageUrl),
+    semanticIcon && (semanticIcon.prefer || !displayImageUrl),
   );
   const SemanticIcon = semanticIcon?.Icon;
 
@@ -317,8 +100,17 @@ export function WebCardItem({
   }, [editingField]);
 
   useEffect(() => {
-    setImgError(false);
-  }, [displayImageUrl]);
+    setImageCandidateIndex(0);
+  }, [card.id, card.imageUrl, card.url]);
+
+  const handleImageError = useCallback(() => {
+    setImageCandidateIndex((current) => current + 1);
+  }, []);
+
+  const handleImageLoad = useCallback(() => {
+    if (!onUpdateCard || !shouldPersistSiteIcon(card.imageUrl, displayImageUrl)) return;
+    onUpdateCard({ ...card, imageUrl: displayImageUrl, updatedAt: Date.now() });
+  }, [card, displayImageUrl, onUpdateCard]);
 
   // Handle key events in the inline input
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -373,12 +165,13 @@ export function WebCardItem({
       >
         {shouldUseSemanticIcon && SemanticIcon ? (
           <SemanticIcon className="h-[18px] w-[18px]" strokeWidth={2.3} />
-        ) : displayImageUrl && !imgError ? (
+        ) : displayImageUrl ? (
           <img
             src={displayImageUrl}
             alt={card.title}
             className="h-full w-full rounded-xl object-cover"
-            onError={() => setImgError(true)}
+            onError={handleImageError}
+            onLoad={handleImageLoad}
             loading="lazy"
           />
         ) : (
