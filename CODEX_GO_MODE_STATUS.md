@@ -37,4 +37,4 @@
 - 2026-06-21 CST committed `a091aa4` and pushed to `origin/main`.
 - 2026-06-21 CST published release `webcollect-2026-06-21-stable-site-icons`.
 - Release URL: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-06-21-stable-site-icons`.
-- Release asset: `WebCollect-Chrome-Extension-webcollect-2026-06-21-stable-site-icons.zip`, size `58513948`, sha256 `bd17b8987c8ec463467297fa85c0a5ff3053ef505c547c446873a2e09d0a285a`.
+- Release asset: `WebCollect-Chrome-Extension-webcollect-2026-06-21-stable-site-icons.zip`, size `58513948`, sha256 `b854d37d09b91b3ebdb6b2d2bb10ef346c4b43a11790c832e1ebf4cda7297d30`.
