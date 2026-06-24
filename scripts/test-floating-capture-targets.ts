@@ -26,6 +26,7 @@ const category = (input: Partial<Category> & Pick<Category, "id" | "name" | "ord
 
 const categories: Category[] = [
   category({ id: "home-parent-common", name: "常用", order: 0, sectionId: "section-home", isParent: true }),
+  category({ id: "home-group-world", name: "看世界", order: 0, sectionId: "section-home", parentId: "home-parent-common" }),
   category({ id: "home-group-zmt", name: "ZMT", order: 0, sectionId: "section-home", parentId: "home-parent-common" }),
   category({ id: "home-inbox", name: "收集箱", order: 99, sectionId: "section-home" }),
   category({ id: "jieliu-inbox", name: "收集箱", order: 99, sectionId: "section-jieliu" }),
@@ -54,6 +55,24 @@ assert.equal(
   ),
   "home-group-zmt",
   "explicit selected group should win"
+);
+
+assert.equal(
+  resolveCaptureTargetCategoryId(
+    draft({
+      sectionId: "section-home",
+      sectionName: "主页",
+      parentCategoryId: "home-parent-common",
+      parentCategoryName: "常用",
+      groupId: "home-group-world",
+      groupName: "看世界",
+    }),
+    categories,
+    sections,
+    "section-jieliu"
+  ),
+  "home-group-world",
+  "selected Home / Common / World destination should not fall back to the throttling inbox"
 );
 
 assert.equal(
@@ -89,6 +108,28 @@ assert.notEqual(
   ),
   "jieliu-inbox",
   "a missing home group must not fall into another section inbox"
+);
+
+assert.equal(
+  resolveCaptureTargetCategoryId(
+    draft({ sectionName: "主页", parentCategoryName: "常用", groupName: "不存在的分组" }),
+    categories,
+    sections,
+    "section-jieliu"
+  ),
+  null,
+  "an explicit missing group should fail instead of silently selecting a sibling or inbox"
+);
+
+assert.equal(
+  resolveCaptureTargetCategoryId(
+    draft({ sectionName: "主页", parentCategoryName: "不存在的分类" }),
+    categories,
+    sections,
+    "section-jieliu"
+  ),
+  null,
+  "an explicit missing parent category should fail instead of falling back to an inbox"
 );
 
 const createdSection = resolveOrCreateCaptureTargetCategory(

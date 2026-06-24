@@ -55,7 +55,7 @@ export function SyncStatusBadge() {
     <button
       type="button"
       disabled={syncStatus === "syncing"}
-      onClick={manualSync}
+      onClick={() => void manualSync()}
       className={`wc-sync-status-badge hidden rounded-2xl border px-3 text-xs shadow-sm shadow-blue-100/50 backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:bg-white disabled:cursor-wait disabled:opacity-80 lg:flex ${tone}`}
       title={
         syncStatus === "error" && error
@@ -425,7 +425,7 @@ export function UserMenu() {
             <button
               type="button"
               disabled={syncStatus === "syncing"}
-              onClick={manualSync}
+              onClick={() => void manualSync()}
               className="wc-panel-action"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${syncStatus === "syncing" ? "animate-spin" : ""}`} />

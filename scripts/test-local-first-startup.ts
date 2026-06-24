@@ -32,7 +32,7 @@ assert.equal(
   "web sessions should not block startup on cloud sync"
 );
 assert.equal(
-  authStore.includes("loadData({ showLoading: false })"),
+  /loadData\(\{\s*showLoading:\s*false[,}\s]/.test(authStore),
   true,
   "background cloud refresh should not return the wall to the loading screen"
 );

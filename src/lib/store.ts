@@ -48,6 +48,11 @@ import {
 
 const DEFAULT_SECTION_ID = "section-default";
 
+interface LoadDataOptions {
+  showLoading?: boolean;
+  preserveOnCollapse?: boolean;
+}
+
 function createDefaultSection(now = Date.now()): CollectionSection {
   return {
     id: DEFAULT_SECTION_ID,
@@ -70,6 +75,48 @@ function getDefaultSectionId(sections: CollectionSection[]): string {
   return sections.some((section) => section.id === DEFAULT_SECTION_ID)
     ? DEFAULT_SECTION_ID
     : sections[0]?.id || DEFAULT_SECTION_ID;
+}
+
+function countCardsInSection(cards: WebCard[], categories: Category[], sectionId: string): number {
+  const categoryIds = new Set(
+    categories
+      .filter((category) => (category.sectionId || DEFAULT_SECTION_ID) === sectionId)
+      .map((category) => category.id)
+  );
+  return cards.filter((card) => categoryIds.has(card.categoryId)).length;
+}
+
+function looksLikeRefreshCollapse(
+  previous: Pick<AppState, "cards" | "categories" | "sections" | "activeSectionId">,
+  next: Pick<AppState, "cards" | "categories" | "sections" | "activeSectionId">
+): boolean {
+  const previousHasWorkspace = previous.sections.length > 1 || previous.categories.length > 3 || previous.cards.length > 5;
+  if (!previousHasWorkspace) return false;
+
+  if (previous.sections.length > 1 && next.sections.length <= 1 && previous.categories.length > 3) {
+    return true;
+  }
+
+  if (previous.categories.length >= 4 && next.categories.length <= 1) {
+    return true;
+  }
+
+  if (previous.cards.length >= 8 && next.cards.length <= Math.max(1, Math.floor(previous.cards.length * 0.2))) {
+    return true;
+  }
+
+  const previousActiveCards = countCardsInSection(previous.cards, previous.categories, previous.activeSectionId);
+  const nextActiveCards = countCardsInSection(next.cards, next.categories, next.activeSectionId);
+  return previousActiveCards >= 5 && nextActiveCards <= Math.max(1, Math.floor(previousActiveCards * 0.2));
+}
+
+function publishCaptureDestinationsSoon(): void {
+  if (typeof window === "undefined") return;
+  void import("./floating-capture")
+    .then(({ publishCaptureDestinationCache }) => publishCaptureDestinationCache())
+    .catch((error) => {
+      console.warn("[WebCollect] Failed to publish floating capture destinations:", error);
+    });
 }
 
 function pruneEmptyDuplicateCategories(categories: Category[], cards: WebCard[]): Category[] {
@@ -404,7 +451,7 @@ interface AppState {
   editMode: boolean;
 
   // Actions
-  loadData: (options?: { showLoading?: boolean }) => Promise<void>;
+  loadData: (options?: LoadDataOptions) => Promise<void>;
   setSearchQuery: (q: string) => void;
   setActiveCategory: (id: string) => void;
   setActiveSection: (id: string) => Promise<void>;
@@ -494,6 +541,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   loadData: async (options) => {
     const showLoading = options?.showLoading ?? true;
+    const previousState = get();
     if (showLoading) set({ isLoading: true });
     const [storedCards, initCategories, init, hiddenSites, pinnedIds, pinnedBookmarkItems, widths, layouts, visualScale, linkOpenMode, storedSections, storedActiveSectionId, workspaceResetAt] = await Promise.all([
       getCards(),
@@ -577,7 +625,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       await withoutLocalChangeEvents(() => saveHiddenSites(cleanedHidden));
     }
 
-    set({
+    const nextState = {
       cards,
       categories,
       sections,
@@ -591,7 +639,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       linkOpenMode,
       initialized: init,
       isLoading: false,
-    });
+    };
+
+    if (options?.preserveOnCollapse && looksLikeRefreshCollapse(previousState, nextState)) {
+      set({ isLoading: false });
+      throw new Error("刷新结果看起来不完整，已保留当前页面。请稍后再试，或先点云端同步。");
+    }
+
+    set(nextState);
+    publishCaptureDestinationsSoon();
 
     // Load recycle bin in background (non-blocking)
     void get().loadRecycleBin();
@@ -618,6 +674,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       await withoutLocalChangeEvents(() => saveCards(updated));
       cards = updated;
       set({ cards: updated });
+      publishCaptureDestinationsSoon();
     }
 
     const categoriesWithInboxes = ensureSectionInboxes(categories, sections);
@@ -678,6 +735,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     set({ cards, categories });
+    publishCaptureDestinationsSoon();
   },
 
   setSearchQuery: (q) => set({ searchQuery: q }),

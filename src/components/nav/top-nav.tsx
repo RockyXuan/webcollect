@@ -103,6 +103,8 @@ export function TopNav({
     linkOpenMode,
   } = useAppStore();
   const recycleBinCount = useAppStore((s) => s.recycleBin.length);
+  const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
+  const syncStatus = useAuthStore((s) => s.syncStatus);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSavingSnapshot, setIsSavingSnapshot] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<"idle" | "saved">("idle");
@@ -279,7 +281,14 @@ export function TopNav({
   const handleRefreshLocalView = async () => {
     setIsRefreshing(true);
     try {
-      await loadData();
+      if (useAuthStore.getState().isLoggedIn) {
+        await useAuthStore.getState().manualSync({ reloadView: false, throwOnError: true });
+      }
+      await loadData({ showLoading: false, preserveOnCollapse: true });
+    } catch (error) {
+      console.error("[WebCollect] Refresh failed", error);
+      const message = error instanceof Error ? error.message : "刷新失败，请稍后重试。";
+      window.alert(message);
     } finally {
       setIsRefreshing(false);
     }
@@ -423,9 +432,9 @@ export function TopNav({
               variant="ghost"
               size="sm"
               onClick={handleRefreshLocalView}
-              disabled={isRefreshing}
+              disabled={isRefreshing || syncStatus === "syncing"}
               className="wc-header-tool"
-              title="刷新本地视图"
+              title={isLoggedIn ? "从云端同步并刷新视图" : "刷新本地视图"}
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
               <span>刷新</span>

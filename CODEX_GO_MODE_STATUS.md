@@ -2,60 +2,54 @@
 
 ## Final Goal
 
-修复 WebCollect 壁纸模式的内容质量、双语台词库、Pets/Cinema/TV 模式和鼠标误退出问题；完成标准是保留当前成果，建立可扩展 quote/asset 数据结构，提供足够本地兜底内容、去重与匹配逻辑，壁纸模式只因明确点击或键盘进入收藏墙，并通过专项测试、构建和浏览器验证证明可用。
+修复 WebCollect 跨设备云同步刷新与浮窗采集目标准确性；完成标准是 Windows 或其他设备新增的网页能在 Mac 手动云同步/刷新后拉取显示，刷新不再把收藏墙临时坍缩成少量分类，浮窗显式选择 `主页 / 常用 / 看世界` 这类目标时必须进入目标分组而不是默认收集箱，并通过代码测试、构建、真实浏览器检查、提交推送和发布包证明可用。
 
 ## Completed
 
-- 阅读并消化用户提供的 `ChatGPT-Webcollect 壁纸和台词优化_副本.md`，形成 `docs/quote-wallpaper-audit.md` 审计文档。
-- 移除壁纸模式里基于鼠标移动、甩动和长按的退出逻辑；现在移动鼠标不会退出，点击空白处或按 Enter 才进入网页墙。
-- 扩展壁纸模式：新增 `TV` 与 `Pets`，并保留 `Auto Mix / Nature / Cinema / Art / Space`。
-- 重建本地双语台词/短句库，第一阶段达到 412 条，并保留旧 `quoteId` 兼容。
-- 新增 quote 选择引擎，支持按模式、标签、资产、媒体来源匹配，并通过最近历史避免短时间重复。
-- 扩展壁纸偏好字段：`currentQuoteId`、`recentQuoteIds`、`recentAssetIds`、`recentMediaIds`。
-- 后台刷新、滚轮换壁纸和偏好更新都会同步更新当前 quote 与最近历史。
-- 滚轮和“立即更新壁纸”现在优先避开最近看过的壁纸资产，避免只在旧图或当前图上反复打转。
-- 修复“后台刷新中点击刷新没反应/只换台词不换背景”的问题：刷新入口不再被 `isRefreshing` 禁用，并且旋转时以实际可见壁纸 ID 为当前项。
-- Curated 壁纸资产现在会自动带上显式 `modes` 和语义 `tags`，Cinema/TV/Pets/Art 优先使用这些模式绑定，而不是只靠粗分类碰运气。
-- 新增 3 张 CC0 打包本地动物/宠物壁纸：`peruvian_guineapig`、`swan_shore`、`seabird`。Pets 模式现在有 15 张显式绑定资产，其中 4 张可离线使用。
-- 新增 `scripts/test-wallpaper-quotes.ts`，并扩展 `scripts/test-wallpaper-data.ts`、`scripts/test-wallpaper-wiring.ts` 覆盖本次行为。
+- 手动云同步改为安全双向同步：现在会执行完整 `syncData(user.id)`，不再因为本地 `updatedAt <= syncedAt` 就直接成功返回。
+- 顶部“刷新”在已登录时会先执行云端双向同步，再通过受保护的本地加载刷新当前视图；未登录时才只是刷新本地视图。
+- `loadData` 增加 `preserveOnCollapse` 防护：如果刷新结果看起来比当前 UI 异常坍缩，会保留当前页面并抛出可读错误。
+- 数据加载后会异步发布浮窗目标缓存，减少浮窗用旧分项/分类/分组 ID 保存的机会。
+- 浮窗目标解析收紧：显式选择分组/分类时，ID 失效会按名称路径回退；仍解析不到时失败并保留错误，不再静默落入默认收集箱。
+- 浮窗队列项增加 `resolvedDestinationPath` / `destinationError` 调试字段，便于定位保存到了哪里或为什么失败。
+- 新增 `scripts/test-sync-refresh-behavior.ts`，扩展 `scripts/test-floating-capture-targets.ts`，覆盖本轮同步刷新和浮窗目标回归。
+- 更新旧测试以匹配当前固定布局和后台刷新语义。
 
 ## Unfinished
 
-- Cinema/TV 当前是合规的原创模式短句，不伪造真实电影/剧集台词；后续若要真实影视台词，需要接入合法数据源或人工精选库。
-- Pets/Cinema/TV 已有显式模式绑定和本地/远程合格池；本轮新增宠物/动物本地资产已通过本地验证。后续仍可继续增加更强的真实精选图包和合法 provider。
+- 未直接操作 Windows 设备做真实跨设备端到端验证；本轮用代码路径、同步语义测试、扩展构建和本机真实页面验证覆盖。
+- Chrome 隔离 profile 视觉验证受本机 Chrome/Computer Use 选择窗口限制；已停止继续操作用户主 Chrome，避免误触个人标签。
+- 发布目标标签：`webcollect-2026-06-24-sync-refresh-capture`。发布后用户仍需在 Windows/Mac 实机安装并确认真实跨设备路径。
 
 ## Current Blockers
 
-- 无必须由用户决策、账号登录或权限授权才能继续的阻塞。
+- 无代码实现阻塞。
+- 隔离 Chrome 扩展视觉验证受工具限制：Computer Use 抓到的是已有 Chrome 主配置窗口，而不是刚启动的临时 profile。
 
 ## Next Step
 
-- 提交、推送并发布包含本轮 Pets 本地资产和显式模式绑定的可下载扩展包；后续增强方向是继续补充合法的真实精选图片资产。
+- 用户在 Windows 和 Mac 安装发布包后重点验证：`tweetmesh` 这类跨设备新增项是否可通过 Mac 顶部云同步/刷新拉回；浮窗选择 `主页 / 常用 / 看世界` 是否进入目标分组。
 
 ## Latest Verification
 
-- 2026-06-22 CST `node --import tsx scripts/test-wallpaper-data.ts` passed.
-- 2026-06-22 CST `node --import tsx scripts/test-wallpaper-quotes.ts` passed.
-- 2026-06-22 CST `node --import tsx scripts/test-wallpaper-wiring.ts` passed.
-- 2026-06-22 CST `./node_modules/.bin/tsc -p tsconfig.json` passed.
-- 2026-06-22 CST `./node_modules/.bin/eslint` passed with 0 errors and 6 existing warnings.
-- 2026-06-22 CST `node ./extension/build.mjs` passed.
-- 2026-06-22 CST `git diff --check` passed.
-- 2026-06-22 CST a fresh Playwright browser rerun was blocked by this Mac's local Chrome/Crashpad permission path; the fresh substitute evidence is the wiring test for mouse gestures plus the previous in-app Browser verification below against the same wallpaper code.
-- 2026-06-21 CST `node --import tsx scripts/test-wallpaper-quotes.ts` passed.
-- 2026-06-21 CST `node --import tsx scripts/test-wallpaper-data.ts` passed.
-- 2026-06-21 CST `node --import tsx scripts/test-wallpaper-wiring.ts` passed.
-- 2026-06-21 CST `./node_modules/.bin/tsc -p tsconfig.json` passed.
-- 2026-06-21 CST `./node_modules/.bin/eslint` passed with 0 errors and 6 existing warnings.
-- 2026-06-21 CST `node ./extension/build.mjs` passed.
-- 2026-06-21 CST `git diff --check` passed.
-- 2026-06-21 CST Browser verification used the in-app Browser workspace at `http://127.0.0.1:5014/`, not the user's Chrome profile.
-- Browser verification passed: initial page is wallpaper mode; hint says wheel changes wallpaper and click/Enter enters the collection wall; large mouse movement did not leave wallpaper mode; wheel changed the displayed quote while staying in wallpaper mode; settings show `Auto Mix / Nature / Cinema / TV / Pets / Art / Space`; clicking blank wallpaper enters the collection wall; returning to wallpaper and pressing Enter enters the collection wall.
-- Browser verification passed after refresh-cache fix: six wheel actions produced six distinct wallpaper background URLs; the `立即更新壁纸` control was enabled while refresh state was active and changed both the visible background URL and the displayed quote.
-- 2026-06-21 CST Browser verification used the in-app Browser workspace at `http://127.0.0.1:5015/`, not the user's Chrome profile.
-- Browser verification passed for the current Pets/mode-binding changes: selecting `Pets` and using the mouse wheel kept the app in wallpaper mode, produced 4 distinct local packaged animal/pet backgrounds, and did not fall back to the collection wall on mouse movement.
-- 2026-06-21 CST committed `88d9c2f` and pushed to `origin/main`.
-- 2026-06-21 CST published release `webcollect-2026-06-21-wallpaper-refresh-88d9c2f`.
-- Release URL: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-06-21-wallpaper-refresh-88d9c2f`.
-- Release asset: `WebCollect-Chrome-Extension-webcollect-2026-06-21-wallpaper-refresh-88d9c2f.zip`, size `58519226`, sha256 `ca628b9770bea55c060b57dbe6a07db1e071c40d2e3e00af158f46923197ba6b`.
-- Local preview returned `GET /api/supabase-config 503` because local Supabase env is not configured; this did not block wallpaper UI verification.
+- 2026-06-24 CST `node --import tsx scripts/test-floating-capture-targets.ts` passed.
+- 2026-06-24 CST `node --import tsx scripts/test-sync-refresh-behavior.ts` passed.
+- 2026-06-24 CST `node --import tsx scripts/test-local-first-startup.ts` passed.
+- 2026-06-24 CST `node --import tsx scripts/test-cloud-snapshots.ts` passed.
+- 2026-06-24 CST `node --import tsx scripts/test-workspace-search.ts` passed.
+- 2026-06-24 CST `node --import tsx scripts/test-layout-preferences.ts` passed.
+- 2026-06-24 CST `node --import tsx scripts/test-layout-sizing.ts` passed.
+- 2026-06-24 CST `node --import tsx scripts/test-resolution-layout.ts` passed.
+- 2026-06-24 CST `node --import tsx scripts/test-pinned-bookmarks.ts` passed.
+- 2026-06-24 CST `node --import tsx scripts/test-site-icons.ts` passed.
+- 2026-06-24 CST `node --import tsx scripts/test-wallpaper-data.ts` passed.
+- 2026-06-24 CST `node --import tsx scripts/test-wallpaper-policy.ts` passed.
+- 2026-06-24 CST `node --import tsx scripts/test-wallpaper-wiring.ts` passed.
+- 2026-06-24 CST `node --import tsx scripts/test-wallpaper-quotes.ts` passed.
+- 2026-06-24 CST `./node_modules/.bin/tsc -p tsconfig.json` passed.
+- 2026-06-24 CST `./node_modules/.bin/eslint` passed with 0 errors and 6 existing warnings.
+- 2026-06-24 CST `node ./extension/build.mjs` passed.
+- 2026-06-24 CST `curl -I http://localhost:5014` returned HTTP 200 when run in the same permission context as the local dev server.
+- 2026-06-24 CST Safari auxiliary browser verification: opened `http://localhost:5014`, clicked from wallpaper mode into the collection wall, confirmed toolbar and wall rendered, clicked `刷新`, and the page stayed rendered without blanking or abnormal collapse.
+- 2026-06-24 CST Chrome extension observation: existing Chrome `chrome://newtab/` WebCollect page rendered with real user data and visible sync/refresh controls; isolated temp-profile Chrome visual verification was attempted but Computer Use selected the existing Chrome window, so no further Chrome interaction was performed.
+- 2026-06-24 CST release target prepared: `webcollect-2026-06-24-sync-refresh-capture`.

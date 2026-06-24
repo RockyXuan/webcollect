@@ -31,6 +31,10 @@ export interface AuthUser {
 
 export type SyncStatus = "idle" | "queued" | "syncing" | "success" | "error";
 export type SyncMode = "manual" | "auto";
+export interface ManualSyncOptions {
+  reloadView?: boolean;
+  throwOnError?: boolean;
+}
 
 interface AuthState {
   user: AuthUser | null;
@@ -46,7 +50,7 @@ interface AuthState {
   initialize: () => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
-  manualSync: () => Promise<void>;
+  manualSync: (options?: ManualSyncOptions) => Promise<void>;
   setSyncMode: (mode: SyncMode) => void;
   setSyncStatus: (status: SyncStatus) => void;
   setLastSyncAt: (timestamp: number) => void;
@@ -174,7 +178,7 @@ async function triggerSync(userId: string): Promise<void> {
     } else {
       await syncData(userId);
     }
-    await useAppStore.getState().loadData({ showLoading: false });
+    await useAppStore.getState().loadData({ showLoading: false, preserveOnCollapse: true });
     store.setState({ syncStatus: "success", lastSyncAt: Date.now(), error: null });
     ensureAutoSyncInterval();
   } catch (err) {
@@ -440,26 +444,23 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  manualSync: async () => {
+  manualSync: async (options) => {
     const user = useAuthStore.getState().user;
     if (!user) return;
 
     set({ syncStatus: "syncing", error: null });
     try {
-      const [localUpdatedAt, localSyncedAt] = await Promise.all([
-        getLocalSnapshotUpdatedAt(),
-        getLocalSnapshotSyncedAt(),
-      ]);
-      if (localUpdatedAt <= localSyncedAt) {
-        set({ syncStatus: "success", lastSyncAt: localSyncedAt || Date.now(), error: null });
-        return;
+      await syncData(user.id);
+      if (options?.reloadView !== false) {
+        await useAppStore.getState().loadData({ showLoading: false, preserveOnCollapse: true });
       }
-      await pushLocalSnapshotToCloud(user.id);
-      set({ syncStatus: "success", lastSyncAt: Date.now(), error: null });
+      set({ syncStatus: "success", lastSyncAt: Date.now(), localSavedAt: null, error: null });
+      ensureAutoSyncInterval();
     } catch (err) {
       console.error("[Auth] Manual sync failed:", err);
       const message = getErrorMessage(err, "Sync failed");
       set({ syncStatus: "error", error: message });
+      if (options?.throwOnError) throw err;
     }
   },
 

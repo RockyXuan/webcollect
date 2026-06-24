@@ -22,7 +22,8 @@ assert.equal(compactFourCardStyle.maxWidth, "77.75rem");
 
 const stretchedFourCardStyle = getSmartChildStyle(72, 4);
 assert.equal(numericPercent(String(stretchedFourCardStyle.width)), 72);
-assert.equal(stretchedFourCardStyle.maxWidth, "77.75rem");
+assert.equal(stretchedFourCardStyle.maxWidth, "none");
+assert.equal(stretchedFourCardStyle.minWidth, "47.25rem");
 
 const fullFourCardStyle = getSmartChildStyle(100, 4);
 assert.equal(numericPercent(String(fullFourCardStyle.width)), 100);

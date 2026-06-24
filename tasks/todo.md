@@ -1,5 +1,19 @@
 # WebCollect Task Plan
 
+## Current Task: Cloud Sync Refresh And Floating Capture Targets
+
+- [x] Make manual cloud sync bidirectional -> Verification: `manualSync` now runs full `syncData(user.id)` even when the Mac has no local dirty changes, then reloads the protected local view.
+- [x] Make the header refresh cloud-aware -> Verification: logged-in refresh first runs manual cloud sync, then reloads with collapse protection; local-only refresh remains available when logged out.
+- [x] Prevent refresh collapse from replacing the visible wall -> Verification: `loadData({ preserveOnCollapse: true })` keeps the previous UI if the new result looks suspiciously smaller.
+- [x] Fix explicit floating-capture destinations -> Verification: selected targets such as `主页 / 常用 / 看世界` resolve by ID or exact path and fail visibly if stale, instead of falling into the default inbox.
+- [x] Refresh floating-capture destination cache after data loads -> Verification: data reload publishes destination cache updates for the extension popup/content script path.
+- [x] Run focused and broad verification -> Verification: sync/capture tests, startup/cloud/search/layout/icon/wallpaper scripts, TypeScript, ESLint, extension build, local HTTP check, and Safari UI refresh smoke check pass.
+- [x] Commit, push, package, and publish the new extension release -> Verification: release tag `webcollect-2026-06-24-sync-refresh-capture` is the target package for this fix.
+
+## Review
+
+Manual cloud sync and the top refresh action now pull cloud changes before repainting the wall, so another device's saved card should no longer require a full page reload or local dirty change to appear. Refresh has a guard against transient collapsed snapshots, and floating capture now treats an explicit user-selected destination as authoritative: stale IDs are resolved by exact section/category/group names, and unresolved explicit targets stay failed instead of silently saving to `主页 / 节流 / 收集箱`. The published package still needs the user to confirm the real Windows-to-Mac path with live data.
+
 ## Current Task: Expand Wallpaper Library And Background Refresh
 
 - [x] Preserve current wallpaper/bookmark behavior boundaries -> Verification: this task only adds wallpaper store/shell/data/test/asset changes on top of the existing uncommitted UI search/menu work.

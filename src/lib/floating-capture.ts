@@ -42,6 +42,8 @@ export interface CaptureQueueItem {
   updatedAt: number;
   status: CaptureQueueStatus;
   error?: string;
+  resolvedDestinationPath?: string;
+  destinationError?: string;
 }
 
 export interface FloatingCapturePrefs {
@@ -153,6 +155,27 @@ function normalizeDestinationName(value?: string): string {
 
 function trimDestinationName(value?: string): string {
   return value?.trim().replace(/\s+/g, " ") || "";
+}
+
+function hasExplicitGroupDestination(destination?: CaptureDestination): boolean {
+  return Boolean(destination?.groupId || trimDestinationName(destination?.groupName));
+}
+
+function hasExplicitParentDestination(destination?: CaptureDestination): boolean {
+  return Boolean(destination?.parentCategoryId || trimDestinationName(destination?.parentCategoryName));
+}
+
+function describeDestinationPath(
+  categoryId: string,
+  categories: DestinationCategory[],
+  sections: DestinationSection[]
+): string {
+  const category = categories.find((item) => item.id === categoryId);
+  if (!category) return categoryId;
+  const parent = category.parentId ? categories.find((item) => item.id === category.parentId) : undefined;
+  const sectionId = categorySectionId(category, categories);
+  const section = sections.find((item) => item.id === sectionId);
+  return [section?.name, parent?.name, category.name].filter(Boolean).join(" / ") || category.name;
 }
 
 function buildChildCount(categories: DestinationCategory[]): Map<string, number> {
@@ -353,6 +376,10 @@ export function resolveCaptureTargetCategoryId(
   );
   if (namedGroup) return namedGroup.id;
 
+  if (hasExplicitGroupDestination(destination)) {
+    return null;
+  }
+
   const parentTarget = parentById && categorySectionId(parentById, categories) === targetSectionId
     ? parentById
     : findParentByName(categories, destination?.parentCategoryName, targetSectionId);
@@ -361,6 +388,10 @@ export function resolveCaptureTargetCategoryId(
       .filter((category) => category.parentId === parentTarget.id)
       .sort(categorySort);
     if (children[0]) return children[0].id;
+  }
+
+  if (hasExplicitParentDestination(destination)) {
+    return null;
   }
 
   const sectionInbox = categories.find(
@@ -636,7 +667,8 @@ export async function drainFloatingCaptureQueue(): Promise<{ imported: number; s
     const categoryId = target.categoryId;
     if (!categoryId) {
       item.status = "failed";
-      item.error = "No available target category";
+      item.error = "Selected WebCollect destination was not found";
+      item.destinationError = item.error;
       item.updatedAt = Date.now();
       failed += 1;
       continue;
@@ -673,6 +705,8 @@ export async function drainFloatingCaptureQueue(): Promise<{ imported: number; s
     cards.push(nextCard);
     item.status = "imported";
     item.error = undefined;
+    item.destinationError = undefined;
+    item.resolvedDestinationPath = describeDestinationPath(categoryId, categories, sections);
     item.updatedAt = Date.now();
     imported += 1;
   }
