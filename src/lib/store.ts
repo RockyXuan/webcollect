@@ -39,6 +39,7 @@ import {
   withoutLocalChangeEvents,
 } from "./db";
 import { createLocalDataSnapshot } from "./local-snapshots";
+import { localizeCardDescriptions } from "./description-translation";
 import {
   normalizePinnedBookmarkItems,
   reorderPinnedBookmarkItems,
@@ -608,6 +609,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         await saveCategories(categories);
         await saveCards(cards);
       });
+    }
+
+    const localizedDescriptions = localizeCardDescriptions(cards);
+    if (localizedDescriptions.changed) {
+      cards = localizedDescriptions.cards;
+      await saveCards(cards);
     }
 
     // Clean up expired hidden sites (non-permanent)

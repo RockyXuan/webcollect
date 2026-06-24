@@ -24,6 +24,7 @@ import { Globe2, Layers, Link2, Loader2, Sparkles, Wand2 } from "lucide-react";
 import type { WebCard } from "@/lib/types";
 import { useAppStore } from "@/lib/store";
 import { fetchMeta as apiFetchMeta } from "@/lib/platform";
+import { localizeDescriptionText } from "@/lib/description-translation";
 
 interface CardDialogProps {
   open: boolean;
@@ -92,8 +93,12 @@ export function CardDialog({ open, onOpenChange, editingCard, defaultCategoryId 
       if (!data) return;
       if (data.title && !title) setTitle(data.title);
       if (data.description && !shortDesc) {
-        setShortDesc(data.description.slice(0, 20));
-        setFullDesc(data.description);
+        const localizedDescription = localizeDescriptionText(data.description, {
+          title: data.title || title,
+          url: url.trim(),
+        });
+        setShortDesc(localizedDescription.slice(0, 20));
+        setFullDesc(localizedDescription);
       }
       if (data.image && !imageUrl) {
         setImageUrl(data.image);
@@ -120,12 +125,21 @@ export function CardDialog({ open, onOpenChange, editingCard, defaultCategoryId 
     const finalCategoryId = safeCategoryId();
     if (!finalCategoryId) return;
 
+    const finalFullDesc = localizeDescriptionText(fullDesc.trim() || shortDesc.trim(), {
+      title: title.trim(),
+      url: url.trim(),
+    });
+    const finalShortDesc = localizeDescriptionText(shortDesc.trim() || finalFullDesc, {
+      title: title.trim(),
+      url: url.trim(),
+    });
+
     const payload: WebCard = {
       id: editingCard?.id || `card-${Date.now()}`,
       url: url.trim(),
       title: title.trim(),
-      shortDesc: shortDesc.trim(),
-      fullDesc: fullDesc.trim(),
+      shortDesc: finalShortDesc.slice(0, 48),
+      fullDesc: finalFullDesc,
       note: note.trim(),
       abbreviation: abbreviation.trim(),
       imageUrl: imageUrl.trim(),

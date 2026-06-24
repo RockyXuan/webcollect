@@ -1,5 +1,6 @@
 import type { Category, CollectionSection, WebCard } from "./types";
 import { saveCategories, saveSections } from "./db";
+import { localizeDescriptionText } from "./description-translation";
 import { isChromeExtension } from "./platform";
 import { useAppStore } from "./store";
 
@@ -685,7 +686,10 @@ export async function drainFloatingCaptureQueue(): Promise<{ imported: number; s
     }
 
     const categoryCards = cards.filter((card) => card.categoryId === categoryId);
-    const description = item.draft.description?.trim() || "";
+    const description = localizeDescriptionText(item.draft.description?.trim() || "", {
+      title,
+      url: normalizedUrl,
+    });
     const nextCard: WebCard = {
       id: `card-${now}-${Math.random().toString(36).slice(2, 9)}`,
       url: normalizedUrl,

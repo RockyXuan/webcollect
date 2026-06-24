@@ -1,5 +1,17 @@
 # WebCollect Task Plan
 
+## Current Task: Localize English Web Descriptions
+
+- [x] Add shared English-description localization helper -> Verification: `src/lib/description-translation.ts` detects all-English text and returns Chinese summaries for known sites/common phrases.
+- [x] Migrate existing card descriptions on load -> Verification: `loadData` calls `localizeCardDescriptions(cards)` and saves changed cards.
+- [x] Localize floating capture descriptions before save -> Verification: content script localizes visible textarea/meta text, and queue drain localizes again before creating `WebCard`.
+- [x] Localize manual add/edit dialog descriptions -> Verification: metadata fetch and submit paths call `localizeDescriptionText`.
+- [x] Run verification -> Verification: description translation test, floating capture target test, TypeScript, ESLint, extension build, and diff check pass.
+
+## Review
+
+WebCollect now has a shared local description-localization layer. It does not depend on a private API key or network translation service, so floating capture can still save reliably offline. Known sites such as Gmail, GitHub, YouTube, X/Twitter, Discord, Bilibili, OpenAI/ChatGPT, DeepSeek, Notion, Figma, TweetMesh, and Pendle get targeted Chinese summaries; unknown all-English descriptions get a Chinese fallback summary instead of staying as a full English paragraph. For professional arbitrary sentence-by-sentence translation, a future pass should add a backend translation proxy or a stable browser translation API.
+
 ## Current Task: Cloud Sync Refresh And Floating Capture Targets
 
 - [x] Make manual cloud sync bidirectional -> Verification: `manualSync` now runs full `syncData(user.id)` even when the Mac has no local dirty changes, then reloads the protected local view.

@@ -1,3 +1,5 @@
+import { localizeDescriptionText } from "@/lib/description-translation";
+
 (() => {
   const QUEUE_MESSAGE = "CAPTURE_QUEUE_ADD";
   const PREFS_GET_MESSAGE = "CAPTURE_GET_PREFS";
@@ -736,7 +738,7 @@
     return {
       url: pageUrl,
       title: compactCaptureTitle(metaTitle, titleFromUrl(pageUrl)),
-      description: metaDescription,
+      description: localizeDescriptionText(metaDescription, { title: metaTitle, url: pageUrl }),
       sourceType,
       sourcePageUrl: pageUrl,
       sourcePageTitle: document.title,
@@ -747,7 +749,11 @@
     const selectedText = window.getSelection()?.toString() || "";
     const selectedUrl = extractFirstUrl(selectedText);
     if (!selectedUrl) return null;
-    const description = selectedText.length > 240 ? `${selectedText.slice(0, 240)}...` : selectedText;
+    const rawDescription = selectedText.length > 240 ? `${selectedText.slice(0, 240)}...` : selectedText;
+    const description = localizeDescriptionText(rawDescription, {
+      title: selectedText,
+      url: selectedUrl,
+    });
     return {
       url: selectedUrl,
       title: compactCaptureTitle(selectedText, titleFromUrl(selectedUrl)),
@@ -913,7 +919,12 @@
     });
     if (!response?.success || !response.data) return;
     if (!titleInput.value.trim() && response.data.title) titleInput.value = response.data.title;
-    if (!descriptionInput.value.trim() && response.data.description) descriptionInput.value = response.data.description;
+    if (!descriptionInput.value.trim() && response.data.description) {
+      descriptionInput.value = localizeDescriptionText(response.data.description, {
+        title: response.data.title || titleInput.value,
+        url: draft.url,
+      });
+    }
     if (response.data.image) panel.dataset.imageUrl = response.data.image;
     if (response.data.favicon) panel.dataset.favicon = response.data.favicon;
   }
@@ -932,7 +943,10 @@
     applyDockState();
     titleInput.value = draft.title || "";
     urlInput.value = draft.url || "";
-    descriptionInput.value = draft.description || "";
+    descriptionInput.value = localizeDescriptionText(draft.description || "", {
+      title: draft.title,
+      url: draft.url,
+    });
     panel.dataset.sourceType = draft.sourceType;
     panel.dataset.sourcePageUrl = draft.sourcePageUrl || window.location.href;
     panel.dataset.sourcePageTitle = draft.sourcePageTitle || document.title || "";
@@ -1030,7 +1044,10 @@
     const draft: CaptureDraft = {
       url: normalizedUrl,
       title,
-      description: descriptionInput.value.trim(),
+      description: localizeDescriptionText(descriptionInput.value.trim(), {
+        title,
+        url: normalizedUrl,
+      }),
       imageUrl: panel.dataset.imageUrl || "",
       favicon: panel.dataset.favicon || "",
       sourceType: (panel.dataset.sourceType as CaptureSourceType) || "floating-button",
