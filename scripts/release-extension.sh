@@ -51,6 +51,21 @@ find_node() {
   exit 127
 }
 
+extension_zip_filename() {
+  local tag="$1"
+  if [[ "${tag}" =~ ^webcollect-([0-9]{4}-[0-9]{2}-[0-9]{2})-(.+)$ ]]; then
+    echo "WebCollect-Chrome-Extension-${BASH_REMATCH[2]}-${BASH_REMATCH[1]}.zip"
+    return
+  fi
+
+  if [[ "${tag}" =~ ^webcollect-([0-9]{4}-[0-9]{2}-[0-9]{2})$ ]]; then
+    echo "WebCollect-Chrome-Extension-${BASH_REMATCH[1]}.zip"
+    return
+  fi
+
+  echo "WebCollect-Chrome-Extension-${tag}.zip"
+}
+
 NODE_BIN="${NODE_BIN:-$(find_node)}"
 export PATH="$(dirname "${NODE_BIN}"):${PATH}"
 
@@ -62,7 +77,8 @@ if [[ -z "${TAG}" ]]; then
   TAG="webcollect-$(date +%F)-$(git rev-parse --short HEAD)"
 fi
 
-ZIP_PATH="${WEB_COLLECT_EXTENSION_ZIP:-/private/tmp/WebCollect-Chrome-Extension-${TAG}.zip}"
+ZIP_NAME="$(extension_zip_filename "${TAG}")"
+ZIP_PATH="${WEB_COLLECT_EXTENSION_ZIP:-/private/tmp/${ZIP_NAME}}"
 
 echo "Using release tag: ${TAG}"
 echo "Using GitHub repo: ${REPO}"
