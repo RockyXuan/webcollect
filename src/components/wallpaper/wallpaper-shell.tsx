@@ -2,7 +2,7 @@
 
 import { RefreshCw, Settings } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type WheelEvent } from "react";
-import { getWallpaperQuote } from "@/lib/wallpaper-quotes";
+import { getWallpaperQuote, isSyntheticWallpaperQuote, selectWallpaperQuote } from "@/lib/wallpaper-quotes";
 import { getRotationMs, selectCurrentWallpaper, useWallpaperStore } from "@/lib/wallpaper-store";
 import { WALLPAPER_BACKGROUND_CHECK_MS } from "@/lib/wallpaper-sources";
 import type { WallpaperMode, WallpaperPrefs } from "@/lib/wallpaper-types";
@@ -146,7 +146,17 @@ export function WallpaperShell({
     backgroundImage: `url("${wallpaper.imageUrl}")`,
   }), [wallpaper.imageUrl]);
 
-  const quote = useMemo(() => getWallpaperQuote(prefs.currentQuoteId || wallpaper.quoteId), [prefs.currentQuoteId, wallpaper.quoteId]);
+  const quote = useMemo(() => {
+    const cachedQuote = getWallpaperQuote(prefs.currentQuoteId || wallpaper.quoteId);
+    if ((prefs.themeMode === "cinema" || prefs.themeMode === "tv") || !isSyntheticWallpaperQuote(cachedQuote)) {
+      return cachedQuote;
+    }
+    return selectWallpaperQuote({
+      wallpaper,
+      themeMode: prefs.themeMode,
+      recentQuoteIds: prefs.recentQuoteIds,
+    }).quote;
+  }, [prefs.currentQuoteId, prefs.recentQuoteIds, prefs.themeMode, wallpaper]);
   const attribution = useMemo(() => (
     wallpaper.attribution
     || `${wallpaper.author} · ${wallpaper.sourceCollection} · ${wallpaper.license}`

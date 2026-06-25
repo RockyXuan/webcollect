@@ -1,5 +1,18 @@
 # WebCollect Task Plan
 
+## Current Task: Lock Hint, Compact Category Layouts, And Wallpaper Quote Matching
+
+- [x] Replace blocking locked-layout alerts with a near-pointer hint -> Verification: source has no `window.alert`/`alertLayoutLocked` path for locked layout, and dedicated Chrome measured `alertCount = 0` with the lightweight hint visible.
+- [x] Make lock state visually clear -> Verification: locked categories use a stronger lock button state with closed/open lock icons, larger icon size, tooltip, and `aria-pressed`.
+- [x] Compact category whitespace from historical widths -> Verification: subgroups now use content-fit rem widths based on stable card columns instead of percent flex-basis; parent panels fit the actual row width.
+- [x] Preserve cross-resolution column consistency -> Verification: dedicated Chrome at 2048x1200 and 1440x1000 kept `download / YT TT INS X` at 2 columns and `download / 其他` at 1 column.
+- [x] Improve wallpaper quote semantic matching -> Verification: mountain/cliff/rock/canyon assets avoid water/tide quotes, normal modes avoid WebCollect synthetic quote sources, and wallpaper display reselects a real-source quote when old cached synthetic quotes are present.
+- [x] Run verification -> Verification: layout scripts, wallpaper scripts, TypeScript, ESLint, extension build, diff check, and dedicated Chrome visual checks pass.
+
+## Review
+
+Locked category resizing now shows a non-blocking hint instead of a modal confirmation, and the lock button state is easier to read. Category panels now ignore old percent flex-basis values for actual wrapping, so the red-box empty-space issue is reduced to a small breathing gap while keeping saved card-column intent stable across resolutions. Wallpaper quote selection now rejects WebCollect-origin filler in normal modes and prioritizes semantically related sourced bilingual quotes for mountain/rock scenes.
+
 ## Current Task: Localize English Web Descriptions
 
 - [x] Add shared English-description localization helper -> Verification: `src/lib/description-translation.ts` detects all-English text and returns Chinese summaries for known sites/common phrases.

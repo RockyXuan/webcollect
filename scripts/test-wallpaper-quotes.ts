@@ -89,4 +89,45 @@ assert.notEqual(second.quote.id, first.quote.id, "recent quote history should av
 
 assert.equal(getWallpaperQuote("quiet-horizon").id, "quiet-horizon", "legacy quote ids must remain resolvable");
 
+const mountainSelection = selectWallpaperQuote({
+  wallpaper: wallpaper({
+    id: "mountain-cliff-wallpaper",
+    title: "Calanche de Piana red granite cliffs and rocky mountain road",
+    category: "landscape",
+    tags: ["mountain", "cliff", "rock", "canyon", "granite"],
+    sourceCollection: "Wikimedia Featured Pictures",
+    quoteId: "water-still",
+  }),
+  themeMode: "nature",
+});
+assert.ok(
+  mountainSelection.quote.tags.some((tag) => /(mountain|stone|rock|journey|height|resilience)/i.test(tag)),
+  `mountain and cliff wallpapers should select mountain/rock/journey quotes, got ${mountainSelection.quote.id}`
+);
+assert.doesNotMatch(
+  `${mountainSelection.quote.id} ${mountainSelection.quote.zh} ${mountainSelection.quote.en} ${mountainSelection.quote.tags.join(" ")}`,
+  /water|ocean|sea|lake|river|tide|潮|水|海|湖|河/i,
+  "mountain and cliff wallpapers should not receive water/tide quotes"
+);
+
+const natureSelection = selectWallpaperQuote({
+  wallpaper: wallpaper({ id: "nature-default-wallpaper", title: "Wide mountain forest trail", category: "landscape", tags: ["mountain", "forest"] }),
+  themeMode: "nature",
+});
+assert.doesNotMatch(
+  `${natureSelection.quote.id} ${natureSelection.quote.source} ${natureSelection.quote.sourceNote || ""}`,
+  /WebCollect .*original|WebCollect .*原创|原创短句|原创氛围台词|original cinematic caption/i,
+  "normal wallpaper quote display should not use WebCollect-original or synthetic caption sources"
+);
+
+const autoAnimalSelection = selectWallpaperQuote({
+  wallpaper: wallpaper({ id: "auto-animal-wallpaper", title: "Cat by the window", category: "animals", tags: ["cat", "pet"] }),
+  themeMode: "auto",
+});
+assert.doesNotMatch(
+  `${autoAnimalSelection.quote.id} ${autoAnimalSelection.quote.source} ${autoAnimalSelection.quote.sourceNote || ""}`,
+  /WebCollect .*original|WebCollect .*原创|原创短句/i,
+  "Auto Mix should not display WebCollect pet-original captions even for animal wallpapers"
+);
+
 console.log("wallpaper quote tests passed");

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, useRef } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useAppStore } from "@/lib/store";
 import { InlineEditableText } from "@/components/ui/inline-editable-text";
 import { EditActionDock, type EditAction } from "@/components/ui/edit-action-dock";
@@ -48,6 +48,16 @@ const MAX_RENDERED_CARD_COLUMNS = 4;
 const SITE_TILE_WIDTH_REM = 14.75;
 const SITE_TILE_GAP_REM = 0.5;
 const GROUP_HORIZONTAL_PADDING_REM = 2;
+const GROUP_FLOW_GAP_REM = 0.75;
+const PARENT_HORIZONTAL_PADDING_REM = 3.5;
+const LOCKED_LAYOUT_HINT_EVENT = "webcollect:locked-layout-hint";
+const LOCKED_LAYOUT_HINT_TEXT = "布局已锁定，若需移动或调整，请先点击右上角解锁。";
+
+type LockedLayoutHint = {
+  id: number;
+  x: number;
+  y: number;
+};
 
 // ============ Custom collision detection ============
 const collisionDetection: CollisionDetection = (args) => {
@@ -81,19 +91,21 @@ function getDefaultWidthPercent(cardCount: number, groupCount: number): number {
 
 export function getSmartParentWidthPercent(rawWidth: number, defaultWidth: number): number {
   const safeWidth = Number.isFinite(rawWidth) ? rawWidth : defaultWidth;
-  return Math.max(30, Math.min(100, safeWidth));
+  return Math.max(30, Math.min(88, safeWidth));
 }
 
-function alertLayoutLocked() {
+function notifyLockedLayoutHint(x: number, y: number) {
   if (typeof window !== "undefined") {
-    window.alert("这个分类布局已经固定。请先点击右上角的固定按钮解除固定，再调整布局。");
+    window.dispatchEvent(new CustomEvent(LOCKED_LAYOUT_HINT_EVENT, {
+      detail: { x, y },
+    }));
   }
 }
 
 function handleLockedLayoutPointerDown(event: React.PointerEvent<HTMLElement>) {
   event.preventDefault();
   event.stopPropagation();
-  alertLayoutLocked();
+  notifyLockedLayoutHint(event.clientX, event.clientY);
 }
 
 function formatRem(value: number): string {
@@ -106,11 +118,15 @@ function normalizeRenderedColumns(columns: number): number {
   return Math.max(1, Math.min(MAX_RENDERED_CARD_COLUMNS, Math.round(columns)));
 }
 
-function getChildBasisForColumns(columns: number): string {
+function getChildBasisRemForColumns(columns: number): number {
   const safeColumns = normalizeRenderedColumns(columns);
-  const width = safeColumns * SITE_TILE_WIDTH_REM
+  return safeColumns * SITE_TILE_WIDTH_REM
     + Math.max(0, safeColumns - 1) * SITE_TILE_GAP_REM
     + GROUP_HORIZONTAL_PADDING_REM;
+}
+
+function getChildBasisForColumns(columns: number): string {
+  const width = getChildBasisRemForColumns(columns);
   return formatRem(width);
 }
 
@@ -156,14 +172,12 @@ export function getSmartChildStyle(
   const maxWidth = getMaxChildWidth(cardCount);
 
   if (widthPercent !== null) {
-    const minPercent = cardCount <= 4 ? 8 : 14;
-    const maxPercent = 100;
-    const smartWidth = Math.max(minPercent, Math.min(maxPercent, widthPercent));
+    const contentMaxWidth = formatRem(Math.max(getChildBasisRemForColumns(columns), GROUP_HORIZONTAL_PADDING_REM + SITE_TILE_WIDTH_REM));
     return {
-      flex: `0 0 calc(${smartWidth}% - 0.75rem)`,
-      width: `calc(${smartWidth}% - 0.75rem)`,
+      flex: `0 0 ${contentMaxWidth}`,
+      width: contentMaxWidth,
       minWidth: columnBasis,
-      maxWidth: "none",
+      maxWidth: contentMaxWidth,
     };
   }
 
@@ -173,6 +187,19 @@ export function getSmartChildStyle(
     minWidth: columnBasis,
     maxWidth,
   };
+}
+
+function getParentContentWidthRem(groupWidths: number[]): number {
+  if (groupWidths.length === 0) return 30;
+  const groupsPerRow = groupWidths.length <= 1 ? 1 : groupWidths.length <= 4 ? 2 : 3;
+  let maxRowWidth = 0;
+  for (let index = 0; index < groupWidths.length; index += groupsPerRow) {
+    const row = groupWidths.slice(index, index + groupsPerRow);
+    const rowWidth = row.reduce((sum, width) => sum + width, 0)
+      + Math.max(0, row.length - 1) * GROUP_FLOW_GAP_REM;
+    maxRowWidth = Math.max(maxRowWidth, rowWidth);
+  }
+  return maxRowWidth + PARENT_HORIZONTAL_PADDING_REM;
 }
 
 // ============ Props ============
@@ -213,11 +240,38 @@ export function SortableGrid({
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [hoveredParentId, setHoveredParentId] = useState<string | null>(null);
+  const [lockedHint, setLockedHint] = useState<LockedLayoutHint | null>(null);
+  const lockedHintTimerRef = useRef<number | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor)
   );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const handleHint = (event: Event) => {
+      const detail = (event as CustomEvent<{ x?: number; y?: number }>).detail || {};
+      const x = Number.isFinite(detail.x) ? Number(detail.x) : window.innerWidth / 2;
+      const y = Number.isFinite(detail.y) ? Number(detail.y) : window.innerHeight / 2;
+      setLockedHint({ id: Date.now(), x, y });
+      if (lockedHintTimerRef.current !== null) {
+        window.clearTimeout(lockedHintTimerRef.current);
+      }
+      lockedHintTimerRef.current = window.setTimeout(() => {
+        setLockedHint(null);
+        lockedHintTimerRef.current = null;
+      }, 1800);
+    };
+    window.addEventListener(LOCKED_LAYOUT_HINT_EVENT, handleHint);
+    return () => {
+      window.removeEventListener(LOCKED_LAYOUT_HINT_EVENT, handleHint);
+      if (lockedHintTimerRef.current !== null) {
+        window.clearTimeout(lockedHintTimerRef.current);
+        lockedHintTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const visibleCategories = useMemo(() => {
     return categories.filter((c) => (c.sectionId || "section-default") === activeSectionId);
@@ -541,6 +595,13 @@ export function SortableGrid({
               (sum, sg) => sum + getCardsForCategory(sg.id).length,
               0
             );
+            const contentWidthRem = getParentContentWidthRem(subGroups.map((sub) => {
+              const subCards = getCardsForCategory(sub.id);
+              const layoutPreference = categoryLayouts[sub.id];
+              const widthPercent = categoryWidths[sub.id] ?? layoutPreference?.widthPercent ?? null;
+              const columns = getStableLayoutColumns(layoutPreference, widthPercent, subCards.length);
+              return getChildBasisRemForColumns(columns);
+            }));
 
             return (
               <SortableCategoryBlock
@@ -552,6 +613,7 @@ export function SortableGrid({
                 isDraggingActive={activeId !== null}
                 widthPercent={categoryWidths[parent.id]}
                 layoutPreference={categoryLayouts[parent.id]}
+                contentWidthRem={contentWidthRem}
                 defaultWidthPercent={getDefaultWidthPercent(totalCards, subGroups.length)}
                 onEditCategory={onEditCategory}
                 onAddCard={onAddCard}
@@ -686,6 +748,18 @@ export function SortableGrid({
         ) : null}
       </DragOverlay>
     </DndContext>
+    {lockedHint && (
+      <div
+        key={lockedHint.id}
+        className="wc-layout-lock-hint pointer-events-none fixed z-[9999] max-w-[18rem] rounded-2xl border border-amber-200/70 bg-white/90 px-3 py-2 text-xs font-medium text-slate-700 shadow-[0_14px_34px_rgba(15,23,42,0.16)] backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150"
+        style={{
+          left: Math.min(Math.max(lockedHint.x + 14, 16), Math.max(16, window.innerWidth - 300)),
+          top: Math.min(Math.max(lockedHint.y + 12, 16), Math.max(16, window.innerHeight - 72)),
+        }}
+      >
+        {LOCKED_LAYOUT_HINT_TEXT}
+      </div>
+    )}
     </div>
   );
 }
@@ -699,6 +773,7 @@ interface SortableCategoryBlockProps {
   isDraggingActive?: boolean;
   widthPercent?: number;
   layoutPreference?: CategoryLayoutPreference;
+  contentWidthRem?: number;
   defaultWidthPercent: number;
   onEditCategory?: (category: Category) => void;
   onAddCard?: (categoryId?: string) => void;
@@ -715,6 +790,7 @@ function SortableCategoryBlock({
   isDraggingActive,
   widthPercent: storedWidth,
   layoutPreference,
+  contentWidthRem,
   defaultWidthPercent,
   onEditCategory,
   onAddCard,
@@ -746,8 +822,8 @@ function SortableCategoryBlock({
     transform: isDragging ? undefined : CSS.Transform.toString(transform),
     transition: isDragging ? transition : `${transition}, min-height 0.3s ease-out`,
     opacity: isDragging ? 0.2 : 1,
-    flex: `0 0 calc(${widthPercent}% - 1rem)`,
-    width: `calc(${widthPercent}% - 1rem)`,
+    flex: `0 0 min(calc(${widthPercent}% - 1rem), ${formatRem(contentWidthRem ?? 90)})`,
+    width: `min(calc(${widthPercent}% - 1rem), ${formatRem(contentWidthRem ?? 90)})`,
     minWidth: "360px",
     maxWidth: "none",
     minHeight: isDraggingActive ? '60px' : undefined,
@@ -758,7 +834,7 @@ function SortableCategoryBlock({
       e.preventDefault();
       e.stopPropagation();
       if (isLayoutLocked) {
-        alertLayoutLocked();
+        notifyLockedLayoutHint(e.clientX, e.clientY);
         return;
       }
       const container = containerRef.current;
@@ -883,7 +959,7 @@ function SortableCategoryBlock({
           aria-label={isLayoutLocked ? "解除固定布局" : "固定当前布局"}
           aria-pressed={isLayoutLocked}
         >
-          {isLayoutLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+          {isLayoutLocked ? <Lock className="h-4 w-4 stroke-[2.5]" /> : <Unlock className="h-4 w-4 stroke-[2.3]" />}
         </Button>
         {(isHeaderHovered || globalEditMode) && (
           <EditActionDock
@@ -1077,7 +1153,7 @@ function SortableSubGroupBlock({
       e.preventDefault();
       e.stopPropagation();
       if (parentLayoutLocked) {
-        alertLayoutLocked();
+        notifyLockedLayoutHint(e.clientX, e.clientY);
         return;
       }
       const container = containerRef.current;

@@ -1098,6 +1098,17 @@
   box-shadow: 0 8px 20px rgba(37, 99, 235, 0.12);
 }
 
+.wc-layout-lock-trigger-active {
+  color: #2563eb;
+  background: rgba(219, 234, 254, 0.92);
+  border: 1px solid rgba(96, 165, 250, 0.46);
+}
+
+.wc-layout-lock-hint {
+  color: #334155;
+  line-height: 1.45;
+}
+
 .wc-group-panel {
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.76), rgba(235, 244, 255, 0.62)),

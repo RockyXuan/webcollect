@@ -2,21 +2,21 @@
 
 ## Final Goal
 
-让 WebCollect 的网页简介优先保持中文：既有卡片加载时自动把全英文简介转换为中文摘要，未来通过浮窗扩展和“新增网页”弹窗添加的网站也在保存前转换，避免收藏墙里继续出现整段英文简介。
+修复 WebCollect 锁定交互、分类留白和壁纸 quote 语义匹配；完成证据包括相关脚本测试、类型检查、lint、扩展构建、真实浏览器双视口/壁纸验证、提交推送和扩展发布。
 
 ## Completed
 
-- 新增 `src/lib/description-translation.ts`，统一检测全英文简介并输出中文摘要。
-- 既有卡片在 `loadData` 时会迁移英文 `shortDesc/fullDesc`，并保存为中文版本。
-- 浮窗内容脚本在打开面板、抓取 meta 简介、保存草稿时都会先转换英文简介。
-- 浮窗队列最终入库前再次兜底转换，防止旧内容脚本或旧队列项把英文简介直接写入卡片。
-- “新增网页/编辑网页”弹窗在抓取 meta 和提交保存时都会转换英文简介。
-- 新增 `scripts/test-description-translation.ts` 覆盖英文检测、常见站点摘要、卡片迁移和浮窗集成入口。
+- 锁定交互不再使用强制 `window.alert`，改为鼠标附近的轻量提示气泡，自动消失。
+- 分类锁定按钮改成清晰的锁住/解锁两态图标，提高尺寸和对比度，并保留 tooltip/aria 状态。
+- 子分组历史百分比宽度不再作为 flex 换行依据，只用于推导稳定列数；实际宽度按卡片列数、固定卡片宽度、gap 和 padding 计算。
+- 父分类宽度按内部实际分组行宽贴合，右侧只保留少量呼吸空间，避免历史 `widthPercent` 撑出大空白。
+- 壁纸默认 quote 不再展示 WebCollect 自造来源；山、岩石、峡谷、峭壁等图优先匹配山川/行路/高处/坚韧相关双语 quote。
+- 壁纸展示层会在普通模式中规避旧缓存里的自造 quote，必要时按当前壁纸重新挑选真实来源 quote。
 
 ## Unfinished
 
-- 当前实现是离线兜底翻译/中文摘要，不依赖外部翻译 API，也没有硬编码任何私密 key；任意复杂英文长段落不会达到专业机器翻译质量。
-- 若后续要高质量逐句翻译，需要接入后端代理翻译服务或浏览器可用的正式翻译 API。
+- 无已知未完成核心项。
+- 用户仍需安装最新扩展包，在自己的主 Chrome/跨设备真实数据里做最终肉眼确认。
 
 ## Current Blockers
 
@@ -24,13 +24,27 @@
 
 ## Next Step
 
-- 提交、推送并发布新的 Chrome 扩展包；用户安装后重点检查 Gmail、GitHub、YouTube、B 站、小众站点等卡片简介是否优先显示中文。
+- 用户安装 Release `webcollect-2026-06-25-lock-layout-wallpaper` 的扩展包后，重点检查锁定提示、分类留白和壁纸 quote 是否符合预期。
 
 ## Latest Verification
 
-- 2026-06-24 CST `node --import tsx scripts/test-description-translation.ts` passed.
-- 2026-06-24 CST `node --import tsx scripts/test-floating-capture-targets.ts` passed.
-- 2026-06-24 CST `./node_modules/.bin/tsc -p tsconfig.json` passed.
-- 2026-06-24 CST `./node_modules/.bin/eslint` passed with 0 errors and 6 existing warnings.
-- 2026-06-24 CST `node ./extension/build.mjs` passed.
-- 2026-06-24 CST `git diff --check` passed.
+- 2026-06-25 CST `node --import tsx scripts/test-layout-sizing.ts` passed.
+- 2026-06-25 CST `node --import tsx scripts/test-layout-preferences.ts` passed.
+- 2026-06-25 CST `node --import tsx scripts/test-resolution-layout.ts` passed.
+- 2026-06-25 CST `node --import tsx scripts/test-wallpaper-quotes.ts` passed.
+- 2026-06-25 CST `node --import tsx scripts/test-wallpaper-data.ts` passed.
+- 2026-06-25 CST `node --import tsx scripts/test-wallpaper-policy.ts` passed.
+- 2026-06-25 CST `node --import tsx scripts/test-wallpaper-wiring.ts` passed.
+- 2026-06-25 CST `./node_modules/.bin/tsc -p tsconfig.json` passed.
+- 2026-06-25 CST `./node_modules/.bin/eslint` passed with 0 errors and 6 existing warnings.
+- 2026-06-25 CST `node ./extension/build.mjs` passed.
+- 2026-06-25 CST `git diff --check` passed.
+- 2026-06-25 CST dedicated headless Chrome at `http://localhost:5010/` verified: `download` kept `YT TT INS X` at 2 columns and `其他` at 1 column in both 2048x1200 and 1440x1000 viewports; right blank was about 35px and 24px respectively.
+- 2026-06-25 CST dedicated headless Chrome verified locked resize path: `alertCount = 0`, hint text shown as `布局已锁定，若需移动或调整，请先点击右上角解锁。`
+- 2026-06-25 CST dedicated headless Chrome verified wallpaper quote: no `WebCollect original/原创` source and no water/tide quote on the checked mountain/nature wallpaper.
+- 2026-06-25 CST prepared fix commit and release tag `webcollect-2026-06-25-lock-layout-wallpaper`.
+- Browser evidence screenshots:
+  - `/private/tmp/webcollect-layout-large-final.png`
+  - `/private/tmp/webcollect-layout-small-final.png`
+  - `/private/tmp/webcollect-lock-hint-final.png`
+  - `/private/tmp/webcollect-wallpaper-quote-final.png`

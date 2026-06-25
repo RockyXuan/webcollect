@@ -32,6 +32,18 @@ assert.doesNotMatch(
   "normal card grids must not auto-fill by viewport width"
 );
 
+const sortableSource = readFileSync("src/components/layout/sortable-grid.tsx", "utf8");
+assert.doesNotMatch(
+  sortableSource,
+  /window\.alert|alertLayoutLocked/,
+  "locked layout feedback should be a non-blocking pointer hint, not a blocking browser alert"
+);
+assert.match(
+  sortableSource,
+  /wc-layout-lock-hint/,
+  "locked layout feedback should render a visible lightweight hint near the interaction point"
+);
+
 const merged = mergeCategoryLayouts(
   { chrome: { widthPercent: 46, columns: 2, locked: true, updatedAt: 200 }, zmt: { widthPercent: 96, columns: 4, updatedAt: 100 } },
   { chrome: { widthPercent: 24, columns: 1, locked: false, updatedAt: 100 }, work: { widthPercent: 50, columns: 2, locked: true, updatedAt: 300 } }

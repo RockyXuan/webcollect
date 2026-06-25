@@ -195,6 +195,32 @@ const LEGACY_QUOTES: WallpaperQuote[] = [
     createdAt: CREATED_AT,
   }),
   quote({
+    id: "climb-high",
+    kind: "general",
+    zh: "会当凌绝顶，一览众山小。",
+    en: "One day I shall stand on the summit and see all other mountains made small.",
+    source: "杜甫《望岳》 / Du Fu",
+    author: "Du Fu",
+    tags: ["mountain", "height", "summit", "journey", "resilience", "landscape"],
+    tone: ["epic", "philosophical"],
+    verified: true,
+    confidence: "high",
+    createdAt: CREATED_AT,
+  }),
+  quote({
+    id: "rock-path",
+    kind: "general",
+    zh: "路虽远，行则将至；事虽难，做则必成。",
+    en: "However distant the road, walking reaches it; however hard the work, doing completes it.",
+    source: "《荀子》意译 / Xunzi, paraphrased",
+    author: "Xunzi",
+    tags: ["journey", "rock", "path", "resilience", "mountain"],
+    tone: ["philosophical", "epic"],
+    verified: true,
+    confidence: "high",
+    createdAt: CREATED_AT,
+  }),
+  quote({
     id: "sea-moon",
     kind: "general",
     zh: "海上生明月，天涯共此时。",
@@ -512,6 +538,34 @@ function getPreferredKinds(wallpaper: WallpaperItem, themeMode: WallpaperThemeMo
   return ["general", "fallback"];
 }
 
+export function isSyntheticWallpaperQuote(quote: WallpaperQuote): boolean {
+  return /WebCollect .*original|WebCollect .*原创|WebCollect fallback|WebCollect 兜底|原创短句|原创氛围台词|Original cinematic caption|Original serial-story caption/i
+    .test(`${quote.id} ${quote.source} ${quote.sourceNote || ""}`);
+}
+
+function allowsSyntheticQuotes(themeMode: WallpaperThemeMode): boolean {
+  return themeMode === "cinema" || themeMode === "tv";
+}
+
+function getSemanticQuoteTags(assetText: string): string[] {
+  if (/(mountain|stone|cliff|rock|gorge|canyon|granite|summit|peak|valley|piana|tarn|geopark|mesa|desert)/.test(assetText)) {
+    return ["mountain", "stone", "rock", "journey", "height", "summit", "resilience", "landscape"];
+  }
+  if (/(ocean|sea|coast|lake|river|bay|fjord|island|tide|wave|water|reflection)/.test(assetText)) {
+    return ["water", "ocean", "sea", "lake", "river", "tide"];
+  }
+  if (/(city|market|church|temple|palace|bridge|tower|street|dawn|sunrise|skyline)/.test(assetText)) {
+    return ["city", "dawn", "daily", "landmark"];
+  }
+  if (/(animal|bird|deer|gazelle|eagle|ibex|lion|wolf|wildlife|cat|dog|pet)/.test(assetText)) {
+    return ["animals", "nature", "life", "healing", "pet"];
+  }
+  if (/(forest|tree|trail|field|landscape|nature|horizon)/.test(assetText)) {
+    return ["nature", "landscape", "forest", "calm", "journey"];
+  }
+  return [];
+}
+
 function pickQuote(candidates: WallpaperQuote[], recentQuoteIds: string[], seed: string): WallpaperQuote | null {
   if (candidates.length === 0) return null;
   const recent = new Set(recentQuoteIds);
@@ -569,7 +623,9 @@ export function selectWallpaperQuote({
 }): WallpaperQuoteSelection {
   const seed = `${wallpaper.id}:${themeMode}:${recentQuoteIds.slice(0, 8).join("|")}`;
   const assetText = getAssetSearchText(wallpaper, themeMode);
-  const validQuotes = WALLPAPER_QUOTES;
+  const validQuotes = allowsSyntheticQuotes(themeMode)
+    ? WALLPAPER_QUOTES
+    : WALLPAPER_QUOTES.filter((item) => !isSyntheticWallpaperQuote(item));
 
   const exactAsset = pickQuote(validQuotes.filter((item) => item.exactAssetId === wallpaper.id), recentQuoteIds, `${seed}:exact`);
   if (exactAsset) return { quote: exactAsset, reason: "exact-asset" };
@@ -582,6 +638,17 @@ export function selectWallpaperQuote({
 
   const sourceTitle = pickQuote(validQuotes.filter((item) => isSameSourceTitleQuote(item, wallpaper)), recentQuoteIds, `${seed}:source`);
   if (sourceTitle) return { quote: sourceTitle, reason: "source-title" };
+
+  const shouldPreferSemanticTags = themeMode === "auto" || themeMode === "nature";
+  const semanticTags = shouldPreferSemanticTags ? getSemanticQuoteTags(assetText) : [];
+  if (semanticTags.length > 0) {
+    const semantic = pickQuote(
+      validQuotes.filter((item) => item.tags.some((tag) => semanticTags.includes(normalizeText(tag)))),
+      recentQuoteIds,
+      `${seed}:semantic`
+    );
+    if (semantic) return { quote: semantic, reason: "tag" };
+  }
 
   const preferredKinds = getPreferredKinds(wallpaper, themeMode);
   for (const kind of preferredKinds) {
