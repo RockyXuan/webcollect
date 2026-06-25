@@ -56,6 +56,8 @@ export interface FloatingCapturePrefs {
   mascot: FloatingCaptureMascot;
   pauseUntil: number | null;
   disabledHosts: string[];
+  hiddenByUserAt?: number | null;
+  recoveredAt?: number | null;
 }
 
 export interface CaptureDestinationCache {
@@ -77,7 +79,40 @@ export const DEFAULT_FLOATING_CAPTURE_PREFS: FloatingCapturePrefs = {
   mascot: "chipmunk",
   pauseUntil: null,
   disabledHosts: [],
+  hiddenByUserAt: null,
+  recoveredAt: null,
 };
+
+export function normalizeFloatingCapturePrefs(
+  stored: Partial<FloatingCapturePrefs> | null | undefined,
+  now = Date.now()
+): FloatingCapturePrefs {
+  const raw = stored || {};
+  const legacyGlobalHidden = (
+    raw.enabled === false || raw.buttonEnabled === false
+  ) && typeof raw.hiddenByUserAt !== "number";
+  const pauseUntil = typeof raw.pauseUntil === "number" && raw.pauseUntil > now
+    ? raw.pauseUntil
+    : null;
+  const disabledHosts = Array.isArray(raw.disabledHosts)
+    ? Array.from(new Set(raw.disabledHosts.filter((host): host is string => typeof host === "string" && host.trim().length > 0)))
+    : [];
+
+  return {
+    ...DEFAULT_FLOATING_CAPTURE_PREFS,
+    ...raw,
+    enabled: legacyGlobalHidden ? true : raw.enabled !== false,
+    buttonEnabled: legacyGlobalHidden ? true : raw.buttonEnabled !== false,
+    hoverEnabled: raw.hoverEnabled !== false,
+    allLinksHoverEnabled: raw.allLinksHoverEnabled === true,
+    contextMenuEnabled: raw.contextMenuEnabled !== false,
+    mascot: raw.mascot === "otter" ? "otter" : "chipmunk",
+    pauseUntil,
+    disabledHosts,
+    hiddenByUserAt: typeof raw.hiddenByUserAt === "number" ? raw.hiddenByUserAt : null,
+    recoveredAt: legacyGlobalHidden ? now : (typeof raw.recoveredAt === "number" ? raw.recoveredAt : null),
+  };
+}
 
 function hasExtensionStorage(): boolean {
   return isChromeExtension()
@@ -138,16 +173,17 @@ export function getFallbackFavicon(url: string): string {
 
 export async function getFloatingCapturePrefs(): Promise<FloatingCapturePrefs> {
   const stored = await getChromeStorage<Partial<FloatingCapturePrefs>>(CAPTURE_PREFS_KEY, {});
-  return {
-    ...DEFAULT_FLOATING_CAPTURE_PREFS,
-    ...stored,
-    mascot: stored.mascot === "otter" ? "otter" : "chipmunk",
-    disabledHosts: Array.isArray(stored.disabledHosts) ? stored.disabledHosts : [],
-  };
+  return normalizeFloatingCapturePrefs(stored);
 }
 
 export async function saveFloatingCapturePrefs(prefs: FloatingCapturePrefs): Promise<void> {
-  await setChromeStorage({ [CAPTURE_PREFS_KEY]: prefs });
+  const next = normalizeFloatingCapturePrefs({
+    ...prefs,
+    hiddenByUserAt: (prefs.enabled === false || prefs.buttonEnabled === false)
+      ? prefs.hiddenByUserAt ?? Date.now()
+      : prefs.hiddenByUserAt ?? null,
+  });
+  await setChromeStorage({ [CAPTURE_PREFS_KEY]: next });
 }
 
 function normalizeDestinationName(value?: string): string {

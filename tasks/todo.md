@@ -1,5 +1,18 @@
 # WebCollect Task Plan
 
+## Current Task: Layout Drag Stability And Floating Capture Recovery
+
+- [x] Rework parent category sizing to wrap real group rows -> Verification: `getParentContentWidthRem` now packs fixed group widths, ignores historical `widthPercent` for rendered width, and browser measurements show right blank under 30px in both checked viewports.
+- [x] Stop group/card drag UI from being clipped by parent glass panels -> Verification: category body, category panel, and group panel now use visible overflow in both Web and extension CSS.
+- [x] Keep group card columns fixed across resolutions -> Verification: Web and extension card grids use `repeat(var(--wc-card-columns), ...)`; layout tests confirm saved/legacy column intent is stable.
+- [x] Restore floating capture injection visibility -> Verification: `floating-capture.js` is built as a classic IIFE content script instead of ESM with top-level imports, and the health test checks manifest, assets, prefs recovery, and built output.
+- [x] Add floating capture self-healing and recovery entry -> Verification: legacy hidden prefs normalize back to visible, expired pause clears, and the user menu exposes `恢复小松鼠浮窗`.
+- [x] Run focused and broad verification -> Verification: layout scripts, floating capture health/target scripts, description/icon scripts, TypeScript, ESLint, extension build, diff check, and dedicated Chrome layout/health checks pass.
+
+## Review
+
+This task fixes the two current blockers without touching bookmark data or cloud schema. Parent categories now fit their actual subgroup rows instead of preserving old percent widths that created huge blank panels; subgroup/card grids keep fixed columns across display sizes; overflow is visible so drag/menu layers are not trapped by rounded parent cards. Floating capture was likely disappearing because the built content script was emitted as ESM while Chrome manifest content scripts run as classic scripts. The build now emits a separate IIFE content script and adds health markers plus preference recovery. Automated Chrome command-line extension auto-load was limited in this environment, so the browser proof uses a dedicated Chrome page, built-script injection, and mocked extension API; the package build itself is now structurally correct for real Chrome installation.
+
 ## Current Task: Lock Hint, Compact Category Layouts, And Wallpaper Quote Matching
 
 - [x] Replace blocking locked-layout alerts with a near-pointer hint -> Verification: source has no `window.alert`/`alertLayoutLocked` path for locked layout, and dedicated Chrome measured `alertCount = 0` with the lightweight hint visible.

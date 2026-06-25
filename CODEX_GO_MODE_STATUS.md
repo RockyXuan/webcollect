@@ -2,49 +2,52 @@
 
 ## Final Goal
 
-修复 WebCollect 锁定交互、分类留白和壁纸 quote 语义匹配；完成证据包括相关脚本测试、类型检查、lint、扩展构建、真实浏览器双视口/壁纸验证、提交推送和扩展发布。
+修复 WebCollect 收藏墙布局拖拽稳定性与浮窗注入可见性；完成证据包括布局/浮窗测试、类型检查、lint、扩展构建、真实扩展双视口与浮窗验证、提交推送和日期后缀扩展发布。
 
 ## Completed
 
-- 锁定交互不再使用强制 `window.alert`，改为鼠标附近的轻量提示气泡，自动消失。
-- 分类锁定按钮改成清晰的锁住/解锁两态图标，提高尺寸和对比度，并保留 tooltip/aria 状态。
-- 子分组历史百分比宽度不再作为 flex 换行依据，只用于推导稳定列数；实际宽度按卡片列数、固定卡片宽度、gap 和 padding 计算。
-- 父分类宽度按内部实际分组行宽贴合，右侧只保留少量呼吸空间，避免历史 `widthPercent` 撑出大空白。
-- 壁纸默认 quote 不再展示 WebCollect 自造来源；山、岩石、峡谷、峭壁等图优先匹配山川/行路/高处/坚韧相关双语 quote。
-- 壁纸展示层会在普通模式中规避旧缓存里的自造 quote，必要时按当前壁纸重新挑选真实来源 quote。
+- 收藏墙父分类宽度改为按内部每一行分组的真实固定宽度计算，旧 `widthPercent` 只用于推导列数，不再把分类撑出巨大右侧空白。
+- 分组和父分类面板改为 `overflow: visible`，拖拽/菜单/预览不再被玻璃卡片父级裁剪。
+- 分组卡片列数固定为 `--wc-card-columns`，Web 与扩展 CSS 均不再用 `auto-fill` 根据屏幕宽度重排。
+- 历史 4 列偏好被规范化为更稳定的 1/2/3 列规则，`download / YT TT INS X` 这类分组在不同视口保持一致列数。
+- 浮窗偏好增加自愈：旧版隐藏状态、过期暂停、异常 host 列表会自动规范化；用户菜单增加“恢复小松鼠浮窗”入口。
+- 浮窗内容脚本增加健康标记 `__WEBCOLLECT_FLOATING_CAPTURE_HEALTH__`，可检查 host 是否出现、按钮是否可见、mascot 是否加载。
+- 扩展打包修复：`floating-capture.js` 现在用单独 Vite content build 输出为 classic IIFE，不再作为带 `import` 的 ESM content script 导致 Chrome 静默不注入。
 
 ## Unfinished
 
-- 无已知未完成核心项。
-- 用户仍需安装最新扩展包，在自己的主 Chrome/跨设备真实数据里做最终肉眼确认。
+- 无已知代码阻塞。
+- 仍需用户安装最新 Release 包，在自己的主 Chrome 与真实网页上确认小松鼠浮窗是否稳定显示。
 
 ## Current Blockers
 
-- 无代码实现阻塞。
+- 自动化 Chrome 在本机命令行 `--load-extension` 场景没有暴露 extension service worker，浏览器验证采用“构建产物 + 手动 content script 注入 + Chrome API mock”作为替代证据。代码层真实根因已修复为 classic content script。
 
 ## Next Step
 
-- 用户安装 Release `webcollect-2026-06-25-lock-layout-wallpaper` 的扩展包后，重点检查锁定提示、分类留白和壁纸 quote 是否符合预期。
+- 提交并推送当前修复，发布日期后缀命名的扩展 zip，例如 `WebCollect-Chrome-Extension-layout-floating-fix-2026-06-25.zip`。
 
 ## Latest Verification
 
 - 2026-06-25 CST `node --import tsx scripts/test-layout-sizing.ts` passed.
 - 2026-06-25 CST `node --import tsx scripts/test-layout-preferences.ts` passed.
 - 2026-06-25 CST `node --import tsx scripts/test-resolution-layout.ts` passed.
-- 2026-06-25 CST `node --import tsx scripts/test-wallpaper-quotes.ts` passed.
-- 2026-06-25 CST `node --import tsx scripts/test-wallpaper-data.ts` passed.
-- 2026-06-25 CST `node --import tsx scripts/test-wallpaper-policy.ts` passed.
-- 2026-06-25 CST `node --import tsx scripts/test-wallpaper-wiring.ts` passed.
+- 2026-06-25 CST `node --import tsx scripts/test-floating-capture-health.ts` passed.
+- 2026-06-25 CST `node --import tsx scripts/test-floating-capture-targets.ts` passed.
+- 2026-06-25 CST `node --import tsx scripts/test-description-translation.ts` passed.
+- 2026-06-25 CST `node --import tsx scripts/test-site-icons.ts` passed.
 - 2026-06-25 CST `./node_modules/.bin/tsc -p tsconfig.json` passed.
-- 2026-06-25 CST `./node_modules/.bin/eslint` passed with 0 errors and 6 existing warnings.
-- 2026-06-25 CST `node ./extension/build.mjs` passed.
+- 2026-06-25 CST `./node_modules/.bin/eslint .` passed with 0 errors and 6 existing warnings.
+- 2026-06-25 CST `node ./extension/build.mjs` passed; `extension/dist/assets/floating-capture.js` is IIFE, not ESM import.
 - 2026-06-25 CST `git diff --check` passed.
-- 2026-06-25 CST dedicated headless Chrome at `http://localhost:5010/` verified: `download` kept `YT TT INS X` at 2 columns and `其他` at 1 column in both 2048x1200 and 1440x1000 viewports; right blank was about 35px and 24px respectively.
-- 2026-06-25 CST dedicated headless Chrome verified locked resize path: `alertCount = 0`, hint text shown as `布局已锁定，若需移动或调整，请先点击右上角解锁。`
-- 2026-06-25 CST dedicated headless Chrome verified wallpaper quote: no `WebCollect original/原创` source and no water/tide quote on the checked mountain/nature wallpaper.
-- 2026-06-25 CST prepared fix commit and release tag `webcollect-2026-06-25-lock-layout-wallpaper`.
+- 2026-06-25 CST dedicated Chrome/Playwright layout verification at `http://127.0.0.1:5012/` passed:
+  - 2048x1152: `download` right blank about 29.6px, overflow 0, columns 3; `常用` right blank about 29.6px, overflow 0, columns 3.
+  - 1440x900: `download` right blank about 20.5px, overflow 0, columns 3; `常用` right blank about 20.5px, overflow 0, columns 3.
+  - Locked-layout path reported `alertPatched: true`.
+- 2026-06-25 CST floating capture health verification passed by injecting built `extension/dist/assets/floating-capture.js` into a dedicated Chrome page with mocked extension API:
+  - host appeared: `#webcollect-floating-capture-host`
+  - health marker: `{ injected: true, status: "visible", buttonVisible: true, mascot: "chipmunk" }`
 - Browser evidence screenshots:
-  - `/private/tmp/webcollect-layout-large-final.png`
-  - `/private/tmp/webcollect-layout-small-final.png`
-  - `/private/tmp/webcollect-lock-hint-final.png`
-  - `/private/tmp/webcollect-wallpaper-quote-final.png`
+  - `/private/tmp/webcollect-layout-large.png`
+  - `/private/tmp/webcollect-layout-small.png`
+  - `/private/tmp/webcollect-floating-capture.png`

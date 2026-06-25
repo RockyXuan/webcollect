@@ -24,7 +24,36 @@ const DEFAULT_CAPTURE_PREFS = {
   mascot: 'chipmunk',
   pauseUntil: null,
   disabledHosts: [],
+  hiddenByUserAt: null,
+  recoveredAt: null,
 };
+
+function normalizeCapturePrefs(stored, now = Date.now()) {
+  const raw = stored || {};
+  const legacyGlobalHidden = (raw.enabled === false || raw.buttonEnabled === false)
+    && typeof raw.hiddenByUserAt !== 'number';
+  const pauseUntil = typeof raw.pauseUntil === 'number' && raw.pauseUntil > now
+    ? raw.pauseUntil
+    : null;
+  const disabledHosts = Array.isArray(raw.disabledHosts)
+    ? Array.from(new Set(raw.disabledHosts.filter(host => typeof host === 'string' && host.trim().length > 0)))
+    : [];
+
+  return {
+    ...DEFAULT_CAPTURE_PREFS,
+    ...raw,
+    enabled: legacyGlobalHidden ? true : raw.enabled !== false,
+    buttonEnabled: legacyGlobalHidden ? true : raw.buttonEnabled !== false,
+    hoverEnabled: raw.hoverEnabled !== false,
+    allLinksHoverEnabled: raw.allLinksHoverEnabled === true,
+    contextMenuEnabled: raw.contextMenuEnabled !== false,
+    mascot: raw.mascot === 'otter' ? 'otter' : 'chipmunk',
+    pauseUntil,
+    disabledHosts,
+    hiddenByUserAt: typeof raw.hiddenByUserAt === 'number' ? raw.hiddenByUserAt : null,
+    recoveredAt: legacyGlobalHidden ? now : (typeof raw.recoveredAt === 'number' ? raw.recoveredAt : null),
+  };
+}
 
 // Listen for messages from the newtab page and content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -254,21 +283,16 @@ function setStorageValue(key, value) {
 
 async function getCapturePrefs() {
   const stored = await getStorageValue(CAPTURE_PREFS_KEY, {});
-  return {
-    ...DEFAULT_CAPTURE_PREFS,
-    ...stored,
-    mascot: stored.mascot === 'otter' ? 'otter' : 'chipmunk',
-    disabledHosts: Array.isArray(stored.disabledHosts) ? stored.disabledHosts : [],
-  };
+  return normalizeCapturePrefs(stored);
 }
 
 async function saveCapturePrefs(prefs) {
-  await setStorageValue(CAPTURE_PREFS_KEY, {
-    ...DEFAULT_CAPTURE_PREFS,
+  await setStorageValue(CAPTURE_PREFS_KEY, normalizeCapturePrefs({
     ...(prefs || {}),
-    mascot: prefs?.mascot === 'otter' ? 'otter' : 'chipmunk',
-    disabledHosts: Array.isArray(prefs?.disabledHosts) ? prefs.disabledHosts : [],
-  });
+    hiddenByUserAt: (prefs?.enabled === false || prefs?.buttonEnabled === false)
+      ? prefs?.hiddenByUserAt || Date.now()
+      : prefs?.hiddenByUserAt ?? null,
+  }));
 }
 
 function normalizeCaptureUrl(input) {

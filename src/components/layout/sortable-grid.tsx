@@ -44,7 +44,7 @@ const catId = (id: string) => `cat:${id}`;
 const cardId = (id: string) => `card:${id}`;
 const ungroupId = (id: string) => `ungrouped:${id}`;
 const subId = (id: string) => `sub:${id}`;
-const MAX_RENDERED_CARD_COLUMNS = 4;
+const MAX_RENDERED_CARD_COLUMNS = 3;
 const SITE_TILE_WIDTH_REM = 14.75;
 const SITE_TILE_GAP_REM = 0.5;
 const GROUP_HORIZONTAL_PADDING_REM = 2;
@@ -113,9 +113,16 @@ function formatRem(value: number): string {
   return `${rounded}rem`;
 }
 
-function normalizeRenderedColumns(columns: number): number {
+function getPracticalMaxColumns(cardCount: number): number {
+  if (!Number.isFinite(cardCount)) return MAX_RENDERED_CARD_COLUMNS;
+  if (cardCount <= 1) return 1;
+  if (cardCount <= 4) return 2;
+  return MAX_RENDERED_CARD_COLUMNS;
+}
+
+function normalizeRenderedColumns(columns: number, cardCount = Number.POSITIVE_INFINITY): number {
   if (!Number.isFinite(columns)) return 1;
-  return Math.max(1, Math.min(MAX_RENDERED_CARD_COLUMNS, Math.round(columns)));
+  return Math.max(1, Math.min(getPracticalMaxColumns(cardCount), Math.round(columns)));
 }
 
 function getChildBasisRemForColumns(columns: number): number {
@@ -138,11 +145,10 @@ function getMaxChildWidth(cardCount: number): string {
 }
 
 export function inferLayoutColumns(widthPercent: number | null, cardCount: number): number {
-  const cappedCardCount = Math.max(1, Math.min(8, cardCount || 1));
-  if (widthPercent === null) return Math.min(cappedCardCount, cardCount <= 4 ? 2 : 3);
-  if (widthPercent >= 86) return Math.min(cappedCardCount, 4);
-  if (widthPercent >= 64) return Math.min(cappedCardCount, 3);
-  if (widthPercent >= 38) return Math.min(cappedCardCount, 2);
+  const maxColumns = getPracticalMaxColumns(cardCount);
+  if (widthPercent === null) return Math.min(maxColumns, cardCount <= 4 ? 2 : 3);
+  if (widthPercent >= 64) return maxColumns;
+  if (widthPercent >= 38) return Math.min(maxColumns, 2);
   return 1;
 }
 
@@ -152,7 +158,7 @@ export function getStableLayoutColumns(
   cardCount: number
 ): number {
   if (typeof layoutPreference?.columns === "number" && Number.isFinite(layoutPreference.columns)) {
-    return normalizeRenderedColumns(layoutPreference.columns);
+    return normalizeRenderedColumns(layoutPreference.columns, cardCount);
   }
   return inferLayoutColumns(widthPercent ?? layoutPreference?.widthPercent ?? null, cardCount);
 }
@@ -189,17 +195,45 @@ export function getSmartChildStyle(
   };
 }
 
-function getParentContentWidthRem(groupWidths: number[]): number {
-  if (groupWidths.length === 0) return 30;
-  const groupsPerRow = groupWidths.length <= 1 ? 1 : groupWidths.length <= 4 ? 2 : 3;
-  let maxRowWidth = 0;
-  for (let index = 0; index < groupWidths.length; index += groupsPerRow) {
-    const row = groupWidths.slice(index, index + groupsPerRow);
-    const rowWidth = row.reduce((sum, width) => sum + width, 0)
-      + Math.max(0, row.length - 1) * GROUP_FLOW_GAP_REM;
-    maxRowWidth = Math.max(maxRowWidth, rowWidth);
+export function getParentLayoutRowWidthsRem(groupWidths: number[]): number[] {
+  const widths = groupWidths.filter((width) => Number.isFinite(width) && width > 0);
+  if (widths.length === 0) return [30 - PARENT_HORIZONTAL_PADDING_REM];
+  if (widths.length <= 2) {
+    return [
+      widths.reduce((sum, width) => sum + width, 0)
+        + Math.max(0, widths.length - 1) * GROUP_FLOW_GAP_REM,
+    ];
   }
-  return maxRowWidth + PARENT_HORIZONTAL_PADDING_REM;
+
+  const sorted = [...widths].sort((a, b) => a - b);
+  const compactPairWidth = sorted[0] + sorted[1] + GROUP_FLOW_GAP_REM;
+  const targetRowWidth = Math.max(sorted[sorted.length - 1], compactPairWidth);
+  const rows: number[] = [];
+  let currentRowWidth = 0;
+  let currentRowCount = 0;
+
+  for (const width of widths) {
+    const nextRowWidth = currentRowCount === 0
+      ? width
+      : currentRowWidth + GROUP_FLOW_GAP_REM + width;
+
+    if (currentRowCount > 0 && nextRowWidth > targetRowWidth + 0.01) {
+      rows.push(currentRowWidth);
+      currentRowWidth = width;
+      currentRowCount = 1;
+    } else {
+      currentRowWidth = nextRowWidth;
+      currentRowCount += 1;
+    }
+  }
+
+  if (currentRowCount > 0) rows.push(currentRowWidth);
+  return rows;
+}
+
+export function getParentContentWidthRem(groupWidths: number[]): number {
+  const rowWidths = getParentLayoutRowWidthsRem(groupWidths);
+  return Math.max(...rowWidths) + PARENT_HORIZONTAL_PADDING_REM;
 }
 
 // ============ Props ============
@@ -817,15 +851,16 @@ function SortableCategoryBlock({
 
   const rawWidthPercent = localWidth ?? storedWidth ?? layoutPreference?.widthPercent ?? defaultWidthPercent;
   const widthPercent = getSmartParentWidthPercent(rawWidthPercent, defaultWidthPercent);
+  const renderedWidth = formatRem(contentWidthRem ?? 30);
 
   const style: React.CSSProperties = {
     transform: isDragging ? undefined : CSS.Transform.toString(transform),
     transition: isDragging ? transition : `${transition}, min-height 0.3s ease-out`,
     opacity: isDragging ? 0.2 : 1,
-    flex: `0 0 min(calc(${widthPercent}% - 1rem), ${formatRem(contentWidthRem ?? 90)})`,
-    width: `min(calc(${widthPercent}% - 1rem), ${formatRem(contentWidthRem ?? 90)})`,
-    minWidth: "360px",
-    maxWidth: "none",
+    flex: `0 0 ${renderedWidth}`,
+    width: renderedWidth,
+    minWidth: "20rem",
+    maxWidth: renderedWidth,
     minHeight: isDraggingActive ? '60px' : undefined,
   };
 
@@ -908,7 +943,7 @@ function SortableCategoryBlock({
       style={style}
       data-wc-category-id={category.id}
       className={`
-        wc-glass-card wc-category-panel relative overflow-hidden
+        wc-glass-card wc-category-panel relative overflow-visible
         ${isHovered ? "ring-2 ring-blue-400/35 shadow-[0_28px_70px_rgba(59,130,246,0.18)]" : ""}
         transition-all duration-300 ease-out
       `}
@@ -1225,7 +1260,7 @@ function SortableSubGroupBlock({
       ref={setRef}
       style={style}
       data-wc-category-id={category.id}
-      className="wc-soft-card wc-group-panel relative min-w-0 overflow-hidden"
+      className="wc-soft-card wc-group-panel relative min-w-0 overflow-visible"
     >
       {/* Sub-group header - buttons right next to title */}
       <div

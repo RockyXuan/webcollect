@@ -44,6 +44,19 @@ import { localizeDescriptionText } from "@/lib/description-translation";
     mascot: "chipmunk" | "otter";
     pauseUntil: number | null;
     disabledHosts: string[];
+    hiddenByUserAt?: number | null;
+    recoveredAt?: number | null;
+  }
+
+  interface FloatingCaptureHealth {
+    injected: boolean;
+    status: "booting" | "visible" | "hidden" | "recovered" | "error";
+    hostId: string;
+    updatedAt: number;
+    buttonVisible: boolean;
+    mascot: "chipmunk" | "otter";
+    reason?: string;
+    error?: string;
   }
 
   type DockSide = "left" | "right";
@@ -84,6 +97,8 @@ import { localizeDescriptionText } from "@/lib/description-translation";
     mascot: "chipmunk",
     pauseUntil: null,
     disabledHosts: [],
+    hiddenByUserAt: null,
+    recoveredAt: null,
   };
   const DOCK_STORAGE_KEY = "webcollect.capture.dock";
   const defaultDockState: FloatingDockState = { side: "right", topRatio: 0.55 };
@@ -120,6 +135,38 @@ import { localizeDescriptionText } from "@/lib/description-translation";
   const CREATE_SECTION_VALUE = "__webcollect_create_section__";
   const CREATE_PARENT_VALUE = "__webcollect_create_parent__";
   const CREATE_GROUP_VALUE = "__webcollect_create_group__";
+  const HEALTH_KEY = "__WEBCOLLECT_FLOATING_CAPTURE_HEALTH__";
+
+  function sanitizeFloatingCapturePrefs(
+    input: Partial<FloatingCapturePrefs> | null | undefined,
+    now = Date.now()
+  ): FloatingCapturePrefs {
+    const raw = input || {};
+    const legacyGlobalHidden = (
+      raw.enabled === false || raw.buttonEnabled === false
+    ) && typeof raw.hiddenByUserAt !== "number";
+    const pauseUntil = typeof raw.pauseUntil === "number" && raw.pauseUntil > now
+      ? raw.pauseUntil
+      : null;
+    const disabledHosts = Array.isArray(raw.disabledHosts)
+      ? Array.from(new Set(raw.disabledHosts.filter((host): host is string => typeof host === "string" && host.trim().length > 0)))
+      : [];
+
+    return {
+      ...defaultPrefs,
+      ...raw,
+      enabled: legacyGlobalHidden ? true : raw.enabled !== false,
+      buttonEnabled: legacyGlobalHidden ? true : raw.buttonEnabled !== false,
+      hoverEnabled: raw.hoverEnabled !== false,
+      allLinksHoverEnabled: raw.allLinksHoverEnabled === true,
+      contextMenuEnabled: raw.contextMenuEnabled !== false,
+      mascot: raw.mascot === "otter" ? "otter" : "chipmunk",
+      pauseUntil,
+      disabledHosts,
+      hiddenByUserAt: typeof raw.hiddenByUserAt === "number" ? raw.hiddenByUserAt : null,
+      recoveredAt: legacyGlobalHidden ? now : (typeof raw.recoveredAt === "number" ? raw.recoveredAt : null),
+    };
+  }
 
   const host = document.createElement("div");
   host.id = "webcollect-floating-capture-host";
@@ -551,6 +598,22 @@ import { localizeDescriptionText } from "@/lib/description-translation";
   const parentCreateInput = shadow.querySelector<HTMLInputElement>('[data-create-field="parent"]')!;
   const groupCreateInput = shadow.querySelector<HTMLInputElement>('[data-create-field="group"]')!;
 
+  function updateHealth(patch: Partial<FloatingCaptureHealth>) {
+    const health: FloatingCaptureHealth = {
+      injected: true,
+      status: patch.status || "booting",
+      hostId: host.id,
+      updatedAt: Date.now(),
+      buttonVisible: button.style.display !== "none",
+      mascot: prefs.mascot === "otter" ? "otter" : "chipmunk",
+      ...patch,
+    };
+    host.dataset.webcollectFloatingCapture = health.status;
+    (window as unknown as Record<string, unknown>)[HEALTH_KEY] = health;
+  }
+
+  updateHealth({ status: "booting", buttonVisible: false });
+
   function clamp(value: number, min: number, max: number) {
     return Math.min(Math.max(value, min), max);
   }
@@ -718,9 +781,27 @@ import { localizeDescriptionText } from "@/lib/description-translation";
     const mascot = prefs.mascot === "otter" ? "otter" : "chipmunk";
     button.dataset.mascot = mascot;
     hoverButton.dataset.mascot = mascot;
-    button.style.display = isEnabledOnThisPage() && prefs.buttonEnabled ? "inline-flex" : "none";
+    const enabledOnPage = isEnabledOnThisPage();
+    const buttonVisible = enabledOnPage && prefs.buttonEnabled;
+    button.style.display = buttonVisible ? "inline-flex" : "none";
     applyDockState();
-    if (!isEnabledOnThisPage()) {
+    updateHealth({
+      status: buttonVisible ? "visible" : "hidden",
+      buttonVisible,
+      mascot,
+      reason: buttonVisible
+        ? undefined
+        : !prefs.enabled
+          ? "disabled"
+          : isTemporarilyPaused()
+            ? "paused"
+            : prefs.disabledHosts.includes(window.location.host)
+              ? "host-disabled"
+              : !prefs.buttonEnabled
+                ? "button-disabled"
+                : "unknown",
+    });
+    if (!enabledOnPage) {
       hoverButton.style.display = "none";
       closePanel();
     }
@@ -1066,7 +1147,7 @@ import { localizeDescriptionText } from "@/lib/description-translation";
   }
 
   async function updatePrefs(next: FloatingCapturePrefs) {
-    prefs = next;
+    prefs = sanitizeFloatingCapturePrefs(next);
     await runtimeMessage({ type: PREFS_SET_MESSAGE, prefs });
     updateButtonVisibility();
   }
@@ -1277,27 +1358,30 @@ import { localizeDescriptionText } from "@/lib/description-translation";
     if (areaName !== "local") return;
     const nextPrefs = changes[CAPTURE_PREFS_STORAGE_KEY]?.newValue as Partial<FloatingCapturePrefs> | undefined;
     if (!nextPrefs) return;
-    prefs = {
-      ...defaultPrefs,
-      ...nextPrefs,
-      mascot: nextPrefs.mascot === "otter" ? "otter" : "chipmunk",
-      disabledHosts: Array.isArray(nextPrefs.disabledHosts) ? nextPrefs.disabledHosts : [],
-    };
+    prefs = sanitizeFloatingCapturePrefs(nextPrefs);
     updateButtonVisibility();
   });
 
   async function init() {
-    const [prefResponse, destinationResponse] = await Promise.all([
-      runtimeMessage<{ success?: boolean; prefs?: FloatingCapturePrefs }>({ type: PREFS_GET_MESSAGE }),
-      runtimeMessage<{ success?: boolean; cache?: CaptureDestinationCache }>({ type: DESTINATIONS_GET_MESSAGE }),
-    ]);
-    prefs = {
-      ...defaultPrefs,
-      ...(prefResponse?.prefs || {}),
-      mascot: prefResponse?.prefs?.mascot === "otter" ? "otter" : "chipmunk",
-    };
-    destinationCache = destinationResponse?.cache || destinationCache;
-    updateButtonVisibility();
+    try {
+      const [prefResponse, destinationResponse] = await Promise.all([
+        runtimeMessage<{ success?: boolean; prefs?: FloatingCapturePrefs }>({ type: PREFS_GET_MESSAGE }),
+        runtimeMessage<{ success?: boolean; cache?: CaptureDestinationCache }>({ type: DESTINATIONS_GET_MESSAGE }),
+      ]);
+      prefs = sanitizeFloatingCapturePrefs(prefResponse?.prefs);
+      destinationCache = destinationResponse?.cache || destinationCache;
+      updateButtonVisibility();
+      if (prefs.recoveredAt && prefResponse?.prefs?.recoveredAt !== prefs.recoveredAt) {
+        void runtimeMessage({ type: PREFS_SET_MESSAGE, prefs });
+        updateHealth({ status: "recovered", buttonVisible: button.style.display !== "none", reason: "legacy-hidden-prefs" });
+      }
+    } catch (error) {
+      prefs = sanitizeFloatingCapturePrefs(defaultPrefs);
+      updateButtonVisibility();
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn("[WebCollect] Floating capture recovered from init failure:", message);
+      updateHealth({ status: "recovered", buttonVisible: button.style.display !== "none", reason: "init-failed", error: message });
+    }
   }
 
   void init();

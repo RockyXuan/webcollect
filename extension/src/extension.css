@@ -1043,6 +1043,7 @@
 
 .wc-category-panel {
   isolation: isolate;
+  overflow: visible;
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.84), rgba(235, 244, 255, 0.70)),
     radial-gradient(circle at 88% 18%, rgba(96, 165, 250, 0.18), transparent 30%),
@@ -1079,6 +1080,7 @@
 
 .wc-category-body {
   min-height: 0;
+  overflow: visible;
 }
 
 .wc-group-flow {
@@ -1110,6 +1112,7 @@
 }
 
 .wc-group-panel {
+  overflow: visible;
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.76), rgba(235, 244, 255, 0.62)),
     radial-gradient(circle at 100% 0%, rgba(96, 165, 250, 0.12), transparent 34%);
@@ -1126,13 +1129,13 @@
 
 .wc-group-card-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--wc-site-tile-width), var(--wc-site-tile-width)));
+  grid-template-columns: repeat(var(--wc-card-columns, 1), var(--wc-site-tile-width));
   justify-content: start;
   align-items: start;
 }
 
 .wc-group-card-list-editing {
-  grid-template-columns: repeat(auto-fill, minmax(var(--wc-site-tile-edit-width), var(--wc-site-tile-edit-width)));
+  grid-template-columns: repeat(var(--wc-card-columns, 1), var(--wc-site-tile-edit-width));
 }
 
 .wc-group-card-list > * {

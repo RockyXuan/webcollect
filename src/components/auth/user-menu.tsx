@@ -330,6 +330,16 @@ export function UserMenu() {
     await saveFloatingCapturePrefs(next);
   };
 
+  const resetCapturePrefs = async () => {
+    const next = {
+      ...DEFAULT_FLOATING_CAPTURE_PREFS,
+      mascot: "chipmunk" as const,
+      recoveredAt: Date.now(),
+    };
+    setCapturePrefs(next);
+    await saveFloatingCapturePrefs(next);
+  };
+
   const toggleAllLinksHover = async () => {
     if (!capturePrefs) return;
     if (!capturePrefs.allLinksHoverEnabled) {
@@ -582,6 +592,14 @@ export function UserMenu() {
                   {"恢复显示"}
                 </button>
               </div>
+              <button
+                type="button"
+                onClick={resetCapturePrefs}
+                className="wc-pill-toggle w-full"
+                title="重置浮窗本机设置，恢复右侧小松鼠快捷收集"
+              >
+                {"恢复小松鼠浮窗"}
+              </button>
               {capturePrefs.disabledHosts.length > 0 && (
                 <button
                   type="button"

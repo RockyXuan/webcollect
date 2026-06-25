@@ -42,6 +42,19 @@ if (viteResult.status !== 0) {
   process.exit(viteResult.status ?? 1);
 }
 
+const contentScriptResult = spawnSync(
+  process.execPath,
+  [viteBin, "build", "--config", join(extensionRoot, "vite.content.config.ts")],
+  {
+    cwd: projectRoot,
+    stdio: "inherit",
+  }
+);
+
+if (contentScriptResult.status !== 0) {
+  process.exit(contentScriptResult.status ?? 1);
+}
+
 cpSync(join(extensionRoot, "manifest.json"), join(distDir, "manifest.json"));
 cpSync(join(extensionRoot, "background.js"), join(distDir, "background.js"));
 
