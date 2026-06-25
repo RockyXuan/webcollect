@@ -25,7 +25,7 @@
 
 ## Next Step
 
-- 提交并推送当前修复，发布日期后缀命名的扩展 zip，例如 `WebCollect-Chrome-Extension-layout-floating-fix-2026-06-25.zip`。
+- 用户安装 Release `webcollect-2026-06-25-layout-floating-fix`，下载 `WebCollect-Chrome-Extension-layout-floating-fix-2026-06-25.zip`，重点检查父分类包裹、分组拖拽和小松鼠浮窗。
 
 ## Latest Verification
 
@@ -47,6 +47,10 @@
 - 2026-06-25 CST floating capture health verification passed by injecting built `extension/dist/assets/floating-capture.js` into a dedicated Chrome page with mocked extension API:
   - host appeared: `#webcollect-floating-capture-host`
   - health marker: `{ injected: true, status: "visible", buttonVisible: true, mascot: "chipmunk" }`
+- 2026-06-25 CST committed `dfd23fc` (`fix: stabilize layout wrapping and floating capture`) and pushed `main`.
+- 2026-06-25 CST published Release `webcollect-2026-06-25-layout-floating-fix`.
+- 2026-06-25 CST published asset `WebCollect-Chrome-Extension-layout-floating-fix-2026-06-25.zip`.
+- 2026-06-25 CST release asset SHA-256 digest: `951d0bd8ec5b194a81368462675edc9bdecbdf2d355ac40dae4829dcf312070e`.
 - Browser evidence screenshots:
   - `/private/tmp/webcollect-layout-large.png`
   - `/private/tmp/webcollect-layout-small.png`
