@@ -6,6 +6,10 @@
 
 ## Completed
 
+- 2026-06-28 小修：分类顶部玻璃头部现在继承圆角并自裁剪，避免 `overflow: visible` 状态下圆角处露出矩形/三角伪影。
+- 2026-06-28 小修：浮窗侧边工具默认缩小到约 2/3（`sizeScale = 0.67`），并在账户/浮窗设置里加入 `浮窗大小` 滑杆和 `小 / 中 / 原始` 预设。
+- 2026-06-28 小修：浮窗收集面板改为可拖动，拖动位置持久保存到 `webcollect.capture.panelPosition`；点击外部不会自动关闭。
+- 2026-06-28 小修：浮窗收集面板内容区可滚动，底部 `保存 / 取消` 操作区 sticky 保持可见；按钮顺序已改为保存在左、取消在右。
 - 收藏墙父分类宽度改为按内部每一行分组的真实固定宽度计算，旧 `widthPercent` 只用于推导列数，不再把分类撑出巨大右侧空白。
 - 分组和父分类面板改为 `overflow: visible`，拖拽/菜单/预览不再被玻璃卡片父级裁剪。
 - 分组卡片列数固定为 `--wc-card-columns`，Web 与扩展 CSS 均不再用 `auto-fill` 根据屏幕宽度重排。
@@ -29,6 +33,21 @@
 
 ## Latest Verification
 
+- 2026-06-28 CST `node --import tsx scripts/test-floating-capture-health.ts` passed.
+- 2026-06-28 CST `node --import tsx scripts/test-layout-preferences.ts` passed.
+- 2026-06-28 CST `./node_modules/.bin/tsc -p tsconfig.json` passed.
+- 2026-06-28 CST `./node_modules/.bin/eslint .` passed with 0 errors and 6 existing warnings.
+- 2026-06-28 CST `node ./extension/build.mjs` passed; `extension/dist/assets/floating-capture.js` rebuilt.
+- 2026-06-28 CST `git diff --check` passed.
+- 2026-06-28 CST in-app Browser smoke at `http://localhost:5015/` loaded WebCollect without console errors; screenshot captured.
+- 2026-06-28 CST dedicated Chrome floating capture verification passed by injecting built `extension/dist/assets/floating-capture.js` into `http://127.0.0.1:5015/` with mocked extension API:
+  - side button measured `159x48`
+  - long create-section/category/group panel kept actions visible
+  - action order was `保存 / 取消`
+  - dragging moved panel from `{ left: 380, top: 183 }` to `{ left: 260, top: 90 }`
+  - stored panel position became `{"left":260,"top":90}`
+  - clicking outside did not close the panel
+  - screenshot: `/private/tmp/webcollect-floating-capture-verify.png`
 - 2026-06-25 CST `node --import tsx scripts/test-layout-sizing.ts` passed.
 - 2026-06-25 CST `node --import tsx scripts/test-layout-preferences.ts` passed.
 - 2026-06-25 CST `node --import tsx scripts/test-resolution-layout.ts` passed.

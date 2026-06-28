@@ -43,6 +43,26 @@ assert.doesNotMatch(
   /\.wc-group-card-list\s*\{[\s\S]*?auto-fill/,
   "extension card grids must not auto-fill by viewport width"
 );
+assert.match(
+  globalCss,
+  /\.wc-category-panel::before\s*\{[\s\S]*?display:\s*none;/,
+  "category decorative pseudo layer should stay disabled so it cannot leak outside rounded corners"
+);
+assert.match(
+  extensionCss,
+  /\.wc-category-panel::before\s*\{[\s\S]*?display:\s*none;/,
+  "extension category decorative pseudo layer should stay disabled so it cannot leak outside rounded corners"
+);
+assert.match(
+  globalCss,
+  /\.wc-category-header\s*\{[\s\S]*?overflow:\s*hidden;[\s\S]*?border-top-left-radius:\s*inherit;[\s\S]*?border-top-right-radius:\s*inherit;/,
+  "category headers should clip their own glass background to the top rounded corners"
+);
+assert.match(
+  extensionCss,
+  /\.wc-category-header\s*\{[\s\S]*?overflow:\s*hidden;[\s\S]*?border-top-left-radius:\s*inherit;[\s\S]*?border-top-right-radius:\s*inherit;/,
+  "extension category headers should clip their own glass background to the top rounded corners"
+);
 
 const sortableSource = readFileSync("src/components/layout/sortable-grid.tsx", "utf8");
 assert.doesNotMatch(

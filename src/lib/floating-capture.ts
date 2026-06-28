@@ -54,6 +54,7 @@ export interface FloatingCapturePrefs {
   allLinksHoverEnabled: boolean;
   contextMenuEnabled: boolean;
   mascot: FloatingCaptureMascot;
+  sizeScale: number;
   pauseUntil: number | null;
   disabledHosts: string[];
   hiddenByUserAt?: number | null;
@@ -77,6 +78,7 @@ export const DEFAULT_FLOATING_CAPTURE_PREFS: FloatingCapturePrefs = {
   allLinksHoverEnabled: false,
   contextMenuEnabled: true,
   mascot: "chipmunk",
+  sizeScale: 0.67,
   pauseUntil: null,
   disabledHosts: [],
   hiddenByUserAt: null,
@@ -97,6 +99,9 @@ export function normalizeFloatingCapturePrefs(
   const disabledHosts = Array.isArray(raw.disabledHosts)
     ? Array.from(new Set(raw.disabledHosts.filter((host): host is string => typeof host === "string" && host.trim().length > 0)))
     : [];
+  const sizeScale = typeof raw.sizeScale === "number" && Number.isFinite(raw.sizeScale)
+    ? Math.min(1.15, Math.max(0.55, raw.sizeScale))
+    : DEFAULT_FLOATING_CAPTURE_PREFS.sizeScale;
 
   return {
     ...DEFAULT_FLOATING_CAPTURE_PREFS,
@@ -107,6 +112,7 @@ export function normalizeFloatingCapturePrefs(
     allLinksHoverEnabled: raw.allLinksHoverEnabled === true,
     contextMenuEnabled: raw.contextMenuEnabled !== false,
     mascot: raw.mascot === "otter" ? "otter" : "chipmunk",
+    sizeScale,
     pauseUntil,
     disabledHosts,
     hiddenByUserAt: typeof raw.hiddenByUserAt === "number" ? raw.hiddenByUserAt : null,

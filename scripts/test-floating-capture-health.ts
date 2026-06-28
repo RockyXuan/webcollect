@@ -43,6 +43,36 @@ assert.match(
   "content script should sanitize old or malformed floating capture prefs"
 );
 assert.match(
+  contentScript,
+  /PANEL_POSITION_STORAGE_KEY/,
+  "floating capture panel should persist draggable panel position"
+);
+assert.match(
+  contentScript,
+  /panelHead\.addEventListener\("pointerdown"/,
+  "floating capture panel header should be draggable"
+);
+assert.match(
+  contentScript,
+  /window\.addEventListener\("pointerup",\s*finishPanelDrag,\s*true\)/,
+  "floating capture panel drag should recover when pointerup happens outside the panel header"
+);
+assert.match(
+  contentScript,
+  /applyPanelPosition\(\);\s*savePanelPosition\(\);/,
+  "floating capture panel should persist position during drag, not only on a perfect pointerup"
+);
+assert.match(
+  contentScript,
+  /position:\s*sticky;[\s\S]*?bottom:\s*-16px;[\s\S]*?wc-actions/,
+  "floating capture actions should stay visible when the panel body scrolls"
+);
+assert.match(
+  contentScript,
+  /data-action="save">保存<\/button>\s*<button class="wc-secondary" type="button" data-action="close">取消<\/button>/,
+  "floating capture actions should put save on the left and cancel on the right"
+);
+assert.match(
   backgroundScript,
   /normalizeCapturePrefs/,
   "background worker should normalize floating capture prefs before returning them"
@@ -65,6 +95,19 @@ const recovered = normalizeFloatingCapturePrefs({
 assert.equal(recovered.enabled, true, "legacy hidden global prefs should recover to visible defaults");
 assert.equal(recovered.buttonEnabled, true, "legacy hidden button prefs should recover to visible defaults");
 assert.equal(typeof recovered.recoveredAt, "number", "legacy recovery should be recorded");
+assert.equal(recovered.sizeScale, 0.67, "floating capture should default to the smaller two-thirds size");
+
+const hugeScale = normalizeFloatingCapturePrefs({
+  ...DEFAULT_FLOATING_CAPTURE_PREFS,
+  sizeScale: 5,
+});
+assert.equal(hugeScale.sizeScale, 1.15, "floating capture size should clamp large custom values");
+
+const tinyScale = normalizeFloatingCapturePrefs({
+  ...DEFAULT_FLOATING_CAPTURE_PREFS,
+  sizeScale: 0.2,
+});
+assert.equal(tinyScale.sizeScale, 0.55, "floating capture size should clamp tiny custom values");
 
 const explicitHidden = normalizeFloatingCapturePrefs({
   ...DEFAULT_FLOATING_CAPTURE_PREFS,

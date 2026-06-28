@@ -42,6 +42,7 @@ import { localizeDescriptionText } from "@/lib/description-translation";
     allLinksHoverEnabled: boolean;
     contextMenuEnabled: boolean;
     mascot: "chipmunk" | "otter";
+    sizeScale: number;
     pauseUntil: number | null;
     disabledHosts: string[];
     hiddenByUserAt?: number | null;
@@ -95,12 +96,14 @@ import { localizeDescriptionText } from "@/lib/description-translation";
     allLinksHoverEnabled: false,
     contextMenuEnabled: true,
     mascot: "chipmunk",
+    sizeScale: 0.67,
     pauseUntil: null,
     disabledHosts: [],
     hiddenByUserAt: null,
     recoveredAt: null,
   };
   const DOCK_STORAGE_KEY = "webcollect.capture.dock";
+  const PANEL_POSITION_STORAGE_KEY = "webcollect.capture.panelPosition";
   const defaultDockState: FloatingDockState = { side: "right", topRatio: 0.55 };
   const mascotAssets = {
     chipmunk: {
@@ -123,12 +126,14 @@ import { localizeDescriptionText } from "@/lib/description-translation";
     categories: [],
   };
   let dockState: FloatingDockState = loadDockState();
+  let panelPosition: { left: number; top: number } | null = loadPanelPosition();
   let hoveredDraft: CaptureDraft | null = null;
   let hoverDelayTimer: number | null = null;
   let hoverHideTimer: number | null = null;
   let scheduledHover: { link: HTMLAnchorElement; x: number; y: number } | null = null;
   let panelOpen = false;
   let dragState: { pointerId: number; startX: number; startY: number; moved: boolean } | null = null;
+  let panelDragState: { pointerId: number; startX: number; startY: number; startLeft: number; startTop: number; moved: boolean } | null = null;
   let suppressNextButtonClick = false;
   const HOVER_DELAY_MS = 700;
   const HOVER_MOVE_TOLERANCE_PX = 8;
@@ -151,6 +156,9 @@ import { localizeDescriptionText } from "@/lib/description-translation";
     const disabledHosts = Array.isArray(raw.disabledHosts)
       ? Array.from(new Set(raw.disabledHosts.filter((host): host is string => typeof host === "string" && host.trim().length > 0)))
       : [];
+    const sizeScale = typeof raw.sizeScale === "number" && Number.isFinite(raw.sizeScale)
+      ? Math.min(1.15, Math.max(0.55, raw.sizeScale))
+      : defaultPrefs.sizeScale;
 
     return {
       ...defaultPrefs,
@@ -161,6 +169,7 @@ import { localizeDescriptionText } from "@/lib/description-translation";
       allLinksHoverEnabled: raw.allLinksHoverEnabled === true,
       contextMenuEnabled: raw.contextMenuEnabled !== false,
       mascot: raw.mascot === "otter" ? "otter" : "chipmunk",
+      sizeScale,
       pauseUntil,
       disabledHosts,
       hiddenByUserAt: typeof raw.hiddenByUserAt === "number" ? raw.hiddenByUserAt : null,
@@ -178,9 +187,16 @@ import { localizeDescriptionText } from "@/lib/description-translation";
     <style>
       :host { color-scheme: light; }
       .wc-button {
-        --wc-button-width: 238px;
-        --wc-button-height: 72px;
-        --wc-peek-width: 44px;
+        --wc-button-width: 160px;
+        --wc-button-height: 48px;
+        --wc-peek-width: 30px;
+        --wc-pill-head-size: 42px;
+        --wc-pill-wc-width: 63px;
+        --wc-pill-wc-height: 36px;
+        --wc-pill-plus-size: 31px;
+        --wc-pill-gap: 5px;
+        --wc-pill-padding-y: 3px;
+        --wc-pill-padding-x: 6px;
         position: fixed;
         top: 50%;
         pointer-events: auto;
@@ -275,13 +291,13 @@ import { localizeDescriptionText } from "@/lib/description-translation";
       .wc-pill-shell {
         box-sizing: border-box;
         display: grid;
-        grid-template-columns: 62px 94px 46px;
+        grid-template-columns: var(--wc-pill-head-size) var(--wc-pill-wc-width) var(--wc-pill-plus-size);
         width: var(--wc-button-width);
         height: var(--wc-button-height);
         align-items: center;
         justify-content: center;
-        gap: 8px;
-        border: 1.5px solid rgba(91, 143, 255, 0.72);
+        gap: var(--wc-pill-gap);
+        border: 1.25px solid rgba(91, 143, 255, 0.72);
         border-radius: 999px;
         background:
           radial-gradient(circle at 15% 18%, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.66) 36%, transparent 37%),
@@ -291,14 +307,14 @@ import { localizeDescriptionText } from "@/lib/description-translation";
           inset 0 -2px 0 rgba(104, 153, 255, 0.20),
           0 16px 30px rgba(64, 91, 180, 0.16),
           0 5px 12px rgba(47, 109, 246, 0.10);
-        padding: 5px 8px;
+        padding: var(--wc-pill-padding-y) var(--wc-pill-padding-x);
         overflow: hidden;
       }
       .wc-pill-head {
         display: grid;
         place-items: center;
-        width: 62px;
-        height: 62px;
+        width: var(--wc-pill-head-size);
+        height: var(--wc-pill-head-size);
         overflow: visible;
       }
       .wc-pill-head img,
@@ -309,13 +325,13 @@ import { localizeDescriptionText } from "@/lib/description-translation";
         -webkit-user-drag: none;
       }
       .wc-pill-head img {
-        width: 62px;
-        height: 62px;
+        width: var(--wc-pill-head-size);
+        height: var(--wc-pill-head-size);
         filter: drop-shadow(0 8px 14px rgba(64, 91, 180, 0.14));
       }
       .wc-peek-head img {
-        width: 62px;
-        height: 62px;
+        width: var(--wc-pill-head-size);
+        height: var(--wc-pill-head-size);
         filter: drop-shadow(0 9px 18px rgba(64, 91, 180, 0.16));
       }
       .wc-button[data-side="right"] .wc-peek-head img {
@@ -336,13 +352,13 @@ import { localizeDescriptionText } from "@/lib/description-translation";
         -webkit-user-drag: none;
       }
       .wc-wc-mark {
-        width: 94px;
-        height: 54px;
+        width: var(--wc-pill-wc-width);
+        height: var(--wc-pill-wc-height);
         filter: drop-shadow(0 7px 12px rgba(68, 83, 220, 0.18));
       }
       .wc-plus-mark {
-        width: 46px;
-        height: 46px;
+        width: var(--wc-pill-plus-size);
+        height: var(--wc-pill-plus-size);
         filter: drop-shadow(0 8px 14px rgba(79, 70, 229, 0.24));
       }
       .wc-hover {
@@ -352,8 +368,8 @@ import { localizeDescriptionText } from "@/lib/description-translation";
         display: none;
         align-items: center;
         justify-content: center;
-        width: 42px;
-        height: 42px;
+        width: var(--wc-hover-size, 28px);
+        height: var(--wc-hover-size, 28px);
         border: 0;
         border-radius: 999px;
         background: conic-gradient(#2563eb var(--wc-ring-angle), #dbeafe 0deg);
@@ -380,8 +396,8 @@ import { localizeDescriptionText } from "@/lib/description-translation";
         position: relative;
         z-index: 1;
         display: none;
-        width: 34px;
-        height: 34px;
+        width: var(--wc-hover-art-size, 23px);
+        height: var(--wc-hover-art-size, 23px);
         object-fit: contain;
         user-select: none;
         -webkit-user-drag: none;
@@ -409,8 +425,10 @@ import { localizeDescriptionText } from "@/lib/description-translation";
         top: 74px;
         width: 360px;
         max-width: calc(100vw - 36px);
+        max-height: calc(100vh - 28px);
         pointer-events: auto;
         display: none;
+        flex-direction: column;
         border: 1px solid rgba(255, 255, 255, 0.82);
         border-radius: 24px;
         background:
@@ -423,7 +441,10 @@ import { localizeDescriptionText } from "@/lib/description-translation";
         overflow: hidden;
         backdrop-filter: blur(24px);
       }
-      .wc-panel[data-open="true"] { display: block; }
+      .wc-panel[data-open="true"] { display: flex; }
+      .wc-panel[data-dragging="true"] {
+        box-shadow: 0 30px 88px rgba(37, 99, 235, 0.24);
+      }
       .wc-head {
         display: flex;
         align-items: center;
@@ -432,6 +453,9 @@ import { localizeDescriptionText } from "@/lib/description-translation";
         padding: 15px 16px;
         border-bottom: 1px solid rgba(226, 232, 240, 0.70);
         background: rgba(255, 255, 255, 0.44);
+        cursor: move;
+        user-select: none;
+        flex: 0 0 auto;
       }
       .wc-title { font-weight: 800; font-size: 15px; letter-spacing: -0.01em; }
       .wc-icon-button {
@@ -444,7 +468,13 @@ import { localizeDescriptionText } from "@/lib/description-translation";
         line-height: 1;
       }
       .wc-icon-button:hover { color: #2563eb; }
-      .wc-body { padding: 14px 16px 16px; }
+      .wc-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        padding: 14px 16px 16px;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+      }
       .wc-grid { display: grid; gap: 9px; }
       .wc-label { display: grid; gap: 4px; font-weight: 700; color: #334155; }
       .wc-label span { font-size: 12px; }
@@ -474,11 +504,16 @@ import { localizeDescriptionText } from "@/lib/description-translation";
       .wc-textarea { min-height: 62px; resize: vertical; }
       .wc-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
       .wc-actions {
+        position: sticky;
+        bottom: -16px;
+        z-index: 2;
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 8px;
         margin-top: 12px;
+        padding: 10px 0 12px;
+        background: linear-gradient(180deg, rgba(248, 251, 255, 0), rgba(248, 251, 255, 0.94) 30%, rgba(248, 251, 255, 0.98));
       }
       .wc-secondary, .wc-primary, .wc-small {
         border: 1px solid rgba(148, 163, 184, 0.24);
@@ -577,8 +612,8 @@ import { localizeDescriptionText } from "@/lib/description-translation";
         <p class="wc-quick-help">选择永久不显示后，只会影响当前网站；后续可在 WebCollect 主页账户设置里重新开启。</p>
         <div class="wc-status"></div>
         <div class="wc-actions">
-          <button class="wc-secondary" type="button" data-action="close">取消</button>
           <button class="wc-primary" type="button" data-action="save">保存</button>
+          <button class="wc-secondary" type="button" data-action="close">取消</button>
         </div>
       </div>
     </section>
@@ -587,6 +622,7 @@ import { localizeDescriptionText } from "@/lib/description-translation";
   const button = shadow.querySelector<HTMLButtonElement>(".wc-button")!;
   const hoverButton = shadow.querySelector<HTMLButtonElement>(".wc-hover")!;
   const panel = shadow.querySelector<HTMLElement>(".wc-panel")!;
+  const panelHead = shadow.querySelector<HTMLElement>(".wc-head")!;
   const statusEl = shadow.querySelector<HTMLElement>(".wc-status")!;
   const titleInput = shadow.querySelector<HTMLInputElement>('[data-field="title"]')!;
   const urlInput = shadow.querySelector<HTMLInputElement>('[data-field="url"]')!;
@@ -618,6 +654,29 @@ import { localizeDescriptionText } from "@/lib/description-translation";
     return Math.min(Math.max(value, min), max);
   }
 
+  function getCaptureButtonScale() {
+    return clamp(prefs.sizeScale || defaultPrefs.sizeScale, 0.55, 1.15);
+  }
+
+  function applyCaptureButtonScale() {
+    const scale = getCaptureButtonScale();
+    const px = (value: number) => `${Math.round(value * scale)}px`;
+    for (const target of [button, hoverButton]) {
+      target.style.setProperty("--wc-button-width", px(238));
+      target.style.setProperty("--wc-button-height", px(72));
+      target.style.setProperty("--wc-peek-width", px(44));
+      target.style.setProperty("--wc-pill-head-size", px(62));
+      target.style.setProperty("--wc-pill-wc-width", px(94));
+      target.style.setProperty("--wc-pill-wc-height", px(54));
+      target.style.setProperty("--wc-pill-plus-size", px(46));
+      target.style.setProperty("--wc-pill-gap", px(8));
+      target.style.setProperty("--wc-pill-padding-y", px(5));
+      target.style.setProperty("--wc-pill-padding-x", px(8));
+      target.style.setProperty("--wc-hover-size", px(42));
+      target.style.setProperty("--wc-hover-art-size", px(34));
+    }
+  }
+
   function loadDockState(): FloatingDockState {
     try {
       const raw = window.localStorage?.getItem(DOCK_STORAGE_KEY);
@@ -633,6 +692,28 @@ import { localizeDescriptionText } from "@/lib/description-translation";
     }
   }
 
+  function loadPanelPosition(): { left: number; top: number } | null {
+    try {
+      const raw = window.localStorage?.getItem(PANEL_POSITION_STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { left?: unknown; top?: unknown };
+      if (typeof parsed.left !== "number" || typeof parsed.top !== "number") return null;
+      if (!Number.isFinite(parsed.left) || !Number.isFinite(parsed.top)) return null;
+      return { left: parsed.left, top: parsed.top };
+    } catch {
+      return null;
+    }
+  }
+
+  function savePanelPosition() {
+    try {
+      if (!panelPosition) return;
+      window.localStorage?.setItem(PANEL_POSITION_STORAGE_KEY, JSON.stringify(panelPosition));
+    } catch {
+      // Panel position is a visual convenience only.
+    }
+  }
+
   function saveDockState() {
     try {
       window.localStorage?.setItem(DOCK_STORAGE_KEY, JSON.stringify(dockState));
@@ -645,6 +726,39 @@ import { localizeDescriptionText } from "@/lib/description-translation";
     return clamp(Math.round(window.innerHeight * dockState.topRatio), 56, Math.max(56, window.innerHeight - 56));
   }
 
+  function getPanelBounds() {
+    return {
+      width: panel.offsetWidth || 360,
+      height: Math.min(panel.offsetHeight || 520, Math.max(240, window.innerHeight - 28)),
+    };
+  }
+
+  function applyPanelPosition() {
+    const { width, height } = getPanelBounds();
+    const maxLeft = Math.max(8, window.innerWidth - width - 8);
+    const maxTop = Math.max(8, window.innerHeight - height - 8);
+
+    if (panelPosition) {
+      const left = clamp(panelPosition.left, 8, maxLeft);
+      const top = clamp(panelPosition.top, 8, maxTop);
+      panelPosition = { left, top };
+      panel.style.left = `${left}px`;
+      panel.style.right = "auto";
+      panel.style.top = `${top}px`;
+      return;
+    }
+
+    if (dockState.side === "left") {
+      panel.style.left = "18px";
+      panel.style.right = "auto";
+    } else {
+      panel.style.left = "auto";
+      panel.style.right = "18px";
+    }
+    const top = getDockTopPx();
+    panel.style.top = `${clamp(top - 126, 16, maxTop)}px`;
+  }
+
   function applyDockState() {
     const top = getDockTopPx();
     button.dataset.side = dockState.side;
@@ -652,17 +766,11 @@ import { localizeDescriptionText } from "@/lib/description-translation";
     if (dockState.side === "left") {
       button.style.left = "0px";
       button.style.right = "auto";
-      panel.style.left = "18px";
-      panel.style.right = "auto";
     } else {
       button.style.left = "auto";
       button.style.right = "0px";
-      panel.style.left = "auto";
-      panel.style.right = "18px";
     }
-    const panelHeight = panel.offsetHeight || 520;
-    const maxPanelTop = Math.max(16, window.innerHeight - Math.min(panelHeight, window.innerHeight - 32) - 16);
-    panel.style.top = `${clamp(top - 126, 16, maxPanelTop)}px`;
+    applyPanelPosition();
   }
 
   function updateDockFromPointer(clientX: number, clientY: number) {
@@ -779,6 +887,7 @@ import { localizeDescriptionText } from "@/lib/description-translation";
 
   function updateButtonVisibility() {
     const mascot = prefs.mascot === "otter" ? "otter" : "chipmunk";
+    applyCaptureButtonScale();
     button.dataset.mascot = mascot;
     hoverButton.dataset.mascot = mascot;
     const enabledOnPage = isEnabledOnThisPage();
@@ -1022,6 +1131,7 @@ import { localizeDescriptionText } from "@/lib/description-translation";
     panel.dataset.open = "true";
     button.dataset.open = "true";
     applyDockState();
+    window.requestAnimationFrame(applyPanelPosition);
     titleInput.value = draft.title || "";
     urlInput.value = draft.url || "";
     descriptionInput.value = localizeDescriptionText(draft.description || "", {
@@ -1216,8 +1326,9 @@ import { localizeDescriptionText } from "@/lib/description-translation";
       sourcePageTitle: document.title,
     };
     const rect = link.getBoundingClientRect();
-    hoverButton.style.left = `${Math.min(Math.max(8, rect.right + 8), window.innerWidth - 44)}px`;
-    hoverButton.style.top = `${Math.max(8, Math.min(rect.top, window.innerHeight - 44))}px`;
+    const hoverSize = Math.round(42 * getCaptureButtonScale());
+    hoverButton.style.left = `${Math.min(Math.max(8, rect.right + 8), window.innerWidth - hoverSize - 8)}px`;
+    hoverButton.style.top = `${Math.max(8, Math.min(rect.top, window.innerHeight - hoverSize - 8))}px`;
     hoverButton.style.animation = "none";
     void hoverButton.offsetWidth;
     hoverButton.style.animation = "";
@@ -1241,6 +1352,55 @@ import { localizeDescriptionText } from "@/lib/description-translation";
     updateCreateInputs();
   });
   groupSelect.addEventListener("change", updateCreateInputs);
+
+  function isPanelDragBlockedTarget(target: EventTarget | null): boolean {
+    return target instanceof Element && !!target.closest("button, input, textarea, select, a");
+  }
+
+  panelHead.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || isPanelDragBlockedTarget(event.target)) return;
+    const rect = panel.getBoundingClientRect();
+    panelDragState = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startLeft: rect.left,
+      startTop: rect.top,
+      moved: false,
+    };
+    panel.dataset.dragging = "true";
+    panelHead.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+  });
+
+  panelHead.addEventListener("pointermove", (event) => {
+    if (!panelDragState || panelDragState.pointerId !== event.pointerId) return;
+    const moved = Math.hypot(event.clientX - panelDragState.startX, event.clientY - panelDragState.startY);
+    if (moved > 3) panelDragState.moved = true;
+    if (!panelDragState.moved) return;
+    const { width, height } = getPanelBounds();
+    panelPosition = {
+      left: clamp(panelDragState.startLeft + event.clientX - panelDragState.startX, 8, Math.max(8, window.innerWidth - width - 8)),
+      top: clamp(panelDragState.startTop + event.clientY - panelDragState.startY, 8, Math.max(8, window.innerHeight - height - 8)),
+    };
+    applyPanelPosition();
+    savePanelPosition();
+    event.preventDefault();
+  });
+
+  function finishPanelDrag(event: PointerEvent) {
+    if (!panelDragState || panelDragState.pointerId !== event.pointerId) return;
+    panelHead.releasePointerCapture?.(event.pointerId);
+    panel.dataset.dragging = "false";
+    if (panelDragState.moved) savePanelPosition();
+    panelDragState = null;
+  }
+
+  panelHead.addEventListener("pointerup", finishPanelDrag);
+  panelHead.addEventListener("pointercancel", finishPanelDrag);
+  window.addEventListener("pointerup", finishPanelDrag, true);
+  window.addEventListener("pointercancel", finishPanelDrag, true);
+
   button.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) return;
     dragState = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, moved: false };

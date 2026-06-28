@@ -1,5 +1,19 @@
 # WebCollect Task Plan
 
+## Current Task: Corner Polish And Floating Capture Panel UX
+
+- [x] Remove category top-corner visual leaks -> Verification: category decorative pseudo layer stays disabled, and category headers now clip their own glass background to inherited top rounded corners.
+- [x] Shrink the floating capture side tool to about two-thirds size -> Verification: default `sizeScale` is `0.67`; built script measured button size `159x48`.
+- [x] Add user-adjustable floating capture size controls -> Verification: user menu now has a `浮窗大小` slider plus `小 / 中 / 原始` presets backed by persisted capture prefs.
+- [x] Keep the capture panel usable after adding new destinations -> Verification: panel body scrolls, actions are sticky, and a long create-section/category/group state keeps `保存 / 取消` visible.
+- [x] Make the capture panel movable and persistent -> Verification: panel header drag updates `webcollect.capture.panelPosition`; clicking outside does not close the panel.
+- [x] Swap capture panel action order -> Verification: panel actions render `保存` on the left and `取消` on the right.
+- [x] Run verification -> Verification: floating capture health, layout preference tests, TypeScript, ESLint, extension build, diff check, Browser page smoke, and dedicated Chrome floating-capture injection test pass.
+
+## Review
+
+This pass is scoped to UI polish and floating-capture ergonomics. It does not change bookmark data, sync schema, capture queue semantics, or cloud APIs. The main app Browser smoke check used `http://localhost:5015/`; the deeper floating-capture check injected the built `extension/dist/assets/floating-capture.js` into a dedicated Chrome page with a mocked extension API and verified the actual shadow-DOM behavior.
+
 ## Current Task: Layout Drag Stability And Floating Capture Recovery
 
 - [x] Rework parent category sizing to wrap real group rows -> Verification: `getParentContentWidthRem` now packs fixed group widths, ignores historical `widthPercent` for rendered width, and browser measurements show right blank under 30px in both checked viewports.

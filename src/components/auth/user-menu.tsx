@@ -374,6 +374,9 @@ export function UserMenu() {
     }
   };
 
+  const captureSizeScale = capturePrefs?.sizeScale ?? DEFAULT_FLOATING_CAPTURE_PREFS.sizeScale;
+  const captureSizePercent = Math.round(captureSizeScale * 100);
+
   return (
     <div className="relative" ref={menuRef}>
       <LocalSnapshotDialog open={snapshotOpen} onOpenChange={setSnapshotOpen} />
@@ -546,6 +549,48 @@ export function UserMenu() {
                       className="wc-mascot-choice-art"
                       style={{ backgroundImage: "url('/assets/mascots/otter-pill.png')" }}
                     />
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-2 px-1">
+                <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-slate-500">
+                  <span>{"浮窗大小"}</span>
+                  <span className="tabular-nums">{captureSizePercent}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={55}
+                  max={115}
+                  step={5}
+                  value={captureSizePercent}
+                  onChange={(e) => updateCapturePrefs({ sizeScale: Number(e.target.value) / 100 })}
+                  className="wc-range w-full"
+                  title="浮窗大小"
+                />
+                <div className="grid grid-cols-3 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => updateCapturePrefs({ sizeScale: 0.67 })}
+                    className="wc-pill-toggle text-center"
+                    data-active={Math.abs(captureSizeScale - 0.67) < 0.01}
+                  >
+                    {"小"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateCapturePrefs({ sizeScale: 0.82 })}
+                    className="wc-pill-toggle text-center"
+                    data-active={Math.abs(captureSizeScale - 0.82) < 0.01}
+                  >
+                    {"中"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateCapturePrefs({ sizeScale: 1 })}
+                    className="wc-pill-toggle text-center"
+                    data-active={Math.abs(captureSizeScale - 1) < 0.01}
+                  >
+                    {"原始"}
                   </button>
                 </div>
               </div>

@@ -1,40 +1,96 @@
-这是一个新的 Codex 线程，请继续开发 RockyXuan/webcollect。请先完成接手检查，再决定是否继续开发。
+这是一个新的 Codex 线程，请继续开发 RockyXuan/webcollect。当前上下文很长，务必先按下面顺序接手，不要从旧假设继续。
 
-第一步必须做：
+## 第一件事
 
-1. 先阅读 `HANDOFF.md`、`NEXT_THREAD_PROMPT.md`、`AGENTS.md`、`tasks/lessons.md`、`tasks/todo.md`。
-2. 运行并汇报：`git status -sb`、`git log --oneline --decorate -8`。
-3. 确认当前目录是否是最新 `main`。不要从旧的 `/Users/rockyx/Documents/webcollect` 脏目录直接继续，除非已经保护并理解其中未提交改动。
-4. 检查最新 Release：`webcollect-2026-06-13-80e1d90`。Chrome 扩展 zip 应为：
-   `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-06-13-80e1d90/WebCollect-Chrome-Extension-webcollect-2026-06-13-80e1d90.zip`
-5. 运行 GitHub 预检：`gh auth status`、`git ls-remote --heads origin main`。如果 Codex 内部出现 token invalid 或 DNS 解析失败，不要反复重试；直接告诉用户 GitHub 环境被阻塞。
+1. 当前正确目录应是：
+   `/Users/rockyx/Documents/Codex/2026-06-14/webcollect-main-clean`
+2. 不要使用旧目录：
+   `/Users/rockyx/Documents/webcollect`
+3. 先阅读这些文件：
+   - `PROJECT_SUMMARY.md`
+   - `HANDOFF.md`
+   - `NEXT_THREAD_PROMPT.md`
+   - `AGENTS.md`
+   - `tasks/lessons.md`
+   - `tasks/todo.md`
+   - `CODEX_GO_MODE_STATUS.md`
+4. 运行并汇报：
 
-浏览器工作区规则：
+```bash
+pwd
+git status -sb
+git log --oneline --decorate -8
+git remote -v
+gh auth status
+git ls-remote --heads origin main
+```
 
-- 本地开发和 localhost 预览优先使用 `@Browser` / Codex in-app Browser。
-- 必须使用 Chrome 时，优先使用 Chrome 辅窗口中的 `Codex Workbench` 标签组。
-- 不要把用户主用 Chrome 窗口或当前活动标签页当作任务现场。
-- 如果浏览器上下文被用户切换或占用，不要连续打开新标签页恢复；回到 `@Browser`、Safari、Chrome 辅窗口或 `Codex Workbench`。
+如果 `gh` 或 GitHub 网络在 Codex 环境里失败，不要反复盲目重试。先说明 GitHub 环境卡点，再检查 Clash/GitHub 代理或让用户在普通 Terminal 验证。
 
-当前已知状态：
+## 当前最新目标状态
 
-- 最新远端主线：`main` at `80e1d90 ci: fix Chrome extension release workflow`。
-- 最新成功 Release：`webcollect-2026-06-13-80e1d90`。
-- Release workflow 的关键修复：删除 `pnpm/action-setup@v4` 中硬编码的 `version: 10.25.0`，让它使用 `package.json` 的 `pnpm@9.0.0`。
-- Zoom 模式已合入主线，且从收藏墙进入 Zoom 模式应只通过显式按钮，不再通过长按、鼠标甩动或墙面鼠标操作触发。
+本线程已经完成一批 WebCollect UI/浮窗小修，准备提交并发布：
 
-下一阶段优先事项：
+- 分类卡片顶部圆角伪影：修复玻璃头部背景从圆角漏出的三角/阴影。
+- 浮窗工具尺寸：默认缩到约 2/3，实测 `159x48`。
+- 浮窗大小设置：用户菜单新增 `浮窗大小` 滑杆和 `小 / 中 / 原始` 预设。
+- 收集面板可拖动：拖动位置保存到 `webcollect.capture.panelPosition`。
+- 收集面板不自动消失：点击外部不会关闭，只有取消/关闭才关闭。
+- 长表单按钮可见：新建分项/分类/分组把面板撑长时，底部操作区仍 sticky 可见。
+- 按钮顺序：左边 `保存`，右边 `取消`。
 
-1. Windows 安装最新 Release 后复测 Chrome 扩展。
-2. 验证 Zoom 壁纸是否多图随机，而不是每次同一张。
-3. 验证本地高清壁纸秒开、文字/提示完整、图片不再黑框慢加载。
-4. 修复或验证分组布局：4 张卡片默认 2x2，拉宽可 1x4，布局偏好可跨 Mac/Windows 记忆。
-5. 排查悬浮采集保存目标错误：用户选择的目标组必须被尊重，不能默认落入截流收集箱/收集箱。
-6. 继续把同步稳定性当作底线：任何改动都不能让默认/空/旧数据覆盖用户云端真实数据。
+最新计划发布：
 
-开发与交付规则：
+- Release tag：`webcollect-2026-06-28-capture-panel-ux`
+- Chrome 扩展 zip：`WebCollect-Chrome-Extension-capture-panel-ux-2026-06-28.zip`
 
-- 数据安全第一，不删除、不覆盖用户收藏、分类、IndexedDB、Supabase 数据。
-- 每次修改后直接同步到 `main`，不要让用户理解分支细节。
-- 涉及 Chrome 扩展可测试版本时，必须给用户最新 Release 页面和 Chrome 扩展 zip 直链。
-- 如果 GitHub / Release / Actions 无法验证，必须明确说明卡点，不要把旧 Release 当新版交付。
+如果接手时 Release 尚不存在，请先检查当前 git 状态，确认是否需要继续完成提交/推送/发布。
+
+## 最近验证结果
+
+这些已经跑过并通过：
+
+```bash
+node --import tsx scripts/test-floating-capture-health.ts
+node --import tsx scripts/test-layout-preferences.ts
+./node_modules/.bin/tsc -p tsconfig.json
+./node_modules/.bin/eslint .
+node ./extension/build.mjs
+git diff --check
+```
+
+说明：
+
+- ESLint 是 0 error，但仍有 6 个既有 warning。
+- `node ./extension/build.mjs` 已重建 `extension/dist/assets/floating-capture.js`。
+- in-app Browser 打开 `http://localhost:5015/` 冒烟检查无相关 console error。
+- 专用 Chrome 注入构建产物验证通过：
+  - side button: `159x48`
+  - long form actions visible
+  - action order: `保存 / 取消`
+  - panel drag persisted `{"left":260,"top":90}`
+  - outside click did not close panel
+  - screenshot: `/private/tmp/webcollect-floating-capture-verify.png`
+
+## 用户偏好和硬规则
+
+- 用中文沟通。
+- 如果要写计划，下次先翻译成中文给用户看。
+- 不要把完成某个小阶段当成最终完成；只有核心功能、验证、构建、发布都完成，才说完成。
+- 对 UI 改动要真实视觉验证，不能只靠代码推断。
+- 本地预览优先用 in-app Browser；必须用 Chrome 时用辅助窗口或 `Codex Workbench`，不要操作用户主 Chrome 窗口。
+- 数据安全第一：不清空 IndexedDB，不重置 Supabase，不用默认数据覆盖用户真实云端数据。
+- 任何扩展可测试版本必须提供 GitHub Release 和 zip 直链。
+- 扩展包文件名日期要放在最后，便于用户一眼看到日期。
+
+## 下一步建议
+
+1. 确认当前最新 commit 已推送 GitHub `main`。
+2. 确认 Release `webcollect-2026-06-28-capture-panel-ux` 已创建，zip asset 名字正确。
+3. 让用户安装最新扩展包后，重点确认：
+   - 分类角落不再露小三角；
+   - 浮窗工具大小合适且可调；
+   - 收集面板可拖动、不会误关；
+   - 新增分项/分类/分组后按钮不被顶掉；
+   - 保存/取消位置符合要求。
+4. 如果用户继续反馈布局、壁纸、同步或浮窗问题，先复现、截图、读 console/network，再动代码。

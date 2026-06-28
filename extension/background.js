@@ -22,6 +22,7 @@ const DEFAULT_CAPTURE_PREFS = {
   allLinksHoverEnabled: false,
   contextMenuEnabled: true,
   mascot: 'chipmunk',
+  sizeScale: 0.67,
   pauseUntil: null,
   disabledHosts: [],
   hiddenByUserAt: null,
@@ -38,6 +39,9 @@ function normalizeCapturePrefs(stored, now = Date.now()) {
   const disabledHosts = Array.isArray(raw.disabledHosts)
     ? Array.from(new Set(raw.disabledHosts.filter(host => typeof host === 'string' && host.trim().length > 0)))
     : [];
+  const sizeScale = typeof raw.sizeScale === 'number' && Number.isFinite(raw.sizeScale)
+    ? Math.min(1.15, Math.max(0.55, raw.sizeScale))
+    : DEFAULT_CAPTURE_PREFS.sizeScale;
 
   return {
     ...DEFAULT_CAPTURE_PREFS,
@@ -48,6 +52,7 @@ function normalizeCapturePrefs(stored, now = Date.now()) {
     allLinksHoverEnabled: raw.allLinksHoverEnabled === true,
     contextMenuEnabled: raw.contextMenuEnabled !== false,
     mascot: raw.mascot === 'otter' ? 'otter' : 'chipmunk',
+    sizeScale,
     pauseUntil,
     disabledHosts,
     hiddenByUserAt: typeof raw.hiddenByUserAt === 'number' ? raw.hiddenByUserAt : null,

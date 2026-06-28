@@ -1,5 +1,107 @@
 # Project Handoff
 
+## 2026-06-28 Current Thread Handoff Update
+
+This section supersedes older handoff notes below when there is a conflict.
+
+### Current Known-Good Source
+
+- Remote repository: `https://github.com/RockyXuan/webcollect`
+- Correct branch for the next thread: `main`
+- Correct local workspace for this thread: `/Users/rockyx/Documents/Codex/2026-06-14/webcollect-main-clean`
+- Do not continue from old directory: `/Users/rockyx/Documents/webcollect`
+- Latest pushed baseline before this handoff task: `06672b6 docs: record layout floating release`
+- Planned release for this handoff batch: `webcollect-2026-06-28-capture-panel-ux`
+- Planned Chrome extension zip name: `WebCollect-Chrome-Extension-capture-panel-ux-2026-06-28.zip`
+
+### What This Thread Completed Since The Last Release
+
+- Re-cloned from GitHub `main` into a clean directory after the old local checkout was stale/dirty.
+- Repaired GitHub/Clash workflow enough for `gh` auth and release operations to work from this machine.
+- Stabilized layout wrapping and floating capture visibility in commit `dfd23fc`, with release `webcollect-2026-06-25-layout-floating-fix`.
+- Added non-blocking locked-layout hints, clearer lock/unlock icons, compact category width behavior, and better wallpaper quote semantic matching.
+- Fixed cloud-aware refresh/manual sync and explicit floating-capture destination resolution so selected targets should not silently fall into the default inbox.
+- Added English-to-Chinese description localization for existing cards and floating capture saves.
+- Added/expanded wallpaper refresh, cache, local fallback, provider filtering, and quote matching, but wallpaper quality/refresh should still be watched in the real installed extension.
+- Reworked group/card action menus so edit actions live under the hover three-dot menus, with the star favorite button preserved.
+- 2026-06-28 UI polish:
+  - Category top glass headers now inherit and clip to rounded corners, avoiding exposed corner triangles/shadow artifacts.
+  - Floating capture side button defaults to about two-thirds size (`sizeScale = 0.67`).
+  - User menu adds `浮窗大小` slider plus `小 / 中 / 原始` presets.
+  - Floating capture panel is draggable, persists its position in `webcollect.capture.panelPosition`, and does not close on outside click.
+  - Long create-section/category/group panel states keep bottom actions visible via a scrollable body and sticky action area.
+  - Capture actions are now ordered `保存` on the left and `取消` on the right.
+
+### Verification Already Run For Latest Batch
+
+```bash
+node --import tsx scripts/test-floating-capture-health.ts
+node --import tsx scripts/test-layout-preferences.ts
+./node_modules/.bin/tsc -p tsconfig.json
+./node_modules/.bin/eslint .
+node ./extension/build.mjs
+git diff --check
+```
+
+Results:
+
+- TypeScript passed.
+- ESLint passed with 0 errors and 6 existing warnings.
+- Extension build passed and rebuilt `extension/dist/assets/floating-capture.js`.
+- Diff whitespace check passed.
+- in-app Browser smoke check loaded `http://localhost:5015/` with no relevant console errors.
+- Dedicated Chrome floating-capture verification passed by injecting built `extension/dist/assets/floating-capture.js` into `http://127.0.0.1:5015/` with a mocked extension API:
+  - side button measured `159x48`
+  - long destination-creation state kept actions visible
+  - action order was `保存 / 取消`
+  - panel moved from `{ left: 380, top: 183 }` to `{ left: 260, top: 90 }`
+  - stored position became `{"left":260,"top":90}`
+  - outside click did not close the panel
+  - screenshot: `/private/tmp/webcollect-floating-capture-verify.png`
+
+### Important Current Risks
+
+- Real installed Chrome extension behavior must still be confirmed by the user after downloading the latest Release package.
+- Cross-device sync still needs real Mac/Windows confirmation with the user's actual cloud data.
+- Layout/drag/blank-space issues have regressed repeatedly in prior passes; every future layout change needs real visual checks at two viewport sizes.
+- Wallpaper refresh and quote quality remain user-sensitive; do not claim it is complete without checking installed extension behavior.
+- Website favicon/icon caching is improved but still needs long-running real use observation for small/niche sites.
+
+### Required Next-Thread Preflight
+
+Run these before code changes:
+
+```bash
+pwd
+git status -sb
+git log --oneline --decorate -8
+git remote -v
+gh auth status
+git ls-remote --heads origin main
+```
+
+Then read:
+
+- `PROJECT_SUMMARY.md`
+- `HANDOFF.md`
+- `NEXT_THREAD_PROMPT.md`
+- `AGENTS.md`
+- `tasks/lessons.md`
+- `tasks/todo.md`
+- `CODEX_GO_MODE_STATUS.md`
+
+### Recommended Next Steps
+
+1. Confirm the latest release asset `WebCollect-Chrome-Extension-capture-panel-ux-2026-06-28.zip` exists after this handoff is pushed.
+2. Ask the user to install that package and confirm:
+   - category corner artifacts are gone,
+   - floating side tool is smaller and adjustable,
+   - capture panel can be dragged and remains open,
+   - long new-destination forms keep Save/Cancel visible,
+   - Save is left and Cancel is right.
+3. If user reports another UI regression, reproduce in an auxiliary Chrome/Codex Workbench or in-app Browser before editing.
+4. Keep data safety first: no clearing IndexedDB, no Supabase reset, no seed overwrite of user data.
+
 ## 2026-06-14 Current Thread Handoff Update
 
 This update supersedes the older 2026-05-25 handoff notes when there is a conflict.

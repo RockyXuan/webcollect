@@ -1056,6 +1056,7 @@
 
 .wc-category-panel::before {
   content: "";
+  display: none;
   position: absolute;
   right: clamp(1.5rem, 4vw, 4.5rem);
   bottom: clamp(1rem, 3vw, 3rem);
@@ -1075,6 +1076,9 @@
 
 .wc-category-header {
   min-height: 3.55rem;
+  overflow: hidden;
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.56), rgba(255, 255, 255, 0.18));
 }
 
