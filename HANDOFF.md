@@ -8,7 +8,8 @@ This section supersedes older handoff notes below when there is a conflict.
 
 - Remote repository: `https://github.com/RockyXuan/webcollect`
 - Correct branch for the next thread: `main`
-- Correct local workspace for this thread: `/Users/rockyx/Documents/Codex/2026-06-14/webcollect-main-clean`
+- Fixed local workspace for future threads: `/Users/rockyx/vibe coding/Web Collect 0628`
+- Historical Codex workspace for this thread: `/Users/rockyx/Documents/Codex/2026-06-14/webcollect-main-clean`
 - Do not continue from old directory: `/Users/rockyx/Documents/webcollect`
 - Latest pushed baseline before this handoff task: `06672b6 docs: record layout floating release`
 - Planned release for this handoff batch: `webcollect-2026-06-28-capture-panel-ux`

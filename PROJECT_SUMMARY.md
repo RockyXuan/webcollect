@@ -7,7 +7,8 @@ WebCollect 是一个个人网页收藏墙：既是 Next.js Web 应用，也是 C
 ## 当前正确工作目录
 
 - GitHub 仓库：`https://github.com/RockyXuan/webcollect`
-- 当前应继续使用的本地目录：`/Users/rockyx/Documents/Codex/2026-06-14/webcollect-main-clean`
+- 当前固定主开发目录：`/Users/rockyx/vibe coding/Web Collect 0628`
+- 历史 Codex 临时目录：`/Users/rockyx/Documents/Codex/2026-06-14/webcollect-main-clean`
 - 当前主分支：`main`
 - 不要继续使用旧目录：`/Users/rockyx/Documents/webcollect`
 - 数据安全底线：不清空、不重置、不覆盖用户 IndexedDB / Supabase / Chrome 扩展本地数据。

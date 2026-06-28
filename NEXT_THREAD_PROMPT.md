@@ -2,8 +2,8 @@
 
 ## 第一件事
 
-1. 当前正确目录应是：
-   `/Users/rockyx/Documents/Codex/2026-06-14/webcollect-main-clean`
+1. 当前固定主开发目录应是：
+   `/Users/rockyx/vibe coding/Web Collect 0628`
 2. 不要使用旧目录：
    `/Users/rockyx/Documents/webcollect`
 3. 先阅读这些文件：
