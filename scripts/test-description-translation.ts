@@ -66,5 +66,15 @@ assert.ok(
   contentSource.includes("localizeDescriptionText"),
   "floating capture should localize descriptions before showing and saving"
 );
+assert.match(
+  contentSource,
+  /data-action="translate-description"[\s\S]*>翻译<\/button>/,
+  "floating capture description field should expose a manual translate button"
+);
+assert.match(
+  contentSource,
+  /descriptionInput\.value\s*=\s*localizeDescriptionText\(descriptionInput\.value\.trim\(\),\s*{\s*title:\s*titleInput\.value\.trim\(\),\s*url:\s*urlInput\.value\.trim\(\),\s*}\s*\)/,
+  "manual translate should localize the current description using the current title and url"
+);
 
 console.log("description translation tests passed");

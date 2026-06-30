@@ -478,6 +478,12 @@ import { localizeDescriptionText } from "@/lib/description-translation";
       .wc-grid { display: grid; gap: 9px; }
       .wc-label { display: grid; gap: 4px; font-weight: 700; color: #334155; }
       .wc-label span { font-size: 12px; }
+      .wc-label-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
       .wc-input, .wc-textarea, .wc-select {
         width: 100%;
         box-sizing: border-box;
@@ -534,6 +540,12 @@ import { localizeDescriptionText } from "@/lib/description-translation";
       }
       .wc-secondary:hover, .wc-small:hover { background: rgba(255, 255, 255, 0.92); color: #1d4ed8; }
       .wc-small { padding: 6px 7px; font-size: 12px; }
+      .wc-translate {
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        line-height: 1;
+      }
       .wc-muted { color: #64748b; font-size: 12px; }
       .wc-status { min-height: 18px; margin-top: 8px; font-size: 12px; color: #64748b; }
       .wc-status[data-tone="error"] { color: #e11d48; }
@@ -584,7 +596,13 @@ import { localizeDescriptionText } from "@/lib/description-translation";
         <div class="wc-grid">
           <label class="wc-label"><span>名称 *</span><input class="wc-input" data-field="title" /></label>
           <label class="wc-label"><span>地址 *</span><input class="wc-input" data-field="url" /></label>
-          <label class="wc-label"><span>简介</span><textarea class="wc-textarea" data-field="description"></textarea></label>
+          <label class="wc-label">
+            <span class="wc-label-heading">
+              <span>简介</span>
+              <button class="wc-small wc-translate" type="button" data-action="translate-description">翻译</button>
+            </span>
+            <textarea class="wc-textarea" data-field="description"></textarea>
+          </label>
           <div class="wc-row">
             <label class="wc-label">
               <span>分项</span>
@@ -1268,6 +1286,25 @@ import { localizeDescriptionText } from "@/lib/description-translation";
     return end.getTime();
   }
 
+  function translateDescription() {
+    const before = descriptionInput.value.trim();
+    if (!before) {
+      setStatus("简介为空，暂无可翻译内容。");
+      descriptionInput.focus();
+      return;
+    }
+    descriptionInput.value = localizeDescriptionText(descriptionInput.value.trim(), {
+      title: titleInput.value.trim(),
+      url: urlInput.value.trim(),
+    });
+    if (descriptionInput.value === before) {
+      setStatus("当前简介已经是中文，或暂无可转换内容。");
+    } else {
+      setStatus("已翻译为中文简介。", "ok");
+    }
+    descriptionInput.focus();
+  }
+
   function clearHoverDelay() {
     if (hoverDelayTimer) {
       window.clearTimeout(hoverDelayTimer);
@@ -1463,6 +1500,7 @@ import { localizeDescriptionText } from "@/lib/description-translation";
     if (!action) return;
     if (action === "close") closePanel();
     if (action === "save") void saveDraft();
+    if (action === "translate-description") translateDescription();
     if (action === "pause-hour") void updatePrefs({ ...prefs, pauseUntil: Date.now() + 60 * 60 * 1000 });
     if (action === "pause-today") void updatePrefs({ ...prefs, pauseUntil: pauseUntilTodayEnd() });
     if (action === "disable-site") {
