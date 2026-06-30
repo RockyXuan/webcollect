@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle, Check, History, Loader2, LogOut, RefreshCw, Settings, Trash2, Type, User, Wrench } from "lucide-react";
+import { APP_RELEASE_DATE_DISPLAY, APP_VERSION } from "@/lib/app-version";
 import { useAuthStore } from "@/lib/auth-store";
 import type { LinkOpenMode } from "@/lib/types";
 import { LocalSnapshotDialog } from "@/components/dialogs/local-snapshot-dialog";
@@ -420,6 +421,9 @@ export function UserMenu() {
                 {user?.displayName || "User"}
               </p>
               <p className="truncate text-sm text-slate-500">{user?.email}</p>
+              <p className="mt-1 text-[11px] font-medium text-slate-400">
+                {APP_RELEASE_DATE_DISPLAY} · V{APP_VERSION}
+              </p>
             </div>
           </div>
 

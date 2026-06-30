@@ -291,21 +291,14 @@
 }
 
 .wc-logo-mark {
-  display: inline-grid;
-  place-items: center;
+  display: inline-block;
   width: 52px;
   height: 52px;
-  color: transparent;
-  font-size: 2.35rem;
-  font-weight: 950;
-  letter-spacing: -0.18em;
-  line-height: 1;
-  text-indent: -0.08em;
-  background:
-    radial-gradient(circle at 26% 16%, rgba(255, 255, 255, 0.9), transparent 21%),
-    linear-gradient(135deg, #60a5fa 0%, #2563eb 44%, #7c3aed 100%);
-  background-clip: text;
-  filter: drop-shadow(0 16px 28px rgba(37, 99, 235, 0.26));
+  flex: 0 0 auto;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  filter: drop-shadow(0 14px 24px rgba(181, 105, 48, 0.22));
 }
 
 .wc-header-search {
@@ -497,8 +490,23 @@
   padding-bottom: 2px;
 }
 
+.wc-section-tabs-editing {
+  gap: 10px;
+}
+
 .wc-section-tabs::-webkit-scrollbar {
   height: 0;
+}
+
+.wc-section-tab-track {
+  display: flex;
+  min-width: max-content;
+  align-items: center;
+  gap: 12px;
+}
+
+.wc-section-tab-wrap {
+  flex: 0 0 auto;
 }
 
 .wc-section-tab {
@@ -522,6 +530,12 @@
 .wc-section-tab:hover {
   border-color: rgba(96, 165, 250, 0.34);
   background: rgba(255, 255, 255, 0.90);
+  transform: translateY(-1px);
+}
+
+.wc-section-tab:not(.wc-section-tab-active):hover {
+  border-color: rgba(96, 165, 250, 0.34);
+  background: rgba(255, 255, 255, 0.90);
   color: #1d4ed8;
   transform: translateY(-1px);
 }
@@ -541,25 +555,93 @@
   color: #64748b;
 }
 
+.wc-section-edit-toggle {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  background: rgba(255, 255, 255, 0.72);
+  color: #64748b;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.08);
+  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.wc-section-edit-toggle:hover {
+  border-color: rgba(37, 99, 235, 0.48);
+  background: #fff;
+  color: #2563eb;
+  transform: translateY(-1px);
+}
+
+.wc-section-edit-toggle-active {
+  border-color: rgba(37, 99, 235, 0.48);
+  background: rgba(219, 234, 254, 0.92);
+  color: #2563eb;
+}
+
 .wc-section-tab-editable {
   position: relative;
   border-style: dashed;
-  padding-right: 34px;
+  padding: 0 12px;
 }
 
-.wc-section-tab-editable::after {
-  content: "";
-  position: absolute;
-  right: 12px;
-  width: 6px;
-  height: 6px;
+.wc-section-drag-handle {
+  display: inline-grid;
+  width: 18px;
+  height: 22px;
+  flex: 0 0 auto;
+  place-items: center;
+  cursor: grab;
   border-radius: 999px;
-  background: currentColor;
-  opacity: 0.38;
+  color: #94a3b8;
 }
 
-.wc-section-tab-editable:hover::after {
-  opacity: 0.72;
+.wc-section-drag-handle:hover {
+  background: rgba(219, 234, 254, 0.82);
+  color: #2563eb;
+}
+
+.wc-section-drag-handle:active {
+  cursor: grabbing;
+}
+
+.wc-section-delete-button {
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  color: #94a3b8;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.wc-section-delete-button:hover {
+  background: rgba(254, 226, 226, 0.92);
+  color: #dc2626;
+}
+
+.wc-section-draft-input {
+  height: 42px;
+  width: 8.5rem;
+  flex: 0 0 auto;
+  border-radius: 16px;
+  border: 1px dashed rgba(37, 99, 235, 0.42);
+  background: rgba(255, 255, 255, 0.82);
+  padding: 0 14px;
+  color: #1e293b;
+  font-size: 0.9rem;
+  font-weight: 780;
+  outline: none;
+  box-shadow: 0 12px 26px rgba(37, 99, 235, 0.06);
+}
+
+.wc-section-draft-input:focus {
+  border-color: rgba(37, 99, 235, 0.72);
+  box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.28);
 }
 
 .wc-bookmark-shell {

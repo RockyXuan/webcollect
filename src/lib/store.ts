@@ -458,6 +458,7 @@ interface AppState {
   setActiveSection: (id: string) => Promise<void>;
   addSection: (name: string) => Promise<void>;
   updateSection: (section: CollectionSection) => Promise<void>;
+  reorderSections: (orderedIds: string[]) => Promise<void>;
   deleteSection: (id: string) => Promise<void>;
   setEditMode: (v: boolean) => void;
   toggleEditMode: () => void;
@@ -784,6 +785,32 @@ export const useAppStore = create<AppState>((set, get) => ({
     const nextSections = sections.map((item) =>
       item.id === section.id ? { ...section, updatedAt: Date.now() } : item
     );
+    await saveSections(nextSections);
+    set({ sections: nextSections });
+  },
+  reorderSections: async (orderedIds) => {
+    const sections = await getSections();
+    const byId = new Map(sections.map((section) => [section.id, section]));
+    const defaultSection = byId.get(DEFAULT_SECTION_ID);
+    const seen = new Set<string>();
+    const orderedMovable = orderedIds
+      .filter((id) => id !== DEFAULT_SECTION_ID && byId.has(id))
+      .map((id) => {
+        seen.add(id);
+        return byId.get(id)!;
+      });
+    const remaining = sections
+      .filter((section) => section.id !== DEFAULT_SECTION_ID && !seen.has(section.id))
+      .sort((a, b) => a.order - b.order);
+    const ordered = [
+      ...(defaultSection ? [defaultSection] : []),
+      ...orderedMovable,
+      ...remaining,
+    ];
+    const now = Date.now();
+    const nextSections = ordered.map((section, order) => (
+      section.order === order ? section : { ...section, order, updatedAt: now }
+    ));
     await saveSections(nextSections);
     set({ sections: nextSections });
   },

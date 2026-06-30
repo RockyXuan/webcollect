@@ -12,8 +12,7 @@ interface InlineEditableTextProps {
 
 /**
  * A text span that becomes an inline editable input on click.
- * - Click to start editing (always available), Enter/Blur to save, Escape to cancel
- * - editMode controls visual hints only (cursor style, hover background)
+ * - Click to start editing in editMode, Enter/Blur to save, Escape to cancel
  * - Stop propagation on pointer events to prevent dnd-kit capture
  */
 export function InlineEditableText({
@@ -28,9 +27,10 @@ export function InlineEditableText({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const startEdit = useCallback(() => {
+    if (!editMode) return;
     setEditValue(value);
     setIsEditing(true);
-  }, [value]);
+  }, [editMode, value]);
 
   const saveEdit = useCallback(() => {
     const trimmed = editValue.trim();

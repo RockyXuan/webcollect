@@ -1,6 +1,7 @@
 import type { Category, CollectionSection, WebCard } from "./types";
-import { saveCategories, saveSections } from "./db";
+import { saveCards, saveCategories, saveSections } from "./db";
 import { localizeDescriptionText } from "./description-translation";
+import { createLocalDataSnapshot } from "./local-snapshots";
 import { isChromeExtension } from "./platform";
 import { useAppStore } from "./store";
 
@@ -459,6 +460,32 @@ export interface CaptureTargetResolution {
   changed: boolean;
 }
 
+export interface CaptureQueueWorkspace {
+  cards: WebCard[];
+  categories: Category[];
+  sections: CollectionSection[];
+  activeSectionId: string;
+}
+
+export interface CaptureQueueDrainOptions {
+  now?: () => number;
+  randomId?: () => string;
+}
+
+export interface CaptureQueueDrainResult extends CaptureQueueWorkspace {
+  queue: CaptureQueueItem[];
+  imported: number;
+  skipped: number;
+  failed: number;
+  changed: boolean;
+}
+
+export interface CaptureQueueRepairResult extends CaptureQueueWorkspace {
+  queue: CaptureQueueItem[];
+  repaired: number;
+  changed: boolean;
+}
+
 function hasCreateDestination(destination?: CaptureDestination): boolean {
   return Boolean(
     trimDestinationName(destination?.createSectionName) ||
@@ -667,33 +694,52 @@ export function resolveOrCreateCaptureTargetCategory(
   return { categoryId: sectionInbox.id, categories: nextCategories, sections: nextSections, changed };
 }
 
-export async function drainFloatingCaptureQueue(): Promise<{ imported: number; skipped: number; failed: number }> {
-  if (!hasExtensionStorage()) return { imported: 0, skipped: 0, failed: 0 };
+function cloneCaptureQueue(queue: CaptureQueueItem[]): CaptureQueueItem[] {
+  return queue.map((item) => ({
+    ...item,
+    draft: {
+      ...item.draft,
+      destination: item.draft.destination ? { ...item.draft.destination } : undefined,
+    },
+  }));
+}
 
-  const queue = await getChromeStorage<CaptureQueueItem[]>(CAPTURE_QUEUE_KEY, []);
-  const pending = queue.filter((item) => item.status === "pending");
-  if (pending.length === 0) return { imported: 0, skipped: 0, failed: 0 };
+function nextCaptureTimestamp(options?: CaptureQueueDrainOptions): number {
+  return options?.now?.() ?? Date.now();
+}
 
-  const app = useAppStore.getState();
-  if (app.isLoading || app.categories.length === 0) {
-    return { imported: 0, skipped: 0, failed: 0 };
-  }
-  const cards = [...app.cards];
-  let categories = [...app.categories];
-  let sections = [...app.sections];
+function nextCaptureRandomId(options?: CaptureQueueDrainOptions): string {
+  return options?.randomId?.() ?? Math.random().toString(36).slice(2, 9);
+}
+
+function isInboxLikeCategory(categoryId: string, categories: Category[]): boolean {
+  const category = categories.find((item) => item.id === categoryId);
+  return normalizeDestinationName(category?.name) === "收集箱";
+}
+
+export function drainCaptureQueueItemsForWorkspace(
+  inputQueue: CaptureQueueItem[],
+  workspace: CaptureQueueWorkspace,
+  options?: CaptureQueueDrainOptions
+): CaptureQueueDrainResult {
+  const queue = cloneCaptureQueue(inputQueue);
+  const cards = workspace.cards.map((card) => ({ ...card }));
+  let categories = workspace.categories.map((category) => ({ ...category }));
+  let sections = workspace.sections.map((section) => ({ ...section }));
   let imported = 0;
   let skipped = 0;
   let failed = 0;
-  const now = Date.now();
+  let changed = false;
 
-  for (const item of pending) {
+  for (const item of queue.filter((queueItem) => queueItem.status === "pending")) {
     const normalizedUrl = normalizeCaptureUrl(item.draft.url);
     const title = item.draft.title.trim();
     if (!normalizedUrl || !title) {
       item.status = "failed";
       item.error = "Missing required title or URL";
-      item.updatedAt = Date.now();
+      item.updatedAt = nextCaptureTimestamp(options);
       failed += 1;
+      changed = true;
       continue;
     }
 
@@ -701,30 +747,34 @@ export async function drainFloatingCaptureQueue(): Promise<{ imported: number; s
     if (alreadyExists) {
       item.status = "imported";
       item.error = "Duplicate URL skipped";
-      item.updatedAt = Date.now();
+      item.updatedAt = nextCaptureTimestamp(options);
       skipped += 1;
+      changed = true;
       continue;
     }
 
-    const target = resolveOrCreateCaptureTargetCategory(item.draft, categories, sections, app.activeSectionId, Date.now());
+    const target = resolveOrCreateCaptureTargetCategory(
+      item.draft,
+      categories,
+      sections,
+      workspace.activeSectionId,
+      nextCaptureTimestamp(options)
+    );
     const categoryId = target.categoryId;
     if (!categoryId) {
       item.status = "failed";
       item.error = "Selected WebCollect destination was not found";
       item.destinationError = item.error;
-      item.updatedAt = Date.now();
+      item.updatedAt = nextCaptureTimestamp(options);
       failed += 1;
+      changed = true;
       continue;
     }
 
     if (target.changed) {
       categories = target.categories;
       sections = target.sections;
-      await Promise.all([
-        saveSections(sections),
-        saveCategories(categories),
-      ]);
-      useAppStore.setState({ sections, categories });
+      changed = true;
     }
 
     const categoryCards = cards.filter((card) => card.categoryId === categoryId);
@@ -732,8 +782,9 @@ export async function drainFloatingCaptureQueue(): Promise<{ imported: number; s
       title,
       url: normalizedUrl,
     });
+    const createdAt = nextCaptureTimestamp(options);
     const nextCard: WebCard = {
-      id: `card-${now}-${Math.random().toString(36).slice(2, 9)}`,
+      id: `card-${createdAt}-${nextCaptureRandomId(options)}`,
       url: normalizedUrl,
       title,
       shortDesc: description.slice(0, 48),
@@ -743,23 +794,159 @@ export async function drainFloatingCaptureQueue(): Promise<{ imported: number; s
       imageUrl: item.draft.favicon || item.draft.imageUrl || getFallbackFavicon(normalizedUrl),
       categoryId,
       order: categoryCards.length > 0 ? Math.max(...categoryCards.map((card) => card.order)) + 1 : 0,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      createdAt,
+      updatedAt: createdAt,
     };
 
-    await useAppStore.getState().addCard(nextCard);
     cards.push(nextCard);
     item.status = "imported";
     item.error = undefined;
     item.destinationError = undefined;
     item.resolvedDestinationPath = describeDestinationPath(categoryId, categories, sections);
-    item.updatedAt = Date.now();
+    item.updatedAt = nextCaptureTimestamp(options);
     imported += 1;
+    changed = true;
   }
 
-  await setChromeStorage({ [CAPTURE_QUEUE_KEY]: queue });
-  if (imported > 0) {
+  return {
+    cards,
+    categories,
+    sections,
+    activeSectionId: workspace.activeSectionId,
+    queue,
+    imported,
+    skipped,
+    failed,
+    changed,
+  };
+}
+
+export function repairVerifiedCaptureMisfiledCardsFromQueue(
+  inputQueue: CaptureQueueItem[],
+  workspace: CaptureQueueWorkspace,
+  options?: Pick<CaptureQueueDrainOptions, "now">
+): CaptureQueueRepairResult {
+  const queue = cloneCaptureQueue(inputQueue);
+  let cards = workspace.cards.map((card) => ({ ...card }));
+  let categories = workspace.categories.map((category) => ({ ...category }));
+  let sections = workspace.sections.map((section) => ({ ...section }));
+  let repaired = 0;
+  let changed = false;
+
+  for (const item of queue) {
+    if (item.status !== "imported" || item.destinationError || !item.draft.destination) continue;
+    const normalizedUrl = normalizeCaptureUrl(item.draft.url);
+    if (!normalizedUrl) continue;
+    const hasMisfiledInboxCard = cards.some(
+      (card) => normalizeCaptureUrl(card.url) === normalizedUrl && isInboxLikeCategory(card.categoryId, categories)
+    );
+    if (!hasMisfiledInboxCard) continue;
+
+    const target = resolveOrCreateCaptureTargetCategory(
+      item.draft,
+      categories,
+      sections,
+      workspace.activeSectionId,
+      options?.now?.() ?? Date.now()
+    );
+    if (!target.categoryId) continue;
+
+    if (target.changed) {
+      categories = target.categories;
+      sections = target.sections;
+      changed = true;
+    }
+
+    const targetCategoryId = target.categoryId;
+    const targetCards = cards.filter((card) => card.categoryId === targetCategoryId);
+    let nextOrder = targetCards.length > 0 ? Math.max(...targetCards.map((card) => card.order)) + 1 : 0;
+    let itemRepaired = 0;
+    cards = cards.map((card) => {
+      if (normalizeCaptureUrl(card.url) !== normalizedUrl) return card;
+      if (card.categoryId === targetCategoryId) return card;
+      if (!isInboxLikeCategory(card.categoryId, categories)) return card;
+      const next = {
+        ...card,
+        categoryId: targetCategoryId,
+        order: nextOrder,
+        updatedAt: options?.now?.() ?? Date.now(),
+      };
+      nextOrder += 1;
+      repaired += 1;
+      itemRepaired += 1;
+      changed = true;
+      return next;
+    });
+
+    if (itemRepaired > 0) {
+      item.resolvedDestinationPath = describeDestinationPath(targetCategoryId, categories, sections);
+      item.updatedAt = options?.now?.() ?? Date.now();
+    }
+  }
+
+  return {
+    cards,
+    categories,
+    sections,
+    activeSectionId: workspace.activeSectionId,
+    queue,
+    repaired,
+    changed,
+  };
+}
+
+export async function drainFloatingCaptureQueue(): Promise<{ imported: number; skipped: number; failed: number; repaired: number }> {
+  if (!hasExtensionStorage()) return { imported: 0, skipped: 0, failed: 0, repaired: 0 };
+
+  const queue = await getChromeStorage<CaptureQueueItem[]>(CAPTURE_QUEUE_KEY, []);
+  const app = useAppStore.getState();
+  if (app.isLoading || app.categories.length === 0) {
+    return { imported: 0, skipped: 0, failed: 0, repaired: 0 };
+  }
+
+  const drained = drainCaptureQueueItemsForWorkspace(queue, {
+    cards: app.cards,
+    categories: app.categories,
+    sections: app.sections,
+    activeSectionId: app.activeSectionId,
+  });
+
+  const repaired = repairVerifiedCaptureMisfiledCardsFromQueue(drained.queue, {
+    cards: drained.cards,
+    categories: drained.categories,
+    sections: drained.sections,
+    activeSectionId: drained.activeSectionId,
+  });
+
+  if (repaired.repaired > 0) {
+    await createLocalDataSnapshot(
+      "before-floating-capture-target-repair",
+      "扩展收集错放修复前本地版本",
+      { force: true }
+    );
+  }
+
+  if (drained.changed || repaired.changed) {
+    await Promise.all([
+      saveSections(repaired.sections),
+      saveCategories(repaired.categories),
+      saveCards(repaired.cards),
+    ]);
+    useAppStore.setState({
+      sections: repaired.sections,
+      categories: repaired.categories,
+      cards: repaired.cards,
+    });
+    await setChromeStorage({ [CAPTURE_QUEUE_KEY]: repaired.queue });
+  }
+
+  if (drained.imported > 0 || repaired.repaired > 0 || repaired.changed) {
     await publishCaptureDestinationCache();
   }
-  return { imported, skipped, failed };
+  return {
+    imported: drained.imported,
+    skipped: drained.skipped,
+    failed: drained.failed,
+    repaired: repaired.repaired,
+  };
 }

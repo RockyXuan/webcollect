@@ -5,7 +5,7 @@ import { useAppStore } from "@/lib/store";
 import { InlineEditableText } from "@/components/ui/inline-editable-text";
 import { EditActionDock, type EditAction } from "@/components/ui/edit-action-dock";
 import { WebCardItem } from "@/components/card/web-card";
-import { Pencil, PencilOff, Plus, GripVertical, ArrowUpFromLine, ArrowDownFromLine, Folder, Layers, Trash2, Send, MoreHorizontal, Lock, Unlock } from "lucide-react";
+import { Pencil, PencilOff, Plus, GripVertical, ArrowUpFromLine, ArrowDownFromLine, Folder, Layers, Trash2, Send, MoreHorizontal, Lock, Unlock, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -919,8 +919,16 @@ function SortableCategoryBlock({
   const categoryActions: EditAction[] = [
     {
       id: "edit",
-      label: "编辑分类",
+      label: "轻量编辑",
       icon: Pencil,
+      onSelect: () => {
+        if (!globalEditMode) toggleEditMode();
+      },
+    },
+    {
+      id: "advanced-settings",
+      label: "高级设置",
+      icon: Settings2,
       onSelect: () => {
         if (!globalEditMode) toggleEditMode();
         onEditCategory?.(category);
@@ -1230,8 +1238,16 @@ function SortableSubGroupBlock({
   const groupActions: EditAction[] = [
     {
       id: "edit",
-      label: "编辑分组",
+      label: "轻量编辑",
       icon: Pencil,
+      onSelect: () => {
+        if (!globalEditMode) toggleEditMode();
+      },
+    },
+    {
+      id: "advanced-settings",
+      label: "高级设置",
+      icon: Settings2,
       onSelect: () => {
         if (!globalEditMode) toggleEditMode();
         onEditCategory?.(category);
@@ -1479,8 +1495,16 @@ function SortableUngroupedBlock({
   const groupActions: EditAction[] = [
     {
       id: "edit",
-      label: "编辑分组",
+      label: "轻量编辑",
       icon: Pencil,
+      onSelect: () => {
+        if (!globalEditMode) toggleEditMode();
+      },
+    },
+    {
+      id: "advanced-settings",
+      label: "高级设置",
+      icon: Settings2,
       onSelect: () => {
         if (!globalEditMode) toggleEditMode();
         onEditCategory?.(category);

@@ -1,13 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, horizontalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { CSS as DndKitCSS } from "@dnd-kit/utilities";
 import {
   ArrowUpRight,
   Boxes,
+  Check,
   Command,
   FileText,
   Folder,
   Globe2,
+  GripVertical,
   Home,
   ImageIcon,
   Layers,
@@ -21,6 +34,17 @@ import {
 } from "lucide-react";
 import { SyncStatusBadge, UserMenu } from "@/components/auth/user-menu";
 import { BookmarkBar } from "@/components/bookmark/bookmark-bar";
+import { InlineEditableText } from "@/components/ui/inline-editable-text";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { PlatformLink } from "@/components/ui/platform-link";
 import { useAuthStore } from "@/lib/auth-store";
@@ -30,6 +54,7 @@ import { openWebCollectUrl } from "@/lib/platform";
 import { useAppStore } from "@/lib/store";
 import { getRenderedVisualScale } from "@/lib/visual-scale";
 import { searchWorkspace } from "@/lib/workspace-search";
+import type { CollectionSection } from "@/lib/types";
 
 interface TopNavProps {
   onAddCard?: (categoryId?: string) => void;
@@ -78,6 +103,90 @@ function WarehouseButton({ onClick }: { onClick?: () => void }) {
   );
 }
 
+interface SortableSectionTabProps {
+  section: CollectionSection;
+  active: boolean;
+  editMode: boolean;
+  onSelect: (sectionId: string) => void;
+  onRename: (section: CollectionSection, name: string) => void;
+  onDeleteRequest: (section: CollectionSection) => void;
+}
+
+function SortableSectionTab({
+  section,
+  active,
+  editMode,
+  onSelect,
+  onRename,
+  onDeleteRequest,
+}: SortableSectionTabProps) {
+  const isDefault = section.id === "section-default";
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: section.id,
+    disabled: !editMode || isDefault,
+  });
+  const style: CSSProperties = {
+    transform: DndKitCSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.45 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="wc-section-tab-wrap">
+      <div
+        role="button"
+        tabIndex={0}
+        className={`wc-section-tab ${active ? "wc-section-tab-active" : ""} ${editMode ? "wc-section-tab-editable" : ""}`}
+        onClick={() => onSelect(section.id)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onSelect(section.id);
+          }
+        }}
+        title={editMode ? "点击文字可重命名" : section.name}
+      >
+        {editMode && !isDefault && (
+          <span
+            className="wc-section-drag-handle"
+            {...attributes}
+            {...listeners}
+            onClick={(event) => event.stopPropagation()}
+            title="拖动排序"
+          >
+            <GripVertical className="h-3.5 w-3.5" />
+          </span>
+        )}
+        {isDefault && <Home className="h-4 w-4" />}
+        {editMode ? (
+          <InlineEditableText
+            value={section.name}
+            className="min-w-[2.5rem] max-w-[8rem] truncate text-sm font-extrabold"
+            editMode
+            onSave={(name) => onRename(section, name)}
+          />
+        ) : (
+          <span className="truncate">{section.name}</span>
+        )}
+        {editMode && !isDefault && (
+          <button
+            type="button"
+            className="wc-section-delete-button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onDeleteRequest(section);
+            }}
+            title="删除分项"
+            aria-label={`删除分项 ${section.name}`}
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function TopNav({
   onAddCard,
   onAddGroup,
@@ -97,8 +206,8 @@ export function TopNav({
     setActiveSection,
     addSection,
     updateSection,
+    reorderSections,
     deleteSection,
-    editMode,
     loadData,
     linkOpenMode,
   } = useAppStore();
@@ -110,7 +219,13 @@ export function TopNav({
   const [saveFeedback, setSaveFeedback] = useState<"idle" | "saved">("idle");
   const [isSearchPanelOpen, setIsSearchPanelOpen] = useState(false);
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
+  const [sectionEditMode, setSectionEditMode] = useState(false);
+  const [isAddingSection, setIsAddingSection] = useState(false);
+  const [sectionDraftName, setSectionDraftName] = useState("");
+  const [deleteSectionCandidate, setDeleteSectionCandidate] = useState<CollectionSection | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const sectionDraftInputRef = useRef<HTMLInputElement | null>(null);
+  const sectionSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   useEffect(() => {
     document.documentElement.style.fontSize = `${getRenderedVisualScale(visualScale)}%`;
@@ -256,26 +371,50 @@ export function TopNav({
   };
 
   const handleAddSection = () => {
-    const name = window.prompt("新分项名称", "常用 AI");
-    if (name?.trim()) {
-      void addSection(name.trim());
+    setSectionEditMode(true);
+    setIsAddingSection(true);
+    setSectionDraftName("");
+    window.requestAnimationFrame(() => sectionDraftInputRef.current?.focus());
+  };
+
+  const handleRenameSection = (section: CollectionSection, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === section.name) return;
+    void updateSection({ ...section, name: trimmed });
+  };
+
+  const handleConfirmDeleteSection = () => {
+    if (!deleteSectionCandidate || deleteSectionCandidate.id === "section-default") return;
+    void deleteSection(deleteSectionCandidate.id);
+    setDeleteSectionCandidate(null);
+  };
+
+  const commitSectionDraft = () => {
+    const trimmed = sectionDraftName.trim();
+    setIsAddingSection(false);
+    setSectionDraftName("");
+    if (trimmed) {
+      void addSection(trimmed);
     }
   };
 
-  const handleRenameSection = (sectionId: string, currentName: string) => {
-    const name = window.prompt("重命名分项", currentName);
-    if (!name?.trim() || name.trim() === currentName) return;
-    const section = sections.find((item) => item.id === sectionId);
-    if (!section) return;
-    void updateSection({ ...section, name: name.trim() });
+  const cancelSectionDraft = () => {
+    setIsAddingSection(false);
+    setSectionDraftName("");
   };
 
-  const handleDeleteSection = (sectionId: string, sectionName: string) => {
-    if (sectionId === "section-default") return;
-    const ok = window.confirm(
-      `删除分项“${sectionName}”？为防止误删数据，只会删除这个页签，里面的分类、分组和网页会移动到主页。`
-    );
-    if (ok) void deleteSection(sectionId);
+  const handleSectionDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || active.id === "section-default") return;
+    const movableIds = sections.filter((section) => section.id !== "section-default").map((section) => section.id);
+    const fromIndex = movableIds.indexOf(String(active.id));
+    const overId = String(over.id);
+    const toIndex = overId === "section-default" ? 0 : movableIds.indexOf(overId);
+    if (fromIndex < 0 || toIndex < 0) return;
+    const nextIds = [...movableIds];
+    const [moved] = nextIds.splice(fromIndex, 1);
+    nextIds.splice(toIndex, 0, moved);
+    void reorderSections(["section-default", ...nextIds]);
   };
 
   const handleRefreshLocalView = async () => {
@@ -328,9 +467,11 @@ export function TopNav({
       <div className="wc-shell wc-header-main-shell">
         <div className="wc-header-grid">
           <div className="wc-brand">
-            <span className="wc-logo-mark" aria-hidden="true">
-              W
-            </span>
+            <span
+              className="wc-logo-mark"
+              aria-hidden="true"
+              style={{ backgroundImage: "url('/assets/mascots/chipmunk-head.png')" }}
+            />
             <div className="min-w-0 leading-tight">
               <span className="wc-brand-title block text-[1.55rem] font-black tracking-[-0.035em] text-slate-950">
                 WebCollect
@@ -502,50 +643,57 @@ export function TopNav({
       </div>
 
       <div className="wc-shell wc-header-tabs-shell">
-        <div className="wc-section-tabs">
-          {sections.map((section) => {
-            const active = section.id === activeSectionId;
-            const canDelete = section.id !== "section-default";
-            return (
-              <div key={section.id} className="group relative flex shrink-0 items-center">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`wc-section-tab ${active ? "wc-section-tab-active" : ""} ${editMode ? "wc-section-tab-editable" : ""}`}
-                  onClick={() => void setActiveSection(section.id)}
-                  onDoubleClick={() => editMode && handleRenameSection(section.id, section.name)}
-                  title={editMode ? "点击切换，双击重命名" : section.name}
-                >
-                  {section.id === "section-default" && <Home className="h-4 w-4" />}
-                  <span>{section.name}</span>
-                </Button>
-                {editMode && (
-                  <div className="absolute left-full top-1/2 z-20 ml-1 flex -translate-y-1/2 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="wc-tab-mini"
-                      onClick={() => handleRenameSection(section.id, section.name)}
-                      title="重命名分项"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    {canDelete && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="wc-tab-mini wc-tab-mini-danger"
-                        onClick={() => handleDeleteSection(section.id, section.name)}
-                        title="删除分项"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                  </div>
-                )}
+        <div className={`wc-section-tabs ${sectionEditMode ? "wc-section-tabs-editing" : ""}`}>
+          <button
+            type="button"
+            className={`wc-section-edit-toggle ${sectionEditMode ? "wc-section-edit-toggle-active" : ""}`}
+            onClick={() => {
+              setSectionEditMode((value) => !value);
+              setIsAddingSection(false);
+              setSectionDraftName("");
+            }}
+            aria-pressed={sectionEditMode}
+            title={sectionEditMode ? "完成分项编辑" : "编辑分项"}
+          >
+            {sectionEditMode ? <Check className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
+          </button>
+          <DndContext sensors={sectionSensors} collisionDetection={closestCenter} onDragEnd={handleSectionDragEnd}>
+            <SortableContext items={sections.map((section) => section.id)} strategy={horizontalListSortingStrategy}>
+              <div className="wc-section-tab-track">
+                {sections.map((section) => (
+                  <SortableSectionTab
+                    key={section.id}
+                    section={section}
+                    active={section.id === activeSectionId}
+                    editMode={sectionEditMode}
+                    onSelect={(sectionId) => void setActiveSection(sectionId)}
+                    onRename={handleRenameSection}
+                    onDeleteRequest={setDeleteSectionCandidate}
+                  />
+                ))}
               </div>
-            );
-          })}
+            </SortableContext>
+          </DndContext>
+          {isAddingSection ? (
+            <input
+              ref={sectionDraftInputRef}
+              className="wc-section-draft-input"
+              value={sectionDraftName}
+              onChange={(event) => setSectionDraftName(event.target.value)}
+              onBlur={commitSectionDraft}
+              onKeyDown={(event) => {
+                event.stopPropagation();
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  commitSectionDraft();
+                } else if (event.key === "Escape") {
+                  event.preventDefault();
+                  cancelSectionDraft();
+                }
+              }}
+              placeholder="新分项名称"
+            />
+          ) : (
           <Button
             variant="ghost"
             size="sm"
@@ -556,10 +704,35 @@ export function TopNav({
             <Plus className="h-4 w-4" />
             <span>分项</span>
           </Button>
+          )}
         </div>
       </div>
 
       <BookmarkBar />
+      <AlertDialog
+        open={Boolean(deleteSectionCandidate)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteSectionCandidate(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-serif">删除分项「{deleteSectionCandidate?.name}」？</AlertDialogTitle>
+            <AlertDialogDescription>
+              为防止误删数据，只会删除这个页签，里面的分类、分组和网页会移动到主页。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleConfirmDeleteSection}
+            >
+              确定
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </nav>
   );
 }
