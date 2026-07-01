@@ -132,18 +132,20 @@ async function handleFetchMeta(url) {
 
     const html = await response.text();
 
-    // Extract OG metadata
-    const title = extractMeta(html, 'og:title')
+    const rawTitle = extractMeta(html, 'og:title')
       || extractTitle(html)
       || '';
 
     const description = extractMeta(html, 'og:description')
       || extractMeta(html, 'description')
+      || extractDescriptionFromTitle(rawTitle, url)
+      || extractReadableDescription(html, rawTitle, url)
       || '';
 
     const image = extractMeta(html, 'og:image') || '';
 
     const favicon = extractFavicon(html, url) || '';
+    const title = compactTitleForCapture(rawTitle, url);
 
     return { title, description, image, favicon };
   } catch (e) {
@@ -219,22 +221,129 @@ async function handleCheckSafety(urls) {
 // ── Helper Functions ──
 
 function extractMeta(html, property) {
-  // Try og: prefix
-  const ogRegex = new RegExp('<meta[^>]*property=["\']' + escapeRegex(property) + '["\'][^>]*content=["\']([^"\']*)["\']', 'i');
-  const ogMatch = html.match(ogRegex);
-  if (ogMatch) return ogMatch[1];
-
-  // Try name attribute (for description etc.)
-  const nameRegex = new RegExp('<meta[^>]*name=["\']' + escapeRegex(property) + '["\'][^>]*content=["\']([^"\']*)["\']', 'i');
-  const nameMatch = html.match(nameRegex);
-  if (nameMatch) return nameMatch[1];
+  const metaTags = html.match(/<meta\b[^>]*>/gi) || [];
+  for (const tag of metaTags) {
+    const propertyValue = getHtmlAttribute(tag, 'property') || getHtmlAttribute(tag, 'name');
+    if (propertyValue?.toLowerCase() !== property.toLowerCase()) continue;
+    const content = getHtmlAttribute(tag, 'content');
+    if (content) return decodeHtmlEntities(content.trim());
+  }
 
   return null;
 }
 
 function extractTitle(html) {
   const match = html.match(/<title[^>]*>([^<]*)<\/title>/i);
-  return match ? match[1].trim() : null;
+  return match ? decodeHtmlEntities(match[1].trim()) : null;
+}
+
+function getHtmlAttribute(tag, name) {
+  const pattern = new RegExp(`${name}\\s*=\\s*(['"])(.*?)\\1`, 'i');
+  const match = tag.match(pattern);
+  return match ? match[2] : null;
+}
+
+function decodeHtmlEntities(value) {
+  return String(value || '')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, ' ')
+    .replace(/&#(\d+);/g, (_match, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_match, code) => String.fromCharCode(parseInt(code, 16)))
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeMetadataText(value) {
+  return decodeHtmlEntities(value)
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function titleFromUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.replace(/^www\./i, '') || parsed.pathname || url;
+  } catch (e) {
+    return url;
+  }
+}
+
+function formatDomainTitle(value) {
+  const trimmed = normalizeMetadataText(value);
+  if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(trimmed) && trimmed === trimmed.toLowerCase()) {
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  }
+  return trimmed;
+}
+
+function titlePartMatchesSite(part, url) {
+  const normalizedPart = normalizeMetadataText(part).toLowerCase().replace(/^www\./, '');
+  const host = titleFromUrl(url).toLowerCase();
+  if (!normalizedPart || !host) return false;
+  if (normalizedPart === host) return true;
+  return normalizedPart === host.split('.')[0];
+}
+
+function compactTitleForCapture(title, url) {
+  const normalizedTitle = normalizeMetadataText(title);
+  const fallback = formatDomainTitle(titleFromUrl(url));
+  if (!normalizedTitle) return fallback;
+  const delimiterMatch = normalizedTitle.match(/^(.{1,48}?)(?:\s+[—–-]\s+|\s+\|\s+|:\s+)(.{2,})$/);
+  if (delimiterMatch && titlePartMatchesSite(delimiterMatch[1], url)) {
+    return formatDomainTitle(delimiterMatch[1]);
+  }
+  const sentence = normalizedTitle
+    .split(/[。！？!?]/)
+    .map(part => part.trim())
+    .find(Boolean) || normalizedTitle;
+  return sentence.length > 48 ? `${sentence.slice(0, 48)}...` : sentence;
+}
+
+function extractDescriptionFromTitle(title, url) {
+  const normalizedTitle = normalizeMetadataText(title);
+  const delimiterMatch = normalizedTitle.match(/^(.{1,48}?)(?:\s+[—–-]\s+|\s+\|\s+|:\s+)(.{2,180})$/);
+  if (!delimiterMatch || !titlePartMatchesSite(delimiterMatch[1], url)) return '';
+  return normalizeMetadataText(delimiterMatch[2]);
+}
+
+function stripHtmlToLines(html) {
+  const bodyMatch = html.match(/<body\b[^>]*>([\s\S]*?)<\/body>/i);
+  const body = bodyMatch ? bodyMatch[1] : html;
+  const readable = body
+    .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<svg\b[\s\S]*?<\/svg>/gi, ' ')
+    .replace(/<noscript\b[\s\S]*?<\/noscript>/gi, ' ')
+    .replace(/<nav\b[\s\S]*?<\/nav>/gi, ' ')
+    .replace(/<header\b[\s\S]*?<\/header>/gi, ' ')
+    .replace(/<footer\b[\s\S]*?<\/footer>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(h[1-6]|p|div|section|main|article|li)>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ');
+  return readable
+    .split(/\n+/)
+    .map(line => normalizeMetadataText(line))
+    .filter(line => line.length >= 4)
+    .filter(line => !/^(features|showcase|platforms|docs|faq|english|简体中文|繁體中文)$/i.test(line));
+}
+
+function extractReadableDescription(html, title, url) {
+  const fromTitle = extractDescriptionFromTitle(title, url);
+  if (fromTitle) return fromTitle;
+  const lines = stripHtmlToLines(html);
+  for (let index = 0; index < lines.length - 1; index += 1) {
+    const joined = normalizeMetadataText(`${lines[index]} ${lines[index + 1]}`);
+    if (/^AI writes it\.?\s+docu\.md does the rest\.?$/i.test(joined)) return joined;
+  }
+  const compactTitle = compactTitleForCapture(title, url).toLowerCase();
+  return lines.find(line => {
+    const lower = line.toLowerCase();
+    return lower !== compactTitle && line.length >= 24 && line.length <= 180;
+  }) || '';
 }
 
 function extractFavicon(html, baseUrl) {
@@ -311,15 +420,6 @@ function normalizeCaptureUrl(input) {
 function extractFirstUrl(text) {
   const match = String(text || '').match(/((?:https?:\/\/|chrome:\/\/|edge:\/\/|about:)[^\s<>"']+|(?:www\.)?[\w.-]+\.[a-z]{2,}(?:\/[^\s<>"']*)?)/i);
   return match ? normalizeCaptureUrl(match[1]) : null;
-}
-
-function titleFromUrl(url) {
-  try {
-    const parsed = new URL(url);
-    return parsed.hostname || parsed.pathname || url;
-  } catch (e) {
-    return url;
-  }
 }
 
 function hostFromUrl(url) {

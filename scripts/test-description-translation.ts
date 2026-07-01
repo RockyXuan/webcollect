@@ -34,6 +34,23 @@ assert.match(
   /X\/Twitter 内容整理工具|数据分析|平台/
 );
 
+assert.equal(
+  localizeDescriptionText("AI writes it. docu.md does the rest.", {
+    title: "docu.md — AI writes it. docu.md does the rest.",
+    url: "https://docu.md/",
+  }),
+  "AI 负责写作，Docu.md 完成其余工作。"
+);
+
+assert.doesNotMatch(
+  localizeDescriptionText("Export markdown to DOCX, PDF, and HTML.", {
+    title: "docu.md — AI writes it. docu.md does the rest.",
+    url: "https://docu.md/",
+  }),
+  /X\/Twitter/,
+  "ordinary English text containing the letter x must not become an X/Twitter summary"
+);
+
 const card: WebCard = {
   id: "card-1",
   url: "https://www.youtube.com/",

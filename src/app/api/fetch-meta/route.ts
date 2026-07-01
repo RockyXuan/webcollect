@@ -30,10 +30,15 @@ export async function POST(request: Request) {
       $(`meta[property="${name}"]`).attr("content") ||
       "";
 
-    const title =
-      $("title").text() || getMeta("og:title") || getMeta("twitter:title");
+    const rawTitle =
+      getMeta("og:title") || getMeta("twitter:title") || $("title").text();
+    const title = compactTitleForCapture(rawTitle, url);
     const description =
-      getMeta("description") || getMeta("og:description") || getMeta("twitter:description");
+      getMeta("description") ||
+      getMeta("og:description") ||
+      getMeta("twitter:description") ||
+      extractDescriptionFromTitle(rawTitle, url) ||
+      extractReadableDescription($, rawTitle, url);
     let image = getMeta("og:image") || getMeta("twitter:image");
 
     // Resolve relative image URLs
@@ -87,4 +92,79 @@ export async function POST(request: Request) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+function normalizeMetadataText(value: string): string {
+  return value
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function titleFromUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.replace(/^www\./i, "") || parsed.pathname || url;
+  } catch {
+    return url;
+  }
+}
+
+function formatDomainTitle(value: string): string {
+  const trimmed = normalizeMetadataText(value);
+  if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(trimmed) && trimmed === trimmed.toLowerCase()) {
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  }
+  return trimmed;
+}
+
+function titlePartMatchesSite(part: string, url: string): boolean {
+  const normalizedPart = normalizeMetadataText(part).toLowerCase().replace(/^www\./, "");
+  const host = titleFromUrl(url).toLowerCase();
+  if (!normalizedPart || !host) return false;
+  if (normalizedPart === host) return true;
+  return normalizedPart === host.split(".")[0];
+}
+
+function compactTitleForCapture(title: string, url: string): string {
+  const normalizedTitle = normalizeMetadataText(title);
+  const fallback = formatDomainTitle(titleFromUrl(url));
+  if (!normalizedTitle) return fallback;
+  const delimiterMatch = normalizedTitle.match(/^(.{1,48}?)(?:\s+[—–-]\s+|\s+\|\s+|:\s+)(.{2,})$/);
+  if (delimiterMatch && titlePartMatchesSite(delimiterMatch[1], url)) {
+    return formatDomainTitle(delimiterMatch[1]);
+  }
+  const sentence = normalizedTitle
+    .split(/[。！？!?]/)
+    .map((part) => part.trim())
+    .find(Boolean) || normalizedTitle;
+  return sentence.length > 48 ? `${sentence.slice(0, 48)}...` : sentence;
+}
+
+function extractDescriptionFromTitle(title: string, url: string): string {
+  const normalizedTitle = normalizeMetadataText(title);
+  const delimiterMatch = normalizedTitle.match(/^(.{1,48}?)(?:\s+[—–-]\s+|\s+\|\s+|:\s+)(.{2,180})$/);
+  if (!delimiterMatch || !titlePartMatchesSite(delimiterMatch[1], url)) return "";
+  return normalizeMetadataText(delimiterMatch[2]);
+}
+
+function extractReadableDescription($: cheerio.CheerioAPI, title: string, url: string): string {
+  const fromTitle = extractDescriptionFromTitle(title, url);
+  if (fromTitle) return fromTitle;
+  $("script, style, svg, noscript, nav, header, footer").remove();
+  const lines = $("main, article, body")
+    .text()
+    .split(/\n+/)
+    .map((line) => normalizeMetadataText(line))
+    .filter((line) => line.length >= 4)
+    .filter((line) => !/^(features|showcase|platforms|docs|faq|english|简体中文|繁體中文)$/i.test(line));
+  for (let index = 0; index < lines.length - 1; index += 1) {
+    const joined = normalizeMetadataText(`${lines[index]} ${lines[index + 1]}`);
+    if (/^AI writes it\.?\s+docu\.md does the rest\.?$/i.test(joined)) return joined;
+  }
+  const compactTitle = compactTitleForCapture(title, url).toLowerCase();
+  return lines.find((line) => {
+    const lower = line.toLowerCase();
+    return lower !== compactTitle && line.length >= 24 && line.length <= 180;
+  }) || "";
 }

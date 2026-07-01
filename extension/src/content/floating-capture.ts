@@ -1,4 +1,4 @@
-import { localizeDescriptionText } from "@/lib/description-translation";
+import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/description-translation";
 
 (() => {
   const QUEUE_MESSAGE = "CAPTURE_QUEUE_ADD";
@@ -844,6 +844,36 @@ import { localizeDescriptionText } from "@/lib/description-translation";
       .trim();
   }
 
+  function hostnameFromCaptureUrl(url?: string): string {
+    try {
+      return new URL(url || "").hostname.replace(/^www\./i, "").toLowerCase();
+    } catch {
+      return "";
+    }
+  }
+
+  function isXHost(hostname: string): boolean {
+    return hostname === "x.com" || hostname.endsWith(".x.com") ||
+      hostname === "twitter.com" || hostname.endsWith(".twitter.com");
+  }
+
+  function formatDomainTitle(value: string): string {
+    const trimmed = value.trim();
+    if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(trimmed) && trimmed === trimmed.toLowerCase()) {
+      return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+    }
+    return trimmed;
+  }
+
+  function titlePartMatchesSite(part: string, fallback: string): boolean {
+    const normalizedPart = normalizeCaptureText(part).toLowerCase();
+    const normalizedFallback = normalizeCaptureText(fallback).replace(/^www\./i, "").toLowerCase();
+    if (!normalizedPart || !normalizedFallback) return false;
+    if (normalizedPart === normalizedFallback) return true;
+    const fallbackRoot = normalizedFallback.split(".")[0];
+    return Boolean(fallbackRoot && normalizedPart === fallbackRoot);
+  }
+
   function compactCaptureTitle(text: string, fallback: string): string {
     const candidates = text
       .split(/\n+/)
@@ -852,11 +882,47 @@ import { localizeDescriptionText } from "@/lib/description-translation";
       .filter((line) => !/^来自\s+/i.test(line))
       .filter((line) => !looksLikeExplicitUrlText(line));
     const rawCandidate = candidates[0] || normalizeCaptureText(text) || fallback;
+    const delimiterMatch = rawCandidate.match(/^(.{1,48}?)(?:\s+[—–-]\s+|\s+\|\s+|:\s+)(.{2,})$/);
+    if (delimiterMatch && titlePartMatchesSite(delimiterMatch[1], fallback)) {
+      return formatDomainTitle(delimiterMatch[1]);
+    }
     const sentence = rawCandidate
       .split(/[。！？!?]/)
       .map((part) => part.trim())
       .find(Boolean) || rawCandidate;
     return sentence.length > 36 ? `${sentence.slice(0, 36)}...` : sentence;
+  }
+
+  function shouldReplaceCaptureTitle(current: string, incoming: string, draft: CaptureDraft): boolean {
+    const currentTitle = normalizeCaptureText(current);
+    const nextTitle = normalizeCaptureText(incoming);
+    if (!nextTitle) return false;
+    if (!currentTitle) return true;
+    if (currentTitle === nextTitle) return false;
+    const sourceHost = hostnameFromCaptureUrl(draft.sourcePageUrl);
+    const targetHost = hostnameFromCaptureUrl(draft.url);
+    const sourceTitle = normalizeCaptureText(draft.sourcePageTitle || "");
+    if (sourceHost && targetHost && sourceHost !== targetHost && sourceTitle && currentTitle === sourceTitle) {
+      return true;
+    }
+    return nextTitle.length < currentTitle.length && currentTitle.toLowerCase().startsWith(nextTitle.toLowerCase());
+  }
+
+  function shouldReplaceCaptureDescription(current: string, incoming: string, draft: CaptureDraft, incomingTitle: string): boolean {
+    const currentDescription = normalizeCaptureText(current);
+    const nextDescription = normalizeCaptureText(incoming);
+    if (!nextDescription) return false;
+    if (!currentDescription) return true;
+    if (currentDescription === nextDescription) return false;
+    if (isMismatchedKnownSiteSummary(currentDescription, { title: incomingTitle || draft.title, url: draft.url })) {
+      return true;
+    }
+    const sourceHost = hostnameFromCaptureUrl(draft.sourcePageUrl);
+    const targetHost = hostnameFromCaptureUrl(draft.url);
+    if (sourceHost && targetHost && sourceHost !== targetHost && isXHost(sourceHost) && /X\/Twitter|Twitter|社交平台/.test(currentDescription)) {
+      return true;
+    }
+    return currentDescription.length < 12 && nextDescription.length > currentDescription.length;
   }
 
   function extractContextText(link?: HTMLAnchorElement): string {
@@ -1126,12 +1192,20 @@ import { localizeDescriptionText } from "@/lib/description-translation";
       url: draft.url,
     });
     if (!response?.success || !response.data) return;
-    if (!titleInput.value.trim() && response.data.title) titleInput.value = response.data.title;
-    if (!descriptionInput.value.trim() && response.data.description) {
-      descriptionInput.value = localizeDescriptionText(response.data.description, {
-        title: response.data.title || titleInput.value,
+    const fetchedTitle = response.data.title
+      ? compactCaptureTitle(response.data.title, titleFromUrl(draft.url))
+      : "";
+    if (shouldReplaceCaptureTitle(titleInput.value, fetchedTitle, draft)) {
+      titleInput.value = fetchedTitle;
+    }
+    if (response.data.description) {
+      const localizedDescription = localizeDescriptionText(response.data.description, {
+        title: fetchedTitle || response.data.title || titleInput.value,
         url: draft.url,
       });
+      if (shouldReplaceCaptureDescription(descriptionInput.value, localizedDescription, draft, fetchedTitle)) {
+        descriptionInput.value = localizedDescription;
+      }
     }
     if (response.data.image) panel.dataset.imageUrl = response.data.image;
     if (response.data.favicon) panel.dataset.favicon = response.data.favicon;
@@ -1150,7 +1224,7 @@ import { localizeDescriptionText } from "@/lib/description-translation";
     button.dataset.open = "true";
     applyDockState();
     window.requestAnimationFrame(applyPanelPosition);
-    titleInput.value = draft.title || "";
+    titleInput.value = compactCaptureTitle(draft.title || "", titleFromUrl(draft.url));
     urlInput.value = draft.url || "";
     descriptionInput.value = localizeDescriptionText(draft.description || "", {
       title: draft.title,
