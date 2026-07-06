@@ -1,5 +1,9 @@
 # WebCollect — 个人网页收藏墙
 
+## 2026-07-07 current audit entry
+
+For full-project handoff, Claude/Codex audit, latest user requirements, screenshot index, lessons, and open UX/functionality risks, read `AGD.md` first. If older handoff sections conflict with `AGD.md`, treat `AGD.md` and `docs/audit/webcollect-full-audit-brief-2026-07-07.md` as newer.
+
 ## ⚠️ 开发第一要义：严禁擅自删除数据 (CRITICAL)
 
 > **这是所有规则中最重要的规则，违反此规则将导致用户数据丢失，必须回滚重做。**

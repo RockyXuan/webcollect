@@ -1,5 +1,22 @@
 # WebCollect Project Summary
 
+## 2026-07-07 最新接手入口
+
+先读 `AGD.md`。它是当前给 Claude / Codex 做全项目体检的总入口，覆盖 7 月 1 日、7 月 2 日两轮最新修复，以及用户一路提出的需求、截图、踩坑和待办。
+
+当前最新状态：
+
+- 最新提交：`c31b507 fix: improve capture metadata relevance`
+- 最新版本：`V1.0.3 / 2026年7月2日`
+- 最新 Release：`webcollect-2026-07-02-v1.0.3`
+- 最新 zip：`WebCollect-Chrome-Extension-v1.0.3-2026-07-02.zip`
+- 最新新增文档：
+  - `AGD.md`
+  - `docs/audit/webcollect-full-audit-brief-2026-07-07.md`
+  - `docs/audit/user-screenshot-index-2026-07-07.md`
+
+如果旧文档和这些新文档冲突，以 `AGD.md` 和 `docs/audit/webcollect-full-audit-brief-2026-07-07.md` 为准。
+
 ## 一句话概览
 
 WebCollect 是一个个人网页收藏墙：既是 Next.js Web 应用，也是 Chrome 新标签页扩展。核心目标是让用户把网页按“分项 / 分类 / 分组 / 网页”组织成可视化墙面，并支持悬浮收集、跨设备同步、壁纸模式、搜索、回滚和扩展发布。

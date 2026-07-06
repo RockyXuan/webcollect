@@ -1,5 +1,22 @@
 # projects
 
+## WebCollect 当前接手入口
+
+如果你是后续接手 WebCollect 的 Claude / Codex / 其他 agent，请先读：
+
+1. `AGD.md`
+2. `docs/audit/webcollect-full-audit-brief-2026-07-07.md`
+3. `docs/audit/user-screenshot-index-2026-07-07.md`
+4. `PROJECT_SUMMARY.md`
+5. `HANDOFF.md`
+6. `tasks/lessons.md`
+7. `tasks/todo.md`
+8. `AGENTS.md`
+
+当前固定开发目录：`/Users/rockyx/vibe coding/Web Collect 0628`。
+当前最新功能版本：`V1.0.3 / 2026年7月2日`。
+如果旧说明和 `AGD.md` 冲突，以 `AGD.md` 为准。
+
 这是一个基于 [Next.js 16](https://nextjs.org) + [shadcn/ui](https://ui.shadcn.com) 的全栈应用项目，由扣子编程 CLI 创建。
 
 ## 快速开始

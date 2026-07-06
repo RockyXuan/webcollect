@@ -1,5 +1,43 @@
 # Project Handoff
 
+## 2026-07-07 Claude / Codex Full-Audit Handoff
+
+This section supersedes older handoff notes below when there is a conflict.
+
+### Current Known-Good Source
+
+- Remote repository: `https://github.com/RockyXuan/webcollect`
+- Correct branch: `main`
+- Fixed local workspace: `/Users/rockyx/vibe coding/Web Collect 0628`
+- Latest pushed baseline before this docs handoff: `c31b507 fix: improve capture metadata relevance`
+- Latest release: `webcollect-2026-07-02-v1.0.3`
+- Latest Chrome extension zip: `WebCollect-Chrome-Extension-v1.0.3-2026-07-02.zip`
+- Current app version/date: `V1.0.3 / 2026年7月2日`
+
+### Read First
+
+- `AGD.md`
+- `docs/audit/webcollect-full-audit-brief-2026-07-07.md`
+- `docs/audit/user-screenshot-index-2026-07-07.md`
+- `PROJECT_SUMMARY.md`
+- `tasks/lessons.md`
+- `tasks/todo.md`
+- `AGENTS.md`
+
+### Latest Completed Work To Preserve
+
+- `V1.0.2 / 2026-07-01`: fixed extension capture target placement, top section editing/reordering, category lightweight edit, tab hover readability, delete misfire prevention, squirrel branding and version/date display.
+- `V1.0.3 / 2026-07-02`: fixed capture metadata relevance, especially `docu.md` opened from X/Twitter being mislabeled with an X/Twitter description.
+- Documentation-only handoff on 2026-07-07: consolidated user requirements, screenshots, implementation notes, lessons, known weak spots, and Claude audit tasks into `AGD.md` and `docs/audit/*`.
+
+### Current Risks To Audit
+
+- Real installed Chrome extension behavior still needs long-running confirmation for floating capture, context menu icons, toolbar icon clarity, and target placement.
+- Metadata extraction is improved but still rule-based; keep testing source-platform vs target-page mismatches.
+- Cloud sync across real Windows/Mac devices remains the most data-sensitive area.
+- Drag, resize, and edit mode have regressed repeatedly; browser verification is required for UI changes.
+- Old docs are still present for history; do not treat older sections as newer than `AGD.md`.
+
 ## 2026-06-28 Current Thread Handoff Update
 
 This section supersedes older handoff notes below when there is a conflict.

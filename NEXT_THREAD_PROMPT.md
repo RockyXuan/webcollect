@@ -7,6 +7,9 @@
 2. 不要使用旧目录：
    `/Users/rockyx/Documents/webcollect`
 3. 先阅读这些文件：
+   - `AGD.md`
+   - `docs/audit/webcollect-full-audit-brief-2026-07-07.md`
+   - `docs/audit/user-screenshot-index-2026-07-07.md`
    - `PROJECT_SUMMARY.md`
    - `HANDOFF.md`
    - `NEXT_THREAD_PROMPT.md`
@@ -26,6 +29,20 @@ git ls-remote --heads origin main
 ```
 
 如果 `gh` 或 GitHub 网络在 Codex 环境里失败，不要反复盲目重试。先说明 GitHub 环境卡点，再检查 Clash/GitHub 代理或让用户在普通 Terminal 验证。
+
+## 2026-07-07 最新背景
+
+当前最新功能版本是 `V1.0.3 / 2026年7月2日`，最新提交是 `c31b507 fix: improve capture metadata relevance`。7 月 1 日和 7 月 2 日已经完成：
+
+- 扩展浮窗保存目标不再静默错放到主页或默认收集箱。
+- 顶部分项支持编辑、行内改名、新增和排序，`主页` 固定。
+- 分类编辑拆成轻量编辑和高级设置。
+- 移除顶部分项的系统 prompt/confirm 误触路径。
+- 修复 tab hover 文字变白不可读。
+- 统一小松鼠品牌图标和版本日期显示。
+- 修复 `docu.md` 从 X/Twitter 打开时简介误识别成 X/Twitter 的问题。
+
+用户现在准备让 Claude 做全项目体检。不要让用户重新复述需求，直接读 `AGD.md` 和 `docs/audit/*`。
 
 ## 当前最新目标状态
 

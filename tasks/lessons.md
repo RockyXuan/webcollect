@@ -2,6 +2,46 @@
 
 Update this file whenever the user corrects the implementation or a preventable bug appears.
 
+## 2026-07-07: Handoff Docs Must Become A Single Audit Entry
+
+User correction pattern: the project has many old handoff files and screenshots from multiple threads, so a new agent can easily read an outdated document and miss the latest user intent.
+
+Rule:
+- Keep `AGD.md` as the current full-project audit entry.
+- Put detailed requirement history, screenshot index, known bad UX, and open risks under `docs/audit/`.
+- If older docs conflict with `AGD.md`, treat `AGD.md` as newer.
+- Do not rely on temporary screenshot paths; copy durable evidence into `docs/audit/screenshots/` when new screenshots are provided.
+
+## 2026-07-02: Metadata Must Prefer The Target Page Over The Source Platform
+
+User correction: saving `docu.md` from X/Twitter produced an X/Twitter description instead of the target page slogan.
+
+Rule:
+- When source host and target host differ, do not let source-platform metadata dominate the saved card.
+- Avoid overly broad known-site terms such as single-letter `x`; token-aware matching is required.
+- If title contains a useful product slogan, compact the title for the card name and use the slogan as the description.
+- Add focused tests for real examples such as `Docu.md`.
+
+## 2026-07-01: Explicit Capture Destinations Must Never Silently Fallback
+
+User correction: pages saved from the extension were all landing in the homepage default inbox/`节流` area even when the floating panel selected another target.
+
+Rule:
+- Preserve destination id, name, and path in the draft.
+- Queue drain must resolve explicit destinations deterministically.
+- If an explicit target is stale or missing, fail and keep an error instead of silently saving elsewhere.
+- Only auto-repair historical misplaced cards when queue evidence proves the intended target by URL + destination.
+
+## 2026-07-01: Editing Should Be Inline First, Modal Only For Advanced Settings
+
+User correction: renaming section tabs used Chrome prompt, and category edit opened a large icon/color modal even for simple reorder/rename work.
+
+Rule:
+- Top section add/rename should be inline, not `window.prompt`.
+- Category/group ordinary edit should enter lightweight edit mode first.
+- Icon/color/theme changes belong behind an explicit advanced settings entry.
+- Delete confirmations must only be reachable through explicit delete actions, not ordinary tab clicks.
+
 ## 2026-05-04: Sync Must Cover The Whole User Snapshot
 
 User correction: sync failures caused categories, sections, and warehouse data to drift or reappear.

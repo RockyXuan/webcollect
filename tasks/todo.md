@@ -1,5 +1,24 @@
 # WebCollect Task Plan
 
+## Current Task: 2026-07-07 Full Project Audit Handoff Docs
+
+- [x] Re-read current project handoff and summary docs -> Verification: inspected `HANDOFF.md`, `PROJECT_SUMMARY.md`, `NEXT_THREAD_PROMPT.md`, `tasks/lessons.md`, `tasks/todo.md`, `CODEX_GO_MODE_STATUS.md`, current git log, and version files.
+- [x] Confirm data files are not being changed -> Verification: read `src/lib/seed.ts`; this task only adds/updates Markdown documentation.
+- [x] Consolidate latest requirements for Claude audit -> Verification: added `AGD.md` and `docs/audit/webcollect-full-audit-brief-2026-07-07.md`.
+- [x] Preserve screenshot context without fabricating missing assets -> Verification: added `docs/audit/user-screenshot-index-2026-07-07.md` and documented that old temp PNG files are no longer available.
+- [x] Route future threads to the new audit entry -> Verification: updated `PROJECT_SUMMARY.md`, `HANDOFF.md`, `NEXT_THREAD_PROMPT.md`, `tasks/lessons.md`, and `README.md`.
+- [x] Prepare docs for GitHub main -> Verification: staged documentation passes `git diff --cached --check`; final commit/push status is reported in the task response.
+
+## Claude Full-Audit Backlog
+
+- [ ] P0: Re-audit floating capture destination placement -> Verification: existing/new target, new section/category/group, queue replay, stale explicit target fail-safe.
+- [ ] P0: Re-audit metadata extraction relevance -> Verification: social-source external links, doc/product homepages, GitHub, YouTube/X, and target/source host mismatch cases.
+- [ ] P0: Re-audit edit mode dangerous actions -> Verification: clicking tabs in edit mode never triggers delete; delete is only in explicit menu/dialog path.
+- [ ] P1: Re-audit squirrel branding in a real installed extension -> Verification: toolbar icon, context menu icon, manifest icons, retina clarity, and right-click menu behavior.
+- [ ] P1: Re-audit Web/extension CSS parity -> Verification: tab hover, active, editing, dialogs, floating panel, long text overflow.
+- [ ] P1: Re-audit sync safety -> Verification: local-first startup, cloud restore, multi-tab fences, reset marker, rollback snapshot coverage.
+- [ ] P2: Improve screenshot evidence discipline -> Verification: future screenshots copied into `docs/audit/screenshots/` and indexed in `docs/audit/user-screenshot-index-2026-07-07.md`.
+
 ## Current Task: Corner Polish And Floating Capture Panel UX
 
 - [x] Remove category top-corner visual leaks -> Verification: category decorative pseudo layer stays disabled, and category headers now clip their own glass background to inherited top rounded corners.

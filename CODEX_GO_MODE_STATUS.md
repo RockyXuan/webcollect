@@ -1,5 +1,22 @@
 # Codex Go Mode Status
 
+## 2026-07-07 Documentation Handoff Status
+
+最新目标：把 WebCollect 全项目需求、用户截图、实现方式、保留边界、踩坑教训和待办，整理成 Claude/Codex 可直接读取的体检入口。
+
+已完成：
+
+- 新增 `AGD.md` 作为当前全项目体检总入口。
+- 新增 `docs/audit/webcollect-full-audit-brief-2026-07-07.md`，汇总需求、做法、保留现状、踩坑、待办和验证基线。
+- 新增 `docs/audit/user-screenshot-index-2026-07-07.md`，记录用户截图名称、标注含义、对应问题和当前状态。
+- 更新 `PROJECT_SUMMARY.md`、`HANDOFF.md`、`NEXT_THREAD_PROMPT.md`、`README.md`、`AGENTS.md`、`tasks/lessons.md`、`tasks/todo.md`，全部指向 `AGD.md`。
+
+当前注意：
+
+- 这是文档交接任务，没有修改 seed、业务逻辑、扩展构建产物或用户数据。
+- 原始对话截图位于系统临时目录，2026-07-07 检查时已经过期，因此本次只保留截图索引和标注说明。
+- 下一步：`git diff --check`、提交并推送 main。
+
 ## Final Goal
 
 修复 WebCollect 收藏墙布局拖拽稳定性与浮窗注入可见性；完成证据包括布局/浮窗测试、类型检查、lint、扩展构建、真实扩展双视口与浮窗验证、提交推送和日期后缀扩展发布。
