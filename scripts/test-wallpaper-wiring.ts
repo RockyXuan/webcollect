@@ -32,6 +32,8 @@ assert.equal(shellSource.includes("FLING_DISTANCE_PX"), false, "WallpaperShell m
 assert.ok(shellSource.includes("refreshOnlineWallpapers({ selectFresh: true })"), "WallpaperShell should opportunistically refresh online wallpapers in the background");
 assert.ok(shellSource.includes("WALLPAPER_BACKGROUND_CHECK_MS"), "WallpaperShell should use the shared background refresh cadence");
 assert.ok(shellSource.includes("<cite>{attribution}</cite>"), "WallpaperShell should show wallpaper attribution below the quote");
+assert.ok(shellSource.includes("wc-wallpaper-source-badge"), "WallpaperShell should show a local/remote source badge for the current wallpaper");
+assert.ok(shellSource.includes('wallpaper.source === "fallback"'), "WallpaperShell should distinguish local fallback wallpapers from remote wallpapers");
 assert.ok(shellSource.includes("WallpaperSettingsDialog"), "WallpaperShell should mount the wallpaper settings dialog");
 assert.ok(shellSource.includes("wc-wallpaper-controls"), "WallpaperShell should render wallpaper controls");
 assert.ok(shellSource.includes("aria-label=\"壁纸设置\""), "WallpaperShell should expose a settings control");
@@ -42,6 +44,10 @@ assert.ok(settingsSource.includes("Auto Mix"), "Wallpaper settings should includ
 assert.ok(settingsSource.includes("TV"), "Wallpaper settings should include TV mode");
 assert.ok(settingsSource.includes("Pets"), "Wallpaper settings should include Pets mode");
 assert.ok(settingsSource.includes("Space"), "Wallpaper settings should include the opt-in Space mode");
+assert.ok(settingsSource.includes("lastRemoteRefreshAt"), "Wallpaper settings should show the last remote refresh time");
+assert.ok(settingsSource.includes("远程图") && settingsSource.includes("本地图"), "Wallpaper settings should show remote/local library counts");
+assert.ok(settingsSource.includes("最近一次刷新错误"), "Wallpaper settings should expose the latest refresh error");
+assert.ok(settingsSource.includes("formatRefreshTime"), "Wallpaper settings should format refresh status for users");
 assert.equal(shellSource.includes("disabled={isRefreshing}"), false, "Wallpaper refresh control must remain clickable while background refresh is in flight");
 assert.equal(settingsSource.includes("disabled={isRefreshing}"), false, "Wallpaper settings refresh action must remain clickable while background refresh is in flight");
 assert.ok(shellSource.includes("prefs.currentQuoteId || wallpaper.quoteId"), "WallpaperShell should render the selected quote id from prefs before falling back to the asset quote id");

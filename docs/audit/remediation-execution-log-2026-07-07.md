@@ -280,9 +280,6 @@
 - `corepack pnpm@9.0.0 lint` passed with 0 warnings.
 - `corepack pnpm@9.0.0 build:ext` passed.
 - `git diff --check` passed.
-- `git diff --check` passed.
-- `git diff --check` passed.
-- `git diff --check` passed.
 
 Phase 1 代码侧状态：
 
@@ -556,6 +553,40 @@ Phase 2 代码侧状态：
 - `node --import tsx scripts/test-wallpaper-policy.ts` passed.
 - `node --import tsx scripts/test-sync-merge.ts` passed.
 - `node --import tsx scripts/test-cloud-snapshots.ts` passed.
+- `node --import tsx scripts/test-floating-capture-targets.ts` passed.
+- `node --import tsx scripts/test-floating-capture-drain.ts` passed.
+- `node --import tsx scripts/test-floating-capture-health.ts` passed.
+- `node --import tsx scripts/test-floating-capture-metadata.ts` passed.
+- `node --import tsx scripts/test-description-translation.ts` passed.
+- `node --import tsx scripts/test-extension-branding.ts` passed.
+- `corepack pnpm@9.0.0 ts-check` passed.
+- `corepack pnpm@9.0.0 lint` passed with 0 warnings.
+- `corepack pnpm@9.0.0 build:ext` passed.
+- `git diff --check` passed.
+
+## Step 3.5 状态：刷新状态可见
+
+已完成：
+
+- `wallpaper-settings-dialog.tsx` 增加只读状态区，显示上次远程刷新时间、远程图/本地图数量、最近一次刷新错误。
+- `wallpaper-shell.tsx` 为当前壁纸增加“远程/本地”角标。
+- 状态区使用当前 `wallpapers`、`prefs.lastRemoteRefreshAt`、`wallpaper-store.error`，不新增额外存储。
+- 角标样式写入 `src/styles/zoom-wallpaper.css`，Web 与扩展共同使用。
+
+新增验收：
+
+- 更新 `scripts/test-wallpaper-wiring.ts`。
+- 验证设置面板包含 `lastRemoteRefreshAt`、远程/本地图数量、最近刷新错误。
+- 验证当前壁纸角标存在，并区分 fallback/local 与 remote。
+
+验证结果：
+
+- `node --import tsx scripts/test-wallpaper-wiring.ts` passed.
+- `node --import tsx scripts/test-wallpaper-data.ts` passed.
+- `node --import tsx scripts/test-wallpaper-sync.ts` passed.
+- `node --import tsx scripts/test-wallpaper-sources.ts` passed.
+- `node --import tsx scripts/test-wallpaper-policy.ts` passed.
+- `node --import tsx scripts/test-sync-merge.ts` passed.
 - `node --import tsx scripts/test-floating-capture-targets.ts` passed.
 - `node --import tsx scripts/test-floating-capture-drain.ts` passed.
 - `node --import tsx scripts/test-floating-capture-health.ts` passed.

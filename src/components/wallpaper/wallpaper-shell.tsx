@@ -47,11 +47,13 @@ export function WallpaperShell({
 }: WallpaperShellProps) {
   const wallpaper = useWallpaperStore(selectCurrentWallpaper);
   const prefs = useWallpaperStore((state) => state.prefs);
+  const wallpapers = useWallpaperStore((state) => state.wallpapers);
   const initialize = useWallpaperStore((state) => state.initialize);
   const nextWallpaper = useWallpaperStore((state) => state.nextWallpaper);
   const updatePrefs = useWallpaperStore((state) => state.updatePrefs);
   const refreshOnlineWallpapers = useWallpaperStore((state) => state.refreshOnlineWallpapers);
   const isRefreshing = useWallpaperStore((state) => state.isRefreshing);
+  const wallpaperError = useWallpaperStore((state) => state.error);
   const [fullImageLoaded, setFullImageLoaded] = useState(false);
   const [hintVisible, setHintVisible] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -136,6 +138,9 @@ export function WallpaperShell({
     wallpaper.attribution
     || `${wallpaper.author} · ${wallpaper.sourceCollection} · ${wallpaper.license}`
   ), [wallpaper.attribution, wallpaper.author, wallpaper.license, wallpaper.sourceCollection]);
+  const wallpaperSourceLabel = wallpaper.source === "fallback" || wallpaper.imageUrl.startsWith("/assets/wallpapers/")
+    ? "本地"
+    : "远程";
 
   useEffect(() => {
     let active = true;
@@ -241,6 +246,7 @@ export function WallpaperShell({
           <p>{quote.en}</p>
           <figcaption>{quote.source}</figcaption>
           <cite>{attribution}</cite>
+          <span className="wc-wallpaper-source-badge">{wallpaperSourceLabel}</span>
         </figure>
 
         <div className="wc-wallpaper-controls" data-wallpaper-control>
@@ -269,7 +275,9 @@ export function WallpaperShell({
           open={settingsOpen}
           onOpenChange={setSettingsOpen}
           prefs={prefs}
+          wallpapers={wallpapers}
           isRefreshing={isRefreshing}
+          error={wallpaperError}
           onUpdatePrefs={handlePrefsUpdate}
           onRefresh={handleManualRefresh}
         />

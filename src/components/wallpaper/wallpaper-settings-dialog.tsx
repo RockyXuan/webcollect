@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import type {
   WallpaperCategory,
+  WallpaperItem,
   WallpaperPrefs,
   WallpaperRotationInterval,
   WallpaperThemeMode,
@@ -49,19 +50,40 @@ interface WallpaperSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   prefs: WallpaperPrefs;
+  wallpapers: WallpaperItem[];
   isRefreshing: boolean;
+  error: string | null;
   onUpdatePrefs: (prefs: Partial<WallpaperPrefs>) => void;
   onRefresh: () => void;
+}
+
+function isLocalWallpaper(item: WallpaperItem): boolean {
+  return item.source === "fallback" || item.imageUrl.startsWith("/assets/wallpapers/");
+}
+
+function formatRefreshTime(timestamp: number): string {
+  if (!timestamp) return "还没有刷新记录";
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
 }
 
 export function WallpaperSettingsDialog({
   open,
   onOpenChange,
   prefs,
+  wallpapers,
   isRefreshing,
+  error,
   onUpdatePrefs,
   onRefresh,
 }: WallpaperSettingsDialogProps) {
+  const localCount = wallpapers.filter(isLocalWallpaper).length;
+  const remoteCount = Math.max(0, wallpapers.length - localCount);
+
   const toggleCategory = (category: WallpaperCategory) => {
     const enabled = prefs.enabledCategories.includes(category);
     if (enabled && prefs.enabledCategories.length === 1) return;
@@ -159,6 +181,23 @@ export function WallpaperSettingsDialog({
               className="h-4 w-4 accent-blue-600"
             />
           </label>
+
+          <section className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-semibold text-slate-500">上次远程刷新</span>
+              <span className="font-bold text-slate-800">{formatRefreshTime(prefs.lastRemoteRefreshAt)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-semibold text-slate-500">图库数量</span>
+              <span className="font-bold text-slate-800">远程图 {remoteCount} · 本地图 {localCount}</span>
+            </div>
+            <div className="flex items-start justify-between gap-3">
+              <span className="font-semibold text-slate-500">最近一次刷新错误</span>
+              <span className={`max-w-[16rem] text-right font-bold ${error ? "text-rose-600" : "text-emerald-700"}`}>
+                {error || "无"}
+              </span>
+            </div>
+          </section>
         </div>
 
         <DialogFooter className="gap-2 sm:justify-between">
