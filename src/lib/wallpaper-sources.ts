@@ -15,6 +15,7 @@ export const WALLPAPER_BACKGROUND_CHECK_MS = 30 * 60 * 1000;
 export const WALLPAPER_CACHE_LIMIT = 8;
 export const WALLPAPER_CACHE_NAME = "webcollect-wallpapers-v2";
 export const WALLPAPER_LEGACY_CACHE_NAMES = ["webcollect-wallpapers-v1"];
+export const WIKIMEDIA_DISPLAY_WIDTH = 2560;
 export const ZOOM_WALLPAPER_MIN_WIDTH = 3000;
 export const ZOOM_WALLPAPER_MIN_HEIGHT = 1600;
 export const ZOOM_WALLPAPER_MIN_RATIO = 1.45;
@@ -123,6 +124,29 @@ function normalizeUrl(url: string): string {
 
 function isStaticImageUrl(url: string): boolean {
   return /\.(avif|jpe?g|png|webp)(\?.*)?$/i.test(url);
+}
+
+export function getDisplayUrl(item: WallpaperItem, targetWidth = WIKIMEDIA_DISPLAY_WIDTH): string {
+  if (item.imageUrl.startsWith("/assets/wallpapers/")) return item.imageUrl;
+  try {
+    const url = new URL(item.imageUrl);
+    if (
+      url.hostname === "upload.wikimedia.org"
+      && url.pathname.includes("/wikipedia/commons/")
+      && !url.pathname.includes("/thumb/")
+    ) {
+      const segments = url.pathname.split("/");
+      const fileName = segments[segments.length - 1];
+      if (!fileName) return item.imageUrl;
+      const prefix = segments.slice(0, 3).join("/");
+      const rest = segments.slice(3).join("/");
+      url.pathname = `${prefix}/thumb/${rest}/${targetWidth}px-${fileName}`;
+      return url.toString();
+    }
+  } catch {
+    return item.imageUrl;
+  }
+  return item.imageUrl;
 }
 
 function isOriginalSizedImageUrl(url: string): boolean {
@@ -573,9 +597,10 @@ export async function cacheWallpaperImages(items: WallpaperItem[]): Promise<void
     const cache = await caches.open(WALLPAPER_CACHE_NAME);
     await Promise.allSettled(
       items.slice(0, WALLPAPER_CACHE_LIMIT).map(async (item) => {
-        const response = await fetch(item.imageUrl, { mode: "no-cors", cache: "reload" });
+        const displayUrl = getDisplayUrl(item);
+        const response = await fetch(displayUrl, { mode: "no-cors" });
         if (response.ok || response.type === "opaque") {
-          await cache.put(item.imageUrl, response);
+          await cache.put(displayUrl, response);
         }
       })
     );

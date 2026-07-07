@@ -4,14 +4,13 @@ import { RefreshCw, Settings } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type WheelEvent } from "react";
 import { getWallpaperQuote, isSyntheticWallpaperQuote, selectWallpaperQuote } from "@/lib/wallpaper-quotes";
 import { getRotationMs, selectCurrentWallpaper, useWallpaperStore } from "@/lib/wallpaper-store";
-import { WALLPAPER_BACKGROUND_CHECK_MS } from "@/lib/wallpaper-sources";
+import { getDisplayUrl, WALLPAPER_BACKGROUND_CHECK_MS } from "@/lib/wallpaper-sources";
 import type { WallpaperMode, WallpaperPrefs } from "@/lib/wallpaper-types";
 import { WallpaperSettingsDialog } from "./wallpaper-settings-dialog";
 
 const IDLE_HINT_MS = 2000;
 const WHEEL_WALLPAPER_DELTA = 70;
 const WHEEL_WALLPAPER_COOLDOWN_MS = 720;
-const WIKIMEDIA_PREVIEW_WIDTH = 1600;
 
 interface WallpaperShellProps {
   mode: WallpaperMode;
@@ -39,28 +38,6 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
       ".wc-hot-card",
     ].join(",")
   ));
-}
-
-function getFastPreviewUrl(imageUrl: string, fallbackUrl: string): string {
-  try {
-    const url = new URL(fallbackUrl || imageUrl);
-    if (
-      url.hostname === "upload.wikimedia.org"
-      && url.pathname.includes("/wikipedia/commons/")
-      && !url.pathname.includes("/thumb/")
-    ) {
-      const segments = url.pathname.split("/");
-      const fileName = segments[segments.length - 1];
-      if (!fileName) return fallbackUrl || imageUrl;
-      const prefix = segments.slice(0, 3).join("/");
-      const rest = segments.slice(3).join("/");
-      url.pathname = `${prefix}/thumb/${rest}/${WIKIMEDIA_PREVIEW_WIDTH}px-${fileName}`;
-      return url.toString();
-    }
-  } catch {
-    return fallbackUrl || imageUrl;
-  }
-  return fallbackUrl || imageUrl;
 }
 
 export function WallpaperShell({
@@ -133,18 +110,16 @@ export function WallpaperShell({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [mode, onEnterCollection]);
 
-  const previewUrl = useMemo(
-    () => getFastPreviewUrl(wallpaper.imageUrl, wallpaper.thumbnailUrl),
-    [wallpaper.imageUrl, wallpaper.thumbnailUrl]
-  );
+  const displayUrl = useMemo(() => getDisplayUrl(wallpaper), [wallpaper]);
+  const previewUrl = wallpaper.thumbnailUrl || displayUrl;
 
   const previewStyle = useMemo(() => ({
     backgroundImage: `url("${previewUrl}")`,
   }), [previewUrl]);
 
   const imageStyle = useMemo(() => ({
-    backgroundImage: `url("${wallpaper.imageUrl}")`,
-  }), [wallpaper.imageUrl]);
+    backgroundImage: `url("${displayUrl}")`,
+  }), [displayUrl]);
 
   const quote = useMemo(() => {
     const cachedQuote = getWallpaperQuote(prefs.currentQuoteId || wallpaper.quoteId);
@@ -173,14 +148,14 @@ export function WallpaperShell({
     image.onerror = () => {
       if (active) setFullImageLoaded(false);
     };
-    image.src = wallpaper.imageUrl;
+    image.src = displayUrl;
     if (image.complete && image.naturalWidth > 0) {
       setFullImageLoaded(true);
     }
     return () => {
       active = false;
     };
-  }, [wallpaper.imageUrl]);
+  }, [displayUrl]);
 
   const clearIdleHint = useCallback(() => {
     if (idleHintTimerRef.current !== null) {

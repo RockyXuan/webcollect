@@ -8,6 +8,7 @@ import {
   filterZoomWallpapers,
   filterUsableWallpapers,
   filterWallpapersForTheme,
+  getDisplayUrl,
   getWallpaperCacheBatch,
   getNextWallpaper,
   inferQuoteId,
@@ -25,6 +26,7 @@ import {
   WALLPAPER_CACHE_LIMIT,
   WALLPAPER_LEGACY_CACHE_NAMES,
   WALLPAPER_REFRESH_INTERVAL_MS,
+  WIKIMEDIA_DISPLAY_WIDTH,
 } from "../src/lib/wallpaper-sources";
 import { ZOOM_CURATED_WALLPAPERS } from "../src/lib/zoom-curated-wallpapers";
 import { WALLPAPER_QUOTES, getWallpaperQuoteCounts } from "../src/lib/wallpaper-quotes";
@@ -43,6 +45,7 @@ assert.equal(WALLPAPER_CACHE_LIMIT, 8);
 assert.equal(WALLPAPER_CACHE_NAME, "webcollect-wallpapers-v2");
 assert.ok(WALLPAPER_LEGACY_CACHE_NAMES.includes("webcollect-wallpapers-v1"));
 assert.equal(WALLPAPER_REFRESH_INTERVAL_MS, 6 * 60 * 60 * 1000);
+assert.equal(WIKIMEDIA_DISPLAY_WIDTH, 2560);
 assert.deepEqual(DEFAULT_WALLPAPER_ENABLED_CATEGORIES, [
   "landscape",
   "landmark",
@@ -179,6 +182,24 @@ const valid: WallpaperItem = {
   quoteId: "quiet-horizon",
   fetchedAt: 1,
 };
+
+const wikimediaOriginal = {
+  ...valid,
+  id: "wikimedia-original",
+  imageUrl: "https://upload.wikimedia.org/wikipedia/commons/a/ab/Example_original.jpg",
+  thumbnailUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Example_original.jpg/640px-Example_original.jpg",
+};
+const wikimediaDisplayUrl = getDisplayUrl(wikimediaOriginal);
+assert.match(wikimediaDisplayUrl, /\/thumb\/a\/ab\/Example_original\.jpg\/2560px-Example_original\.jpg$/);
+assert.equal(wikimediaOriginal.imageUrl.includes("/thumb/"), false, "source imageUrl should remain the original asset URL");
+assert.equal(getDisplayUrl({ ...valid, imageUrl: "/assets/wallpapers/local.jpg" }), "/assets/wallpapers/local.jpg");
+
+const wallpaperShellSource = readFileSync("src/components/wallpaper/wallpaper-shell.tsx", "utf8");
+const wallpaperSourcesSource = readFileSync("src/lib/wallpaper-sources.ts", "utf8");
+assert.ok(wallpaperShellSource.includes("backgroundImage: `url(\"${displayUrl}\")`"));
+assert.ok(wallpaperShellSource.includes("image.src = displayUrl"));
+assert.ok(wallpaperSourcesSource.includes("const displayUrl = getDisplayUrl(item);"));
+assert.equal(wallpaperSourcesSource.includes('cache: "reload"'), false);
 
 const filtered = filterUsableWallpapers([
   valid,

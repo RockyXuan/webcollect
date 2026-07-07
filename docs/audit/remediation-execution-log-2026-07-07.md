@@ -430,3 +430,36 @@ Phase 2 代码侧状态：
 
 - Step 2.1 至 Step 2.4 已按 Fable 方案完成并逐步提交。
 - React DevTools Profiler 的人工 FPS/重渲染观察仍需后续浏览器手测环境补充。
+
+## Step 3.1 状态：壁纸展示层改用缩略图管线
+
+已完成：
+
+- `wallpaper-sources.ts` 新增 `getDisplayUrl(item, targetWidth = 2560)`。
+- Wikimedia 原始图展示 URL 改为 `/thumb/.../2560px-*`，原始 `imageUrl` 仍保留为来源资产 URL。
+- 本地打包壁纸保持原路径，不走缩略图转换。
+- `wallpaper-shell.tsx` 的实际背景图和图片预加载改用 `displayUrl`。
+- `cacheWallpaperImages` 改用 `getDisplayUrl(item)` 缓存展示图，并移除 `cache: "reload"`。
+
+新增验收：
+
+- 更新 `scripts/test-wallpaper-data.ts`。
+- 验证 Wikimedia 原图能转换为 2560px thumb。
+- 验证 `imageUrl` 不被改成 thumb。
+- 验证 shell 背景图和预加载使用 `displayUrl`。
+- 验证缓存层不再使用 `cache: "reload"`。
+
+验证结果：
+
+- `node --import tsx scripts/test-wallpaper-data.ts` passed.
+- `node --import tsx scripts/test-sync-merge.ts` passed.
+- `node --import tsx scripts/test-floating-capture-targets.ts` passed.
+- `node --import tsx scripts/test-floating-capture-drain.ts` passed.
+- `node --import tsx scripts/test-floating-capture-health.ts` passed.
+- `node --import tsx scripts/test-floating-capture-metadata.ts` passed.
+- `node --import tsx scripts/test-description-translation.ts` passed.
+- `node --import tsx scripts/test-extension-branding.ts` passed.
+- `corepack pnpm@9.0.0 ts-check` passed.
+- `corepack pnpm@9.0.0 lint` passed with 0 warnings.
+- `corepack pnpm@9.0.0 build:ext` passed.
+- `git diff --check` passed.
