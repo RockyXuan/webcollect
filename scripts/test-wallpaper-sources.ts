@@ -2,10 +2,34 @@ import assert from "node:assert/strict";
 import {
   DEFAULT_WALLPAPER_ENABLED_CATEGORIES,
   fetchRemoteWallpapers,
+  getDisplayUrl,
 } from "../src/lib/wallpaper-sources";
+import type { WallpaperItem } from "../src/lib/wallpaper-types";
 
 const requestedUrls: string[] = [];
 let pageId = 1000;
+const wikimediaImageUrl = "https://upload.wikimedia.org/wikipedia/commons/a/ab/Featured_Test.jpg";
+
+function makeWallpaperWithWidth(width: number): WallpaperItem {
+  return {
+    id: `wikimedia-width-${width}`,
+    title: "Featured Test",
+    author: "Wikimedia Commons",
+    source: "wikimedia",
+    sourceUrl: "https://commons.wikimedia.org/wiki/File:Featured_Test.jpg",
+    imageUrl: wikimediaImageUrl,
+    thumbnailUrl: wikimediaImageUrl,
+    license: "CC BY-SA 4.0",
+    width,
+    height: 1800,
+    category: "landscape",
+    quality: "featured",
+    sourceCollection: "Featured pictures on Wikimedia Commons",
+    quoteId: "fallback-new-beginning",
+    fetchedAt: 1_777_200_000_000,
+    provider: "wikimedia",
+  };
+}
 
 function makeWikimediaPage(title: string, categoryIndex: number, itemIndex: number) {
   pageId += 1;
@@ -50,6 +74,25 @@ async function fetchMock(input: string): Promise<Response> {
 }
 
 async function main(): Promise<void> {
+  assert.equal(
+    getDisplayUrl(makeWallpaperWithWidth(2560), 2560),
+    wikimediaImageUrl,
+    "Wikimedia thumb requests must not ask for a width equal to the source width"
+  );
+  assert.equal(
+    getDisplayUrl(makeWallpaperWithWidth(2000), 2560),
+    wikimediaImageUrl,
+    "Wikimedia thumb requests must not upscale smaller source images"
+  );
+  assert.ok(
+    getDisplayUrl(makeWallpaperWithWidth(0), 2560).includes("/thumb/a/ab/Featured_Test.jpg/2560px-Featured_Test.jpg"),
+    "Unknown source width should still use the requested display width"
+  );
+  assert.ok(
+    getDisplayUrl(makeWallpaperWithWidth(4200), 2560).includes("/thumb/a/ab/Featured_Test.jpg/2560px-Featured_Test.jpg"),
+    "Wider source images should use the target display width"
+  );
+
   const remote = await fetchRemoteWallpapers(
     DEFAULT_WALLPAPER_ENABLED_CATEGORIES,
     1_777_200_000_000,

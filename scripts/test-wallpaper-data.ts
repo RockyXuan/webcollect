@@ -197,8 +197,11 @@ assert.equal(getDisplayUrl({ ...valid, imageUrl: "/assets/wallpapers/local.jpg" 
 const wallpaperShellSource = readFileSync("src/components/wallpaper/wallpaper-shell.tsx", "utf8");
 const wallpaperSourcesSource = readFileSync("src/lib/wallpaper-sources.ts", "utf8");
 const wallpaperStoreSource = readFileSync("src/lib/wallpaper-store.ts", "utf8");
-assert.ok(wallpaperShellSource.includes("backgroundImage: `url(\"${displayUrl}\")`"));
-assert.ok(wallpaperShellSource.includes("image.src = displayUrl"));
+assert.ok(wallpaperShellSource.includes("backgroundImage: `url(\"${activeImageUrl}\")`"));
+assert.ok(wallpaperShellSource.includes("loadImage(displayUrl, \"display\")"));
+assert.ok(wallpaperShellSource.includes("loadImage(wallpaper.imageUrl, \"original\")"));
+assert.ok(wallpaperShellSource.includes("setImageLoadStage(\"failed\")"));
+assert.ok(wallpaperShellSource.includes("error={imageLoadError || wallpaperError}"));
 assert.ok(wallpaperSourcesSource.includes("const displayUrl = getDisplayUrl(item);"));
 assert.equal(wallpaperSourcesSource.includes('cache: "reload"'), false);
 assert.ok(wallpaperStoreSource.includes('prefs.rotationInterval === "open"'));

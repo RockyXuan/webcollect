@@ -11,6 +11,7 @@ import { WallpaperSettingsDialog } from "./wallpaper-settings-dialog";
 const IDLE_HINT_MS = 2000;
 const WHEEL_WALLPAPER_DELTA = 70;
 const WHEEL_WALLPAPER_COOLDOWN_MS = 720;
+type WallpaperImageLoadStage = "display" | "original" | "failed";
 
 interface WallpaperShellProps {
   mode: WallpaperMode;
@@ -55,6 +56,8 @@ export function WallpaperShell({
   const isRefreshing = useWallpaperStore((state) => state.isRefreshing);
   const wallpaperError = useWallpaperStore((state) => state.error);
   const [fullImageLoaded, setFullImageLoaded] = useState(false);
+  const [imageLoadStage, setImageLoadStage] = useState<WallpaperImageLoadStage>("display");
+  const [imageLoadError, setImageLoadError] = useState<string | null>(null);
   const [hintVisible, setHintVisible] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const idleHintTimerRef = useRef<number | null>(null);
@@ -114,14 +117,15 @@ export function WallpaperShell({
 
   const displayUrl = useMemo(() => getDisplayUrl(wallpaper), [wallpaper]);
   const previewUrl = wallpaper.thumbnailUrl || displayUrl;
+  const activeImageUrl = imageLoadStage === "original" ? wallpaper.imageUrl : displayUrl;
 
   const previewStyle = useMemo(() => ({
     backgroundImage: `url("${previewUrl}")`,
   }), [previewUrl]);
 
   const imageStyle = useMemo(() => ({
-    backgroundImage: `url("${displayUrl}")`,
-  }), [displayUrl]);
+    backgroundImage: `url("${activeImageUrl}")`,
+  }), [activeImageUrl]);
 
   const quote = useMemo(() => {
     const cachedQuote = getWallpaperQuote(prefs.currentQuoteId || wallpaper.quoteId);
@@ -145,22 +149,42 @@ export function WallpaperShell({
   useEffect(() => {
     let active = true;
     setFullImageLoaded(false);
-    const image = new window.Image();
-    image.decoding = "async";
-    image.onload = () => {
-      if (active) setFullImageLoaded(true);
+    setImageLoadStage("display");
+    setImageLoadError(null);
+
+    const loadImage = (url: string, stage: WallpaperImageLoadStage) => {
+      const image = new window.Image();
+      image.decoding = "async";
+      image.onload = () => {
+        if (!active) return;
+        setImageLoadStage(stage);
+        setFullImageLoaded(true);
+        setImageLoadError(null);
+      };
+      image.onerror = () => {
+        if (!active) return;
+        if (stage === "display" && wallpaper.imageUrl && wallpaper.imageUrl !== url) {
+          setImageLoadStage("original");
+          loadImage(wallpaper.imageUrl, "original");
+          return;
+        }
+        setImageLoadStage("failed");
+        setFullImageLoaded(false);
+        setImageLoadError("远程壁纸高清图加载失败，已保留预览图。");
+      };
+      image.src = url;
+      if (image.complete && image.naturalWidth > 0) {
+        setImageLoadStage(stage);
+        setFullImageLoaded(true);
+        setImageLoadError(null);
+      }
     };
-    image.onerror = () => {
-      if (active) setFullImageLoaded(false);
-    };
-    image.src = displayUrl;
-    if (image.complete && image.naturalWidth > 0) {
-      setFullImageLoaded(true);
-    }
+
+    loadImage(displayUrl, "display");
     return () => {
       active = false;
     };
-  }, [displayUrl]);
+  }, [displayUrl, wallpaper.imageUrl]);
 
   const clearIdleHint = useCallback(() => {
     if (idleHintTimerRef.current !== null) {
@@ -277,7 +301,7 @@ export function WallpaperShell({
           prefs={prefs}
           wallpapers={wallpapers}
           isRefreshing={isRefreshing}
-          error={wallpaperError}
+          error={imageLoadError || wallpaperError}
           onUpdatePrefs={handlePrefsUpdate}
           onRefresh={handleManualRefresh}
         />

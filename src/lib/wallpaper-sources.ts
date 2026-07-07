@@ -138,9 +138,11 @@ export function getDisplayUrl(item: WallpaperItem, targetWidth = WIKIMEDIA_DISPL
       const segments = url.pathname.split("/");
       const fileName = segments[segments.length - 1];
       if (!fileName) return item.imageUrl;
+      if (item.width > 0 && item.width <= targetWidth) return item.imageUrl;
+      const displayWidth = item.width > 0 ? Math.min(targetWidth, item.width - 1) : targetWidth;
       const prefix = segments.slice(0, 3).join("/");
       const rest = segments.slice(3).join("/");
-      url.pathname = `${prefix}/thumb/${rest}/${targetWidth}px-${fileName}`;
+      url.pathname = `${prefix}/thumb/${rest}/${displayWidth}px-${fileName}`;
       return url.toString();
     }
   } catch {
