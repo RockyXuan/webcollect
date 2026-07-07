@@ -1300,6 +1300,7 @@ export async function syncData(userId: string): Promise<void> {
   const normalizedLocal = await normalizeLocalIdsForCloud(rawLocalCategories, rawLocalCards);
   let localCategories = normalizedLocal.categories;
   let localCards = normalizedLocal.cards;
+  const syncStartLocalUpdatedAt = localSnapshotUpdatedAt;
   const dirtySets = await getSyncDirtySets();
 
   // 2. Load cloud data
@@ -1583,7 +1584,7 @@ export async function syncData(userId: string): Promise<void> {
     categories: categorySyncSelection.resolvedIds,
     cards: cardSyncSelection.resolvedIds,
   });
-  await saveLocalSnapshotSyncedAt(Math.max(localSnapshotUpdatedAt, cloudSnapshotUpdatedAt, Date.now()));
+  await saveLocalSnapshotSyncedAt(syncStartLocalUpdatedAt);
 
   console.log("[Sync] Sync completed successfully");
 }
@@ -1641,6 +1642,7 @@ export async function pushLocalSnapshotToCloud(
   await createLocalDataSnapshot("before-cloud-push", "\u63a8\u9001\u4e91\u7aef\u524d\u672c\u5730\u7248\u672c");
   const { categories: normalizedLocalCategories, cards: normalizedLocalCards } =
     await normalizeLocalIdsForCloud(rawLocalCategories, rawLocalCards);
+  const syncStartLocalUpdatedAt = localSnapshotUpdatedAt;
   const dirtySets = await getSyncDirtySets();
 
   const localDedupe = dedupeSyncedData(
@@ -1842,7 +1844,7 @@ export async function pushLocalSnapshotToCloud(
     categories: categorySyncSelection.resolvedIds,
     cards: cardSyncSelection.resolvedIds,
   });
-  await saveLocalSnapshotSyncedAt(snapshotUpdatedAt);
+  await saveLocalSnapshotSyncedAt(syncStartLocalUpdatedAt);
 
   console.log("[Sync] Local snapshot pushed successfully");
 }

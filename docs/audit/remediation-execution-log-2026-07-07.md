@@ -165,3 +165,30 @@
 - `corepack pnpm@9.0.0 lint` passed with existing 6 warnings.
 - `corepack pnpm@9.0.0 build:ext` passed.
 - `git diff --check` passed.
+
+## Step 1.4 状态：同步完成时间戳记账
+
+已完成：
+
+- `syncData` 在加载本地快照时记录 `syncStartLocalUpdatedAt`。
+- `pushLocalSnapshotToCloud` 在加载本地快照时记录 `syncStartLocalUpdatedAt`。
+- 同步完成后 `saveLocalSnapshotSyncedAt(syncStartLocalUpdatedAt)`，不再用 `Date.now()` 抬高 synced marker。
+
+新增验收：
+
+- `scripts/test-sync-merge.ts` 在 fake `user_preferences` upsert 期间注入一次本地卡片修改。
+- 断言同步结束后 `getLocalSnapshotUpdatedAt() > getLocalSnapshotSyncedAt()`，中途新修改会留给下一轮同步。
+
+验证结果：
+
+- `node --import tsx scripts/test-sync-merge.ts` passed.
+- `node --import tsx scripts/test-floating-capture-targets.ts` passed.
+- `node --import tsx scripts/test-floating-capture-drain.ts` passed.
+- `node --import tsx scripts/test-floating-capture-health.ts` passed.
+- `node --import tsx scripts/test-floating-capture-metadata.ts` passed.
+- `node --import tsx scripts/test-description-translation.ts` passed.
+- `node --import tsx scripts/test-extension-branding.ts` passed.
+- `corepack pnpm@9.0.0 ts-check` passed.
+- `corepack pnpm@9.0.0 lint` passed with existing 6 warnings.
+- `corepack pnpm@9.0.0 build:ext` passed.
+- `git diff --check` passed.

@@ -66,12 +66,14 @@ class FakeSupabaseQuery {
     return this;
   }
 
-  upsert(value: Row | Row[], options?: { onConflict?: string }): Promise<{ data: Row[]; error: null }> {
+  async upsert(value: Row | Row[], options?: { onConflict?: string }): Promise<{ data: Row[]; error: null }> {
     const count = Array.isArray(value) ? value.length : 1;
     this.db.operations.upsert += count;
     this.db.operations.upsertRequests += 1;
     this.db.operations.upsertByTable[this.table] += count;
-    return Promise.resolve({ data: this.db.upsert(this.table, value, options?.onConflict), error: null });
+    const data = this.db.upsert(this.table, value, options?.onConflict);
+    await this.db.onUpsert?.(this.table, value);
+    return { data, error: null };
   }
 
   insert(value: Row | Row[]): Promise<{ data: Row[]; error: null }> {
@@ -102,6 +104,8 @@ class FakeSupabaseQuery {
 }
 
 class FakeSupabaseClient {
+  onUpsert?: (table: TableName, value: Row | Row[]) => void | Promise<void>;
+
   readonly tables: Record<TableName, Row[]> = {
     categories: [],
     cards: [],
@@ -417,6 +421,37 @@ async function main(): Promise<void> {
 
     assert.equal(fake.tables.cards[0]?.title, "Newer Local", "newer local timestamp should be pushed to cloud");
     assert.equal((await db.getCards())[0]?.title, "Newer Local", "newer local timestamp should remain local");
+  }
+
+  {
+    const fake = new FakeSupabaseClient();
+    const sharedCategory = category();
+    const originalCard = card({ title: "Original", updatedAt: baseTime });
+    const duringSyncCard = card({ title: "Changed During Sync", updatedAt: baseTime + 7_000 });
+    fake.tables.categories.push(cloudCategory(sharedCategory));
+    fake.tables.cards.push(cloudCard(originalCard));
+    let injected = false;
+    fake.onUpsert = async (table) => {
+      if (table !== "user_preferences" || injected) return;
+      injected = true;
+      await db.saveCards([duringSyncCard]);
+    };
+    supabase.__setBrowserSupabaseClientForTest(fake as unknown as SupabaseClient);
+    await resetLocal(db);
+    await db.withoutLocalChangeEvents(async () => {
+      await db.saveCategories([sharedCategory]);
+      await db.saveCards([originalCard]);
+    });
+    await db.clearSyncDirtySets();
+
+    await sync.syncData(userId);
+
+    assert.equal(injected, true, "test should inject a local edit during sync");
+    assert.equal((await db.getCards())[0]?.title, "Changed During Sync");
+    assert.ok(
+      (await db.getLocalSnapshotUpdatedAt()) > (await db.getLocalSnapshotSyncedAt()),
+      "local edits during sync should remain newer than the synced marker"
+    );
   }
 
   {
