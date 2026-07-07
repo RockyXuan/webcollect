@@ -253,3 +253,35 @@
 - `corepack pnpm@9.0.0 lint` passed with existing 6 warnings.
 - `corepack pnpm@9.0.0 build:ext` passed.
 - `git diff --check` passed.
+
+## Step 1.7 状态：删除死代码并清零 lint warning
+
+已完成：
+
+- 删除 `pushCardToCloud` / `pushCategoryToCloud`。
+- 删除 `deleteCardFromCloud` / `deleteCategoryFromCloud`。
+- 删除 `legacyLoginWithGoogleExtension`。
+- 更新 `src/lib/sync.ts` 文件头注释，描述当前“快照同步 + dirty/local-only/newer rows 增量写”的真实架构。
+- `src/app/api/supabase-config/route.ts` 改为静态导入 `node:child_process`，去掉无效 eslint-disable。
+- 对必须兼容 Chrome 扩展的原生 `<img>` 组件加明确 lint 例外。
+- 移除 `recycle-bin-dialog.tsx` 未使用的 `useState` import。
+
+验证结果：
+
+- `node --import tsx scripts/test-emergency-restore.ts` passed.
+- `node --import tsx scripts/test-sync-merge.ts` passed.
+- `node --import tsx scripts/test-floating-capture-targets.ts` passed.
+- `node --import tsx scripts/test-floating-capture-drain.ts` passed.
+- `node --import tsx scripts/test-floating-capture-health.ts` passed.
+- `node --import tsx scripts/test-floating-capture-metadata.ts` passed.
+- `node --import tsx scripts/test-description-translation.ts` passed.
+- `node --import tsx scripts/test-extension-branding.ts` passed.
+- `corepack pnpm@9.0.0 ts-check` passed.
+- `corepack pnpm@9.0.0 lint` passed with 0 warnings.
+- `corepack pnpm@9.0.0 build:ext` passed.
+- `git diff --check` passed.
+
+Phase 1 代码侧状态：
+
+- Step 1.1 至 Step 1.7 已按 Fable 方案完成并逐步提交。
+- 真实 Supabase 迁移和双设备真实账号验收仍需用户先完成 CSV/本地备份后再执行。

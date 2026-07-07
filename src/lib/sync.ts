@@ -1,19 +1,9 @@
 /**
- * Sync Service 鈥?Local IndexedDB 鈫?Cloud Supabase data synchronization
- * 
- * Strategy: "Last-Write-Wins" based on updatedAt timestamps
- * 
- * Flow:
- * 1. On login: Pull cloud data 鈫?merge with local 鈫?push merged result
- * 2. On data change (when logged in): Push local changes to cloud
- * 3. On periodic sync: Pull cloud 鈫?merge 鈫?push
- * 
- * Merge rules:
- * - If cloud item is newer 鈫?use cloud version
- * - If local item is newer 鈫?use local version
- * - If item exists only in cloud 鈫?add to local
- * - If item exists only in local 鈫?push to cloud
- * - Deleted items (in recycle bin) are excluded from sync
+ * Sync service for local IndexedDB and Supabase.
+ *
+ * The service syncs whole local snapshots, but cloud writes are narrowed to
+ * dirty/local-only/newer rows. Row conflict resolution is Last-Write-Wins based
+ * on each card/category's client-provided updatedAt timestamp.
  */
 
 import { getBrowserSupabaseClient, initBrowserSupabase } from "@/lib/supabase-browser";
@@ -2204,50 +2194,4 @@ async function writePreferences(
     throw new Error(`Failed to sync preferences: ${message}`);
   }
 
-}
-
-// 鈹€鈹€ Push single item to cloud (called on data change) 鈹€鈹€
-
-export async function pushCategoryToCloud(category: Category, userId: string): Promise<void> {
-  const client = getBrowserSupabaseClient();
-  const cloudCat = localToCloudCategory(category, userId);
-  const { error } = await client
-    .from("categories")
-    .upsert(cloudCat, { onConflict: "id" });
-  if (error) {
-    console.error("[Sync] Failed to push category:", error.message);
-  }
-}
-
-export async function pushCardToCloud(card: WebCard, userId: string): Promise<void> {
-  const client = getBrowserSupabaseClient();
-  const cloudCard = localToCloudCard(card, userId);
-  const { error } = await client
-    .from("cards")
-    .upsert(cloudCard, { onConflict: "id" });
-  if (error) {
-    console.error("[Sync] Failed to push card:", error.message);
-  }
-}
-
-export async function deleteCategoryFromCloud(categoryId: string): Promise<void> {
-  const client = getBrowserSupabaseClient();
-  const { error } = await client
-    .from("categories")
-    .delete()
-    .eq("id", categoryId);
-  if (error) {
-    console.error("[Sync] Failed to delete category from cloud:", error.message);
-  }
-}
-
-export async function deleteCardFromCloud(cardId: string): Promise<void> {
-  const client = getBrowserSupabaseClient();
-  const { error } = await client
-    .from("cards")
-    .delete()
-    .eq("id", cardId);
-  if (error) {
-    console.error("[Sync] Failed to delete card from cloud:", error.message);
-  }
 }

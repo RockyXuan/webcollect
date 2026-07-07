@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { ExternalLink, Send, Trash2 } from "lucide-react";
 import type { WarehouseCard } from "@/lib/db-warehouse";
