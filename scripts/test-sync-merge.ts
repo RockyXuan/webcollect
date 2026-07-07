@@ -208,6 +208,21 @@ function cloneRow(row: Row): Row {
   return JSON.parse(JSON.stringify(row)) as Row;
 }
 
+function cloneValue<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function captureLocalStore(): Map<string, unknown> {
+  return new Map([...memoryStore.entries()].map(([key, value]) => [key, cloneValue(value)]));
+}
+
+function restoreLocalStore(snapshot: Map<string, unknown>): void {
+  memoryStore.clear();
+  for (const [key, value] of snapshot.entries()) {
+    memoryStore.set(key, cloneValue(value));
+  }
+}
+
 function category(input: Partial<Category> = {}): Category {
   return {
     id: "11111111-1111-4111-8111-111111111111",
@@ -382,6 +397,45 @@ async function main(): Promise<void> {
 
     assert.equal(fake.tables.cards[0]?.title, "Newer Local", "newer local timestamp should be pushed to cloud");
     assert.equal((await db.getCards())[0]?.title, "Newer Local", "newer local timestamp should remain local");
+  }
+
+  {
+    const fake = new FakeSupabaseClient();
+    const sharedCategory = category();
+    const originalCard = card({ title: "Original", updatedAt: baseTime });
+    const editedAt = baseTime + 1_000;
+    const editedCard = card({ title: "Device A Edit", updatedAt: editedAt });
+    fake.tables.categories.push(cloudCategory(sharedCategory));
+    fake.tables.cards.push(cloudCard(originalCard));
+    supabase.__setBrowserSupabaseClientForTest(fake as unknown as SupabaseClient);
+
+    await resetLocal(db);
+    await db.withoutLocalChangeEvents(async () => {
+      await db.saveCategories([sharedCategory]);
+      await db.saveCards([originalCard]);
+    });
+    await db.clearSyncDirtySets();
+    const deviceBStore = captureLocalStore();
+
+    await resetLocal(db);
+    await db.withoutLocalChangeEvents(async () => {
+      await db.saveCategories([sharedCategory]);
+      await db.saveCards([originalCard]);
+    });
+    await db.clearSyncDirtySets();
+    await db.saveCards([editedCard]);
+    const deviceAStore = captureLocalStore();
+
+    restoreLocalStore(deviceBStore);
+    await sync.syncData(userId);
+    assert.equal(fake.tables.cards[0]?.title, "Original", "clean device B sync should not refresh cloud card content");
+
+    restoreLocalStore(deviceAStore);
+    await sync.syncData(userId);
+
+    assert.equal((await db.getCards())[0]?.title, "Device A Edit", "device A edit should not be rolled back after device B sync");
+    assert.equal(fake.tables.cards[0]?.title, "Device A Edit", "device A edit should be pushed to cloud");
+    assert.equal(fake.tables.cards[0]?.updated_at, new Date(editedAt).toISOString(), "cloud row should preserve client edit timestamp");
   }
 
   supabase.__resetBrowserSupabaseForTest();

@@ -253,7 +253,11 @@ function cloudToLocalCategory(c: CloudCategory): Category {
   };
 }
 
-function localToCloudCategory(c: Category, userId: string): Omit<CloudCategory, "updated_at" | "created_at"> {
+function toCloudUpdatedAt(input: { createdAt?: number; updatedAt?: number }): string {
+  return new Date(input.updatedAt || input.createdAt || Date.now()).toISOString();
+}
+
+function localToCloudCategory(c: Category, userId: string): Omit<CloudCategory, "created_at"> {
   return {
     id: c.id,
     user_id: userId,
@@ -263,6 +267,7 @@ function localToCloudCategory(c: Category, userId: string): Omit<CloudCategory, 
     parent_id: c.parentId ?? null,
     is_parent: c.isParent ?? null,
     order: c.order,
+    updated_at: toCloudUpdatedAt(c),
   };
 }
 
@@ -324,7 +329,7 @@ function cloudToLocalCard(c: CloudCard): WebCard {
   };
 }
 
-function localToCloudCard(c: WebCard, userId: string): Omit<CloudCard, "updated_at" | "created_at"> {
+function localToCloudCard(c: WebCard, userId: string): Omit<CloudCard, "created_at"> {
   return {
     id: c.id,
     user_id: userId,
@@ -337,6 +342,7 @@ function localToCloudCard(c: WebCard, userId: string): Omit<CloudCard, "updated_
     abbreviation: c.abbreviation || null,
     image_url: c.imageUrl || null,
     order: c.order,
+    updated_at: toCloudUpdatedAt(c),
   };
 }
 
@@ -414,7 +420,8 @@ function mergeByTimestamp<T extends { id: string }>(
         merged.push(cloudItem);
         cloudToPull.push(cloudItem);
       } else {
-        // Local is newer or equal
+        // Local is newer, or equal. Equal timestamps intentionally keep the
+        // local row so a no-op cloud sync cannot roll back the current tab.
         merged.push(localItem);
         if (localTs > cloudTs) {
           localToPush.push(localItem);

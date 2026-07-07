@@ -83,7 +83,9 @@ language plpgsql
 set search_path = ''
 as $$
 begin
-  new.updated_at = now();
+  if new.updated_at is not distinct from old.updated_at then
+    new.updated_at = now();
+  end if;
   return new;
 end;
 $$;

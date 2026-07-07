@@ -101,3 +101,39 @@
 
 - 本 Step 未操作用户真实 Chrome / IndexedDB / Supabase 数据。
 - 真实账号双设备同步人工复验仍等待用户先完成 Fable 要求的手动备份。
+
+## Step 1.2 状态：客户端显式提供 updated_at
+
+已完成：
+
+- 新增 `migrations/2026-07-07-client-updated-at.sql`。
+- 更新 `src/storage/database/supabase-init.sql`，新环境 bootstrap 也使用同一触发器逻辑。
+- `public.set_updated_at()` 改为仅在客户端没有提供新 `updated_at` 时补 `now()`。
+- `localToCloudCategory` / `localToCloudCard` upsert payload 增加本地 `updated_at`。
+- `mergeByTimestamp` 注释明确相等时间戳保留本地行，避免无操作云同步回滚当前标签。
+
+新增验收：
+
+- `scripts/test-sync-merge.ts` 增加两设备复现场景：
+  - 设备 B 无改动同步后不会刷新云端卡片。
+  - 设备 A 早前本地编辑再次同步时不会被回滚。
+  - 云端行保留设备 A 的客户端编辑时间戳。
+
+验证结果：
+
+- `node --import tsx scripts/test-sync-merge.ts` passed.
+- `node --import tsx scripts/test-floating-capture-targets.ts` passed.
+- `node --import tsx scripts/test-floating-capture-drain.ts` passed.
+- `node --import tsx scripts/test-floating-capture-health.ts` passed.
+- `node --import tsx scripts/test-floating-capture-metadata.ts` passed.
+- `node --import tsx scripts/test-description-translation.ts` passed.
+- `node --import tsx scripts/test-extension-branding.ts` passed.
+- `corepack pnpm@9.0.0 ts-check` passed.
+- `corepack pnpm@9.0.0 lint` passed with existing 6 warnings.
+- `corepack pnpm@9.0.0 build:ext` passed.
+- `git diff --check` passed.
+
+备注：
+
+- 本 Step 只提交迁移文件，没有连接或修改真实 Supabase。
+- 真实执行迁移前仍需按 Fable 要求导出 `cards` / `categories` CSV 备份。
