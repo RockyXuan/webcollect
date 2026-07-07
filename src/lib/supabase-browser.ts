@@ -28,6 +28,7 @@ export const DEFAULT_EXTENSION_CONFIG: SupabaseConfig = {
 
 let _config: SupabaseConfig | null = null;
 let _client: SupabaseClient | null = null;
+let _testClient: SupabaseClient | null = null;
 
 function isExtensionRuntime(): boolean {
   try {
@@ -131,6 +132,7 @@ export function setSupabaseConfig(config: SupabaseConfig): void {
  * Must be called before getBrowserSupabaseClient().
  */
 export async function initBrowserSupabase(): Promise<boolean> {
+  if (_testClient) return true;
   const config = await loadConfig();
   return !!(config.url && config.anonKey);
 }
@@ -140,6 +142,7 @@ export async function initBrowserSupabase(): Promise<boolean> {
  * Uses anon key (safe for client-side) with optional user token for RLS.
  */
 export function getBrowserSupabaseClient(token?: string): SupabaseClient {
+  if (!token && _testClient) return _testClient;
   if (!token && _client) return _client;
 
   const url = _config?.url || '';
@@ -169,4 +172,16 @@ export function getBrowserSupabaseClient(token?: string): SupabaseClient {
   }
 
   return client;
+}
+
+export function __setBrowserSupabaseClientForTest(client: SupabaseClient): void {
+  _testClient = client;
+  _config = { url: "https://webcollect.test", anonKey: "test-anon-key" };
+  _client = null;
+}
+
+export function __resetBrowserSupabaseForTest(): void {
+  _testClient = null;
+  _config = null;
+  _client = null;
 }

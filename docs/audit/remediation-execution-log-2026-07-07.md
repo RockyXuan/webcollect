@@ -36,3 +36,32 @@
 
 - Step 0.2：新增 `scripts/test-sync-merge.ts` 同步测试骨架。
 - Phase 1：按 Fable 方案修同步正确性。
+
+## Step 0.2 状态：同步测试骨架
+
+已完成：
+
+- 新增 `scripts/test-sync-merge.ts`。
+- 在 `src/lib/supabase-browser.ts` 增加测试专用 fake Supabase client 注入 hook。
+- 测试脚本通过内存 Map 替代 localforage，不读写真实 IndexedDB。
+- 测试脚本通过 fake Supabase client 替代真实网络，不连接真实 Supabase。
+
+已覆盖 golden cases：
+
+- 本地新增分类/卡片会推送到云端。
+- 云端新增分类/卡片会拉取到本地。
+- 同 ID 冲突时云端时间戳较新则云端赢。
+- 同 ID 冲突时本地时间戳较新则本地赢并推送云端。
+
+验证结果：
+
+- `node --import tsx scripts/test-sync-merge.ts` passed.
+- `node --import tsx scripts/test-floating-capture-targets.ts` passed.
+- `node --import tsx scripts/test-floating-capture-drain.ts` passed.
+- `node --import tsx scripts/test-floating-capture-health.ts` passed.
+- `node --import tsx scripts/test-floating-capture-metadata.ts` passed.
+- `node --import tsx scripts/test-description-translation.ts` passed.
+- `node --import tsx scripts/test-extension-branding.ts` passed.
+- `corepack pnpm@9.0.0 ts-check` passed.
+- `corepack pnpm@9.0.0 lint` passed with existing 6 warnings.
+- `corepack pnpm@9.0.0 build:ext` passed.
