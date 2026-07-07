@@ -677,6 +677,144 @@ Phase 2 代码侧状态：
 - Phase 4.1、4.2、4.5 等 UI 还原度任务仍等待用户补 `docs/design/mockups/` 样板图。
 - Phase 5.3 `V1.0.4` 发版尚未执行。
 
+## R1.1 状态：启动新鲜度 marker 对齐
+
+来源：
+
+- `docs/audit/claude-fable-followup-plan-2026-07-07.md` A-1 / R1.1。
+
+已完成：
+
+- `src/lib/db.ts` 新增本地 `lastSeenCloudSnapshotUpdatedAt` 读写函数。
+- `auth-store` 启动判定改为四时间点三态：
+  - 云端 marker 大于 last-seen -> `sync`。
+  - 本地 updatedAt 大于 syncedAt -> `push`。
+  - 否则 -> `none`。
+- `syncData` 成功后记录它最终写回云端的 `localSnapshotUpdatedAt`。
+- `pushLocalSnapshotToCloud` 成功后记录它实际写到云端的 `snapshotUpdatedAt`。
+- 解决“本设备 push 后，下一次启动仍把自己的云端 marker 当成他端更新，反复全量 sync”的问题。
+
+新增验收：
+
+- `scripts/test-startup-light-sync.ts` 增加：
+  - 本设备 push 完成后模拟重启 -> `none`。
+  - 另一设备抬高云端 marker -> `sync`。
+  - 本地有未同步编辑 -> `push`。
+
+验证结果：
+
+- `node --import tsx scripts/test-startup-light-sync.ts` passed.
+- Full `for test in scripts/test-*.ts` loop passed.
+- `corepack pnpm@9.0.0 ts-check` passed.
+- `corepack pnpm@9.0.0 lint` passed with 0 warnings.
+- `corepack pnpm@9.0.0 build:ext` passed; Vite only reported existing bundle-size/dynamic-import warnings.
+- `git diff --check` passed.
+
+提交：
+
+- `05dd1d7 fix(sync): remember seen cloud snapshot marker`
+
+## R1.2 状态：Wikimedia 缩略图 400 降级链
+
+来源：
+
+- `docs/audit/claude-fable-followup-plan-2026-07-07.md` A-2 / R1.2。
+
+已完成：
+
+- `getDisplayUrl(item, targetWidth)` 改为按原图宽度生成 Wikimedia thumb URL：
+  - 原图宽度已知且 `<= targetWidth` 时直接用原图，不再请求同宽/放大缩略图。
+  - 原图宽度已知且更大时，使用 `Math.min(targetWidth, item.width - 1)`。
+  - 原图宽度未知时沿用目标宽度。
+- `wallpaper-shell.tsx` 增加加载降级链：
+  - 先加载 `displayUrl`。
+  - display 失败后只尝试一次 `wallpaper.imageUrl` 原图。
+  - 原图也失败时保持预览图，并在设置面板错误区显示“远程壁纸高清图加载失败，已保留预览图。”
+- 不做递归重试，不让失败图片把壁纸页打空。
+
+新增验收：
+
+- `scripts/test-wallpaper-sources.ts` 增加 Wikimedia width=2560、width=2000、width=0、width=4200 用例。
+- `scripts/test-wallpaper-data.ts` 更新展示层合同，验证存在 display -> original -> failed 降级链。
+
+验证结果：
+
+- `node --import tsx scripts/test-wallpaper-sources.ts` passed.
+- Full `for test in scripts/test-*.ts` loop passed.
+- `corepack pnpm@9.0.0 ts-check` passed.
+- `corepack pnpm@9.0.0 lint` passed with 0 warnings.
+- `corepack pnpm@9.0.0 build:ext` passed; Vite only reported existing bundle-size/dynamic-import warnings.
+- `git diff --check` passed.
+
+未完成的真实浏览器验收：
+
+- 本机当前项目未安装 Playwright，当前工具集中也没有可用 Browser 控制器；因此未复跑 Fable 要求的“轮换 5 张远程壁纸且 console 无 400”的真实浏览器步骤。
+- 后续如要补齐，应使用 Browser 插件/辅助 Chrome/Playwright 独立 profile，不能使用用户主 Chrome。
+
+提交：
+
+- `c7efc07 fix(wallpaper): fallback from wikimedia thumb failures`
+
+## R1.3 状态：wallpaperPrefs 云同步瘦身
+
+来源：
+
+- `docs/audit/claude-fable-followup-plan-2026-07-07.md` A-3 / R1.3。
+
+已完成：
+
+- 新增 `WallpaperSyncedSettings`：
+  - `defaultMode`
+  - `themeMode`
+  - `rotationInterval`
+  - `enabledCategories`
+  - `autoUpdate`
+  - `showZoomHints`
+  - `settingsUpdatedAt`
+- 本地仍保存完整 `WallpaperPrefs`，但云端 `user_preferences.wallpaperPrefs` 只写稳定设置字段。
+- `saveWallpaperPrefs` 只在稳定设置实际变化时 bump `settingsUpdatedAt`。
+- 壁纸轮换、当前壁纸、当前 quote、recent 列表、远程刷新时间都保持设备本地，不再推动云端设置时间。
+- 拉取云端较新设置时只覆盖稳定字段，保留本设备 `currentWallpaperId` / recent 历史。
+- 兼容旧云端完整 `WallpaperPrefs`：旧 `updatedAt` 会规范化为 `settingsUpdatedAt`。
+
+新增验收：
+
+- `scripts/test-wallpaper-sync.ts` 增加：
+  - 轮换壁纸后 `settingsUpdatedAt` 不变。
+  - 修改 `themeMode` 后 `settingsUpdatedAt` 变化。
+  - 云端较新稳定设置拉下来后，本地 `currentWallpaperId` 不被覆盖。
+  - 普通 sync / snapshot push 都只写 `toWallpaperSyncedSettings(...)`。
+
+验证结果：
+
+- `node --import tsx scripts/test-wallpaper-sync.ts` passed.
+- Full `for test in scripts/test-*.ts` loop passed.
+- `corepack pnpm@9.0.0 ts-check` passed.
+- `corepack pnpm@9.0.0 lint` passed with 0 warnings.
+- `corepack pnpm@9.0.0 build:ext` passed; Vite only reported existing bundle-size/dynamic-import warnings.
+- `git diff --check` passed.
+
+提交：
+
+- `2ed3325 fix(wallpaper): sync only stable settings`
+
+## 当前下一步（R2 / R3）
+
+R1 代码项已完成。合并 `main` 和发布 `V1.0.4` 前仍需完成 Fable follow-up 的真实环境验收：
+
+1. 用户先在 Supabase Dashboard 导出 `cards` / `categories` CSV 备份。
+2. 用户在 SQL Editor 运行 `migrations/2026-07-07-client-updated-at.sql`。
+3. 验证 `select prosrc from pg_proc where proname = 'set_updated_at';` 输出包含 `is not distinct from`。
+4. 使用两个浏览器 profile 登录同一账号，按 follow-up plan R2.2 做双设备同步验收。
+5. 使用辅助 Chrome / Codex Workbench 加载 `extension/dist`，做扩展真实验收。
+
+注意：
+
+- 用户已确认此前 Image2 要求属于误提；UI 还原度任务本轮暂缓，不再作为合并/发版阻塞项。
+- 当前分支仍未合并 `main`，也尚未发布 `V1.0.4`。
+
+## Step 5.2 本地验证补充
+
 本地验证：
 
 - `rg -n "鈹|�|鍏|鐢" src/lib/sync.ts src/lib/auth-store.ts` returned no matches.

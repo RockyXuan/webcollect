@@ -1,6 +1,6 @@
 # WebCollect 全项目体检入口
 
-更新时间：2026-07-07
+更新时间：2026-07-08
 面向对象：Claude / Codex / 后续任何接手 WebCollect 的开发 agent
 当前主目录：`/Users/rockyx/vibe coding/Web Collect 0628`
 远端仓库：`https://github.com/RockyXuan/webcollect`
@@ -8,18 +8,19 @@
 当前最新已发布版本：`V1.0.3 / 2026年7月2日`
 当前 main 已知基线提交：`a779f26`（Claude Fable 审查时的 main）
 当前整改分支：`fix/sync-architecture`
-当前整改分支最新状态：本文件随整改分支持续更新；截至 Phase 5.2 已推 `bc6311a docs(audit): update remediation status`，最新点以 `git log -1 --oneline` 为准。
+当前整改分支最新状态：本文件随整改分支持续更新；Fable 第二轮 R1 代码项已完成，最新点以 `git log -1 --oneline` 为准。
 
 ## 2026-07-07 Fable 整改执行状态
 
 - 已导入并按步执行 Fable 方案：`docs/audit/claude-fable-remediation-plan-2026-07-07.md`。
 - 执行日志：`docs/audit/remediation-execution-log-2026-07-07.md`。
 - 已完成 Phase 1 同步正确性、Phase 2 启动/性能减负、Phase 3 壁纸远程/同步/状态可见。
-- Phase 4.0 已准备 `docs/design/mockups/`，等待用户补 Image2 设计样板图；Phase 4.1、4.2、4.5 因缺少样板图暂不能客观执行。
+- Phase 4.0 已准备 `docs/design/mockups/`；用户已确认此前 Image2 要求属于误提，UI 还原度任务（Phase 4.1、4.2、4.5）本轮暂缓，不再阻塞合并/发版。
 - Phase 4.3 已清除 `src` 与 `extension/src` 的系统 `prompt/confirm/alert` 残留。
 - Phase 4.4 已按 Fable 方案拆分原 `sortable-grid.tsx`：DnD shell、分类块、分组块、未分类块、卡片块和布局数学已分离，并新增 `scripts/test-grid-layout.ts` 防回归；已补 Playwright 浏览器验收，覆盖编辑模式、误删防护、resize 收缩/恢复和分组拖拽排序。
 - Phase 5.1 已新增 GitHub Actions CI。
-- 当前尚未合并回 `main`，也尚未发布 `V1.0.4` Release；需在剩余阻塞项确认后再做最终发版。
+- Fable 第二轮 R1 已完成：启动新鲜度 marker、Wikimedia 缩略图降级、wallpaperPrefs 稳定设置同步瘦身。
+- 当前尚未合并回 `main`，也尚未发布 `V1.0.4` Release；发版前仍需用户完成 R2 Supabase SQL 迁移与双设备真实同步验收。
 
 ## 先读这个
 
