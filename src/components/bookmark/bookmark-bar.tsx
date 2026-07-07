@@ -7,6 +7,7 @@ import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type D
 import { SortableContext, horizontalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Check, GripVertical, Pencil, Star } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getPinnedBookmarkLabel, resolvePinnedBookmarkCards } from "@/lib/pinned-bookmarks";
 import { openWebCollectUrl } from "@/lib/platform";
 import { getSemanticSiteIcon, getSiteIconCandidates, shouldPersistSiteIcon } from "@/lib/site-icons";
@@ -101,6 +102,9 @@ interface SortableBookmarkProps {
 
 function SortableBookmark({ item, card, editMode, onOpen, onUpdate, onUpdateCard, onRemove }: SortableBookmarkProps) {
   const [imageCandidateIndex, setImageCandidateIndex] = useState(0);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [draftLabel, setDraftLabel] = useState(item.customLabel || "");
+  const [draftMode, setDraftMode] = useState<PinnedBookmarkDisplayMode>(item.displayMode);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
     disabled: !editMode,
@@ -120,14 +124,9 @@ function SortableBookmark({ item, card, editMode, onOpen, onUpdate, onUpdateCard
     opacity: isDragging ? 0.45 : 1,
   };
 
-  const editBookmark = () => {
-    const nextLabel = window.prompt("收藏栏短标签，留空则自动使用简称", item.customLabel || label);
-    if (nextLabel === null) return;
-    const modeInput = window.prompt("显示方式：icon / label / both", item.displayMode);
-    if (modeInput === null) return;
-    const displayMode: PinnedBookmarkDisplayMode =
-      modeInput === "label" || modeInput === "both" || modeInput === "icon" ? modeInput : item.displayMode;
-    onUpdate({ ...item, customLabel: nextLabel.trim() || undefined, displayMode });
+  const commitBookmarkEdit = () => {
+    onUpdate({ ...item, customLabel: draftLabel.trim() || undefined, displayMode: draftMode });
+    setEditorOpen(false);
   };
 
   const handleImageError = () => {
@@ -143,6 +142,12 @@ function SortableBookmark({ item, card, editMode, onOpen, onUpdate, onUpdateCard
   React.useEffect(() => {
     setImageCandidateIndex(0);
   }, [card.id, card.imageUrl, card.url]);
+
+  React.useEffect(() => {
+    if (!editorOpen) return;
+    setDraftLabel(item.customLabel || "");
+    setDraftMode(item.displayMode);
+  }, [editorOpen, item.customLabel, item.displayMode]);
 
   return (
     <button
@@ -188,24 +193,74 @@ function SortableBookmark({ item, card, editMode, onOpen, onUpdate, onUpdateCard
       {!showLabel && !showIcon && <span className="wc-bookmark-label">{label}</span>}
       {editMode && (
       <span className="wc-bookmark-actions">
-        <span
-          role="button"
-          tabIndex={0}
-          className="wc-bookmark-mini"
-          onClick={(event) => {
-            event.stopPropagation();
-            editBookmark();
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.stopPropagation();
-              editBookmark();
-            }
-          }}
-          title="编辑收藏显示"
-        >
-          <Pencil className="h-3 w-3" />
-        </span>
+        <Popover open={editorOpen} onOpenChange={setEditorOpen}>
+          <PopoverTrigger asChild>
+            <span
+              role="button"
+              tabIndex={0}
+              className="wc-bookmark-mini"
+              onClick={(event) => {
+                event.stopPropagation();
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.stopPropagation();
+                }
+              }}
+              title="编辑收藏显示"
+            >
+              <Pencil className="h-3 w-3" />
+            </span>
+          </PopoverTrigger>
+          <PopoverContent
+            align="start"
+            className="w-64 space-y-3 rounded-2xl border-slate-200 bg-white/95 p-3 text-slate-900 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <label className="block space-y-1 text-xs font-bold text-slate-600">
+              <span>短标签</span>
+              <input
+                value={draftLabel}
+                onChange={(event) => setDraftLabel(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    commitBookmarkEdit();
+                  }
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    setEditorOpen(false);
+                  }
+                }}
+                placeholder={label}
+                className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:border-blue-300"
+              />
+            </label>
+            <div className="space-y-1">
+              <p className="text-xs font-bold text-slate-600">显示方式</p>
+              <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1">
+                {(["icon", "label", "both"] as PinnedBookmarkDisplayMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={`rounded-lg px-2 py-1.5 text-xs font-bold transition-colors ${draftMode === mode ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+                    onClick={() => setDraftMode(mode)}
+                  >
+                    {mode === "icon" ? "图标" : mode === "label" ? "文字" : "全部"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button type="button" className="rounded-xl px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-100" onClick={() => setEditorOpen(false)}>
+                取消
+              </button>
+              <button type="button" className="rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-bold text-white" onClick={commitBookmarkEdit}>
+                保存
+              </button>
+            </div>
+          </PopoverContent>
+        </Popover>
         <span
           role="button"
           tabIndex={0}

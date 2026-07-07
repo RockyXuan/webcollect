@@ -80,6 +80,8 @@ export function NewTabApp() {
   const [defaultParentId, setDefaultParentId] = useState<string | undefined>();
   const [isCreatingParent, setIsCreatingParent] = useState(false);
   const [isWarehouseRefreshing, setIsWarehouseRefreshing] = useState(false);
+  const [warehouseNotice, setWarehouseNotice] = useState("");
+  const [clearWarehouseOpen, setClearWarehouseOpen] = useState(false);
   const [emergencyRestorePrompt, setEmergencyRestorePrompt] = useState<EmergencyRestorePrompt | null>(null);
 
   // 鈹€鈹€ Warehouse state 鈹€鈹€
@@ -370,7 +372,9 @@ export function NewTabApp() {
                   onClick={async () => {
                     const removed = await deleteExistingWarehouseItems();
                     if (removed === 0) {
-                      window.alert("No existing or duplicate warehouse items found.");
+                      setWarehouseNotice("No existing or duplicate warehouse items found.");
+                    } else {
+                      setWarehouseNotice(`Removed ${removed} existing or duplicate warehouse items.`);
                     }
                   }}
                   disabled={warehouseCards.length === 0}
@@ -381,10 +385,7 @@ export function NewTabApp() {
                   {"\u5220\u9664\u5df2\u5b58\u5728"}
                 </button>
                 <button
-                  onClick={async () => {
-                    if (!window.confirm(`Clear ${warehouseCategories.length} warehouse categories and ${warehouseCards.length} pages? Main page data will not be changed.`)) return;
-                    await clearAllWarehouse();
-                  }}
+                  onClick={() => setClearWarehouseOpen(true)}
                   disabled={warehouseCards.length === 0 && warehouseCategories.length === 0}
                   className="inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-white/75 px-4 py-2 text-sm text-rose-600 transition-colors hover:bg-rose-50 disabled:opacity-40"
                   title="Clear warehouse"
@@ -401,6 +402,13 @@ export function NewTabApp() {
               </div>
             </div>
           </nav>
+          {warehouseNotice && (
+            <div className="wc-shell px-5 pt-3">
+              <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
+                {warehouseNotice}
+              </div>
+            </div>
+          )}
           <main className="wc-shell px-5 py-7">
             <ErrorBoundary>
               <WarehouseGrid />
@@ -412,6 +420,29 @@ export function NewTabApp() {
           />
         </>
       )}
+      <AlertDialog open={clearWarehouseOpen} onOpenChange={setClearWarehouseOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear warehouse?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will clear {warehouseCategories.length} warehouse categories and {warehouseCards.length} pages.
+              Main page data will not be changed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                await clearAllWarehouse();
+                setWarehouseNotice("Warehouse cleared. Main page data was not changed.");
+              }}
+            >
+              Clear
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog
         open={!!emergencyRestorePrompt}
         onOpenChange={(open) => {

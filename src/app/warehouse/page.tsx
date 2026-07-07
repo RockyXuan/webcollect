@@ -46,6 +46,7 @@ export default function WarehousePage() {
 
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [notice, setNotice] = useState("");
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -123,7 +124,9 @@ export default function WarehousePage() {
               onClick={async () => {
                 const removed = await deleteExistingWarehouseItems();
                 if (removed === 0) {
-                  window.alert("没有找到已存在或重复的仓库网页。");
+                  setNotice("没有找到已存在或重复的仓库网页。");
+                } else {
+                  setNotice(`已删除 ${removed} 个已存在或重复的仓库网页。`);
                 }
               }}
             >
@@ -175,6 +178,12 @@ export default function WarehousePage() {
           </div>
         </div>
       </nav>
+
+      {notice && (
+        <div className="mx-4 mt-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
+          {notice}
+        </div>
+      )}
 
       <main className="w-full px-3 sm:px-5 lg:px-6 py-4 space-y-4">
         {/* Batch filter tabs */}

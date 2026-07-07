@@ -615,3 +615,34 @@ Phase 2 代码侧状态：
 
 - 请把目标 UI 样板图重新导出为 PNG，放入 `docs/design/mockups/`。
 - 文件名建议使用 `YYYY-MM-DD-screen-name.png`。
+
+## Step 4.3 状态：清除系统弹窗残留
+
+已完成：
+
+- `bookmark-bar.tsx` 的双 `window.prompt` 改为项目内 Popover：短标签输入框 + 图标/文字/全部三段选择。
+- `category-tabs.tsx` 删除确认改为 AlertDialog。
+- `warehouse/page.tsx` 的无结果提示改为页面内状态条；清空仓库继续使用 AlertDialog。
+- `extension/src/newtab-app.tsx` 的无结果提示改为页面内状态条；清空仓库改为 AlertDialog。
+- `user-menu.tsx` 的清空数据、开启所有链接提示、修复结构确认全部改为 AlertDialog；清空数据保留输入“清空”的强确认。
+- `local-snapshot-dialog.tsx` 的整库恢复/只修结构确认改为 AlertDialog。
+- `top-nav.tsx` 的刷新/保存失败提示改为顶部状态条，不再使用浏览器 alert。
+
+验证结果：
+
+- `rg -n "window\\.prompt|window\\.confirm|window\\.alert|\\bprompt\\(|\\bconfirm\\(|\\balert\\(" src extension/src` returned no matches.
+- `corepack pnpm@9.0.0 ts-check` passed.
+- `node --import tsx scripts/test-section-tabs-editing.ts` passed.
+- `node --import tsx scripts/test-category-light-editing.ts` passed.
+- `node --import tsx scripts/test-floating-capture-targets.ts` passed.
+- `node --import tsx scripts/test-floating-capture-drain.ts` passed.
+- `node --import tsx scripts/test-floating-capture-health.ts` passed.
+- `node --import tsx scripts/test-floating-capture-metadata.ts` passed.
+- `node --import tsx scripts/test-description-translation.ts` passed.
+- `node --import tsx scripts/test-extension-branding.ts` passed.
+- `node --import tsx scripts/test-wallpaper-wiring.ts` passed.
+- `node --import tsx scripts/test-wallpaper-sync.ts` passed.
+- `node --import tsx scripts/test-sync-merge.ts` passed.
+- `corepack pnpm@9.0.0 lint` passed with 0 warnings.
+- `corepack pnpm@9.0.0 build:ext` passed.
+- `git diff --check` passed.

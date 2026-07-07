@@ -3,6 +3,16 @@
 import { useState } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import type { Category } from "@/lib/types";
@@ -16,12 +26,14 @@ interface CategoryTabsProps {
 export function CategoryTabs({ onAddCategory, onEditCategory }: CategoryTabsProps) {
   const { categories, activeCategoryId, setActiveCategory, deleteCategory } = useAppStore();
   const [hoveredCat, setHoveredCat] = useState<string | null>(null);
+  const [deleteCandidate, setDeleteCandidate] = useState<Category | null>(null);
 
   const getIcon = getLucideIcon;
 
   const allCategories = [{ id: "all", name: "全部", icon: "layout-grid", color: "", order: -1, createdAt: 0 }, ...categories];
 
   return (
+    <>
     <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
       {allCategories.map((cat) => {
         const IconEl = getIcon(cat.icon || "circle");
@@ -63,9 +75,7 @@ export function CategoryTabs({ onAddCategory, onEditCategory }: CategoryTabsProp
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (confirm(`确定删除分类「${cat.name}」吗？其中的卡片将被保留但变为未分类。`)) {
-                      deleteCategory(cat.id);
-                    }
+                    setDeleteCandidate(cat as Category);
                   }}
                   className="p-1 rounded-full bg-destructive text-destructive-foreground shadow-sm hover:scale-110 transition-transform"
                 >
@@ -87,5 +97,30 @@ export function CategoryTabs({ onAddCategory, onEditCategory }: CategoryTabsProp
         分类
       </Button>
     </div>
+    <AlertDialog open={Boolean(deleteCandidate)} onOpenChange={(open) => {
+      if (!open) setDeleteCandidate(null);
+    }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>删除分类「{deleteCandidate?.name}」？</AlertDialogTitle>
+          <AlertDialogDescription>
+            其中的卡片将被保留，但会变为未分类。这个操作不会删除网页卡片。
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>取消</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => {
+              if (deleteCandidate) deleteCategory(deleteCandidate.id);
+              setDeleteCandidate(null);
+            }}
+          >
+            确定
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

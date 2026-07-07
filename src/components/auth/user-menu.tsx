@@ -8,6 +8,16 @@ import { APP_RELEASE_DATE_DISPLAY, APP_VERSION } from "@/lib/app-version";
 import { useAuthStore } from "@/lib/auth-store";
 import type { LinkOpenMode } from "@/lib/types";
 import { LocalSnapshotDialog } from "@/components/dialogs/local-snapshot-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { restoreStructureFromBestLocalSnapshot, saveVersionAndClearLocalData } from "@/lib/local-snapshots";
 import { isChromeExtension } from "@/lib/platform";
 import { DEFAULT_EXTENSION_CONFIG, EXTENSION_STORAGE_KEYS, setSupabaseConfig } from "@/lib/supabase-browser";
@@ -104,6 +114,10 @@ export function UserMenu() {
   const [repairMessage, setRepairMessage] = useState("");
   const [clearingData, setClearingData] = useState(false);
   const [clearMessage, setClearMessage] = useState("");
+  const [clearDataDialogOpen, setClearDataDialogOpen] = useState(false);
+  const [clearConfirmText, setClearConfirmText] = useState("");
+  const [allLinksDialogOpen, setAllLinksDialogOpen] = useState(false);
+  const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
   const [capturePrefs, setCapturePrefs] = useState<FloatingCapturePrefs | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const visualScale = useAppStore((s) => s.visualScale);
@@ -282,19 +296,6 @@ export function UserMenu() {
     : RefreshCw;
 
   const saveVersionAndClearData = async () => {
-    const firstOk = window.confirm(
-      "\u8fd9\u4e2a\u64cd\u4f5c\u4f1a\u5148\u628a\u5f53\u524d\u5b8c\u6574\u6570\u636e\u4fdd\u5b58\u5230\u201c\u7248\u672c\u56de\u6863\u201d\uff0c\u7136\u540e\u6e05\u7a7a\u4e3b\u9875\u3001\u5206\u9879\u3001\u5206\u7c7b\u3001\u5206\u7ec4\u3001\u7f51\u9875\u3001\u56de\u6536\u7ad9\u548c\u4ed3\u5e93\u3002\u7ee7\u7eed\u5417\uff1f"
-    );
-    if (!firstOk) return;
-
-    const secondOk = window.confirm(
-      "\u518d\u6b21\u786e\u8ba4\uff1a\u6e05\u7a7a\u540e\u9875\u9762\u53ea\u4fdd\u7559\u4e00\u4e2a\u7a7a\u7684\u6536\u96c6\u7bb1\u3002\u5982\u679c\u5df2\u767b\u5f55\uff0c\u8fd9\u6b21\u6e05\u7a7a\u4e5f\u4f1a\u540c\u6b65\u5230\u4e91\u7aef\uff0c\u9632\u6b62\u65e7\u4e91\u7aef\u6570\u636e\u53c8\u88ab\u62c9\u56de\u6765\u3002\u786e\u5b9a\u7ee7\u7eed\uff1f"
-    );
-    if (!secondOk) return;
-
-    const typed = window.prompt("\u6700\u540e\u786e\u8ba4\uff1a\u8bf7\u8f93\u5165\u201c\u6e05\u7a7a\u201d\u4e24\u4e2a\u5b57\u3002");
-    if (typed !== "\u6e05\u7a7a") return;
-
     setClearingData(true);
     setClearMessage("");
     try {
@@ -345,12 +346,6 @@ export function UserMenu() {
 
   const toggleAllLinksHover = async () => {
     if (!capturePrefs) return;
-    if (!capturePrefs.allLinksHoverEnabled) {
-      const ok = window.confirm(
-        "开启后，页面上几乎所有链接悬停都会出现 WC 提示，可能比较打扰。建议只在临时整理链接时开启。确定开启吗？"
-      );
-      if (!ok) return;
-    }
     await updateCapturePrefs({
       hoverEnabled: true,
       allLinksHoverEnabled: !capturePrefs.allLinksHoverEnabled,
@@ -358,10 +353,6 @@ export function UserMenu() {
   };
 
   const restoreStructureOnly = async () => {
-    const ok = window.confirm(
-      "\u5c06\u5148\u4fdd\u5b58\u5f53\u524d\u72b6\u6001\uff0c\u7136\u540e\u4ece\u672c\u5730\u5386\u53f2\u4e2d\u9009\u62e9\u7ed3\u6784\u6700\u5b8c\u6574\u7684\u4e00\u7248\uff0c\u53ea\u6062\u590d\u5206\u9879/\u5206\u7c7b/\u5206\u7ec4\u5173\u7cfb\uff0c\u4fdd\u7559\u6240\u6709\u73b0\u6709\u7f51\u9875\u3002\u5982\u679c\u4f60\u5f53\u524d\u9875\u9762\u5df2\u7ecf\u6b63\u786e\uff0c\u8bf7\u4e0d\u8981\u70b9\u8fd9\u4e2a\uff0c\u76f4\u63a5\u624b\u52a8\u4e91\u540c\u6b65\u3002\u7ee7\u7eed\u5417\uff1f"
-    );
-    if (!ok) return;
     setRepairingLayout(true);
     setRepairMessage("");
     try {
@@ -383,6 +374,73 @@ export function UserMenu() {
   return (
     <div className="relative" ref={menuRef}>
       <LocalSnapshotDialog open={snapshotOpen} onOpenChange={setSnapshotOpen} />
+      <AlertDialog open={allLinksDialogOpen} onOpenChange={setAllLinksDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>开启所有链接提示？</AlertDialogTitle>
+            <AlertDialogDescription>
+              开启后，页面上几乎所有链接悬停都会出现 WC 提示，可能比较打扰。建议只在临时整理链接时开启。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { void toggleAllLinksHover(); }}>
+              开启
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={restoreDialogOpen} onOpenChange={setRestoreDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>修复结构并保留网页？</AlertDialogTitle>
+            <AlertDialogDescription>
+              将先保存当前状态，然后从本地历史中选择结构最完整的一版，只恢复分项、分类、分组关系，保留所有现有网页。
+              如果当前页面已经正确，请不要执行这个操作，直接手动云同步即可。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { void restoreStructureOnly(); }}>
+              继续修复
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={clearDataDialogOpen} onOpenChange={(open) => {
+        setClearDataDialogOpen(open);
+        if (!open) setClearConfirmText("");
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>保存版本并清空数据？</AlertDialogTitle>
+            <AlertDialogDescription>
+              这个操作会先把当前完整数据保存到“版本回档”，然后清空主页、分项、分类、分组、网页、回收站和仓库。
+              如果已登录，这次清空也会同步到云端，防止旧云端数据被拉回。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <label className="block text-sm font-semibold text-slate-700">
+              最后确认：请输入“清空”
+            </label>
+            <input
+              value={clearConfirmText}
+              onChange={(event) => setClearConfirmText(event.target.value)}
+              className="wc-input h-10 w-full rounded-2xl px-3 text-sm text-slate-900 outline-none"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={clearConfirmText !== "清空"}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:pointer-events-none disabled:opacity-45"
+              onClick={() => { void saveVersionAndClearData(); }}
+            >
+              保存版本并清空
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <button
         onClick={() => setMenuOpen(!menuOpen)}
         aria-label="打开账户设置"
@@ -619,7 +677,13 @@ export function UserMenu() {
                 </button>
                 <button
                   type="button"
-                  onClick={toggleAllLinksHover}
+                  onClick={() => {
+                    if (capturePrefs.allLinksHoverEnabled) {
+                      void toggleAllLinksHover();
+                    } else {
+                      setAllLinksDialogOpen(true);
+                    }
+                  }}
                   className="wc-pill-toggle col-span-2"
                   data-active={capturePrefs.allLinksHoverEnabled}
                   title="开启后，页面上几乎所有链接都会出现 WC 提示，可能比较打扰。"
@@ -687,7 +751,7 @@ export function UserMenu() {
             <button
               type="button"
               disabled={repairingLayout}
-              onClick={restoreStructureOnly}
+              onClick={() => setRestoreDialogOpen(true)}
               className="wc-panel-action"
             >
               {repairingLayout ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wrench className="h-3.5 w-3.5" />}
@@ -697,7 +761,10 @@ export function UserMenu() {
             <button
               type="button"
               disabled={clearingData || syncStatus === "syncing"}
-              onClick={saveVersionAndClearData}
+              onClick={() => {
+                setClearConfirmText("");
+                setClearDataDialogOpen(true);
+              }}
               className="wc-panel-action wc-panel-action-danger"
             >
               {clearingData ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}

@@ -4,6 +4,16 @@ import { useCallback, useEffect, useState } from "react";
 import { Cloud, Clock3, HardDrive, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -33,6 +43,10 @@ interface LocalSnapshotDialogProps {
 }
 
 type SnapshotLike = LocalSnapshotEntry | CloudWorkspaceSnapshotEntry;
+type PendingRestoreAction = {
+  mode: "full" | "structure";
+  snapshot: SnapshotLike;
+};
 
 function isCloudSnapshot(snapshot: SnapshotLike): snapshot is CloudWorkspaceSnapshotEntry {
   return (snapshot as CloudWorkspaceSnapshotEntry).source === "cloud";
@@ -99,6 +113,7 @@ export function LocalSnapshotDialog({ open, onOpenChange }: LocalSnapshotDialogP
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [structureRestoringId, setStructureRestoringId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState("all");
+  const [pendingRestore, setPendingRestore] = useState<PendingRestoreAction | null>(null);
 
   const loadSnapshots = useCallback(async () => {
     setIsLoading(true);
@@ -132,10 +147,6 @@ export function LocalSnapshotDialog({ open, onOpenChange }: LocalSnapshotDialogP
   }, [loadSnapshots, open]);
 
   const handleRestore = async (snapshot: SnapshotLike) => {
-    const ok = window.confirm(
-      `恢复到 ${formatSnapshotTime(snapshot.createdAt)} 的${isCloudSnapshot(snapshot) ? "云端" : "本地"}版本？当前版本会先自动备份。`
-    );
-    if (!ok) return;
     const key = snapshotKey(snapshot);
     setRestoringId(key);
     try {
@@ -153,10 +164,6 @@ export function LocalSnapshotDialog({ open, onOpenChange }: LocalSnapshotDialogP
   };
 
   const handleStructureRestore = async (snapshot: SnapshotLike) => {
-    const ok = window.confirm(
-      `只修复 ${formatSnapshotTime(snapshot.createdAt)} 的分项/分类/分组关系？当前新增网页会保留，不做整库回档。`
-    );
-    if (!ok) return;
     const key = snapshotKey(snapshot);
     setStructureRestoringId(key);
     try {
@@ -231,7 +238,7 @@ export function LocalSnapshotDialog({ open, onOpenChange }: LocalSnapshotDialogP
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleStructureRestore(snapshot)}
+              onClick={() => setPendingRestore({ mode: "structure", snapshot })}
               disabled={structureRestoringId === key}
             >
               <RotateCcw className="h-3.5 w-3.5" />
@@ -240,7 +247,7 @@ export function LocalSnapshotDialog({ open, onOpenChange }: LocalSnapshotDialogP
             <Button
               variant="default"
               size="sm"
-              onClick={() => handleRestore(snapshot)}
+              onClick={() => setPendingRestore({ mode: "full", snapshot })}
               disabled={restoringId === key}
             >
               <RotateCcw className="h-3.5 w-3.5" />
@@ -274,6 +281,7 @@ export function LocalSnapshotDialog({ open, onOpenChange }: LocalSnapshotDialogP
   );
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
@@ -357,5 +365,40 @@ export function LocalSnapshotDialog({ open, onOpenChange }: LocalSnapshotDialogP
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    <AlertDialog open={Boolean(pendingRestore)} onOpenChange={(dialogOpen) => {
+      if (!dialogOpen) setPendingRestore(null);
+    }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {pendingRestore?.mode === "structure" ? "只修复结构？" : "恢复全部版本？"}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {pendingRestore
+              ? pendingRestore.mode === "structure"
+                ? `只修复 ${formatSnapshotTime(pendingRestore.snapshot.createdAt)} 的分项、分类、分组关系。当前新增网页会保留，不做整库回档。`
+                : `恢复到 ${formatSnapshotTime(pendingRestore.snapshot.createdAt)} 的${isCloudSnapshot(pendingRestore.snapshot) ? "云端" : "本地"}版本。当前版本会先自动备份。`
+              : ""}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>取消</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              if (!pendingRestore) return;
+              if (pendingRestore.mode === "structure") {
+                void handleStructureRestore(pendingRestore.snapshot);
+              } else {
+                void handleRestore(pendingRestore.snapshot);
+              }
+              setPendingRestore(null);
+            }}
+          >
+            确认
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

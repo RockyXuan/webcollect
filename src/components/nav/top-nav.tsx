@@ -217,6 +217,7 @@ export function TopNav({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSavingSnapshot, setIsSavingSnapshot] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<"idle" | "saved">("idle");
+  const [headerNotice, setHeaderNotice] = useState("");
   const [isSearchPanelOpen, setIsSearchPanelOpen] = useState(false);
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
   const [sectionEditMode, setSectionEditMode] = useState(false);
@@ -427,7 +428,7 @@ export function TopNav({
     } catch (error) {
       console.error("[WebCollect] Refresh failed", error);
       const message = error instanceof Error ? error.message : "刷新失败，请稍后重试。";
-      window.alert(message);
+      setHeaderNotice(message);
     } finally {
       setIsRefreshing(false);
     }
@@ -449,14 +450,14 @@ export function TopNav({
           source: "header-save",
         });
       } else {
-        window.alert("未登录：当前版本已保存到本地。登录后，手动版本会保存到云端并跟随账号。");
+        setHeaderNotice("未登录：当前版本已保存到本地。登录后，手动版本会保存到云端并跟随账号。");
       }
       setSaveFeedback("saved");
       window.setTimeout(() => setSaveFeedback("idle"), 1400);
     } catch (error) {
       console.error("[WebCollect] Save snapshot failed", error);
       const message = error instanceof Error ? error.message : "保存当前版本失败，请稍后再试。";
-      window.alert(localSaved ? `本地已保存，但云端版本保存失败：${message}` : message);
+      setHeaderNotice(localSaved ? `本地已保存，但云端版本保存失败：${message}` : message);
     } finally {
       setIsSavingSnapshot(false);
     }
@@ -580,6 +581,16 @@ export function TopNav({
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
               <span>刷新</span>
             </Button>
+            {headerNotice && (
+              <button
+                type="button"
+                className="max-w-72 truncate rounded-2xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700"
+                onClick={() => setHeaderNotice("")}
+                title="点击关闭提示"
+              >
+                {headerNotice}
+              </button>
+            )}
             {onShowWallpaper && (
               <Button
                 variant="ghost"
