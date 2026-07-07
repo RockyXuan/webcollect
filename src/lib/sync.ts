@@ -120,6 +120,30 @@ interface SyncBackup {
   sampleCardTitles: string[];
 }
 
+const MAX_SYNC_RECURSION_DEPTH = 2;
+
+let syncInFlight: Promise<void> | null = null;
+
+function runWithSyncGate(task: () => Promise<void>, depth: number, label: string): Promise<void> {
+  if (depth > MAX_SYNC_RECURSION_DEPTH) {
+    console.warn(`[Sync] ${label} skipped after reaching recursion depth ${depth}.`);
+    return Promise.resolve();
+  }
+
+  if (depth > 0) {
+    return task();
+  }
+
+  if (syncInFlight) {
+    return syncInFlight;
+  }
+
+  syncInFlight = task().finally(() => {
+    syncInFlight = null;
+  });
+  return syncInFlight;
+}
+
 // 鈹€鈹€ Mapping helpers 鈹€鈹€
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -1247,7 +1271,11 @@ function formatCloudLoadError(resourceName: string, message: string): Error {
   return new Error(`\u52a0\u8f7d\u4e91\u7aef${resourceName}\u5931\u8d25: ${message}`);
 }
 
-export async function syncData(userId: string): Promise<void> {
+export function syncData(userId: string, depth = 0): Promise<void> {
+  return runWithSyncGate(() => syncDataUnsafe(userId, depth), depth, "syncData");
+}
+
+async function syncDataUnsafe(userId: string, depth: number): Promise<void> {
   console.log("[Sync] Starting sync for user:", userId);
 
   // Ensure Supabase is configured
@@ -1342,7 +1370,7 @@ export async function syncData(userId: string): Promise<void> {
   const localChangedDuringCloudLoad = localSnapshotUpdatedAtAfterCloudLoad > localSnapshotUpdatedAt;
   if (localChangedDuringCloudLoad) {
     console.warn("[Sync] Local data changed while cloud was loading; aborting restore merge and pushing latest local snapshot instead.");
-    await pushLocalSnapshotToCloud(userId);
+    await pushLocalSnapshotToCloud(userId, {}, depth + 1);
     return;
   }
   const localScore = localSnapshotContentScore({
@@ -1589,9 +1617,18 @@ export async function syncData(userId: string): Promise<void> {
   console.log("[Sync] Sync completed successfully");
 }
 
-export async function pushLocalSnapshotToCloud(
+export function pushLocalSnapshotToCloud(
   userId: string,
-  options: { allowDestructiveClear?: boolean; skipStructureGuard?: boolean } = {}
+  options: { allowDestructiveClear?: boolean; skipStructureGuard?: boolean } = {},
+  depth = 0
+): Promise<void> {
+  return runWithSyncGate(() => pushLocalSnapshotToCloudUnsafe(userId, options, depth), depth, "pushLocalSnapshotToCloud");
+}
+
+async function pushLocalSnapshotToCloudUnsafe(
+  userId: string,
+  options: { allowDestructiveClear?: boolean; skipStructureGuard?: boolean },
+  depth: number
 ): Promise<void> {
   console.log("[Sync] Pushing local snapshot for user:", userId);
 
@@ -1679,7 +1716,7 @@ export async function pushLocalSnapshotToCloud(
   const cloudWorkspaceResetAt = getNumberPreference(cloudPrefsMap, WORKSPACE_RESET_PREF_KEY);
   if (!options.allowDestructiveClear && cloudWorkspaceResetAt > localWorkspaceResetAt) {
     console.warn("[Sync] Cloud workspace reset is newer than this tab; pulling before push.");
-    await syncData(userId);
+    await syncData(userId, depth + 1);
     return;
   }
   const cloudSnapshotUpdatedAt = Math.max(getNumberPreference(cloudPrefsMap, "localSnapshotUpdatedAt"), cloudWorkspaceResetAt);
@@ -1710,12 +1747,12 @@ export async function pushLocalSnapshotToCloud(
     && localLayoutLooksCollapsed(localSections, localCategorySectionIds)
   ) {
     console.warn("[Sync] Refusing to push a default-only local section layout over a multi-section cloud layout.");
-    await syncData(userId);
+    await syncData(userId, depth + 1);
     return;
   }
   if (!options.allowDestructiveClear && !resetReplacement && cloudSnapshotUpdatedAt > localSnapshotUpdatedAt) {
     console.warn("[Sync] Cloud snapshot is newer than local; pulling/merging before push.");
-    await syncData(userId);
+    await syncData(userId, depth + 1);
     return;
   }
   const localScore = localSnapshotContentScore({
@@ -1729,7 +1766,7 @@ export async function pushLocalSnapshotToCloud(
   const cloudScore = cloudSnapshotContentScore(cloudCategories, cloudCards, cloudPrefsMap, workspaceResetAt);
   if (!options.allowDestructiveClear && !resetReplacement && cloudScore > 0 && localScore === 0) {
     console.warn("[Sync] Refusing to push an empty local snapshot over non-empty cloud data.");
-    await syncData(userId);
+    await syncData(userId, depth + 1);
     return;
   }
   if (
@@ -1750,7 +1787,7 @@ export async function pushLocalSnapshotToCloud(
     )
   ) {
     console.warn("[Sync] Refusing to push a much smaller local snapshot over richer cloud data.");
-    await syncData(userId);
+    await syncData(userId, depth + 1);
     return;
   }
 

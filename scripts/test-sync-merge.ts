@@ -98,12 +98,14 @@ class FakeSupabaseQuery {
       return { data: this.db.delete(this.table, this.filters), error: null };
     }
     this.db.operations.select += 1;
+    await this.db.onSelect?.(this.table);
     const data = this.db.select(this.table, this.filters, this.limitCount);
     return { data, error: null };
   }
 }
 
 class FakeSupabaseClient {
+  onSelect?: (table: TableName) => void | Promise<void>;
   onUpsert?: (table: TableName, value: Row | Row[]) => void | Promise<void>;
 
   readonly tables: Record<TableName, Row[]> = {
@@ -235,6 +237,12 @@ function restoreLocalStore(snapshot: Map<string, unknown>): void {
   for (const [key, value] of snapshot.entries()) {
     memoryStore.set(key, cloneValue(value));
   }
+}
+
+async function delay(ms: number): Promise<void> {
+  await new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 function category(input: Partial<Category> = {}): Category {
@@ -452,6 +460,67 @@ async function main(): Promise<void> {
       (await db.getLocalSnapshotUpdatedAt()) > (await db.getLocalSnapshotSyncedAt()),
       "local edits during sync should remain newer than the synced marker"
     );
+  }
+
+  {
+    const fake = new FakeSupabaseClient();
+    const sharedCategory = category();
+    const sharedCard = card();
+    fake.tables.categories.push(cloudCategory(sharedCategory));
+    fake.tables.cards.push(cloudCard(sharedCard));
+    fake.onSelect = async (table) => {
+      if (table === "categories") await delay(5);
+    };
+    supabase.__setBrowserSupabaseClientForTest(fake as unknown as SupabaseClient);
+    await resetLocal(db);
+    await db.withoutLocalChangeEvents(async () => {
+      await db.saveCategories([sharedCategory]);
+      await db.saveCards([sharedCard]);
+    });
+    await db.clearSyncDirtySets();
+
+    await Promise.all([
+      sync.syncData(userId),
+      sync.syncData(userId),
+    ]);
+
+    assert.equal(fake.operations.select, 3, "concurrent top-level syncData calls should share one in-flight run");
+  }
+
+  {
+    const fake = new FakeSupabaseClient();
+    const sharedCategory = category();
+    const sharedCard = card({ title: "Original", updatedAt: baseTime });
+    fake.tables.categories.push(cloudCategory(sharedCategory));
+    fake.tables.cards.push(cloudCard(sharedCard));
+    fake.tables.user_preferences.push({
+      id: "pref-future-snapshot",
+      user_id: userId,
+      key: "localSnapshotUpdatedAt",
+      value: 9_999_999_999_999,
+      updated_at: new Date(baseTime).toISOString(),
+    });
+    let injectedWrites = 0;
+    fake.onSelect = async (table) => {
+      if (table !== "cards" || injectedWrites >= 3) return;
+      injectedWrites += 1;
+      await delay(2);
+      await db.saveCards([
+        card({ title: `Concurrent Local ${injectedWrites}`, updatedAt: baseTime + injectedWrites * 1_000 }),
+      ]);
+    };
+    supabase.__setBrowserSupabaseClientForTest(fake as unknown as SupabaseClient);
+    await resetLocal(db);
+    await db.withoutLocalChangeEvents(async () => {
+      await db.saveCategories([sharedCategory]);
+      await db.saveCards([sharedCard]);
+    });
+    await db.clearSyncDirtySets();
+
+    await sync.syncData(userId);
+
+    assert.equal(injectedWrites, 3, "test should keep writing through the max allowed recursion depth");
+    assert.ok(fake.operations.select <= 9, `recursive sync/push should stop after depth 2, got ${fake.operations.select} selects`);
   }
 
   {

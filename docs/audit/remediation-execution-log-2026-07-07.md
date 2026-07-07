@@ -192,3 +192,31 @@
 - `corepack pnpm@9.0.0 lint` passed with existing 6 warnings.
 - `corepack pnpm@9.0.0 build:ext` passed.
 - `git diff --check` passed.
+
+## Step 1.5 状态：single-flight 与递归深度保护
+
+已完成：
+
+- `sync.ts` 增加模块级 `syncInFlight`。
+- 顶层 `syncData` / `pushLocalSnapshotToCloud` 并发调用会复用同一个 in-flight promise。
+- `syncData` / `pushLocalSnapshotToCloud` 互调增加 `depth + 1`。
+- 最大递归深度限制为 2，超过后 `console.warn` 并收敛返回。
+
+新增验收：
+
+- `scripts/test-sync-merge.ts` 增加并发同步用例，断言两个顶层 `syncData` 只产生一次云端读取。
+- `scripts/test-sync-merge.ts` 增加持续本地写入互调用例，断言递归到深度 3 时跳过，不进入死循环。
+
+验证结果：
+
+- `node --import tsx scripts/test-sync-merge.ts` passed.
+- `node --import tsx scripts/test-floating-capture-targets.ts` passed.
+- `node --import tsx scripts/test-floating-capture-drain.ts` passed.
+- `node --import tsx scripts/test-floating-capture-health.ts` passed.
+- `node --import tsx scripts/test-floating-capture-metadata.ts` passed.
+- `node --import tsx scripts/test-description-translation.ts` passed.
+- `node --import tsx scripts/test-extension-branding.ts` passed.
+- `corepack pnpm@9.0.0 ts-check` passed.
+- `corepack pnpm@9.0.0 lint` passed with existing 6 warnings.
+- `corepack pnpm@9.0.0 build:ext` passed.
+- `git diff --check` passed.
