@@ -67,7 +67,7 @@ import { allDefaultCategories } from "@/lib/seed";
 import type { WebCard, Category, HiddenSite, LinkOpenMode, CollectionSection, RecycleBinItem, PinnedBookmarkItem, CategoryLayoutPreference } from "@/lib/types";
 import type { WallpaperPrefs } from "@/lib/wallpaper-types";
 
-// 鈹€鈹€ Types 鈹€鈹€
+// Types
 
 interface CloudCategory {
   id: string;
@@ -148,7 +148,7 @@ function runWithSyncGate(task: () => Promise<void>, depth: number, label: string
   return syncInFlight;
 }
 
-// 鈹€鈹€ Mapping helpers 鈹€鈹€
+// Mapping helpers
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -392,7 +392,7 @@ function localToCloudCard(c: WebCard, userId: string): Omit<CloudCard, "created_
   };
 }
 
-// 鈹€鈹€ Merge logic 鈹€鈹€
+// Merge logic
 
 async function upsertCardsInChunks(
   client: SupabaseClient,
@@ -1252,7 +1252,7 @@ function removeRecoveredMainData(
   };
 }
 
-// 鈹€鈹€ Main sync function 鈹€鈹€
+// Main sync function
 
 function isMissingTableError(message: string): boolean {
   return /Could not find the table 'public\.[^']+' in the schema cache/i.test(message)
@@ -1890,7 +1890,7 @@ async function pushLocalSnapshotToCloudUnsafe(
   console.log("[Sync] Local snapshot pushed successfully");
 }
 
-// 鈹€鈹€ Sync preferences 鈹€鈹€
+// Sync preferences
 
 function isCategoryLayoutPreference(value: unknown): value is CategoryLayoutPreference {
   if (!value || typeof value !== "object") return false;

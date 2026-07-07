@@ -663,3 +663,24 @@ Phase 2 代码侧状态：
 本地验证：
 
 - `git diff --check` passed.
+
+## Step 5.2 状态：文档收口与乱码注释清理
+
+已完成：
+
+- 更新 `AGD.md`，加入当前整改分支、最新已推提交、Fable 执行状态和执行日志入口。
+- 更新 `docs/audit/claude-code-review-handoff-2026-07-07.md`，同步 Phase 1/2/3、4.0、4.3、5.1 的完成状态，并列出仍未完成项。
+- 清理 `src/lib/sync.ts` 与 `src/lib/auth-store.ts` 的 mojibake 分隔注释。
+
+仍未完成：
+
+- Phase 4.1、4.2、4.5 等 UI 还原度任务仍等待用户补 `docs/design/mockups/` 样板图。
+- Phase 4.4 `sortable-grid.tsx` 拆分尚未执行。
+- Phase 5.3 `V1.0.4` 发版尚未执行。
+
+本地验证：
+
+- `rg -n "鈹|�|鍏|鐢" src/lib/sync.ts src/lib/auth-store.ts` returned no matches.
+- `corepack pnpm@9.0.0 ts-check` passed.
+- `corepack pnpm@9.0.0 lint` passed with 0 warnings.
+- `git diff --check` passed.

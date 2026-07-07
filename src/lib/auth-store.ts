@@ -19,7 +19,7 @@ import { useAppStore } from "@/lib/store";
 import { getLocalSnapshotSyncedAt, getLocalSnapshotUpdatedAt } from "@/lib/db";
 import { createLocalDataSnapshot, type LocalSnapshotEntry } from "@/lib/local-snapshots";
 
-// 鈹€鈹€ Types 鈹€鈹€
+// Types
 
 export interface AuthUser {
   id: string;
@@ -57,7 +57,7 @@ interface AuthState {
   clearError: () => void;
 }
 
-// 鈹€鈹€ Helper: upsert user record 鈹€鈹€
+// Helper: upsert user record
 
 async function upsertUser(user: AuthUser): Promise<void> {
   const client = getBrowserSupabaseClient();
@@ -77,7 +77,7 @@ async function upsertUser(user: AuthUser): Promise<void> {
   }
 }
 
-// 鈹€鈹€ Helper: restore session from localStorage 鈹€鈹€
+// Helper: restore session from localStorage
 
 const SESSION_KEY = "webcollect_auth_session";
 const SYNC_MODE_KEY = "webcollect_sync_mode";
@@ -217,7 +217,7 @@ function clearSession(): void {
   }
 }
 
-// 鈹€鈹€ Helper: map Supabase user to AuthUser 鈹€鈹€
+// Helper: map Supabase user to AuthUser
 
 function mapSupabaseUser(supabaseUser: Record<string, unknown>): AuthUser {
   const meta = (supabaseUser.user_metadata || {}) as Record<string, unknown>;
@@ -229,7 +229,7 @@ function mapSupabaseUser(supabaseUser: Record<string, unknown>): AuthUser {
   };
 }
 
-// 鈹€鈹€ Helper: trigger background sync 鈹€鈹€
+// Helper: trigger background sync
 
 export async function triggerSync(userId: string): Promise<void> {
   const store = useAuthStore;
@@ -435,7 +435,7 @@ function loadSyncMode(): SyncMode {
   }
 }
 
-// 鈹€鈹€ Store 鈹€鈹€
+// Store
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
@@ -583,7 +583,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 }));
 
-// 鈹€鈹€ Web version: Supabase Auth OAuth 鈹€鈹€
+// Web version: Supabase Auth OAuth
 
 async function loginWithGoogleWeb(): Promise<void> {
   const client = getBrowserSupabaseClient();
@@ -603,7 +603,7 @@ async function loginWithGoogleWeb(): Promise<void> {
   // The initialize() function will pick it up on page reload.
 }
 
-// 鈹€鈹€ Extension version: chrome.identity.launchWebAuthFlow 鈹€鈹€
+// Extension version: chrome.identity.launchWebAuthFlow
 
 async function loginWithGoogleExtension(): Promise<void> {
   if (typeof chrome === "undefined" || !chrome.identity) {

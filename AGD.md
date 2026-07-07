@@ -6,7 +6,19 @@
 远端仓库：`https://github.com/RockyXuan/webcollect`
 主分支：`main`
 当前最新已发布版本：`V1.0.3 / 2026年7月2日`
-当前最新提交：`c31b507 fix: improve capture metadata relevance`
+当前 main 已知基线提交：`a779f26`（Claude Fable 审查时的 main）
+当前整改分支：`fix/sync-architecture`
+当前整改分支最新已推提交：`b1f7718 ci: add main verification workflow`
+
+## 2026-07-07 Fable 整改执行状态
+
+- 已导入并按步执行 Fable 方案：`docs/audit/claude-fable-remediation-plan-2026-07-07.md`。
+- 执行日志：`docs/audit/remediation-execution-log-2026-07-07.md`。
+- 已完成 Phase 1 同步正确性、Phase 2 启动/性能减负、Phase 3 壁纸远程/同步/状态可见。
+- Phase 4.0 已准备 `docs/design/mockups/`，等待用户补 Image2 设计样板图；Phase 4.1、4.2、4.5 因缺少样板图暂不能客观执行。
+- Phase 4.3 已清除 `src` 与 `extension/src` 的系统 `prompt/confirm/alert` 残留。
+- Phase 5.1 已新增 GitHub Actions CI。
+- 当前尚未合并回 `main`，也尚未发布 `V1.0.4` Release；需在剩余阻塞项确认后再做最终发版。
 
 ## 先读这个
 
@@ -14,6 +26,7 @@
 
 0. `docs/audit/claude-fable-code-review-2026-07-07.md`（Claude Fable 5 全量代码审查结论：P0 同步缺陷、性能根因、壁纸根因、UI 基准缺失）
 0.5 `docs/audit/claude-fable-remediation-plan-2026-07-07.md`（整改执行方案：Phase 0-5 分步操作，按序执行，每步有验收标准）
+0.6 `docs/audit/remediation-execution-log-2026-07-07.md`（Codex 实际执行日志：每步改法、测试和当前阻塞）
 1. `AGD.md`
 2. `docs/audit/claude-code-review-handoff-2026-07-07.md`
 3. `docs/audit/webcollect-full-audit-brief-2026-07-07.md`
