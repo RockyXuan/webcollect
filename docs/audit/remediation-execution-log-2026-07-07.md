@@ -390,3 +390,43 @@ Phase 1 代码侧状态：
 - `corepack pnpm@9.0.0 lint` passed with 0 warnings.
 - `corepack pnpm@9.0.0 build:ext` passed.
 - `git diff --check` passed.
+
+## Step 2.4 状态：渲染层减负
+
+已完成：
+
+- `store.ts` 中写入后再 `await getCards()` / `await getCategories()` 的全量回读路径已清零。
+- 卡片、分类、分组、跨分项移动等 mutation 改为使用已计算好的 `nextCards` / `nextCategories` 更新 Zustand 状态。
+- `resolveCardDropCategoryId` 改为返回 `{ categoryId, categories }`，自动创建父分类收集箱时不再依赖额外全量回读。
+- `SortableCategoryBlock` / `SortableSubGroupBlock` / `SortableUngroupedBlock` / `SortableCard` 已用 `React.memo` 包装。
+- `hot-recommendation.tsx` 的自动安全扫描改为推荐区进入视口后触发；手动安全扫描按钮仍保留。
+
+新增验收：
+
+- 新增 `scripts/test-render-performance-guards.ts`。
+- 验证 store mutation 不再包含写后全量回读模式。
+- 验证四个 Sortable 组件都被 `React.memo` 包装。
+- 验证热门推荐使用 `IntersectionObserver` 延迟触发安全扫描。
+
+验证结果：
+
+- `node --import tsx scripts/test-render-performance-guards.ts` passed.
+- `node --import tsx scripts/test-background-sync-throttle.ts` passed.
+- `node --import tsx scripts/test-load-data-migrations.ts` passed.
+- `node --import tsx scripts/test-startup-light-sync.ts` passed.
+- `node --import tsx scripts/test-sync-merge.ts` passed.
+- `node --import tsx scripts/test-floating-capture-targets.ts` passed.
+- `node --import tsx scripts/test-floating-capture-drain.ts` passed.
+- `node --import tsx scripts/test-floating-capture-health.ts` passed.
+- `node --import tsx scripts/test-floating-capture-metadata.ts` passed.
+- `node --import tsx scripts/test-description-translation.ts` passed.
+- `node --import tsx scripts/test-extension-branding.ts` passed.
+- `corepack pnpm@9.0.0 ts-check` passed.
+- `corepack pnpm@9.0.0 lint` passed with 0 warnings.
+- `corepack pnpm@9.0.0 build:ext` passed.
+- `git diff --check` passed.
+
+Phase 2 代码侧状态：
+
+- Step 2.1 至 Step 2.4 已按 Fable 方案完成并逐步提交。
+- React DevTools Profiler 的人工 FPS/重渲染观察仍需后续浏览器手测环境补充。

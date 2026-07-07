@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import React, { memo, useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useAppStore } from "@/lib/store";
 import { InlineEditableText } from "@/components/ui/inline-editable-text";
 import { EditActionDock, type EditAction } from "@/components/ui/edit-action-dock";
@@ -816,7 +816,7 @@ interface SortableCategoryBlockProps {
   children: React.ReactNode;
 }
 
-function SortableCategoryBlock({
+const SortableCategoryBlock = memo(function SortableCategoryBlock({
   category,
   isParent,
   editMode,
@@ -1110,7 +1110,7 @@ function SortableCategoryBlock({
       )}
     </div>
   );
-}
+});
 
 // ============ Sortable Sub-Group Container (provides SortableContext for sub-groups within a parent) ============
 interface SortableSubGroupContainerProps {
@@ -1150,7 +1150,7 @@ interface SortableSubGroupBlockProps {
   onShipCard?: (card: WebCard) => void;
 }
 
-function SortableSubGroupBlock({
+const SortableSubGroupBlock = memo(function SortableSubGroupBlock({
   category,
   cards,
   editMode,
@@ -1394,7 +1394,7 @@ function SortableSubGroupBlock({
       </AlertDialog>
     </div>
   );
-}
+});
 
 // ============ Sortable Ungrouped Block ============
 interface SortableUngroupedBlockProps {
@@ -1412,7 +1412,7 @@ interface SortableUngroupedBlockProps {
   onShipCard?: (card: WebCard) => void;
 }
 
-function SortableUngroupedBlock({
+const SortableUngroupedBlock = memo(function SortableUngroupedBlock({
   category,
   cards,
   editMode,
@@ -1641,7 +1641,7 @@ function SortableUngroupedBlock({
       </AlertDialog>
     </div>
   );
-}
+});
 
 // ============ Sortable Card ============
 interface SortableCardProps {
@@ -1656,7 +1656,7 @@ interface SortableCardProps {
   onCreateGroup?: () => void;
 }
 
-function SortableCard({
+const SortableCard = memo(function SortableCard({
   card,
   categoryColor,
   editMode,
@@ -1703,4 +1703,4 @@ function SortableCard({
       />
     </div>
   );
-}
+});

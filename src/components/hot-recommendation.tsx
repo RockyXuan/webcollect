@@ -608,6 +608,7 @@ export function HotRecommendation() {
   const [addedUrls, setAddedUrls] = useState<Set<string>>(new Set());
   const [showExtra, setShowExtra] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const discoverRef = useRef<HTMLDivElement | null>(null);
 
   const visibleCategories = useMemo(
     () => categories.filter((cat) => (cat.sectionId || "section-default") === activeSectionId),
@@ -834,13 +835,26 @@ export function HotRecommendation() {
     setChecking(false);
   }, [flatFiltered]);
 
-  /* auto-check on first load */
+  /* auto-check once the recommendation panel enters the viewport */
   const autoChecked = useRef(false);
   useEffect(() => {
-    if (!autoChecked.current && flatFiltered.length > 0) {
+    if (autoChecked.current || flatFiltered.length === 0) return;
+
+    const node = discoverRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") {
       autoChecked.current = true;
       checkSafety();
+      return;
     }
+
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      autoChecked.current = true;
+      observer.disconnect();
+      checkSafety();
+    }, { rootMargin: "160px" });
+    observer.observe(node);
+    return () => observer.disconnect();
   }, [flatFiltered.length, checkSafety]);
 
   /* count totals across all */
@@ -887,7 +901,7 @@ export function HotRecommendation() {
   if (categorizedGroups.length === 0 && !searchQuery) return null;
 
   return (
-    <div className="wc-discover-shell mt-8 p-6 sm:p-7">
+    <div ref={discoverRef} className="wc-discover-shell mt-8 p-6 sm:p-7">
       <div className="wc-discover-hero mb-8">
         <div className="flex min-w-0 flex-col justify-between gap-6">
           <div>

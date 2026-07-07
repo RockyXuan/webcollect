@@ -105,16 +105,16 @@ async function resolveCardDropCategoryId(
   categories: Category[],
   targetCategoryId: string,
   activeSectionId: string
-): Promise<string> {
+): Promise<{ categoryId: string; categories: Category[] }> {
   const target = categories.find((category) => category.id === targetCategoryId);
-  if (!target) return targetCategoryId;
+  if (!target) return { categoryId: targetCategoryId, categories };
 
   const targetChildren = categories
     .filter((category) => category.parentId === target.id)
     .sort((a, b) => a.order - b.order);
   const isContainerOnly = target.isParent || targetChildren.length > 0;
-  if (!isContainerOnly) return targetCategoryId;
-  if (targetChildren[0]) return targetChildren[0].id;
+  if (!isContainerOnly) return { categoryId: targetCategoryId, categories };
+  if (targetChildren[0]) return { categoryId: targetChildren[0].id, categories };
 
   const now = Date.now();
   const inboxGroup: Category = {
@@ -129,7 +129,7 @@ async function resolveCardDropCategoryId(
     sectionId: target.sectionId || activeSectionId,
   };
   await dbAddCategory(inboxGroup);
-  return inboxGroup.id;
+  return { categoryId: inboxGroup.id, categories: [...categories, inboxGroup] };
 }
 
 interface AppState {
@@ -439,26 +439,25 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   addCard: async (card) => {
     await dbAddCard(card);
-    const cards = await getCards();
-    set({ cards });
+    set({ cards: [...get().cards, card].sort((a, b) => a.order - b.order) });
   },
 
   updateCard: async (card) => {
-    await dbUpdateCard({ ...card, updatedAt: Date.now() });
-    const cards = await getCards();
-    set({ cards });
+    const updated = { ...card, updatedAt: Date.now() };
+    await dbUpdateCard(updated);
+    set({ cards: get().cards.map((item) => item.id === updated.id ? updated : item) });
   },
 
   deleteCard: async (id) => {
     await dbDeleteCard(id);
-    const cards = await getCards();
-    set({ cards });
+    set({ cards: get().cards.filter((card) => card.id !== id) });
   },
 
   moveCard: async (cardId, targetCategoryId, newOrder) => {
     const cards = await getCards();
     const categories = await getCategories();
-    const finalCategoryId = await resolveCardDropCategoryId(categories, targetCategoryId, get().activeSectionId);
+    const resolved = await resolveCardDropCategoryId(categories, targetCategoryId, get().activeSectionId);
+    const finalCategoryId = resolved.categoryId;
     const idx = cards.findIndex((c) => c.id === cardId);
     if (idx < 0) return;
 
@@ -482,13 +481,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
 
     await saveCards(allCards);
-    set({ cards: await getCards(), categories: await getCategories() });
+    set({ cards: allCards, categories: resolved.categories });
   },
 
   reorderCards: async (cardId, targetCategoryId, newOrder) => {
     const cards = await getCards();
     const categories = await getCategories();
-    const finalCategoryId = await resolveCardDropCategoryId(categories, targetCategoryId, get().activeSectionId);
+    const resolved = await resolveCardDropCategoryId(categories, targetCategoryId, get().activeSectionId);
+    const finalCategoryId = resolved.categoryId;
     const cardIdx = cards.findIndex((c) => c.id === cardId);
     if (cardIdx < 0) return;
 
@@ -505,7 +505,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
 
     await saveCards(cards);
-    set({ cards: await getCards(), categories: await getCategories() });
+    set({ cards, categories: resolved.categories });
   },
 
   addCategory: async (cat) => {
@@ -517,20 +517,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       sectionId: cat.sectionId || get().activeSectionId,
     };
     await dbAddCategory(nextCategory);
-    const categories = await getCategories();
-    set({ categories });
+    set({ categories: [...get().categories, nextCategory].sort((a, b) => a.order - b.order) });
   },
 
   updateCategory: async (cat) => {
-    await dbUpdateCategory({ ...cat, updatedAt: Date.now(), sectionId: cat.sectionId || get().activeSectionId });
-    const categories = await getCategories();
-    set({ categories });
+    const updated = { ...cat, updatedAt: Date.now(), sectionId: cat.sectionId || get().activeSectionId };
+    await dbUpdateCategory(updated);
+    set({ categories: get().categories.map((category) => category.id === updated.id ? updated : category) });
   },
 
   deleteCategory: async (id) => {
     await dbDeleteCategory(id);
-    const [cards, categories] = await Promise.all([getCards(), getCategories()]);
-    set({ cards, categories });
+    set({ categories: get().categories.filter((category) => category.id !== id) });
   },
 
   reorderCategories: async (orderedIds) => {
@@ -544,7 +542,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     });
     await saveCategories(categories);
-    set({ categories: await getCategories() });
+    set({ categories });
   },
 
   // Move a standalone category into a parent (demotion: 鍒嗙被 鈫?鍒嗙粍)
@@ -576,7 +574,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       sibling.updatedAt = now;
     });
     await saveCategories(categories);
-    set({ categories: await getCategories() });
+    set({ categories });
   },
 
   // Remove a sub-group from its parent (promotion: 鍒嗙粍 鈫?椤剁骇鍒嗙被)
@@ -599,7 +597,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (repaired.changed) {
       await saveCards(repaired.cards);
     }
-    set({ cards: await getCards(), categories: await getCategories() });
+    set({ cards: repaired.cards, categories: repaired.categories });
   },
 
   // Promote an ungrouped item to a parent category
@@ -616,7 +614,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (repaired.changed) {
       await saveCards(repaired.cards);
     }
-    set({ cards: await getCards(), categories: await getCategories() });
+    set({ cards: repaired.cards, categories: repaired.categories });
   },
 
   // Demote a parent category: remove isParent, detach all sub-groups
@@ -636,7 +634,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }
     await saveCategories(categories);
-    set({ categories: await getCategories() });
+    set({ categories });
   },
 
   moveCategoryToSection: async (categoryId: string, targetSectionId: string) => {
@@ -675,7 +673,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
 
     await saveCategories(nextCategories);
-    set({ categories: await getCategories() });
+    set({ categories: nextCategories });
   },
 
   moveCardToSection: async (cardId: string, targetSectionId: string, targetCategoryId?: string) => {
@@ -686,6 +684,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!card) return;
 
     let finalCategoryId = targetCategoryId;
+    let nextCategories = categories;
     const targetCategory = finalCategoryId ? categories.find((category) => category.id === finalCategoryId) : null;
     if (!targetCategory || targetCategory.sectionId !== targetSectionId) {
       const inbox = categories.find(
@@ -707,16 +706,17 @@ export const useAppStore = create<AppState>((set, get) => ({
         };
         await dbAddCategory(newCategory);
         finalCategoryId = newCategory.id;
+        nextCategories = [...categories, newCategory];
       }
     }
 
-    const nextCards = (await getCards()).map((item) =>
+    const nextCards = cards.map((item) =>
       item.id === cardId
         ? { ...item, categoryId: finalCategoryId as string, updatedAt: Date.now() }
         : item
     );
     await saveCards(nextCards);
-    set({ cards: await getCards(), categories: await getCategories() });
+    set({ cards: nextCards, categories: nextCategories });
   },
 
   // Hidden sites management (per-user preferences)
