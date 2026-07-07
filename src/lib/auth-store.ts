@@ -18,7 +18,6 @@ import { pushLocalSnapshotToCloud, syncData } from "@/lib/sync";
 import { useAppStore } from "@/lib/store";
 import { getLocalSnapshotSyncedAt, getLocalSnapshotUpdatedAt } from "@/lib/db";
 import { createLocalDataSnapshot } from "@/lib/local-snapshots";
-import { EMERGENCY_RESTORE_PENDING_PUSH_KEY } from "@/lib/emergency-restore";
 
 // 鈹€鈹€ Types 鈹€鈹€
 
@@ -108,22 +107,6 @@ let backgroundSyncRunning = false;
 let cloudRestoreRunning = false;
 let localSafetySnapshotTimer: ReturnType<typeof setTimeout> | null = null;
 
-function hasEmergencyRestorePendingPush(): boolean {
-  try {
-    return !!localStorage.getItem(EMERGENCY_RESTORE_PENDING_PUSH_KEY);
-  } catch {
-    return false;
-  }
-}
-
-function clearEmergencyRestorePendingPush(): void {
-  try {
-    localStorage.removeItem(EMERGENCY_RESTORE_PENDING_PUSH_KEY);
-  } catch {
-    // ignore
-  }
-}
-
 function saveSession(user: AuthUser): void {
   try {
     localStorage.setItem(SESSION_KEY, JSON.stringify(user));
@@ -172,12 +155,7 @@ async function triggerSync(userId: string): Promise<void> {
   store.setState({ syncStatus: "syncing", localSavedAt: null });
 
   try {
-    if (hasEmergencyRestorePendingPush()) {
-      await pushLocalSnapshotToCloud(userId);
-      clearEmergencyRestorePendingPush();
-    } else {
-      await syncData(userId);
-    }
+    await syncData(userId);
     await useAppStore.getState().loadData({ showLoading: false, preserveOnCollapse: true });
     store.setState({ syncStatus: "success", lastSyncAt: Date.now(), error: null });
     ensureAutoSyncInterval();

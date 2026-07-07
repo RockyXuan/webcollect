@@ -12,14 +12,12 @@ import {
 import type { Category, CollectionSection, WebCard } from "@/lib/types";
 
 const DEFAULT_SECTION_ID = "section-default";
-const EMERGENCY_RESTORE_MARKER = "webcollect_emergency_restore_v20260518";
-const EMERGENCY_RESTORE_FORCE_VERSION = "snapshot-only-20260518-3";
-export const EMERGENCY_RESTORE_PENDING_PUSH_KEY = "webcollect_emergency_restore_pending_push";
 
 export type EmergencyRestoreResult =
-  | { restored: false; reason: string }
+  | { restored: false; shouldPrompt: false; reason: string }
   | {
-    restored: true;
+    restored: false;
+    shouldPrompt: true;
     source: "snapshot";
     snapshotId?: string;
     snapshotCreatedAt?: number;
@@ -28,6 +26,17 @@ export type EmergencyRestoreResult =
     cards: number;
     sectionCardCounts: Record<string, number>;
   };
+
+export type EmergencyRestoreApplyResult = {
+  restored: true;
+  source: "snapshot";
+  snapshotId: string;
+  snapshotCreatedAt?: number;
+  sections: number;
+  categories: number;
+  cards: number;
+  sectionCardCounts: Record<string, number>;
+};
 
 function countCardsBySection(data: Pick<LocalSnapshotData, "cards" | "categories" | "sections">): Record<string, number> {
   const categoryById = new Map(data.categories.map((category) => [category.id, category]));
@@ -66,27 +75,6 @@ function distributionStats(data: Pick<LocalSnapshotData, "cards" | "categories" 
   return { counts, sectionsWithCards, defaultShare, nonDefaultCards };
 }
 
-function hasKnownCryptoGroupsInHome(categories: Category[]): boolean {
-  const suspiciousTerms = [
-    "bstocks",
-    "rwa",
-    "macro & stocks",
-    "zksync",
-    "zk era",
-    "zk official",
-    "coin",
-    "defi",
-    "airdrop",
-    "layerzero",
-    "stark",
-  ];
-  return categories.some((category) => {
-    if ((category.sectionId || DEFAULT_SECTION_ID) !== DEFAULT_SECTION_ID) return false;
-    const name = category.name.trim().toLowerCase();
-    return suspiciousTerms.some((term) => name.includes(term));
-  });
-}
-
 function isHealthySnapshot(snapshot: LocalSnapshotEntry): boolean {
   const data = snapshot.data;
   if (data.cards.length < 40 || data.categories.length < 20 || data.sections.length < 3) return false;
@@ -94,7 +82,6 @@ function isHealthySnapshot(snapshot: LocalSnapshotEntry): boolean {
   if (stats.sectionsWithCards < 2) return false;
   if (stats.nonDefaultCards < 12) return false;
   if (stats.defaultShare > 0.82) return false;
-  if (hasKnownCryptoGroupsInHome(data.categories)) return false;
   return parentLinkCount(data.categories) >= 4;
 }
 
@@ -110,25 +97,7 @@ function currentLooksCollapsed(
     sections,
   };
   const stats = distributionStats(data);
-  if (hasKnownCryptoGroupsInHome(categories)) return true;
   if (sections.length > 1 && stats.nonDefaultCards === 0) return true;
-  const sectionById = new Map(sections.map((section) => [section.id, section.name.trim().toLowerCase()]));
-  const counts = countCardsBySection(data);
-  const hodlId = sections.find((section) => section.name.trim().toLowerCase() === "hodl")?.id;
-  const fomId = sections.find((section) => section.name.trim().toLowerCase() === "fom")?.id;
-  const cryptoInHome = categories.some((category) => {
-    const sectionName = sectionById.get(category.sectionId || DEFAULT_SECTION_ID) || "主页";
-    const name = category.name.trim().toLowerCase();
-    return sectionName !== "hodl" && (
-      name.includes("coin") ||
-      name.includes("rwa") ||
-      name.includes("stock") ||
-      name.includes("zk") ||
-      name.includes("defi")
-    );
-  });
-  if (cryptoInHome && (counts[hodlId || ""] || 0) < 8) return true;
-  if ((counts[hodlId || ""] || 0) === 0 && (counts[fomId || ""] || 0) === 0 && cards.length > 80) return true;
   return stats.defaultShare > 0.68 && stats.sectionsWithCards <= 2;
 }
 
@@ -157,30 +126,16 @@ export async function restoreLatestHealthyWorkspaceIfNeeded(): Promise<Emergency
     getSections(),
   ]);
 
-  const forceRestore = (() => {
-    try {
-      return localStorage.getItem(EMERGENCY_RESTORE_MARKER) !== EMERGENCY_RESTORE_FORCE_VERSION;
-    } catch {
-      return true;
-    }
-  })();
-
-  if (!forceRestore && !currentLooksCollapsed(cards, categories, sections)) {
-    return { restored: false, reason: "current-layout-not-collapsed" };
+  if (!currentLooksCollapsed(cards, categories, sections)) {
+    return { restored: false, shouldPrompt: false, reason: "current-layout-not-collapsed" };
   }
 
   const snapshots = await getLocalDataSnapshots();
   const latestHealthy = pickLatestHealthySnapshot(snapshots);
   if (latestHealthy) {
-    await restoreLocalDataSnapshot(latestHealthy.id);
-    try {
-      localStorage.setItem(EMERGENCY_RESTORE_MARKER, EMERGENCY_RESTORE_FORCE_VERSION);
-      localStorage.setItem(EMERGENCY_RESTORE_PENDING_PUSH_KEY, String(Date.now()));
-    } catch {
-      // ignore
-    }
     return {
-      restored: true,
+      restored: false,
+      shouldPrompt: true,
       source: "snapshot",
       snapshotId: latestHealthy.id,
       snapshotCreatedAt: latestHealthy.createdAt,
@@ -191,5 +146,25 @@ export async function restoreLatestHealthyWorkspaceIfNeeded(): Promise<Emergency
     };
   }
 
-  return { restored: false, reason: "no-healthy-webcollect-snapshot-found" };
+  return { restored: false, shouldPrompt: false, reason: "no-healthy-webcollect-snapshot-found" };
+}
+
+export async function restoreEmergencyWorkspaceSnapshot(snapshotId: string): Promise<EmergencyRestoreApplyResult> {
+  const snapshots = await getLocalDataSnapshots();
+  const snapshot = snapshots.find((item) => item.id === snapshotId);
+  if (!snapshot) {
+    throw new Error("Emergency restore snapshot not found");
+  }
+
+  await restoreLocalDataSnapshot(snapshot.id);
+  return {
+    restored: true,
+    source: "snapshot",
+    snapshotId: snapshot.id,
+    snapshotCreatedAt: snapshot.createdAt,
+    sections: snapshot.data.sections.length,
+    categories: snapshot.data.categories.length,
+    cards: snapshot.data.cards.length,
+    sectionCardCounts: sectionNameCounts(snapshot.data),
+  };
 }

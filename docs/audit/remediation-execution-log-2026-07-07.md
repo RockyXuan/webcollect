@@ -220,3 +220,36 @@
 - `corepack pnpm@9.0.0 lint` passed with existing 6 warnings.
 - `corepack pnpm@9.0.0 build:ext` passed.
 - `git diff --check` passed.
+
+## Step 1.6 状态：emergency-restore 只检测不自动回档
+
+已完成：
+
+- `restoreLatestHealthyWorkspaceIfNeeded` 改为只检测并返回提示候选，不再自动调用 `restoreLocalDataSnapshot`。
+- 新增 `restoreEmergencyWorkspaceSnapshot(snapshotId)`，只有用户确认后才恢复。
+- 删除 `EMERGENCY_RESTORE_FORCE_VERSION` 强制逻辑。
+- 删除 `hasKnownCryptoGroupsInHome` 以及 zksync/layerzero/defi/coin/rwa/stock/HODL/FOM 等硬编码个人分组名判据。
+- 删除 auth-store 里的 emergency pending push 自动回推通道。
+- Web 页面和 Chrome 扩展新标签页都改为项目内 AlertDialog 确认恢复。
+
+新增验收：
+
+- 新增 `scripts/test-emergency-restore.ts`。
+- 验证健康启动路径不会提示且 IndexedDB 写入次数为 0。
+- 验证异常布局只提示、不写 IndexedDB、不修改卡片。
+- 验证用户确认后才恢复快照并写入本地数据。
+
+验证结果：
+
+- `node --import tsx scripts/test-emergency-restore.ts` passed.
+- `node --import tsx scripts/test-sync-merge.ts` passed.
+- `node --import tsx scripts/test-floating-capture-targets.ts` passed.
+- `node --import tsx scripts/test-floating-capture-drain.ts` passed.
+- `node --import tsx scripts/test-floating-capture-health.ts` passed.
+- `node --import tsx scripts/test-floating-capture-metadata.ts` passed.
+- `node --import tsx scripts/test-description-translation.ts` passed.
+- `node --import tsx scripts/test-extension-branding.ts` passed.
+- `corepack pnpm@9.0.0 ts-check` passed.
+- `corepack pnpm@9.0.0 lint` passed with existing 6 warnings.
+- `corepack pnpm@9.0.0 build:ext` passed.
+- `git diff --check` passed.

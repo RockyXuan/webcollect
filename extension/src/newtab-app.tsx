@@ -12,7 +12,11 @@ import { useAppStore } from "@/lib/store";
 import { useAuthStore } from "@/lib/auth-store";
 import { useWarehouseStore } from "@/lib/store-warehouse";
 import { saveCards, saveCategories, setInitialized, withoutLocalChangeEvents } from "@/lib/db";
-import { restoreLatestHealthyWorkspaceIfNeeded } from "@/lib/emergency-restore";
+import {
+  restoreEmergencyWorkspaceSnapshot,
+  restoreLatestHealthyWorkspaceIfNeeded,
+  type EmergencyRestoreResult,
+} from "@/lib/emergency-restore";
 import { drainFloatingCaptureQueue, publishCaptureDestinationCache } from "@/lib/floating-capture";
 import { isChromeExtension } from "@/lib/platform";
 import { SortableGrid } from "@/components/layout/sortable-grid";
@@ -27,10 +31,31 @@ import { SectionShipDialog } from "@/components/dialogs/section-ship-dialog";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { WallpaperShell } from "@/components/wallpaper/wallpaper-shell";
 import { useWallpaperStore } from "@/lib/wallpaper-store";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { WebCard, Category } from "@/lib/types";
 import { RefreshCw, Trash2, XCircle } from "lucide-react";
 
 type View = "main" | "warehouse";
+type EmergencyRestorePrompt = Extract<EmergencyRestoreResult, { shouldPrompt: true }>;
+
+function formatSnapshotDate(timestamp: number | undefined): string {
+  if (!timestamp) return "较早";
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
+}
 
 export function NewTabApp() {
   const [view, setView] = useState<View>("main");
@@ -55,6 +80,7 @@ export function NewTabApp() {
   const [defaultParentId, setDefaultParentId] = useState<string | undefined>();
   const [isCreatingParent, setIsCreatingParent] = useState(false);
   const [isWarehouseRefreshing, setIsWarehouseRefreshing] = useState(false);
+  const [emergencyRestorePrompt, setEmergencyRestorePrompt] = useState<EmergencyRestorePrompt | null>(null);
 
   // 鈹€鈹€ Warehouse state 鈹€鈹€
   const {
@@ -79,11 +105,12 @@ export function NewTabApp() {
     const init = async () => {
       try {
         const restore = await restoreLatestHealthyWorkspaceIfNeeded();
-        if (restore.restored) {
-          console.warn("[WebCollect] Emergency workspace restore applied before auth sync", restore);
+        if (restore.shouldPrompt) {
+          console.warn("[WebCollect] Emergency workspace restore candidate found", restore);
+          setEmergencyRestorePrompt(restore);
         }
       } catch (error) {
-        console.error("[WebCollect] Emergency workspace restore failed", error);
+        console.error("[WebCollect] Emergency workspace restore check failed", error);
       }
 
       try {
@@ -195,6 +222,21 @@ export function NewTabApp() {
   const handleReturnToWallpaper = useCallback(() => {
     returnToWallpaper();
   }, [returnToWallpaper]);
+
+  const handleConfirmEmergencyRestore = useCallback(async () => {
+    const prompt = emergencyRestorePrompt;
+    if (!prompt?.snapshotId) return;
+    try {
+      const restored = await restoreEmergencyWorkspaceSnapshot(prompt.snapshotId);
+      console.warn("[WebCollect] Emergency workspace restore applied after confirmation", restored);
+      setEmergencyRestorePrompt(null);
+      await loadData({ showLoading: false });
+      await publishCaptureDestinationCache();
+    } catch (error) {
+      console.error("[WebCollect] Emergency workspace restore failed", error);
+      setEmergencyRestorePrompt(null);
+    }
+  }, [emergencyRestorePrompt, loadData]);
 
   // 鈹€鈹€ Loading state 鈹€鈹€
   if (wallpaperMode === "wallpaper") {
@@ -370,6 +412,29 @@ export function NewTabApp() {
           />
         </>
       )}
+      <AlertDialog
+        open={!!emergencyRestorePrompt}
+        onOpenChange={(open) => {
+          if (!open) setEmergencyRestorePrompt(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>检测到布局可能异常</AlertDialogTitle>
+            <AlertDialogDescription>
+              可从 {formatSnapshotDate(emergencyRestorePrompt?.snapshotCreatedAt)} 的本地快照恢复：
+              {emergencyRestorePrompt?.sections || 0} 个分项、{emergencyRestorePrompt?.categories || 0} 个分类、
+              {emergencyRestorePrompt?.cards || 0} 个网页。取消不会修改任何数据。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>暂不恢复</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { void handleConfirmEmergencyRestore(); }}>
+              恢复快照
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
     </WallpaperShell>
   );

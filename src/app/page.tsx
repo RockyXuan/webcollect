@@ -13,7 +13,21 @@ import { WallpaperShell } from "@/components/wallpaper/wallpaper-shell";
 import { useAppStore } from "@/lib/store";
 import { useAuthStore } from "@/lib/auth-store";
 import { saveCards, saveCategories, setInitialized, withoutLocalChangeEvents } from "@/lib/db";
-import { restoreLatestHealthyWorkspaceIfNeeded } from "@/lib/emergency-restore";
+import {
+  restoreEmergencyWorkspaceSnapshot,
+  restoreLatestHealthyWorkspaceIfNeeded,
+  type EmergencyRestoreResult,
+} from "@/lib/emergency-restore";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   COLLECTION_CANVAS_HEIGHT,
   COLLECTION_CANVAS_WIDTH,
@@ -21,6 +35,18 @@ import {
 } from "@/lib/resolution-layout";
 import { useWallpaperStore } from "@/lib/wallpaper-store";
 import type { WebCard, Category } from "@/lib/types";
+
+type EmergencyRestorePrompt = Extract<EmergencyRestoreResult, { shouldPrompt: true }>;
+
+function formatSnapshotDate(timestamp: number | undefined): string {
+  if (!timestamp) return "较早";
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
+}
 
 export default function HomePage() {
   const { loadData, isLoading, softDeleteCard, updateCard } = useAppStore();
@@ -41,16 +67,18 @@ export default function HomePage() {
   const [defaultParentId, setDefaultParentId] = useState<string | undefined>();
   const [isCreatingParent, setIsCreatingParent] = useState(false);
   const [collectionViewportScale, setCollectionViewportScale] = useState(1);
+  const [emergencyRestorePrompt, setEmergencyRestorePrompt] = useState<EmergencyRestorePrompt | null>(null);
 
   useEffect(() => {
     const init = async () => {
       try {
         const restore = await restoreLatestHealthyWorkspaceIfNeeded();
-        if (restore.restored) {
-          console.warn("[WebCollect] Emergency workspace restore applied before auth sync", restore);
+        if (restore.shouldPrompt) {
+          console.warn("[WebCollect] Emergency workspace restore candidate found", restore);
+          setEmergencyRestorePrompt(restore);
         }
       } catch (error) {
-        console.error("[WebCollect] Emergency workspace restore failed", error);
+        console.error("[WebCollect] Emergency workspace restore check failed", error);
       }
 
       try {
@@ -132,6 +160,20 @@ export default function HomePage() {
   const handleReturnToWallpaper = useCallback(() => {
     returnToWallpaper();
   }, [returnToWallpaper]);
+
+  const handleConfirmEmergencyRestore = useCallback(async () => {
+    const prompt = emergencyRestorePrompt;
+    if (!prompt?.snapshotId) return;
+    try {
+      const restored = await restoreEmergencyWorkspaceSnapshot(prompt.snapshotId);
+      console.warn("[WebCollect] Emergency workspace restore applied after confirmation", restored);
+      setEmergencyRestorePrompt(null);
+      await loadData({ showLoading: false });
+    } catch (error) {
+      console.error("[WebCollect] Emergency workspace restore failed", error);
+      setEmergencyRestorePrompt(null);
+    }
+  }, [emergencyRestorePrompt, loadData]);
 
   useEffect(() => {
     const updateCollectionViewportScale = () => {
@@ -256,6 +298,29 @@ export default function HomePage() {
           item={sectionShipItem}
         />
       </ErrorBoundary>
+      <AlertDialog
+        open={!!emergencyRestorePrompt}
+        onOpenChange={(open) => {
+          if (!open) setEmergencyRestorePrompt(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>检测到布局可能异常</AlertDialogTitle>
+            <AlertDialogDescription>
+              可从 {formatSnapshotDate(emergencyRestorePrompt?.snapshotCreatedAt)} 的本地快照恢复：
+              {emergencyRestorePrompt?.sections || 0} 个分项、{emergencyRestorePrompt?.categories || 0} 个分类、
+              {emergencyRestorePrompt?.cards || 0} 个网页。取消不会修改任何数据。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>暂不恢复</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { void handleConfirmEmergencyRestore(); }}>
+              恢复快照
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
     </div>
     </WallpaperShell>
