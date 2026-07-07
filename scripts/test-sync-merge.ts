@@ -69,6 +69,7 @@ class FakeSupabaseQuery {
   upsert(value: Row | Row[], options?: { onConflict?: string }): Promise<{ data: Row[]; error: null }> {
     const count = Array.isArray(value) ? value.length : 1;
     this.db.operations.upsert += count;
+    this.db.operations.upsertRequests += 1;
     this.db.operations.upsertByTable[this.table] += count;
     return Promise.resolve({ data: this.db.upsert(this.table, value, options?.onConflict), error: null });
   }
@@ -110,6 +111,7 @@ class FakeSupabaseClient {
   readonly operations = {
     select: 0,
     upsert: 0,
+    upsertRequests: 0,
     upsertByTable: {
       categories: 0,
       cards: 0,
@@ -122,6 +124,14 @@ class FakeSupabaseClient {
 
   from(table: TableName): FakeSupabaseQuery {
     return new FakeSupabaseQuery(this, table);
+  }
+
+  requestCount(): number {
+    return this.operations.select
+      + this.operations.upsertRequests
+      + this.operations.insert
+      + this.operations.update
+      + this.operations.delete;
   }
 
   select(table: TableName, filters: FakeSupabaseQuery["filters"], limitCount: number | null): Row[] {
@@ -315,16 +325,26 @@ async function main(): Promise<void> {
 
   {
     const fake = new FakeSupabaseClient();
+    const parentCategory = category();
+    const childCategory = category({
+      id: "33333333-3333-4333-8333-333333333333",
+      name: "默认收集箱",
+      parentId: parentCategory.id,
+      isParent: false,
+      order: 0,
+    });
+    const childCard = card({ categoryId: childCategory.id });
     supabase.__setBrowserSupabaseClientForTest(fake as unknown as SupabaseClient);
     await resetLocal(db);
-    await db.saveCategories([category()]);
-    await db.saveCards([card()]);
+    await db.saveCategories([parentCategory, childCategory]);
+    await db.saveCards([childCard]);
 
     await sync.syncData(userId);
 
-    assert.equal(fake.tables.categories.length, 1, "local category should be pushed to cloud");
+    assert.equal(fake.tables.categories.length, 2, "local parent and child categories should be pushed to cloud");
     assert.equal(fake.tables.cards.length, 1, "local card should be pushed to cloud");
     assert.equal(fake.tables.cards[0]?.title, "Example");
+    assert.ok(fake.requestCount() <= 8, `syncData should stay within the Step 1.3 request budget, got ${fake.requestCount()}`);
   }
 
   {

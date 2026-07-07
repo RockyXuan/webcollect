@@ -271,23 +271,40 @@ function localToCloudCategory(c: Category, userId: string): Omit<CloudCategory, 
   };
 }
 
+function getCategoryParentDepth(
+  category: Category,
+  categoryById: Map<string, Category>,
+  seen = new Set<string>()
+): number {
+  if (!category.parentId) return 0;
+  if (seen.has(category.id)) return 0;
+  const parent = categoryById.get(category.parentId);
+  if (!parent) return 0;
+  seen.add(category.id);
+  return 1 + getCategoryParentDepth(parent, categoryById, seen);
+}
+
 function sortCategoriesByParentDepth(categories: Category[]): Category[] {
   const categoryById = new Map(categories.map((category) => [category.id, category]));
-
-  function getDepth(category: Category, seen = new Set<string>()): number {
-    if (!category.parentId) return 0;
-    if (seen.has(category.id)) return 0;
-    const parent = categoryById.get(category.parentId);
-    if (!parent) return 0;
-    seen.add(category.id);
-    return 1 + getDepth(parent, seen);
-  }
-
   return [...categories].sort((a, b) => {
-    const depthDiff = getDepth(a) - getDepth(b);
+    const depthDiff = getCategoryParentDepth(a, categoryById) - getCategoryParentDepth(b, categoryById);
     if (depthDiff !== 0) return depthDiff;
     return (a.order ?? 0) - (b.order ?? 0);
   });
+}
+
+function groupCategoriesByParentDepth(categories: Category[]): Category[][] {
+  const categoryById = new Map(categories.map((category) => [category.id, category]));
+  const layers = new Map<number, Category[]>();
+  for (const category of categories) {
+    const depth = getCategoryParentDepth(category, categoryById);
+    const layer = layers.get(depth) || [];
+    layer.push(category);
+    layers.set(depth, layer);
+  }
+  return [...layers.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([, layer]) => layer.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
 }
 
 async function upsertCategoriesWithParents(
@@ -295,19 +312,20 @@ async function upsertCategoriesWithParents(
   categories: Category[],
   userId: string
 ): Promise<void> {
-  const orderedCategories = sortCategoriesByParentDepth(categories);
+  const layers = groupCategoriesByParentDepth(categories);
 
-  for (const cat of orderedCategories) {
-    const cloudCat = {
+  for (const layer of layers) {
+    if (layer.length === 0) continue;
+    const cloudCategories = layer.map((cat) => ({
       ...localToCloudCategory(cat, userId),
       parent_id: cat.parentId ?? null,
-    };
+    }));
     const { error } = await client
       .from("categories")
-      .upsert(cloudCat, { onConflict: "id" });
+      .upsert(cloudCategories, { onConflict: "id" });
     if (error) {
-      console.error("[Sync] Failed to upsert category:", cat.id, error.message);
-      throw new Error(`Failed to update category "${cat.name}": ${error.message}`);
+      console.error("[Sync] Failed to upsert category layer:", error.message);
+      throw new Error(`Failed to update category layer: ${error.message}`);
     }
   }
 }
@@ -2130,37 +2148,21 @@ async function writePreferences(
   userId: string,
   preferences: Record<string, unknown>
 ): Promise<void> {
-  for (const [key, value] of Object.entries(preferences)) {
-    const existing = await client
-      .from("user_preferences")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("key", key)
-      .limit(1);
+  const rows = Object.entries(preferences).map(([key, value]) => ({
+    user_id: userId,
+    key,
+    value,
+  }));
+  if (rows.length === 0) return;
 
-    if (existing.error) {
-      throw new Error(`Failed to load preference "${key}": ${existing.error.message}`);
-    }
+  const { error } = await client
+    .from("user_preferences")
+    .upsert(rows, { onConflict: "user_id,key" });
 
-    const existingId = existing.data?.[0]?.id;
-    const writeResult = existingId
-      ? await client
-        .from("user_preferences")
-        .update({ value })
-        .eq("id", existingId)
-      : await client
-        .from("user_preferences")
-        .insert({
-          user_id: userId,
-          key,
-          value,
-        });
-
-    if (writeResult.error) {
-      const message = summarizeRemoteError(writeResult.error.message);
-      console.error(`[Sync] Failed to sync preference "${key}":`, message);
-      throw new Error(`Failed to sync preference "${key}": ${message}`);
-    }
+  if (error) {
+    const message = summarizeRemoteError(error.message);
+    console.error("[Sync] Failed to sync preferences:", message);
+    throw new Error(`Failed to sync preferences: ${message}`);
   }
 
 }

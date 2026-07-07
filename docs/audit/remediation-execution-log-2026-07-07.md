@@ -137,3 +137,31 @@
 
 - 本 Step 只提交迁移文件，没有连接或修改真实 Supabase。
 - 真实执行迁移前仍需按 Fable 要求导出 `cards` / `categories` CSV 备份。
+
+## Step 1.3 状态：批量 preferences 与分类分层 upsert
+
+已完成：
+
+- `writePreferences` 从逐 key `select -> update/insert` 改为单次批量 `upsert(rows, { onConflict: "user_id,key" })`。
+- `upsertCategoriesWithParents` 从逐分类串行 upsert 改为按父子深度分层批量 upsert。
+- 父分类先写，子分组后写，避免外键顺序问题。
+
+新增验收：
+
+- `scripts/test-sync-merge.ts` 的本地推送场景改为“父分类 + 子分组 + 卡片”。
+- fake Supabase client 新增请求次数统计。
+- 断言一次 `syncData` 总请求数不超过 Fable 预算 `<= 8`。
+
+验证结果：
+
+- `node --import tsx scripts/test-sync-merge.ts` passed.
+- `node --import tsx scripts/test-floating-capture-targets.ts` passed.
+- `node --import tsx scripts/test-floating-capture-drain.ts` passed.
+- `node --import tsx scripts/test-floating-capture-health.ts` passed.
+- `node --import tsx scripts/test-floating-capture-metadata.ts` passed.
+- `node --import tsx scripts/test-description-translation.ts` passed.
+- `node --import tsx scripts/test-extension-branding.ts` passed.
+- `corepack pnpm@9.0.0 ts-check` passed.
+- `corepack pnpm@9.0.0 lint` passed with existing 6 warnings.
+- `corepack pnpm@9.0.0 build:ext` passed.
+- `git diff --check` passed.
