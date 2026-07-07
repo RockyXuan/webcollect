@@ -12,6 +12,8 @@
 
 这个文件是 WebCollect 的“全身体检交接入口”。后续 agent 不需要让用户重新复述需求，先读：
 
+0. `docs/audit/claude-fable-code-review-2026-07-07.md`（Claude Fable 5 全量代码审查结论：P0 同步缺陷、性能根因、壁纸根因、UI 基准缺失）
+0.5 `docs/audit/claude-fable-remediation-plan-2026-07-07.md`（整改执行方案：Phase 0-5 分步操作，按序执行，每步有验收标准）
 1. `AGD.md`
 2. `docs/audit/claude-code-review-handoff-2026-07-07.md`
 3. `docs/audit/webcollect-full-audit-brief-2026-07-07.md`
