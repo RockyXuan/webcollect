@@ -25,6 +25,9 @@ Object.assign(localforage, {
   async clear(): Promise<void> {
     memoryStore.clear();
   },
+  createInstance() {
+    return localforage;
+  },
 });
 
 class FakeSupabaseQuery {

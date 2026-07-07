@@ -30,7 +30,7 @@ function normalizeStringArray(value: unknown, limit: number): string[] {
     .slice(0, limit);
 }
 
-function normalizePrefs(value: Partial<WallpaperPrefs> | null | undefined): WallpaperPrefs {
+export function normalizeWallpaperPrefs(value: Partial<WallpaperPrefs> | null | undefined): WallpaperPrefs {
   const enabledCategories = Array.isArray(value?.enabledCategories)
     ? value.enabledCategories.filter((category): category is WallpaperCategory =>
       WALLPAPER_CATEGORIES.includes(category as WallpaperCategory)
@@ -60,14 +60,18 @@ function normalizePrefs(value: Partial<WallpaperPrefs> | null | undefined): Wall
 
 export async function getWallpaperPrefs(): Promise<WallpaperPrefs> {
   const stored = await wallpaperDb.getItem<Partial<WallpaperPrefs>>(WALLPAPER_PREFS_KEY);
-  return normalizePrefs(stored);
+  return normalizeWallpaperPrefs(stored);
 }
 
-export async function saveWallpaperPrefs(prefs: WallpaperPrefs): Promise<void> {
+export async function saveWallpaperPrefs(prefs: Partial<WallpaperPrefs>): Promise<void> {
   await wallpaperDb.setItem(WALLPAPER_PREFS_KEY, {
-    ...normalizePrefs(prefs),
+    ...normalizeWallpaperPrefs(prefs),
     updatedAt: Date.now(),
   });
+}
+
+export async function saveSyncedWallpaperPrefs(prefs: Partial<WallpaperPrefs>): Promise<void> {
+  await wallpaperDb.setItem(WALLPAPER_PREFS_KEY, normalizeWallpaperPrefs(prefs));
 }
 
 export async function getWallpaperLibrary(): Promise<WallpaperItem[]> {

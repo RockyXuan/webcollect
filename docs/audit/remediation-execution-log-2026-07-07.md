@@ -280,6 +280,9 @@
 - `corepack pnpm@9.0.0 lint` passed with 0 warnings.
 - `corepack pnpm@9.0.0 build:ext` passed.
 - `git diff --check` passed.
+- `git diff --check` passed.
+- `git diff --check` passed.
+- `git diff --check` passed.
 
 Phase 1 代码侧状态：
 
@@ -516,6 +519,43 @@ Phase 2 代码侧状态：
 - `node --import tsx scripts/test-wallpaper-data.ts` passed.
 - `node --import tsx scripts/test-wallpaper-sources.ts` passed.
 - `node --import tsx scripts/test-sync-merge.ts` passed.
+- `node --import tsx scripts/test-floating-capture-targets.ts` passed.
+- `node --import tsx scripts/test-floating-capture-drain.ts` passed.
+- `node --import tsx scripts/test-floating-capture-health.ts` passed.
+- `node --import tsx scripts/test-floating-capture-metadata.ts` passed.
+- `node --import tsx scripts/test-description-translation.ts` passed.
+- `node --import tsx scripts/test-extension-branding.ts` passed.
+- `corepack pnpm@9.0.0 ts-check` passed.
+- `corepack pnpm@9.0.0 lint` passed with 0 warnings.
+- `corepack pnpm@9.0.0 build:ext` passed.
+- `git diff --check` passed.
+
+## Step 3.4 状态：壁纸偏好接入云同步
+
+已完成：
+
+- `syncData` 普通双向同步路径读取本地 `wallpaperPrefs`，并通过 `user_preferences.wallpaperPrefs` 写入云端。
+- `pushLocalSnapshotToCloud` 本地快照推送路径也带上 `wallpaperPrefs`，避免只在一条同步入口生效。
+- 壁纸偏好合并规则使用 `WallpaperPrefs.updatedAt` 做 LWW；不使用 Supabase 行级 `updated_at`。
+- 云端壁纸偏好更新时，先写入本地 wallpaper DB，再把 `wallpaper-store` 标记为未初始化并重新 `initialize()`。
+- 只同步壁纸偏好，不同步 `wallpaperLibrary`；各设备仍各自抓取和缓存远程图库。
+- `touchLocalSnapshot` 改为单调递增时间戳，避免同一毫秒内本地编辑和同步 marker 相等导致的漏判。
+
+新增验收：
+
+- 新增 `scripts/test-wallpaper-sync.ts`。
+- 验证较新的云端壁纸偏好会覆盖本地，较旧云端偏好不会覆盖本地。
+- 验证 `sync.ts` 只写入 `wallpaperPrefs`，不包含 `wallpaperLibrary` / `saveWallpaperLibrary`。
+- 更新 `scripts/test-sync-merge.ts` 的 localforage mock，使 `createInstance()` 独立存储路径也进入测试内存仓。
+
+验证结果：
+
+- `node --import tsx scripts/test-wallpaper-sync.ts` passed.
+- `node --import tsx scripts/test-wallpaper-data.ts` passed.
+- `node --import tsx scripts/test-wallpaper-sources.ts` passed.
+- `node --import tsx scripts/test-wallpaper-policy.ts` passed.
+- `node --import tsx scripts/test-sync-merge.ts` passed.
+- `node --import tsx scripts/test-cloud-snapshots.ts` passed.
 - `node --import tsx scripts/test-floating-capture-targets.ts` passed.
 - `node --import tsx scripts/test-floating-capture-drain.ts` passed.
 - `node --import tsx scripts/test-floating-capture-health.ts` passed.

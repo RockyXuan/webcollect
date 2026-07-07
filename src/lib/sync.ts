@@ -55,10 +55,17 @@ import {
   type WarehouseCategory,
   type ImportBatch,
 } from "@/lib/db-warehouse";
+import {
+  getWallpaperPrefs,
+  normalizeWallpaperPrefs,
+  saveSyncedWallpaperPrefs,
+} from "@/lib/wallpaper-db";
+import { useWallpaperStore } from "@/lib/wallpaper-store";
 import { createLocalDataSnapshot, getLocalDataSnapshots } from "@/lib/local-snapshots";
 import { normalizePinnedBookmarkItems } from "@/lib/pinned-bookmarks";
 import { allDefaultCategories } from "@/lib/seed";
 import type { WebCard, Category, HiddenSite, LinkOpenMode, CollectionSection, RecycleBinItem, PinnedBookmarkItem, CategoryLayoutPreference } from "@/lib/types";
+import type { WallpaperPrefs } from "@/lib/wallpaper-types";
 
 // 鈹€鈹€ Types 鈹€鈹€
 
@@ -109,6 +116,13 @@ interface SyncBackup {
   sampleCategoryNames: string[];
   sampleCardTitles: string[];
 }
+
+interface WallpaperPrefsMergeResult {
+  prefs: WallpaperPrefs;
+  shouldApplyCloud: boolean;
+}
+
+type CloudPreferenceMap = Record<string, { value: unknown; updatedAt: string }>;
 
 const MAX_SYNC_RECURSION_DEPTH = 2;
 
@@ -826,8 +840,8 @@ function mergePinnedBookmarkPreferences(
   return normalizePinnedBookmarkItems([...byCardId.values()]);
 }
 
-function preferencesToMap(cloudPrefs: CloudPreference[]): Record<string, { value: unknown; updatedAt: string }> {
-  const cloudPrefsMap: Record<string, { value: unknown; updatedAt: string }> = {};
+function preferencesToMap(cloudPrefs: CloudPreference[]): CloudPreferenceMap {
+  const cloudPrefsMap: CloudPreferenceMap = {};
   for (const pref of cloudPrefs) {
     cloudPrefsMap[pref.key] = { value: pref.value, updatedAt: pref.updated_at };
   }
@@ -836,19 +850,12 @@ function preferencesToMap(cloudPrefs: CloudPreference[]): Record<string, { value
 
 const WORKSPACE_RESET_PREF_KEY = "currentWorkspaceResetAt";
 
-function getPreferenceUpdatedAt(
-  cloudPrefsMap: Record<string, { value: unknown; updatedAt: string }>,
-  key: string
-): number {
+function getPreferenceUpdatedAt(cloudPrefsMap: CloudPreferenceMap, key: string): number {
   const updatedAt = cloudPrefsMap[key]?.updatedAt;
   return updatedAt ? new Date(updatedAt).getTime() : 0;
 }
 
-function shouldIgnoreCloudPreference(
-  cloudPrefsMap: Record<string, { value: unknown; updatedAt: string }>,
-  key: string,
-  workspaceResetAt: number
-): boolean {
+function shouldIgnoreCloudPreference(cloudPrefsMap: CloudPreferenceMap, key: string, workspaceResetAt: number): boolean {
   return workspaceResetAt > 0 && getPreferenceUpdatedAt(cloudPrefsMap, key) < workspaceResetAt;
 }
 
@@ -1290,6 +1297,7 @@ async function syncDataUnsafe(userId: string, depth: number): Promise<void> {
     localWarehouseCategories,
     localImportBatches,
     localWarehouseUpdatedAt,
+    localWallpaperPrefs,
     localWorkspaceResetAt,
     localSnapshotUpdatedAt,
   ] = await Promise.all([
@@ -1310,6 +1318,7 @@ async function syncDataUnsafe(userId: string, depth: number): Promise<void> {
     getWarehouseCategories(),
     getImportBatches(),
     getWarehouseUpdatedAt(),
+    getWallpaperPrefs(),
     getWorkspaceResetAt(),
     getLocalSnapshotUpdatedAt(),
   ]);
@@ -1594,6 +1603,7 @@ async function syncDataUnsafe(userId: string, depth: number): Promise<void> {
     localWarehouseCategories,
     localImportBatches,
     localWarehouseUpdatedAt,
+    localWallpaperPrefs,
     localWorkspaceResetAt,
     localLooksEmptyAgainstCloud || localLooksMuchSmallerAgainstCloud || shouldProtectCloudLayout ? 0 : localSnapshotUpdatedAt,
     cloudPrefs
@@ -1642,6 +1652,7 @@ async function pushLocalSnapshotToCloudUnsafe(
     localWarehouseCategories,
     localImportBatches,
     localWarehouseUpdatedAt,
+    localWallpaperPrefs,
     localWorkspaceResetAt,
     localSnapshotUpdatedAt,
   ] = await Promise.all([
@@ -1662,6 +1673,7 @@ async function pushLocalSnapshotToCloudUnsafe(
     getWarehouseCategories(),
     getImportBatches(),
     getWarehouseUpdatedAt(),
+    getWallpaperPrefs(),
     getWorkspaceResetAt(),
     getLocalSnapshotUpdatedAt(),
   ]);
@@ -1727,6 +1739,7 @@ async function pushLocalSnapshotToCloudUnsafe(
       warehouseCategories: localWarehouseCategories,
       warehouseImportBatches: localImportBatches,
       warehouseUpdatedAt: localWarehouseUpdatedAt,
+      wallpaperPrefs: localWallpaperPrefs,
       localSnapshotUpdatedAt: snapshotUpdatedAt,
     });
   }
@@ -1865,6 +1878,7 @@ async function pushLocalSnapshotToCloudUnsafe(
     warehouseCategories: localWarehouseCategories,
     warehouseImportBatches: localImportBatches,
     warehouseUpdatedAt: localWarehouseUpdatedAt,
+    wallpaperPrefs: localWallpaperPrefs,
     localSnapshotUpdatedAt: snapshotUpdatedAt,
   });
   await clearSyncDirtyIds({
@@ -1917,6 +1931,55 @@ export function mergeCategoryLayouts(
   return merged;
 }
 
+function getWallpaperPrefsUpdatedAt(prefs: Partial<WallpaperPrefs> | null | undefined): number {
+  return typeof prefs?.updatedAt === "number" && Number.isFinite(prefs.updatedAt) ? prefs.updatedAt : 0;
+}
+
+function getCloudWallpaperPrefs(cloudPrefsMap: CloudPreferenceMap): WallpaperPrefs | null {
+  const value = cloudPrefsMap.wallpaperPrefs?.value;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return normalizeWallpaperPrefs(value as Partial<WallpaperPrefs>);
+}
+
+export function mergeWallpaperPrefsByUpdatedAt(
+  localWallpaperPrefs: WallpaperPrefs,
+  cloudWallpaperPrefs: WallpaperPrefs | null
+): WallpaperPrefsMergeResult {
+  if (!cloudWallpaperPrefs) {
+    return {
+      prefs: localWallpaperPrefs,
+      shouldApplyCloud: false,
+    };
+  }
+
+  const localUpdatedAt = getWallpaperPrefsUpdatedAt(localWallpaperPrefs);
+  const cloudUpdatedAt = getWallpaperPrefsUpdatedAt(cloudWallpaperPrefs);
+  if (cloudUpdatedAt > localUpdatedAt) {
+    return {
+      prefs: cloudWallpaperPrefs,
+      shouldApplyCloud: true,
+    };
+  }
+
+  return {
+    prefs: localWallpaperPrefs,
+    shouldApplyCloud: false,
+  };
+}
+
+async function applySyncedWallpaperPrefsIfNeeded(
+  mergedWallpaperPrefs: WallpaperPrefs,
+  shouldApplyCloud: boolean
+): Promise<void> {
+  if (!shouldApplyCloud) return;
+
+  await withoutLocalChangeEvents(async () => {
+    await saveSyncedWallpaperPrefs(mergedWallpaperPrefs);
+  });
+  useWallpaperStore.setState({ isReady: false });
+  await useWallpaperStore.getState().initialize();
+}
+
 async function syncPreferences(
   client: SupabaseClient,
   userId: string,
@@ -1936,6 +1999,7 @@ async function syncPreferences(
   localWarehouseCategories: WarehouseCategory[],
   localImportBatches: ImportBatch[],
   localWarehouseUpdatedAt: number,
+  localWallpaperPrefs: WallpaperPrefs,
   localWorkspaceResetAt: number,
   localSnapshotUpdatedAt: number,
   cloudPrefs: CloudPreference[]
@@ -2150,6 +2214,13 @@ async function syncPreferences(
     });
   }
 
+  const cloudWallpaperPrefs = getCloudWallpaperPrefs(cloudPrefsMap);
+  const wallpaperPrefsMerge = mergeWallpaperPrefsByUpdatedAt(localWallpaperPrefs, cloudWallpaperPrefs);
+  await applySyncedWallpaperPrefsIfNeeded(wallpaperPrefsMerge.prefs, wallpaperPrefsMerge.shouldApplyCloud);
+  const mergedWallpaperPrefs = wallpaperPrefsMerge.shouldApplyCloud
+    ? await getWallpaperPrefs()
+    : wallpaperPrefsMerge.prefs;
+
   await writePreferences(client, userId, {
     currentWorkspaceResetAt: workspaceResetAt,
     hiddenSites: mergedHiddenSites,
@@ -2168,6 +2239,7 @@ async function syncPreferences(
     warehouseCategories,
     warehouseImportBatches,
     warehouseUpdatedAt,
+    wallpaperPrefs: mergedWallpaperPrefs,
     localSnapshotUpdatedAt: Math.max(localSnapshotUpdatedAt, cloudSnapshotUpdatedAt),
   });
 }

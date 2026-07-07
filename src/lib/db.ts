@@ -112,7 +112,8 @@ export async function saveDataSchemaVersion(version: number): Promise<void> {
 
 async function touchLocalSnapshot(): Promise<void> {
   if (localChangeSilenceDepth > 0) return;
-  const timestamp = Date.now();
+  const previous = await getLocalSnapshotUpdatedAt();
+  const timestamp = Math.max(Date.now(), previous + 1);
   await localforage.setItem(LOCAL_UPDATED_AT_KEY, timestamp);
   if (typeof window !== "undefined") {
     try {
