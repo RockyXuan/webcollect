@@ -65,3 +65,39 @@
 - `corepack pnpm@9.0.0 ts-check` passed.
 - `corepack pnpm@9.0.0 lint` passed with existing 6 warnings.
 - `corepack pnpm@9.0.0 build:ext` passed.
+
+## Step 1.1 状态：停止无差别全量 upsert
+
+已完成：
+
+- 在 `src/lib/db.ts` 增加持久 dirty 集合 `syncDirtySets`。
+- `saveCards` / `saveCategories` 通过本地差异检测登记新增或内容变化的卡片、分类。
+- `withoutLocalChangeEvents` 包裹的同步、恢复、迁移写入不会登记 dirty。
+- `syncData` 合并后只推送 `dirty ∪ localOnly ∪ localToPush`。
+- `pushLocalSnapshotToCloud` 只推送 dirty、本地新增、本地更新时间较新的行。
+- 分类部分推送时保留真实 `parent_id`，避免只推子分组时被拍平成顶级分类。
+- 已和云端逐字段相等的分类/卡片不会 upsert。
+- 同步成功后清理已处理的 dirty id。
+
+新增验收：
+
+- `scripts/test-sync-merge.ts` 增加“本地无改动、云端内容一致时，分类/卡片 upsert 次数为 0”的断言。
+
+验证结果：
+
+- `node --import tsx scripts/test-sync-merge.ts` passed.
+- `node --import tsx scripts/test-floating-capture-targets.ts` passed.
+- `node --import tsx scripts/test-floating-capture-drain.ts` passed.
+- `node --import tsx scripts/test-floating-capture-health.ts` passed.
+- `node --import tsx scripts/test-floating-capture-metadata.ts` passed.
+- `node --import tsx scripts/test-description-translation.ts` passed.
+- `node --import tsx scripts/test-extension-branding.ts` passed.
+- `corepack pnpm@9.0.0 ts-check` passed.
+- `corepack pnpm@9.0.0 lint` passed with existing 6 warnings.
+- `corepack pnpm@9.0.0 build:ext` passed.
+- `git diff --check` passed.
+
+备注：
+
+- 本 Step 未操作用户真实 Chrome / IndexedDB / Supabase 数据。
+- 真实账号双设备同步人工复验仍等待用户先完成 Fable 要求的手动备份。

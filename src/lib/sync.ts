@@ -50,6 +50,8 @@ import {
   getWorkspaceResetAt,
   saveWorkspaceResetAt,
   withoutLocalChangeEvents,
+  getSyncDirtySets,
+  clearSyncDirtyIds,
 } from "@/lib/db";
 import {
   getWarehouseCards,
@@ -289,12 +291,11 @@ async function upsertCategoriesWithParents(
   userId: string
 ): Promise<void> {
   const orderedCategories = sortCategoriesByParentDepth(categories);
-  const categoryIds = new Set(orderedCategories.map((cat) => cat.id));
 
   for (const cat of orderedCategories) {
     const cloudCat = {
       ...localToCloudCategory(cat, userId),
-      parent_id: cat.parentId && categoryIds.has(cat.parentId) ? cat.parentId : null,
+      parent_id: cat.parentId ?? null,
     };
     const { error } = await client
       .from("categories")
@@ -435,6 +436,110 @@ function mergeByTimestamp<T extends { id: string }>(
   }
 
   return { merged, cloudToPull, localToPush, localOnly, cloudOnly };
+}
+
+function resolveDedupedIds(ids: Iterable<string>, idMap: Map<string, string>): Set<string> {
+  const resolved = new Set<string>();
+  for (const id of ids) {
+    resolved.add(idMap.get(id) || id);
+  }
+  return resolved;
+}
+
+function mergePushCandidateIds<T extends { id: string }>(
+  mergeResult: Pick<MergeResult<T>, "localOnly" | "localToPush">
+): string[] {
+  return [
+    ...mergeResult.localOnly.map((item) => item.id),
+    ...mergeResult.localToPush.map((item) => item.id),
+  ];
+}
+
+function includeParentCategoryIds(ids: Set<string>, categories: Category[]): Set<string> {
+  const result = new Set(ids);
+  const categoryById = new Map(categories.map((category) => [category.id, category]));
+
+  for (const id of [...ids]) {
+    let category = categoryById.get(id);
+    const seen = new Set<string>();
+    while (category?.parentId && !seen.has(category.id)) {
+      seen.add(category.id);
+      result.add(category.parentId);
+      category = categoryById.get(category.parentId);
+    }
+  }
+
+  return result;
+}
+
+function selectChangedRowsForCloud<T extends { id: string }, CloudRow>(
+  rows: T[],
+  candidateIds: Set<string>,
+  cloudById: Map<string, CloudRow>,
+  rowMatchesCloud: (row: T, cloudRow: CloudRow | undefined) => boolean
+): { rowsToUpsert: T[]; resolvedIds: string[] } {
+  const rowsToUpsert: T[] = [];
+  const resolvedIds: string[] = [];
+
+  for (const row of rows) {
+    if (!candidateIds.has(row.id)) continue;
+    resolvedIds.push(row.id);
+    if (!rowMatchesCloud(row, cloudById.get(row.id))) {
+      rowsToUpsert.push(row);
+    }
+  }
+
+  return { rowsToUpsert, resolvedIds };
+}
+
+function cloudCategoryMatchesLocal(category: Category, cloudCategory: CloudCategory | undefined, userId: string): boolean {
+  if (!cloudCategory) return false;
+  const local = localToCloudCategory(category, userId);
+  return (
+    cloudCategory.id === local.id &&
+    cloudCategory.user_id === local.user_id &&
+    cloudCategory.name === local.name &&
+    (cloudCategory.icon ?? null) === local.icon &&
+    (cloudCategory.color ?? null) === local.color &&
+    (cloudCategory.parent_id ?? null) === local.parent_id &&
+    (cloudCategory.is_parent ?? null) === local.is_parent &&
+    (cloudCategory.order ?? 0) === (local.order ?? 0)
+  );
+}
+
+function cloudCardMatchesLocal(card: WebCard, cloudCard: CloudCard | undefined, userId: string): boolean {
+  if (!cloudCard) return false;
+  const local = localToCloudCard(card, userId);
+  return (
+    cloudCard.id === local.id &&
+    cloudCard.user_id === local.user_id &&
+    cloudCard.category_id === local.category_id &&
+    cloudCard.url === local.url &&
+    (cloudCard.title ?? null) === local.title &&
+    (cloudCard.short_desc ?? null) === local.short_desc &&
+    (cloudCard.full_desc ?? null) === local.full_desc &&
+    (cloudCard.note ?? null) === local.note &&
+    (cloudCard.abbreviation ?? null) === local.abbreviation &&
+    (cloudCard.image_url ?? null) === local.image_url &&
+    (cloudCard.order ?? 0) === (local.order ?? 0)
+  );
+}
+
+function collectLocalSnapshotPushIds<T extends { id: string; createdAt: number; updatedAt?: number }, CloudRow extends { updated_at: string }>(
+  localRows: T[],
+  cloudById: Map<string, CloudRow>,
+  dirtyIds: Set<string>
+): Set<string> {
+  const candidateIds = new Set<string>();
+  for (const row of localRows) {
+    const cloudRow = cloudById.get(row.id);
+    const localUpdatedAt = row.updatedAt || row.createdAt || 0;
+    const cloudUpdatedAt = cloudRow ? new Date(cloudRow.updated_at).getTime() : 0;
+    if (dirtyIds.has(row.id) || !cloudRow || localUpdatedAt > cloudUpdatedAt) {
+      candidateIds.add(row.id);
+    }
+  }
+  return candidateIds;
 }
 
 function normalizeText(value: string | undefined): string {
@@ -1170,6 +1275,7 @@ export async function syncData(userId: string): Promise<void> {
   const normalizedLocal = await normalizeLocalIdsForCloud(rawLocalCategories, rawLocalCards);
   let localCategories = normalizedLocal.categories;
   let localCards = normalizedLocal.cards;
+  const dirtySets = await getSyncDirtySets();
 
   // 2. Load cloud data
   const client = getBrowserSupabaseClient();
@@ -1375,11 +1481,37 @@ export async function syncData(userId: string): Promise<void> {
     );
   }
 
-  // 6. Push local changes to cloud. Categories are ordered by parent depth so
-  // child groups reference already-created parents without a transient flat state.
-  await upsertCategoriesWithParents(client, mergedCategories, userId);
+  // 6. Push only rows that are dirty, local-only, or newer locally. Clean rows
+  // that already match cloud content are intentionally skipped.
+  const cloudCategoryById = new Map(cloudCategories.map((category) => [category.id, category]));
+  const cloudCardById = new Map(cloudCards.map((card) => [card.id, card]));
+  const categoryCandidateIds = includeParentCategoryIds(
+    resolveDedupedIds(
+      [...mergePushCandidateIds(catMerge), ...dirtySets.categories],
+      deduped.categoryIdMap
+    ),
+    mergedCategories
+  );
+  const cardCandidateIds = resolveDedupedIds(
+    [...mergePushCandidateIds(cardMerge), ...dirtySets.cards],
+    deduped.cardIdMap
+  );
+  const categorySyncSelection = selectChangedRowsForCloud(
+    mergedCategories,
+    categoryCandidateIds,
+    cloudCategoryById,
+    (category, cloudCategory) => cloudCategoryMatchesLocal(category, cloudCategory, userId)
+  );
+  const cardSyncSelection = selectChangedRowsForCloud(
+    mergedCards,
+    cardCandidateIds,
+    cloudCardById,
+    (card, cloudCard) => cloudCardMatchesLocal(card, cloudCard, userId)
+  );
 
-  await upsertCardsInChunks(client, mergedCards, userId);
+  await upsertCategoriesWithParents(client, categorySyncSelection.rowsToUpsert, userId);
+
+  await upsertCardsInChunks(client, cardSyncSelection.rowsToUpsert, userId);
 
   if (defaultDuplicateCleanup.removedCards > 0) {
     await writeSyncBackup(
@@ -1422,6 +1554,10 @@ export async function syncData(userId: string): Promise<void> {
     localLooksEmptyAgainstCloud || localLooksMuchSmallerAgainstCloud || shouldProtectCloudLayout ? 0 : localSnapshotUpdatedAt,
     cloudPrefs
   );
+  await clearSyncDirtyIds({
+    categories: categorySyncSelection.resolvedIds,
+    cards: cardSyncSelection.resolvedIds,
+  });
   await saveLocalSnapshotSyncedAt(Math.max(localSnapshotUpdatedAt, cloudSnapshotUpdatedAt, Date.now()));
 
   console.log("[Sync] Sync completed successfully");
@@ -1480,6 +1616,7 @@ export async function pushLocalSnapshotToCloud(
   await createLocalDataSnapshot("before-cloud-push", "\u63a8\u9001\u4e91\u7aef\u524d\u672c\u5730\u7248\u672c");
   const { categories: normalizedLocalCategories, cards: normalizedLocalCards } =
     await normalizeLocalIdsForCloud(rawLocalCategories, rawLocalCards);
+  const dirtySets = await getSyncDirtySets();
 
   const localDedupe = dedupeSyncedData(
     normalizedLocalCategories,
@@ -1599,6 +1736,25 @@ export async function pushLocalSnapshotToCloud(
   }
   const localCategoryIds = new Set(localCategories.map((category) => category.id));
   const localCardIds = new Set(localCards.map((card) => card.id));
+  const cloudCategoryById = new Map(cloudCategories.map((category) => [category.id, category]));
+  const cloudCardById = new Map(cloudCards.map((card) => [card.id, card]));
+  const categoryCandidateIds = includeParentCategoryIds(
+    collectLocalSnapshotPushIds(localCategories, cloudCategoryById, new Set(dirtySets.categories)),
+    localCategories
+  );
+  const cardCandidateIds = collectLocalSnapshotPushIds(localCards, cloudCardById, new Set(dirtySets.cards));
+  const categorySyncSelection = selectChangedRowsForCloud(
+    localCategories,
+    categoryCandidateIds,
+    cloudCategoryById,
+    (category, cloudCategory) => cloudCategoryMatchesLocal(category, cloudCategory, userId)
+  );
+  const cardSyncSelection = selectChangedRowsForCloud(
+    localCards,
+    cardCandidateIds,
+    cloudCardById,
+    (card, cloudCard) => cloudCardMatchesLocal(card, cloudCard, userId)
+  );
 
   const staleCardIds = cloudCards
     .filter((card) => !localCardIds.has(card.id))
@@ -1614,9 +1770,9 @@ export async function pushLocalSnapshotToCloud(
     }
   }
 
-  await upsertCategoriesWithParents(client, localCategories, userId);
+  await upsertCategoriesWithParents(client, categorySyncSelection.rowsToUpsert, userId);
 
-  await upsertCardsInChunks(client, localCards, userId);
+  await upsertCardsInChunks(client, cardSyncSelection.rowsToUpsert, userId);
 
   const staleCategoryIds = sortCategoriesByParentDepth(
     cloudCategories
@@ -1656,6 +1812,10 @@ export async function pushLocalSnapshotToCloud(
     warehouseImportBatches: localImportBatches,
     warehouseUpdatedAt: localWarehouseUpdatedAt,
     localSnapshotUpdatedAt: snapshotUpdatedAt,
+  });
+  await clearSyncDirtyIds({
+    categories: categorySyncSelection.resolvedIds,
+    cards: cardSyncSelection.resolvedIds,
   });
   await saveLocalSnapshotSyncedAt(snapshotUpdatedAt);
 

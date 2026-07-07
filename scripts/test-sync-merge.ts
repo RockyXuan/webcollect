@@ -67,7 +67,9 @@ class FakeSupabaseQuery {
   }
 
   upsert(value: Row | Row[], options?: { onConflict?: string }): Promise<{ data: Row[]; error: null }> {
-    this.db.operations.upsert += Array.isArray(value) ? value.length : 1;
+    const count = Array.isArray(value) ? value.length : 1;
+    this.db.operations.upsert += count;
+    this.db.operations.upsertByTable[this.table] += count;
     return Promise.resolve({ data: this.db.upsert(this.table, value, options?.onConflict), error: null });
   }
 
@@ -108,6 +110,11 @@ class FakeSupabaseClient {
   readonly operations = {
     select: 0,
     upsert: 0,
+    upsertByTable: {
+      categories: 0,
+      cards: 0,
+      user_preferences: 0,
+    } as Record<TableName, number>,
     insert: 0,
     update: 0,
     delete: 0,
@@ -303,6 +310,26 @@ async function main(): Promise<void> {
     assert.equal(fake.tables.categories.length, 1, "local category should be pushed to cloud");
     assert.equal(fake.tables.cards.length, 1, "local card should be pushed to cloud");
     assert.equal(fake.tables.cards[0]?.title, "Example");
+  }
+
+  {
+    const fake = new FakeSupabaseClient();
+    const existingCategory = category();
+    const existingCard = card();
+    fake.tables.categories.push(cloudCategory(existingCategory));
+    fake.tables.cards.push(cloudCard(existingCard));
+    supabase.__setBrowserSupabaseClientForTest(fake as unknown as SupabaseClient);
+    await resetLocal(db);
+    await db.withoutLocalChangeEvents(async () => {
+      await db.saveCategories([existingCategory]);
+      await db.saveCards([existingCard]);
+    });
+    await db.clearSyncDirtySets();
+
+    await sync.syncData(userId);
+
+    const rowUpserts = fake.operations.upsertByTable.categories + fake.operations.upsertByTable.cards;
+    assert.equal(rowUpserts, 0, "clean local rows that match cloud should not be upserted");
   }
 
   {

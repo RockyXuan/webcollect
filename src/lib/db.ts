@@ -22,8 +22,83 @@ const WORKSPACE_RESET_AT_KEY = "currentWorkspaceResetAt";
 const LOCAL_UPDATED_AT_KEY = "localSnapshotUpdatedAt";
 const LOCAL_SYNCED_AT_KEY = "localSnapshotSyncedAt";
 const LOCAL_UPDATED_SIGNAL_KEY = "webcollect_local_snapshot_updated_at";
+const SYNC_DIRTY_SETS_KEY = "syncDirtySets";
 
 let localChangeSilenceDepth = 0;
+
+export interface SyncDirtySets {
+  cards: string[];
+  categories: string[];
+}
+
+type SyncDirtyKind = "card" | "category";
+
+function emptySyncDirtySets(): SyncDirtySets {
+  return { cards: [], categories: [] };
+}
+
+function normalizeSyncDirtySets(value: unknown): SyncDirtySets {
+  if (!value || typeof value !== "object") return emptySyncDirtySets();
+  const raw = value as Partial<Record<keyof SyncDirtySets, unknown>>;
+  return {
+    cards: Array.isArray(raw.cards) ? [...new Set(raw.cards.filter((id): id is string => typeof id === "string" && id.length > 0))] : [],
+    categories: Array.isArray(raw.categories) ? [...new Set(raw.categories.filter((id): id is string => typeof id === "string" && id.length > 0))] : [],
+  };
+}
+
+function dirtyKeyForKind(kind: SyncDirtyKind): keyof SyncDirtySets {
+  return kind === "card" ? "cards" : "categories";
+}
+
+function stableSnapshot(value: unknown): string {
+  return JSON.stringify(value);
+}
+
+function changedItemIds<T extends { id: string }>(previous: T[], next: T[]): string[] {
+  const previousById = new Map(previous.map((item) => [item.id, stableSnapshot(item)]));
+  return next
+    .filter((item) => previousById.get(item.id) !== stableSnapshot(item))
+    .map((item) => item.id);
+}
+
+export async function getSyncDirtySets(): Promise<SyncDirtySets> {
+  return normalizeSyncDirtySets(await localforage.getItem<unknown>(SYNC_DIRTY_SETS_KEY));
+}
+
+async function saveSyncDirtySets(dirtySets: SyncDirtySets): Promise<void> {
+  await localforage.setItem(SYNC_DIRTY_SETS_KEY, normalizeSyncDirtySets(dirtySets));
+}
+
+export async function markDirty(kind: SyncDirtyKind, id: string): Promise<void> {
+  await markDirtyIds(kind, [id]);
+}
+
+export async function markDirtyIds(kind: SyncDirtyKind, ids: string[]): Promise<void> {
+  if (localChangeSilenceDepth > 0) return;
+  const cleanIds = [...new Set(ids.filter((id) => typeof id === "string" && id.length > 0))];
+  if (cleanIds.length === 0) return;
+  const dirtySets = await getSyncDirtySets();
+  const key = dirtyKeyForKind(kind);
+  dirtySets[key] = [...new Set([...dirtySets[key], ...cleanIds])];
+  await saveSyncDirtySets(dirtySets);
+}
+
+export async function clearSyncDirtyIds(input: Partial<SyncDirtySets>): Promise<void> {
+  const dirtySets = await getSyncDirtySets();
+  const cardIds = new Set(input.cards || []);
+  const categoryIds = new Set(input.categories || []);
+  if (cardIds.size > 0) {
+    dirtySets.cards = dirtySets.cards.filter((id) => !cardIds.has(id));
+  }
+  if (categoryIds.size > 0) {
+    dirtySets.categories = dirtySets.categories.filter((id) => !categoryIds.has(id));
+  }
+  await saveSyncDirtySets(dirtySets);
+}
+
+export async function clearSyncDirtySets(): Promise<void> {
+  await saveSyncDirtySets(emptySyncDirtySets());
+}
 
 async function touchLocalSnapshot(): Promise<void> {
   if (localChangeSilenceDepth > 0) return;
@@ -82,7 +157,9 @@ export async function getCards(): Promise<WebCard[]> {
 }
 
 export async function saveCards(cards: WebCard[]): Promise<void> {
+  const previous = (await localforage.getItem<WebCard[]>(CARDS_KEY)) || [];
   await localforage.setItem(CARDS_KEY, cards);
+  await markDirtyIds("card", changedItemIds(previous, cards));
   await touchLocalSnapshot();
 }
 
@@ -112,7 +189,9 @@ export async function getCategories(): Promise<Category[]> {
 }
 
 export async function saveCategories(categories: Category[]): Promise<void> {
+  const previous = (await localforage.getItem<Category[]>(CATEGORIES_KEY)) || [];
   await localforage.setItem(CATEGORIES_KEY, categories);
+  await markDirtyIds("category", changedItemIds(previous, categories));
   await touchLocalSnapshot();
 }
 
