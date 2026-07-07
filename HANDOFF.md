@@ -17,6 +17,7 @@ This section supersedes older handoff notes below when there is a conflict.
 ### Read First
 
 - `AGD.md`
+- `docs/audit/claude-code-review-handoff-2026-07-07.md`
 - `docs/audit/webcollect-full-audit-brief-2026-07-07.md`
 - `docs/audit/user-screenshot-index-2026-07-07.md`
 - `PROJECT_SUMMARY.md`
@@ -28,7 +29,7 @@ This section supersedes older handoff notes below when there is a conflict.
 
 - `V1.0.2 / 2026-07-01`: fixed extension capture target placement, top section editing/reordering, category lightweight edit, tab hover readability, delete misfire prevention, squirrel branding and version/date display.
 - `V1.0.3 / 2026-07-02`: fixed capture metadata relevance, especially `docu.md` opened from X/Twitter being mislabeled with an X/Twitter description.
-- Documentation-only handoff on 2026-07-07: consolidated user requirements, screenshots, implementation notes, lessons, known weak spots, and Claude audit tasks into `AGD.md` and `docs/audit/*`.
+- Documentation-only handoff on 2026-07-07: consolidated user requirements, screenshots, implementation notes, lessons, known weak spots, Claude audit tasks, and code-review self-assessment into `AGD.md` and `docs/audit/*`.
 
 ### Current Risks To Audit
 

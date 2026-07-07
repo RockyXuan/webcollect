@@ -7,6 +7,7 @@
 已完成：
 
 - 新增 `AGD.md` 作为当前全项目体检总入口。
+- 新增 `docs/audit/claude-code-review-handoff-2026-07-07.md`，按 Claude Code Review 需要整理实现进度、遗留问题、壁纸专项问题和自评。
 - 新增 `docs/audit/webcollect-full-audit-brief-2026-07-07.md`，汇总需求、做法、保留现状、踩坑、待办和验证基线。
 - 新增 `docs/audit/user-screenshot-index-2026-07-07.md`，记录用户截图名称、标注含义、对应问题和当前状态。
 - 更新 `PROJECT_SUMMARY.md`、`HANDOFF.md`、`NEXT_THREAD_PROMPT.md`、`README.md`、`AGENTS.md`、`tasks/lessons.md`、`tasks/todo.md`，全部指向 `AGD.md`。

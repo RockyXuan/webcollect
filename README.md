@@ -5,13 +5,14 @@
 如果你是后续接手 WebCollect 的 Claude / Codex / 其他 agent，请先读：
 
 1. `AGD.md`
-2. `docs/audit/webcollect-full-audit-brief-2026-07-07.md`
-3. `docs/audit/user-screenshot-index-2026-07-07.md`
-4. `PROJECT_SUMMARY.md`
-5. `HANDOFF.md`
-6. `tasks/lessons.md`
-7. `tasks/todo.md`
-8. `AGENTS.md`
+2. `docs/audit/claude-code-review-handoff-2026-07-07.md`
+3. `docs/audit/webcollect-full-audit-brief-2026-07-07.md`
+4. `docs/audit/user-screenshot-index-2026-07-07.md`
+5. `PROJECT_SUMMARY.md`
+6. `HANDOFF.md`
+7. `tasks/lessons.md`
+8. `tasks/todo.md`
+9. `AGENTS.md`
 
 当前固定开发目录：`/Users/rockyx/vibe coding/Web Collect 0628`。
 当前最新功能版本：`V1.0.3 / 2026年7月2日`。

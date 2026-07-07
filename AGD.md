@@ -13,13 +13,14 @@
 这个文件是 WebCollect 的“全身体检交接入口”。后续 agent 不需要让用户重新复述需求，先读：
 
 1. `AGD.md`
-2. `docs/audit/webcollect-full-audit-brief-2026-07-07.md`
-3. `docs/audit/user-screenshot-index-2026-07-07.md`
-4. `PROJECT_SUMMARY.md`
-5. `HANDOFF.md`
-6. `tasks/lessons.md`
-7. `tasks/todo.md`
-8. `AGENTS.md`
+2. `docs/audit/claude-code-review-handoff-2026-07-07.md`
+3. `docs/audit/webcollect-full-audit-brief-2026-07-07.md`
+4. `docs/audit/user-screenshot-index-2026-07-07.md`
+5. `PROJECT_SUMMARY.md`
+6. `HANDOFF.md`
+7. `tasks/lessons.md`
+8. `tasks/todo.md`
+9. `AGENTS.md`
 
 如果这些文件和旧文档冲突，以 `AGD.md` 和 `docs/audit/webcollect-full-audit-brief-2026-07-07.md` 为准。
 

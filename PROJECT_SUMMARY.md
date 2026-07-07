@@ -12,6 +12,7 @@
 - 最新 zip：`WebCollect-Chrome-Extension-v1.0.3-2026-07-02.zip`
 - 最新新增文档：
   - `AGD.md`
+  - `docs/audit/claude-code-review-handoff-2026-07-07.md`
   - `docs/audit/webcollect-full-audit-brief-2026-07-07.md`
   - `docs/audit/user-screenshot-index-2026-07-07.md`
 

@@ -11,6 +11,7 @@
 
 ## Claude Full-Audit Backlog
 
+- [x] Add Claude code-review handoff -> Verification: `docs/audit/claude-code-review-handoff-2026-07-07.md` lists implementation progress, repeated failures, wallpaper risks, UI issues, and self-assessment.
 - [ ] P0: Re-audit floating capture destination placement -> Verification: existing/new target, new section/category/group, queue replay, stale explicit target fail-safe.
 - [ ] P0: Re-audit metadata extraction relevance -> Verification: social-source external links, doc/product homepages, GitHub, YouTube/X, and target/source host mismatch cases.
 - [ ] P0: Re-audit edit mode dangerous actions -> Verification: clicking tabs in edit mode never triggers delete; delete is only in explicit menu/dialog path.
