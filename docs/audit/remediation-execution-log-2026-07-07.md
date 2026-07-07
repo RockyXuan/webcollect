@@ -463,3 +463,37 @@ Phase 2 代码侧状态：
 - `corepack pnpm@9.0.0 lint` passed with 0 warnings.
 - `corepack pnpm@9.0.0 build:ext` passed.
 - `git diff --check` passed.
+
+## Step 3.2 状态：提升远程壁纸产出
+
+已完成：
+
+- Wikimedia 远程刷新改为按启用分类分别请求，而不是把多个分类拼成一个 OR 查询。
+- 每个 Wikimedia 分类请求的 `gsrlimit` 从 12 提升到 30。
+- 默认 Auto Mix 仍不包含 `space`，因此默认刷新不调用 NASA；Space 模式仍保留 NASA 请求能力。
+- 远程结果继续统一走 `filterUsableWallpapers` 过滤、去重和排序。
+
+新增验收：
+
+- 新增 `scripts/test-wallpaper-sources.ts`。
+- mock Wikimedia API，验证默认启用的 4 个分类会产生 4 个独立 Wikimedia 请求。
+- 验证每个请求都使用 `gsrlimit=30`。
+- 验证默认 Auto Mix 不调用 NASA。
+- 验证 mock 刷新至少产出 10 张合格远程图。
+
+验证结果：
+
+- `node --import tsx scripts/test-wallpaper-sources.ts` passed.
+- `node --import tsx scripts/test-wallpaper-data.ts` passed.
+- `node --import tsx scripts/test-wallpaper-policy.ts` passed.
+- `node --import tsx scripts/test-sync-merge.ts` passed.
+- `node --import tsx scripts/test-floating-capture-targets.ts` passed.
+- `node --import tsx scripts/test-floating-capture-drain.ts` passed.
+- `node --import tsx scripts/test-floating-capture-health.ts` passed.
+- `node --import tsx scripts/test-floating-capture-metadata.ts` passed.
+- `node --import tsx scripts/test-description-translation.ts` passed.
+- `node --import tsx scripts/test-extension-branding.ts` passed.
+- `corepack pnpm@9.0.0 ts-check` passed.
+- `corepack pnpm@9.0.0 lint` passed with 0 warnings.
+- `corepack pnpm@9.0.0 build:ext` passed.
+- `git diff --check` passed.

@@ -486,12 +486,24 @@ async function fetchWikimediaWallpapers(
   now: number,
   fetchImpl: FetchLike
 ): Promise<WallpaperItem[]> {
-  const term = categories.flatMap((category) => CATEGORY_SEARCH_TERMS[category]).slice(0, 4).join(" OR ");
+  const enabled = categories.length > 0 ? categories : DEFAULT_WALLPAPER_ENABLED_CATEGORIES;
+  const results = await Promise.allSettled(
+    enabled.map((category) => fetchWikimediaCategoryWallpapers(category, now, fetchImpl))
+  );
+  return results.flatMap((result) => result.status === "fulfilled" ? result.value : []);
+}
+
+async function fetchWikimediaCategoryWallpapers(
+  category: WallpaperCategory,
+  now: number,
+  fetchImpl: FetchLike
+): Promise<WallpaperItem[]> {
+  const term = (CATEGORY_SEARCH_TERMS[category] || []).join(" OR ") || `${category} featured picture`;
   const params = new URLSearchParams({
     action: "query",
     generator: "search",
     gsrnamespace: "6",
-    gsrlimit: "12",
+    gsrlimit: "30",
     gsrsearch: term || "featured picture landscape",
     prop: "imageinfo",
     iiprop: "url|size|extmetadata",
