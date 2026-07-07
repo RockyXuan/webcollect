@@ -15,7 +15,7 @@
 - Phase 3：壁纸。包括 Wikimedia 2560px thumb 展示、远程刷新扩大产出、每次打开换图、`wallpaperPrefs` 云同步、刷新状态可见。
 - Phase 4.0：已创建 `docs/design/mockups/`，等待用户补 Image2 样板图。
 - Phase 4.3：已清除 `src` 与 `extension/src` 中的 `window.prompt` / `window.confirm` / `window.alert` 以及裸 `prompt/confirm/alert`。
-- Phase 4.4：已将原 `src/components/layout/sortable-grid.tsx` 拆成 `src/components/layout/sortable-grid/` 目录模块，并补 `scripts/test-grid-layout.ts`。
+- Phase 4.4：已将原 `src/components/layout/sortable-grid.tsx` 拆成 `src/components/layout/sortable-grid/` 目录模块，并补 `scripts/test-grid-layout.ts`；已用 Playwright 验证编辑模式、误删防护、resize 和分组拖拽排序。
 - Phase 5.1：已新增 `.github/workflows/ci.yml`，main push/PR 自动跑 ts-check、lint、全部脚本测试和扩展构建。
 
 当前仍未完成 / 仍需 Claude 继续审查：

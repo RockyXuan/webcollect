@@ -17,7 +17,7 @@
 - 已完成 Phase 1 同步正确性、Phase 2 启动/性能减负、Phase 3 壁纸远程/同步/状态可见。
 - Phase 4.0 已准备 `docs/design/mockups/`，等待用户补 Image2 设计样板图；Phase 4.1、4.2、4.5 因缺少样板图暂不能客观执行。
 - Phase 4.3 已清除 `src` 与 `extension/src` 的系统 `prompt/confirm/alert` 残留。
-- Phase 4.4 已按 Fable 方案拆分原 `sortable-grid.tsx`：DnD shell、分类块、分组块、未分类块、卡片块和布局数学已分离，并新增 `scripts/test-grid-layout.ts` 防回归。
+- Phase 4.4 已按 Fable 方案拆分原 `sortable-grid.tsx`：DnD shell、分类块、分组块、未分类块、卡片块和布局数学已分离，并新增 `scripts/test-grid-layout.ts` 防回归；已补 Playwright 浏览器验收，覆盖编辑模式、误删防护、resize 收缩/恢复和分组拖拽排序。
 - Phase 5.1 已新增 GitHub Actions CI。
 - 当前尚未合并回 `main`，也尚未发布 `V1.0.4` Release；需在剩余阻塞项确认后再做最终发版。
 

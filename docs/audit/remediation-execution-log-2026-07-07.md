@@ -717,9 +717,20 @@ Phase 2 代码侧状态：
 - `corepack pnpm@9.0.0 lint` passed.
 - `corepack pnpm@9.0.0 build:ext` passed; Vite only reported existing bundle-size/dynamic-import warnings.
 - `git diff --check` passed.
+- Browser verification with Playwright CLI on `http://localhost:5010/` passed:
+  - Entered WebCollect from the Zoom wallpaper prompt.
+  - Confirmed the main collection wall rendered, no React error overlay or blank page.
+  - Entered collection edit mode; `退出编辑` and inline group edit affordances rendered.
+  - Clicked `主页` while editing and confirmed no delete-confirmation dialog appeared.
+  - Added three temporary cards to `收集箱` inside the isolated Playwright browser profile.
+  - Verified group resize shrink and expand: `32rem / 2 columns` → `16.75rem / 1 column` → `32rem / 2 columns`.
+  - Created a temporary group `拖拽验收` and verified slow pointer drag reordered it before `收集箱`.
+  - Saved evidence screenshots:
+    - `docs/audit/screenshots/webcollect-phase4-4-editing-2026-07-07.png`
+    - `docs/audit/screenshots/webcollect-phase4-4-dragged-2026-07-07.png`
+  - Console notes: `/api/supabase-config` returned 503 because no local Supabase env was configured; several Wikimedia 2560px image requests returned 400, matching the already documented wallpaper-source fragility and not blocking sortable-grid validation.
 
 仍未完成：
 
 - Phase 4.1、4.2、4.5 等 UI 还原度任务仍等待用户补 `docs/design/mockups/` 样板图。
-- 本步尚未做真实浏览器拖拽/resize 视觉验收；当前证据是源码拆分、脚本回归、类型/lint/扩展构建。
 - Phase 5.3 `V1.0.4` 发版尚未执行。
