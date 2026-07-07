@@ -354,3 +354,39 @@ Phase 1 代码侧状态：
 - `corepack pnpm@9.0.0 lint` passed with 0 warnings.
 - `corepack pnpm@9.0.0 build:ext` passed.
 - `git diff --check` passed.
+
+## Step 2.3 状态：降低后台同步频率与云端快照体量
+
+已完成：
+
+- `AUTO_SYNC_INTERVAL_MS` 从 3 分钟调整为 10 分钟。
+- 保留本地安全快照 10 秒防抖频率，仍能快速生成本地回滚点。
+- 云端 `workspace_snapshots` 系统快照上传增加 30 分钟最小间隔。
+- 云端系统快照增加内容 hash 去重；同内容即使超过 30 分钟也不重复上传。
+- 云端上传逻辑改为 `maybeUploadCloudSafetySnapshot`，本地快照生成和云端上传解耦。
+
+新增验收：
+
+- 新增 `scripts/test-background-sync-throttle.ts`。
+- 验证后台轮询间隔为 10 分钟。
+- 验证云端系统快照 30 分钟节流。
+- 验证 hash 忽略 snapshot entry 的 `id/createdAt`，但工作区数据变化会改变 hash。
+- 验证同内容 hash 会跳过云端上传。
+
+验证结果：
+
+- `node --import tsx scripts/test-background-sync-throttle.ts` passed.
+- `node --import tsx scripts/test-cloud-snapshots.ts` passed.
+- `node --import tsx scripts/test-load-data-migrations.ts` passed.
+- `node --import tsx scripts/test-startup-light-sync.ts` passed.
+- `node --import tsx scripts/test-sync-merge.ts` passed.
+- `node --import tsx scripts/test-floating-capture-targets.ts` passed.
+- `node --import tsx scripts/test-floating-capture-drain.ts` passed.
+- `node --import tsx scripts/test-floating-capture-health.ts` passed.
+- `node --import tsx scripts/test-floating-capture-metadata.ts` passed.
+- `node --import tsx scripts/test-description-translation.ts` passed.
+- `node --import tsx scripts/test-extension-branding.ts` passed.
+- `corepack pnpm@9.0.0 ts-check` passed.
+- `corepack pnpm@9.0.0 lint` passed with 0 warnings.
+- `corepack pnpm@9.0.0 build:ext` passed.
+- `git diff --check` passed.

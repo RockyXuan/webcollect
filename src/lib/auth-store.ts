@@ -17,7 +17,7 @@ import { saveCloudWorkspaceSnapshot } from "@/lib/cloud-snapshots";
 import { pushLocalSnapshotToCloud, syncData } from "@/lib/sync";
 import { useAppStore } from "@/lib/store";
 import { getLocalSnapshotSyncedAt, getLocalSnapshotUpdatedAt } from "@/lib/db";
-import { createLocalDataSnapshot } from "@/lib/local-snapshots";
+import { createLocalDataSnapshot, type LocalSnapshotEntry } from "@/lib/local-snapshots";
 
 // 鈹€鈹€ Types 鈹€鈹€
 
@@ -82,8 +82,9 @@ async function upsertUser(user: AuthUser): Promise<void> {
 const SESSION_KEY = "webcollect_auth_session";
 const SYNC_MODE_KEY = "webcollect_sync_mode";
 const SYNC_MODE_VERSION_KEY = "webcollect_sync_mode_version";
-const AUTO_SYNC_INTERVAL_MS = 3 * 60 * 1000;
+export const AUTO_SYNC_INTERVAL_MS = 10 * 60 * 1000;
 const AUTO_SYNC_MAX_DELAY_MS = 5 * 60 * 1000;
+export const CLOUD_SAFETY_SNAPSHOT_MIN_INTERVAL_MS = 30 * 60 * 1000;
 const LOCAL_UPDATED_SIGNAL_KEY = "webcollect_local_snapshot_updated_at";
 
 function summarizeAuthError(message: string): string {
@@ -107,6 +108,8 @@ let autoSyncListenerAttached = false;
 let backgroundSyncRunning = false;
 let cloudRestoreRunning = false;
 let localSafetySnapshotTimer: ReturnType<typeof setTimeout> | null = null;
+let lastCloudSafetySnapshotUploadedAt = 0;
+let lastCloudSafetySnapshotHash = "";
 
 function normalizeNumberPreference(value: unknown): number {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -121,6 +124,34 @@ export function decideStartupSyncAction(localSnapshotUpdatedAt: number, cloudSna
   if (cloudSnapshotUpdatedAt > localSnapshotUpdatedAt) return "sync";
   if (localSnapshotUpdatedAt > cloudSnapshotUpdatedAt) return "push";
   return "none";
+}
+
+export function buildSafetySnapshotHash(snapshot: LocalSnapshotEntry): string {
+  const text = JSON.stringify({
+    counts: snapshot.counts,
+    sectionNames: snapshot.sectionNames,
+    sampleCategoryNames: snapshot.sampleCategoryNames,
+    sampleCardTitles: snapshot.sampleCardTitles,
+    data: snapshot.data,
+  });
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${text.length}:${(hash >>> 0).toString(16)}`;
+}
+
+export function shouldUploadCloudSafetySnapshot(
+  now: number,
+  snapshotHash: string,
+  lastUploadedAt: number,
+  lastSnapshotHash: string
+): boolean {
+  if (!snapshotHash) return false;
+  if (snapshotHash === lastSnapshotHash) return false;
+  if (lastUploadedAt > 0 && now - lastUploadedAt < CLOUD_SAFETY_SNAPSHOT_MIN_INTERVAL_MS) return false;
+  return true;
 }
 
 async function readCloudSnapshotUpdatedAt(userId: string): Promise<number> {
@@ -138,6 +169,26 @@ async function readCloudSnapshotUpdatedAt(userId: string): Promise<number> {
 
   const rows = Array.isArray(data) ? data : [];
   return normalizeNumberPreference((rows[0] as { value?: unknown } | undefined)?.value);
+}
+
+async function maybeUploadCloudSafetySnapshot(userId: string, snapshot: LocalSnapshotEntry): Promise<void> {
+  const snapshotHash = buildSafetySnapshotHash(snapshot);
+  const now = Date.now();
+  if (!shouldUploadCloudSafetySnapshot(
+    now,
+    snapshotHash,
+    lastCloudSafetySnapshotUploadedAt,
+    lastCloudSafetySnapshotHash
+  )) {
+    return;
+  }
+
+  await saveCloudWorkspaceSnapshot(userId, snapshot, {
+    kind: "system",
+    source: "auto-local-change",
+  });
+  lastCloudSafetySnapshotUploadedAt = now;
+  lastCloudSafetySnapshotHash = snapshotHash;
 }
 
 function saveSession(user: AuthUser): void {
@@ -287,10 +338,7 @@ function scheduleLocalSafetySnapshot(): void {
       const snapshot = await createLocalDataSnapshot("auto-local-change", "本地修改自动版本");
       const user = useAuthStore.getState().user;
       if (snapshot && user) {
-        await saveCloudWorkspaceSnapshot(user.id, snapshot, {
-          kind: "system",
-          source: "auto-local-change",
-        });
+        await maybeUploadCloudSafetySnapshot(user.id, snapshot);
       }
     })().catch((error) => {
       console.warn("[Auth] Failed to save local/cloud safety snapshot:", error);
