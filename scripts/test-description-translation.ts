@@ -72,10 +72,10 @@ assert.match(localizedCard.fullDesc, /YouTube|视频|音乐/);
 assert.equal(isEnglishOnlyDescription(localizedCard.fullDesc), false);
 assert.equal(isEnglishOnlyDescription(localizedCard.shortDesc), false);
 
-const storeSource = readFileSync("src/lib/store.ts", "utf8");
+const migrationsSource = readFileSync("src/lib/migrations.ts", "utf8");
 assert.ok(
-  storeSource.includes("localizeCardDescriptions(cards)"),
-  "loadData should migrate existing English descriptions"
+  migrationsSource.includes("localizeCardDescriptions(cards)"),
+  "local data migrations should migrate existing English descriptions"
 );
 
 const contentSource = readFileSync("extension/src/content/floating-capture.ts", "utf8");

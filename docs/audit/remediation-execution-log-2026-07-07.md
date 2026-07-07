@@ -319,3 +319,38 @@ Phase 1 代码侧状态：
 - `corepack pnpm@9.0.0 lint` passed with 0 warnings.
 - `corepack pnpm@9.0.0 build:ext` passed.
 - `git diff --check` passed.
+
+## Step 2.2 状态：loadData 修复管线改为版本化本地迁移
+
+已完成：
+
+- `db.ts` 新增 `getDataSchemaVersion()` / `saveDataSchemaVersion()`。
+- 新增 `src/lib/migrations.ts`，集中执行历史本地数据修复。
+- 已迁入一次性迁移的内容包括：favicon 回填、英文简介本地化、isParent 修复、section 迁移、默认分项名称修复、Recovered 数据清理、父分类直挂卡片修复、空 seed 模板裁剪。
+- `store.loadData()` 改为读数据后调用 `runLocalMigrations()`，常驻逻辑只保留过期 hidden 清理、`ensureSectionInboxes` 和最终状态提交。
+- `loadData()` 移除后置迁移 `set({ cards, categories })`，正常路径只做最终一次状态提交。
+- 保留分类操作里需要复用的 `ensureSectionInboxes` / `ensureParentDirectCardsAreVisible`，从 `migrations.ts` 统一导入。
+
+新增验收：
+
+- 新增 `scripts/test-load-data-migrations.ts`。
+- 验证第一次启动会写入本地 schema version；第二次启动在已迁移且数据干净时 IndexedDB 写入次数为 0。
+- 更新 `scripts/test-description-translation.ts`，让它检查英文简介迁移已迁到 `src/lib/migrations.ts`。
+
+验证结果：
+
+- `node --import tsx scripts/test-load-data-migrations.ts` passed.
+- `node --import tsx scripts/test-startup-light-sync.ts` passed.
+- `node --import tsx scripts/test-local-first-startup.ts` passed.
+- `node --import tsx scripts/test-sync-refresh-behavior.ts` passed.
+- `node --import tsx scripts/test-sync-merge.ts` passed.
+- `node --import tsx scripts/test-floating-capture-targets.ts` passed.
+- `node --import tsx scripts/test-floating-capture-drain.ts` passed.
+- `node --import tsx scripts/test-floating-capture-health.ts` passed.
+- `node --import tsx scripts/test-floating-capture-metadata.ts` passed.
+- `node --import tsx scripts/test-description-translation.ts` passed.
+- `node --import tsx scripts/test-extension-branding.ts` passed.
+- `corepack pnpm@9.0.0 ts-check` passed.
+- `corepack pnpm@9.0.0 lint` passed with 0 warnings.
+- `corepack pnpm@9.0.0 build:ext` passed.
+- `git diff --check` passed.

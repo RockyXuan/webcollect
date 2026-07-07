@@ -23,6 +23,7 @@ const LOCAL_UPDATED_AT_KEY = "localSnapshotUpdatedAt";
 const LOCAL_SYNCED_AT_KEY = "localSnapshotSyncedAt";
 const LOCAL_UPDATED_SIGNAL_KEY = "webcollect_local_snapshot_updated_at";
 const SYNC_DIRTY_SETS_KEY = "syncDirtySets";
+const DATA_SCHEMA_VERSION_KEY = "localDataSchemaVersion";
 
 let localChangeSilenceDepth = 0;
 
@@ -98,6 +99,15 @@ export async function clearSyncDirtyIds(input: Partial<SyncDirtySets>): Promise<
 
 export async function clearSyncDirtySets(): Promise<void> {
   await saveSyncDirtySets(emptySyncDirtySets());
+}
+
+export async function getDataSchemaVersion(): Promise<number> {
+  const value = await localforage.getItem<number>(DATA_SCHEMA_VERSION_KEY);
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+export async function saveDataSchemaVersion(version: number): Promise<void> {
+  await localforage.setItem(DATA_SCHEMA_VERSION_KEY, version);
 }
 
 async function touchLocalSnapshot(): Promise<void> {
