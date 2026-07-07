@@ -285,3 +285,37 @@ Phase 1 代码侧状态：
 
 - Step 1.1 至 Step 1.7 已按 Fable 方案完成并逐步提交。
 - 真实 Supabase 迁移和双设备真实账号验收仍需用户先完成 CSV/本地备份后再执行。
+
+## Step 2.1 状态：启动同步改为轻量新鲜度检查
+
+已完成：
+
+- `auth-store.triggerSync` 启动后台同步前只读云端 `user_preferences.localSnapshotUpdatedAt`。
+- 增加 `decideStartupSyncAction`：云端更新走 `syncData`，本地更新走 `pushLocalSnapshotToCloud`，两端相等不做全量同步。
+- `initialize()` 的缓存 session / Supabase session 恢复路径改为 `scheduleStartupSync`。
+- `scheduleStartupSync` 优先使用 `requestIdleCallback`，不支持时退回 `setTimeout(0)`，避免启动同步抢首屏。
+- 保留 `manualSync()` 的完整双向 `syncData`，手动刷新仍能拉取其他设备修改。
+
+新增验收：
+
+- 新增 `scripts/test-startup-light-sync.ts`。
+- 验证本地与云端 `localSnapshotUpdatedAt` 相等时，只产生 1 次云端 `user_preferences` 查询，且同步状态标为 success。
+- 验证云端新 / 本地新 / 相等三种启动决策。
+- 验证 `initialize()` 不再直接 `void triggerSync(...)`，而是走 idle/timeout 调度。
+
+验证结果：
+
+- `node --import tsx scripts/test-startup-light-sync.ts` passed.
+- `node --import tsx scripts/test-local-first-startup.ts` passed.
+- `node --import tsx scripts/test-sync-refresh-behavior.ts` passed.
+- `node --import tsx scripts/test-sync-merge.ts` passed.
+- `node --import tsx scripts/test-floating-capture-targets.ts` passed.
+- `node --import tsx scripts/test-floating-capture-drain.ts` passed.
+- `node --import tsx scripts/test-floating-capture-health.ts` passed.
+- `node --import tsx scripts/test-floating-capture-metadata.ts` passed.
+- `node --import tsx scripts/test-description-translation.ts` passed.
+- `node --import tsx scripts/test-extension-branding.ts` passed.
+- `corepack pnpm@9.0.0 ts-check` passed.
+- `corepack pnpm@9.0.0 lint` passed with 0 warnings.
+- `corepack pnpm@9.0.0 build:ext` passed.
+- `git diff --check` passed.

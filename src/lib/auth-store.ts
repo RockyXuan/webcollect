@@ -30,6 +30,7 @@ export interface AuthUser {
 
 export type SyncStatus = "idle" | "queued" | "syncing" | "success" | "error";
 export type SyncMode = "manual" | "auto";
+export type StartupSyncAction = "sync" | "push" | "none";
 export interface ManualSyncOptions {
   reloadView?: boolean;
   throwOnError?: boolean;
@@ -107,6 +108,38 @@ let backgroundSyncRunning = false;
 let cloudRestoreRunning = false;
 let localSafetySnapshotTimer: ReturnType<typeof setTimeout> | null = null;
 
+function normalizeNumberPreference(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : 0;
+  }
+  return 0;
+}
+
+export function decideStartupSyncAction(localSnapshotUpdatedAt: number, cloudSnapshotUpdatedAt: number): StartupSyncAction {
+  if (cloudSnapshotUpdatedAt > localSnapshotUpdatedAt) return "sync";
+  if (localSnapshotUpdatedAt > cloudSnapshotUpdatedAt) return "push";
+  return "none";
+}
+
+async function readCloudSnapshotUpdatedAt(userId: string): Promise<number> {
+  const client = getBrowserSupabaseClient();
+  const { data, error } = await client
+    .from("user_preferences")
+    .select("value")
+    .eq("user_id", userId)
+    .eq("key", "localSnapshotUpdatedAt")
+    .limit(1);
+
+  if (error) {
+    throw new Error(`Failed to read cloud freshness marker: ${error.message}`);
+  }
+
+  const rows = Array.isArray(data) ? data : [];
+  return normalizeNumberPreference((rows[0] as { value?: unknown } | undefined)?.value);
+}
+
 function saveSession(user: AuthUser): void {
   try {
     localStorage.setItem(SESSION_KEY, JSON.stringify(user));
@@ -147,7 +180,7 @@ function mapSupabaseUser(supabaseUser: Record<string, unknown>): AuthUser {
 
 // 鈹€鈹€ Helper: trigger background sync 鈹€鈹€
 
-async function triggerSync(userId: string): Promise<void> {
+export async function triggerSync(userId: string): Promise<void> {
   const store = useAuthStore;
   if (backgroundSyncRunning) return;
   backgroundSyncRunning = true;
@@ -155,8 +188,19 @@ async function triggerSync(userId: string): Promise<void> {
   store.setState({ syncStatus: "syncing", localSavedAt: null });
 
   try {
-    await syncData(userId);
-    await useAppStore.getState().loadData({ showLoading: false, preserveOnCollapse: true });
+    const [localSnapshotUpdatedAt, cloudSnapshotUpdatedAt] = await Promise.all([
+      getLocalSnapshotUpdatedAt(),
+      readCloudSnapshotUpdatedAt(userId),
+    ]);
+    const action = decideStartupSyncAction(localSnapshotUpdatedAt, cloudSnapshotUpdatedAt);
+
+    if (action === "sync") {
+      await syncData(userId);
+      await useAppStore.getState().loadData({ showLoading: false, preserveOnCollapse: true });
+    } else if (action === "push") {
+      await pushLocalSnapshotToCloud(userId);
+    }
+
     store.setState({ syncStatus: "success", lastSyncAt: Date.now(), error: null });
     ensureAutoSyncInterval();
   } catch (err) {
@@ -170,6 +214,26 @@ async function triggerSync(userId: string): Promise<void> {
       autoSyncPending = false;
       scheduleAutoSync();
     }
+  }
+}
+
+function scheduleStartupSync(userId: string): void {
+  const run = () => {
+    void triggerSync(userId);
+  };
+
+  if (typeof window === "undefined") {
+    setTimeout(run, 0);
+    return;
+  }
+
+  const idleWindow = window as Window & {
+    requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
+  };
+  if (typeof idleWindow.requestIdleCallback === "function") {
+    idleWindow.requestIdleCallback(run, { timeout: 2_000 });
+  } else {
+    window.setTimeout(run, 0);
   }
 }
 
@@ -354,7 +418,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (cached) {
       set({ user: cached, isLoggedIn: true, isLoading: false });
       if (isAutoSyncEnabled()) {
-        void triggerSync(cached.id);
+        scheduleStartupSync(cached.id);
       }
       return;
     }
@@ -370,7 +434,7 @@ export const useAuthStore = create<AuthState>((set) => ({
           await upsertUser(user);
           set({ user, isLoggedIn: true, isLoading: false });
           if (isAutoSyncEnabled()) {
-            void triggerSync(user.id);
+            scheduleStartupSync(user.id);
           }
           return;
         }

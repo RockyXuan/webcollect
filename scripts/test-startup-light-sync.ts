@@ -1,0 +1,142 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import localforage from "localforage";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+type PreferenceRow = {
+  user_id: string;
+  key: string;
+  value: unknown;
+};
+
+const userId = "user-startup-light-sync";
+const baseTime = 1_777_200_000_000;
+const memoryStore = new Map<string, unknown>();
+
+Object.assign(localforage, {
+  async getItem<T>(key: string): Promise<T | null> {
+    return (memoryStore.has(key) ? memoryStore.get(key) : null) as T | null;
+  },
+  async setItem<T>(key: string, value: T): Promise<T> {
+    memoryStore.set(key, value);
+    return value;
+  },
+  async removeItem(key: string): Promise<void> {
+    memoryStore.delete(key);
+  },
+  async clear(): Promise<void> {
+    memoryStore.clear();
+  },
+});
+
+class FakePreferenceQuery {
+  private filters: Array<{ column: keyof PreferenceRow; value: unknown }> = [];
+  private limitCount: number | null = null;
+
+  constructor(private readonly db: FakeSupabaseClient) {}
+
+  select(): this {
+    return this;
+  }
+
+  eq(column: keyof PreferenceRow, value: unknown): this {
+    this.filters.push({ column, value });
+    return this;
+  }
+
+  limit(count: number): this {
+    this.limitCount = count;
+    return this;
+  }
+
+  then<TResult1 = { data: PreferenceRow[]; error: null }, TResult2 = never>(
+    onfulfilled?: ((value: { data: PreferenceRow[]; error: null }) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
+  ): Promise<TResult1 | TResult2> {
+    return this.execute().then(onfulfilled, onrejected);
+  }
+
+  private async execute(): Promise<{ data: PreferenceRow[]; error: null }> {
+    this.db.selectRequests += 1;
+    let rows = this.db.preferences.filter((row) =>
+      this.filters.every((filter) => row[filter.column] === filter.value)
+    );
+    if (this.limitCount !== null) rows = rows.slice(0, this.limitCount);
+    return {
+      data: rows.map((row) => ({ ...row })),
+      error: null,
+    };
+  }
+}
+
+class FakeSupabaseClient {
+  preferences: PreferenceRow[] = [];
+  selectRequests = 0;
+
+  from(table: string): FakePreferenceQuery {
+    assert.equal(table, "user_preferences", "startup freshness check should only read user_preferences");
+    return new FakePreferenceQuery(this);
+  }
+
+  requestCount(): number {
+    return this.selectRequests;
+  }
+}
+
+async function main(): Promise<void> {
+  const supabase = await import("../src/lib/supabase-browser");
+  const auth = await import("../src/lib/auth-store");
+
+  assert.equal(auth.decideStartupSyncAction(baseTime, baseTime), "none");
+  assert.equal(auth.decideStartupSyncAction(baseTime, baseTime + 1), "sync");
+  assert.equal(auth.decideStartupSyncAction(baseTime + 1, baseTime), "push");
+
+  const fake = new FakeSupabaseClient();
+  fake.preferences.push({
+    user_id: userId,
+    key: "localSnapshotUpdatedAt",
+    value: baseTime,
+  });
+  supabase.__setBrowserSupabaseClientForTest(fake as unknown as SupabaseClient);
+  memoryStore.clear();
+  await localforage.setItem("localSnapshotUpdatedAt", baseTime);
+
+  auth.useAuthStore.setState({
+    user: {
+      id: userId,
+      email: "startup-light-sync@example.com",
+      displayName: "Startup Sync",
+      avatarUrl: "",
+    },
+    isLoggedIn: true,
+    syncMode: "auto",
+    syncStatus: "idle",
+    localSavedAt: null,
+    lastSyncAt: null,
+    error: null,
+  });
+
+  await auth.triggerSync(userId);
+
+  assert.equal(fake.requestCount(), 1, "equal startup freshness should use only one cloud request");
+  assert.equal(auth.useAuthStore.getState().syncStatus, "success");
+  assert.ok(auth.useAuthStore.getState().lastSyncAt, "equal startup freshness should still mark sync success");
+
+  const authSource = readFileSync("src/lib/auth-store.ts", "utf8");
+  const initializeStart = authSource.indexOf("initialize: async () => {");
+  const loginStart = authSource.indexOf("loginWithGoogle: async () => {");
+  const initializeBody = authSource.slice(initializeStart, loginStart);
+  assert.ok(initializeBody.includes("scheduleStartupSync(cached.id)"));
+  assert.ok(initializeBody.includes("scheduleStartupSync(user.id)"));
+  assert.equal(initializeBody.includes("void triggerSync(cached.id)"), false);
+  assert.equal(initializeBody.includes("void triggerSync(user.id)"), false);
+  assert.ok(authSource.includes("requestIdleCallback"), "startup sync should be scheduled after first paint when supported");
+
+  supabase.__resetBrowserSupabaseForTest();
+  console.log("startup light sync tests passed");
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
