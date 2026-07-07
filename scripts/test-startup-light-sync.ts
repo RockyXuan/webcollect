@@ -87,9 +87,21 @@ async function main(): Promise<void> {
   const supabase = await import("../src/lib/supabase-browser");
   const auth = await import("../src/lib/auth-store");
 
-  assert.equal(auth.decideStartupSyncAction(baseTime, baseTime), "none");
-  assert.equal(auth.decideStartupSyncAction(baseTime, baseTime + 1), "sync");
-  assert.equal(auth.decideStartupSyncAction(baseTime + 1, baseTime), "push");
+  assert.equal(
+    auth.decideStartupSyncAction(baseTime, baseTime, baseTime + 100, baseTime + 100),
+    "none",
+    "this device should not sync again after it already saw its own pushed cloud marker"
+  );
+  assert.equal(
+    auth.decideStartupSyncAction(baseTime, baseTime, baseTime + 200, baseTime + 100),
+    "sync",
+    "a cloud marker newer than the last seen marker means another device pushed data"
+  );
+  assert.equal(
+    auth.decideStartupSyncAction(baseTime + 300, baseTime, baseTime + 100, baseTime + 100),
+    "push",
+    "local edits newer than the synced marker should push when cloud has no unseen marker"
+  );
 
   const fake = new FakeSupabaseClient();
   fake.preferences.push({
@@ -100,6 +112,8 @@ async function main(): Promise<void> {
   supabase.__setBrowserSupabaseClientForTest(fake as unknown as SupabaseClient);
   memoryStore.clear();
   await localforage.setItem("localSnapshotUpdatedAt", baseTime);
+  await localforage.setItem("localSnapshotSyncedAt", baseTime);
+  await localforage.setItem("lastSeenCloudSnapshotUpdatedAt", baseTime);
 
   auth.useAuthStore.setState({
     user: {

@@ -16,7 +16,11 @@ import { isChromeExtension } from "@/lib/platform";
 import { saveCloudWorkspaceSnapshot } from "@/lib/cloud-snapshots";
 import { pushLocalSnapshotToCloud, syncData } from "@/lib/sync";
 import { useAppStore } from "@/lib/store";
-import { getLocalSnapshotSyncedAt, getLocalSnapshotUpdatedAt } from "@/lib/db";
+import {
+  getLastSeenCloudSnapshotUpdatedAt,
+  getLocalSnapshotSyncedAt,
+  getLocalSnapshotUpdatedAt,
+} from "@/lib/db";
 import { createLocalDataSnapshot, type LocalSnapshotEntry } from "@/lib/local-snapshots";
 
 // Types
@@ -120,9 +124,14 @@ function normalizeNumberPreference(value: unknown): number {
   return 0;
 }
 
-export function decideStartupSyncAction(localSnapshotUpdatedAt: number, cloudSnapshotUpdatedAt: number): StartupSyncAction {
-  if (cloudSnapshotUpdatedAt > localSnapshotUpdatedAt) return "sync";
-  if (localSnapshotUpdatedAt > cloudSnapshotUpdatedAt) return "push";
+export function decideStartupSyncAction(
+  localSnapshotUpdatedAt: number,
+  localSnapshotSyncedAt: number,
+  cloudSnapshotUpdatedAt: number,
+  lastSeenCloudSnapshotUpdatedAt: number
+): StartupSyncAction {
+  if (cloudSnapshotUpdatedAt > lastSeenCloudSnapshotUpdatedAt) return "sync";
+  if (localSnapshotUpdatedAt > localSnapshotSyncedAt) return "push";
   return "none";
 }
 
@@ -239,11 +248,23 @@ export async function triggerSync(userId: string): Promise<void> {
   store.setState({ syncStatus: "syncing", localSavedAt: null });
 
   try {
-    const [localSnapshotUpdatedAt, cloudSnapshotUpdatedAt] = await Promise.all([
+    const [
+      localSnapshotUpdatedAt,
+      localSnapshotSyncedAt,
+      cloudSnapshotUpdatedAt,
+      lastSeenCloudSnapshotUpdatedAt,
+    ] = await Promise.all([
       getLocalSnapshotUpdatedAt(),
+      getLocalSnapshotSyncedAt(),
       readCloudSnapshotUpdatedAt(userId),
+      getLastSeenCloudSnapshotUpdatedAt(),
     ]);
-    const action = decideStartupSyncAction(localSnapshotUpdatedAt, cloudSnapshotUpdatedAt);
+    const action = decideStartupSyncAction(
+      localSnapshotUpdatedAt,
+      localSnapshotSyncedAt,
+      cloudSnapshotUpdatedAt,
+      lastSeenCloudSnapshotUpdatedAt
+    );
 
     if (action === "sync") {
       await syncData(userId);

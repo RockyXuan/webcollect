@@ -21,6 +21,7 @@ const ACTIVE_SECTION_KEY = "activeCollectionSectionId";
 const WORKSPACE_RESET_AT_KEY = "currentWorkspaceResetAt";
 const LOCAL_UPDATED_AT_KEY = "localSnapshotUpdatedAt";
 const LOCAL_SYNCED_AT_KEY = "localSnapshotSyncedAt";
+const LAST_SEEN_CLOUD_SNAPSHOT_UPDATED_AT_KEY = "lastSeenCloudSnapshotUpdatedAt";
 const LOCAL_UPDATED_SIGNAL_KEY = "webcollect_local_snapshot_updated_at";
 const SYNC_DIRTY_SETS_KEY = "syncDirtySets";
 const DATA_SCHEMA_VERSION_KEY = "localDataSchemaVersion";
@@ -141,6 +142,15 @@ export async function getLocalSnapshotSyncedAt(): Promise<number> {
 
 export async function saveLocalSnapshotSyncedAt(timestamp: number): Promise<void> {
   await localforage.setItem(LOCAL_SYNCED_AT_KEY, timestamp);
+}
+
+export async function getLastSeenCloudSnapshotUpdatedAt(): Promise<number> {
+  const value = await localforage.getItem<number>(LAST_SEEN_CLOUD_SNAPSHOT_UPDATED_AT_KEY);
+  return typeof value === "number" ? value : 0;
+}
+
+export async function saveLastSeenCloudSnapshotUpdatedAt(timestamp: number): Promise<void> {
+  await localforage.setItem(LAST_SEEN_CLOUD_SNAPSHOT_UPDATED_AT_KEY, timestamp);
 }
 
 export async function getWorkspaceResetAt(): Promise<number> {

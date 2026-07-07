@@ -35,6 +35,7 @@ import {
   saveActiveSectionId,
   getRecycleBin,
   saveRecycleBin,
+  saveLastSeenCloudSnapshotUpdatedAt,
   getLocalSnapshotUpdatedAt,
   saveLocalSnapshotSyncedAt,
   getWorkspaceResetAt,
@@ -1584,7 +1585,7 @@ async function syncDataUnsafe(userId: string, depth: number): Promise<void> {
   // 7. Sync preferences. Login/restore sync intentionally does not delete
   // cloud-only rows; destructive cloud replacement is guarded in
   // pushLocalSnapshotToCloud only.
-  await syncPreferences(
+  const syncedCloudSnapshotUpdatedAt = await syncPreferences(
     client,
     userId,
     localHiddenSites,
@@ -1613,6 +1614,7 @@ async function syncDataUnsafe(userId: string, depth: number): Promise<void> {
     cards: cardSyncSelection.resolvedIds,
   });
   await saveLocalSnapshotSyncedAt(syncStartLocalUpdatedAt);
+  await saveLastSeenCloudSnapshotUpdatedAt(syncedCloudSnapshotUpdatedAt);
 
   console.log("[Sync] Sync completed successfully");
 }
@@ -1886,6 +1888,7 @@ async function pushLocalSnapshotToCloudUnsafe(
     cards: cardSyncSelection.resolvedIds,
   });
   await saveLocalSnapshotSyncedAt(syncStartLocalUpdatedAt);
+  await saveLastSeenCloudSnapshotUpdatedAt(snapshotUpdatedAt);
 
   console.log("[Sync] Local snapshot pushed successfully");
 }
@@ -2003,7 +2006,7 @@ async function syncPreferences(
   localWorkspaceResetAt: number,
   localSnapshotUpdatedAt: number,
   cloudPrefs: CloudPreference[]
-): Promise<void> {
+): Promise<number> {
   const cloudPrefsMap = preferencesToMap(cloudPrefs);
   const cloudWorkspaceResetAt = getNumberPreference(cloudPrefsMap, WORKSPACE_RESET_PREF_KEY);
   const workspaceResetAt = Math.max(localWorkspaceResetAt, cloudWorkspaceResetAt);
@@ -2221,6 +2224,7 @@ async function syncPreferences(
     ? await getWallpaperPrefs()
     : wallpaperPrefsMerge.prefs;
 
+  const syncedCloudSnapshotUpdatedAt = Math.max(localSnapshotUpdatedAt, cloudSnapshotUpdatedAt);
   await writePreferences(client, userId, {
     currentWorkspaceResetAt: workspaceResetAt,
     hiddenSites: mergedHiddenSites,
@@ -2240,8 +2244,9 @@ async function syncPreferences(
     warehouseImportBatches,
     warehouseUpdatedAt,
     wallpaperPrefs: mergedWallpaperPrefs,
-    localSnapshotUpdatedAt: Math.max(localSnapshotUpdatedAt, cloudSnapshotUpdatedAt),
+    localSnapshotUpdatedAt: syncedCloudSnapshotUpdatedAt,
   });
+  return syncedCloudSnapshotUpdatedAt;
 }
 
 async function writePreferences(
