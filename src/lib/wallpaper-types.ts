@@ -71,5 +71,17 @@ export interface WallpaperPrefs {
   recentAssetIds: string[];
   recentMediaIds: string[];
   lastRemoteRefreshAt: number;
+  settingsUpdatedAt: number;
+  // Legacy alias kept so old local/cloud values normalize safely.
   updatedAt: number;
+}
+
+export interface WallpaperSyncedSettings {
+  defaultMode: WallpaperMode;
+  themeMode: WallpaperThemeMode;
+  rotationInterval: WallpaperRotationInterval;
+  enabledCategories: WallpaperCategory[];
+  autoUpdate: boolean;
+  showZoomHints: boolean;
+  settingsUpdatedAt: number;
 }

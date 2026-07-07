@@ -57,16 +57,17 @@ import {
   type ImportBatch,
 } from "@/lib/db-warehouse";
 import {
+  applyWallpaperSyncedSettings,
   getWallpaperPrefs,
-  normalizeWallpaperPrefs,
   saveSyncedWallpaperPrefs,
+  toWallpaperSyncedSettings,
 } from "@/lib/wallpaper-db";
 import { useWallpaperStore } from "@/lib/wallpaper-store";
 import { createLocalDataSnapshot, getLocalDataSnapshots } from "@/lib/local-snapshots";
 import { normalizePinnedBookmarkItems } from "@/lib/pinned-bookmarks";
 import { allDefaultCategories } from "@/lib/seed";
 import type { WebCard, Category, HiddenSite, LinkOpenMode, CollectionSection, RecycleBinItem, PinnedBookmarkItem, CategoryLayoutPreference } from "@/lib/types";
-import type { WallpaperPrefs } from "@/lib/wallpaper-types";
+import type { WallpaperPrefs, WallpaperSyncedSettings } from "@/lib/wallpaper-types";
 
 // Types
 
@@ -1741,7 +1742,7 @@ async function pushLocalSnapshotToCloudUnsafe(
       warehouseCategories: localWarehouseCategories,
       warehouseImportBatches: localImportBatches,
       warehouseUpdatedAt: localWarehouseUpdatedAt,
-      wallpaperPrefs: localWallpaperPrefs,
+      wallpaperPrefs: toWallpaperSyncedSettings(localWallpaperPrefs),
       localSnapshotUpdatedAt: snapshotUpdatedAt,
     });
   }
@@ -1880,7 +1881,7 @@ async function pushLocalSnapshotToCloudUnsafe(
     warehouseCategories: localWarehouseCategories,
     warehouseImportBatches: localImportBatches,
     warehouseUpdatedAt: localWarehouseUpdatedAt,
-    wallpaperPrefs: localWallpaperPrefs,
+    wallpaperPrefs: toWallpaperSyncedSettings(localWallpaperPrefs),
     localSnapshotUpdatedAt: snapshotUpdatedAt,
   });
   await clearSyncDirtyIds({
@@ -1934,19 +1935,23 @@ export function mergeCategoryLayouts(
   return merged;
 }
 
-function getWallpaperPrefsUpdatedAt(prefs: Partial<WallpaperPrefs> | null | undefined): number {
-  return typeof prefs?.updatedAt === "number" && Number.isFinite(prefs.updatedAt) ? prefs.updatedAt : 0;
+function getWallpaperPrefsUpdatedAt(prefs: Partial<WallpaperPrefs> | WallpaperSyncedSettings | null | undefined): number {
+  if (!prefs) return 0;
+  if (typeof prefs.settingsUpdatedAt === "number" && Number.isFinite(prefs.settingsUpdatedAt)) {
+    return prefs.settingsUpdatedAt;
+  }
+  return "updatedAt" in prefs && typeof prefs.updatedAt === "number" && Number.isFinite(prefs.updatedAt) ? prefs.updatedAt : 0;
 }
 
-function getCloudWallpaperPrefs(cloudPrefsMap: CloudPreferenceMap): WallpaperPrefs | null {
+function getCloudWallpaperSettings(cloudPrefsMap: CloudPreferenceMap): WallpaperSyncedSettings | null {
   const value = cloudPrefsMap.wallpaperPrefs?.value;
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return normalizeWallpaperPrefs(value as Partial<WallpaperPrefs>);
+  return toWallpaperSyncedSettings(value as Partial<WallpaperPrefs>);
 }
 
 export function mergeWallpaperPrefsByUpdatedAt(
   localWallpaperPrefs: WallpaperPrefs,
-  cloudWallpaperPrefs: WallpaperPrefs | null
+  cloudWallpaperPrefs: Partial<WallpaperPrefs> | WallpaperSyncedSettings | null
 ): WallpaperPrefsMergeResult {
   if (!cloudWallpaperPrefs) {
     return {
@@ -1956,10 +1961,11 @@ export function mergeWallpaperPrefsByUpdatedAt(
   }
 
   const localUpdatedAt = getWallpaperPrefsUpdatedAt(localWallpaperPrefs);
-  const cloudUpdatedAt = getWallpaperPrefsUpdatedAt(cloudWallpaperPrefs);
+  const cloudSettings = toWallpaperSyncedSettings(cloudWallpaperPrefs);
+  const cloudUpdatedAt = getWallpaperPrefsUpdatedAt(cloudSettings);
   if (cloudUpdatedAt > localUpdatedAt) {
     return {
-      prefs: cloudWallpaperPrefs,
+      prefs: applyWallpaperSyncedSettings(localWallpaperPrefs, cloudSettings),
       shouldApplyCloud: true,
     };
   }
@@ -2217,8 +2223,8 @@ async function syncPreferences(
     });
   }
 
-  const cloudWallpaperPrefs = getCloudWallpaperPrefs(cloudPrefsMap);
-  const wallpaperPrefsMerge = mergeWallpaperPrefsByUpdatedAt(localWallpaperPrefs, cloudWallpaperPrefs);
+  const cloudWallpaperSettings = getCloudWallpaperSettings(cloudPrefsMap);
+  const wallpaperPrefsMerge = mergeWallpaperPrefsByUpdatedAt(localWallpaperPrefs, cloudWallpaperSettings);
   await applySyncedWallpaperPrefsIfNeeded(wallpaperPrefsMerge.prefs, wallpaperPrefsMerge.shouldApplyCloud);
   const mergedWallpaperPrefs = wallpaperPrefsMerge.shouldApplyCloud
     ? await getWallpaperPrefs()
@@ -2243,7 +2249,7 @@ async function syncPreferences(
     warehouseCategories,
     warehouseImportBatches,
     warehouseUpdatedAt,
-    wallpaperPrefs: mergedWallpaperPrefs,
+    wallpaperPrefs: toWallpaperSyncedSettings(mergedWallpaperPrefs),
     localSnapshotUpdatedAt: syncedCloudSnapshotUpdatedAt,
   });
   return syncedCloudSnapshotUpdatedAt;

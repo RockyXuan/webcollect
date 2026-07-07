@@ -42,6 +42,7 @@ export const DEFAULT_WALLPAPER_PREFS: WallpaperPrefs = {
   recentAssetIds: [],
   recentMediaIds: [],
   lastRemoteRefreshAt: 0,
+  settingsUpdatedAt: 0,
   updatedAt: 0,
 };
 

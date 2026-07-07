@@ -4,6 +4,7 @@ import {
   type WallpaperCategory,
   type WallpaperItem,
   type WallpaperPrefs,
+  type WallpaperSyncedSettings,
   type WallpaperThemeMode,
 } from "./wallpaper-types";
 import { DEFAULT_WALLPAPER_PREFS, FALLBACK_WALLPAPERS, filterUsableWallpapers, mergeWallpaperLibrary, pruneWallpaperLibrary } from "./wallpaper-sources";
@@ -39,6 +40,9 @@ export function normalizeWallpaperPrefs(value: Partial<WallpaperPrefs> | null | 
   const safeEnabledCategories = enabledCategories.length > 0
     ? enabledCategories
     : DEFAULT_WALLPAPER_PREFS.enabledCategories;
+  const settingsUpdatedAt = typeof value?.settingsUpdatedAt === "number"
+    ? value.settingsUpdatedAt
+    : typeof value?.updatedAt === "number" ? value.updatedAt : 0;
 
   return {
     ...DEFAULT_WALLPAPER_PREFS,
@@ -48,13 +52,72 @@ export function normalizeWallpaperPrefs(value: Partial<WallpaperPrefs> | null | 
       : DEFAULT_WALLPAPER_PREFS.themeMode,
     enabledCategories: safeEnabledCategories,
     showZoomHints: typeof value?.showZoomHints === "boolean" ? value.showZoomHints : true,
-    updatedAt: typeof value?.updatedAt === "number" ? value.updatedAt : 0,
     lastRemoteRefreshAt: typeof value?.lastRemoteRefreshAt === "number" ? value.lastRemoteRefreshAt : 0,
     currentWallpaperId: typeof value?.currentWallpaperId === "string" ? value.currentWallpaperId : null,
     currentQuoteId: typeof value?.currentQuoteId === "string" ? value.currentQuoteId : null,
     recentQuoteIds: normalizeStringArray(value?.recentQuoteIds, 50),
     recentAssetIds: normalizeStringArray(value?.recentAssetIds, 30),
     recentMediaIds: normalizeStringArray(value?.recentMediaIds, 20),
+    settingsUpdatedAt,
+    updatedAt: settingsUpdatedAt,
+  };
+}
+
+export function toWallpaperSyncedSettings(value: Partial<WallpaperPrefs> | WallpaperSyncedSettings): WallpaperSyncedSettings {
+  const prefs = normalizeWallpaperPrefs(value as Partial<WallpaperPrefs>);
+  return {
+    defaultMode: prefs.defaultMode,
+    themeMode: prefs.themeMode,
+    rotationInterval: prefs.rotationInterval,
+    enabledCategories: [...prefs.enabledCategories],
+    autoUpdate: prefs.autoUpdate,
+    showZoomHints: prefs.showZoomHints,
+    settingsUpdatedAt: prefs.settingsUpdatedAt,
+  };
+}
+
+export function applyWallpaperSyncedSettings(
+  localPrefs: WallpaperPrefs,
+  settings: WallpaperSyncedSettings
+): WallpaperPrefs {
+  return normalizeWallpaperPrefs({
+    ...localPrefs,
+    defaultMode: settings.defaultMode,
+    themeMode: settings.themeMode,
+    rotationInterval: settings.rotationInterval,
+    enabledCategories: settings.enabledCategories,
+    autoUpdate: settings.autoUpdate,
+    showZoomHints: settings.showZoomHints,
+    settingsUpdatedAt: settings.settingsUpdatedAt,
+    updatedAt: settings.settingsUpdatedAt,
+  });
+}
+
+function sameSyncedSettings(left: WallpaperSyncedSettings, right: WallpaperSyncedSettings): boolean {
+  return left.defaultMode === right.defaultMode
+    && left.themeMode === right.themeMode
+    && left.rotationInterval === right.rotationInterval
+    && left.autoUpdate === right.autoUpdate
+    && left.showZoomHints === right.showZoomHints
+    && JSON.stringify(left.enabledCategories) === JSON.stringify(right.enabledCategories);
+}
+
+export function prepareWallpaperPrefsForSave(
+  previous: Partial<WallpaperPrefs> | null | undefined,
+  next: Partial<WallpaperPrefs>,
+  now = Date.now()
+): WallpaperPrefs {
+  const previousPrefs = normalizeWallpaperPrefs(previous);
+  const nextPrefs = normalizeWallpaperPrefs(next);
+  const previousSettings = toWallpaperSyncedSettings(previousPrefs);
+  const nextSettings = toWallpaperSyncedSettings(nextPrefs);
+  const settingsUpdatedAt = sameSyncedSettings(previousSettings, nextSettings)
+    ? previousPrefs.settingsUpdatedAt
+    : now;
+  return {
+    ...nextPrefs,
+    settingsUpdatedAt,
+    updatedAt: settingsUpdatedAt,
   };
 }
 
@@ -64,10 +127,8 @@ export async function getWallpaperPrefs(): Promise<WallpaperPrefs> {
 }
 
 export async function saveWallpaperPrefs(prefs: Partial<WallpaperPrefs>): Promise<void> {
-  await wallpaperDb.setItem(WALLPAPER_PREFS_KEY, {
-    ...normalizeWallpaperPrefs(prefs),
-    updatedAt: Date.now(),
-  });
+  const previous = await wallpaperDb.getItem<Partial<WallpaperPrefs>>(WALLPAPER_PREFS_KEY);
+  await wallpaperDb.setItem(WALLPAPER_PREFS_KEY, prepareWallpaperPrefsForSave(previous, prefs));
 }
 
 export async function saveSyncedWallpaperPrefs(prefs: Partial<WallpaperPrefs>): Promise<void> {
