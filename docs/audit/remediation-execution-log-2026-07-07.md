@@ -646,3 +646,20 @@ Phase 2 代码侧状态：
 - `corepack pnpm@9.0.0 lint` passed with 0 warnings.
 - `corepack pnpm@9.0.0 build:ext` passed.
 - `git diff --check` passed.
+
+## Step 5.1 状态：GitHub Actions CI
+
+已完成：
+
+- 新增 `.github/workflows/ci.yml`。
+- push / PR 到 `main` 时自动运行：
+  - `pnpm install --frozen-lockfile --registry=https://registry.npmjs.org`
+  - `pnpm ts-check`
+  - `pnpm lint`
+  - 所有 `scripts/test-*.ts`
+  - `pnpm build:ext`
+- 保留已有 tag 发布工作流 `.github/workflows/webcollect-release.yml` 不变。
+
+本地验证：
+
+- `git diff --check` passed.
