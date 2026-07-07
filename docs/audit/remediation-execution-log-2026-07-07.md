@@ -597,3 +597,21 @@ Phase 2 代码侧状态：
 - `corepack pnpm@9.0.0 lint` passed with 0 warnings.
 - `corepack pnpm@9.0.0 build:ext` passed.
 - `git diff --check` passed.
+
+## Step 4.0 状态：等待用户补设计基准
+
+已完成：
+
+- 新建 `docs/design/mockups/`。
+- 新增 `docs/design/mockups/README.md`，说明样板图命名、用途、当前阻塞范围。
+
+当前阻塞：
+
+- 仓库内还没有 Fable 指定的 Image2 样板图。
+- Phase 4.1 design token 抽取、Phase 4.2 双端视觉收敛、Phase 4.5 逐屏还原度走查，都需要样板图作为客观标尺。
+- 不依赖样板图的工程项，如系统弹窗清理、CI 护栏、文档收口，可以继续推进。
+
+需要用户补充：
+
+- 请把目标 UI 样板图重新导出为 PNG，放入 `docs/design/mockups/`。
+- 文件名建议使用 `YYYY-MM-DD-screen-name.png`。
