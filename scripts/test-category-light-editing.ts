@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const source = readFileSync("src/components/layout/sortable-grid.tsx", "utf8");
+const source = [
+  readFileSync("src/components/layout/sortable-grid/category-block.tsx", "utf8"),
+  readFileSync("src/components/layout/sortable-grid/sub-group-block.tsx", "utf8"),
+  readFileSync("src/components/layout/sortable-grid/ungrouped-block.tsx", "utf8"),
+].join("\n");
 
 const lightEditBlocks = source.match(/id: "edit",[\s\S]*?id: "advanced-settings"/g) ?? [];
 assert.equal(lightEditBlocks.length, 3, "category and group menus should expose light edit before advanced settings");

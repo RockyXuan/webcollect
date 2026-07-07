@@ -8,7 +8,7 @@
 当前最新已发布版本：`V1.0.3 / 2026年7月2日`
 当前 main 已知基线提交：`a779f26`（Claude Fable 审查时的 main）
 当前整改分支：`fix/sync-architecture`
-当前整改分支最新已推提交：`b1f7718 ci: add main verification workflow`
+当前整改分支最新状态：本文件随整改分支持续更新；截至 Phase 5.2 已推 `bc6311a docs(audit): update remediation status`，最新点以 `git log -1 --oneline` 为准。
 
 ## 2026-07-07 Fable 整改执行状态
 
@@ -17,6 +17,7 @@
 - 已完成 Phase 1 同步正确性、Phase 2 启动/性能减负、Phase 3 壁纸远程/同步/状态可见。
 - Phase 4.0 已准备 `docs/design/mockups/`，等待用户补 Image2 设计样板图；Phase 4.1、4.2、4.5 因缺少样板图暂不能客观执行。
 - Phase 4.3 已清除 `src` 与 `extension/src` 的系统 `prompt/confirm/alert` 残留。
+- Phase 4.4 已按 Fable 方案拆分原 `sortable-grid.tsx`：DnD shell、分类块、分组块、未分类块、卡片块和布局数学已分离，并新增 `scripts/test-grid-layout.ts` 防回归。
 - Phase 5.1 已新增 GitHub Actions CI。
 - 当前尚未合并回 `main`，也尚未发布 `V1.0.4` Release；需在剩余阻塞项确认后再做最终发版。
 
@@ -132,7 +133,12 @@ WebCollect 是个人网页收藏工作台：用户可以用 Web 页面和 Chrome
 - 当前视觉方向：蓝白玻璃、轻量卡片、收藏墙工作台，而不是传统书签列表。
 - 分类、分组、网页卡片多轮修过右侧留白、拖拽裁剪、固定列数和跨分辨率布局。
 - 高风险文件：
-  - `src/components/layout/sortable-grid.tsx`
+  - `src/components/layout/sortable-grid/index.tsx`
+  - `src/components/layout/sortable-grid/category-block.tsx`
+  - `src/components/layout/sortable-grid/sub-group-block.tsx`
+  - `src/components/layout/sortable-grid/ungrouped-block.tsx`
+  - `src/components/layout/sortable-grid/sortable-card.tsx`
+  - `src/components/layout/sortable-grid/layout-math.ts`
   - `src/app/globals.css`
   - `extension/src/extension.css`
 - 每次 UI 改动都要做真实视觉检查，至少桌面宽屏和较窄桌面各一次。

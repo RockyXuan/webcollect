@@ -15,12 +15,12 @@
 - Phase 3：壁纸。包括 Wikimedia 2560px thumb 展示、远程刷新扩大产出、每次打开换图、`wallpaperPrefs` 云同步、刷新状态可见。
 - Phase 4.0：已创建 `docs/design/mockups/`，等待用户补 Image2 样板图。
 - Phase 4.3：已清除 `src` 与 `extension/src` 中的 `window.prompt` / `window.confirm` / `window.alert` 以及裸 `prompt/confirm/alert`。
+- Phase 4.4：已将原 `src/components/layout/sortable-grid.tsx` 拆成 `src/components/layout/sortable-grid/` 目录模块，并补 `scripts/test-grid-layout.ts`。
 - Phase 5.1：已新增 `.github/workflows/ci.yml`，main push/PR 自动跑 ts-check、lint、全部脚本测试和扩展构建。
 
 当前仍未完成 / 仍需 Claude 继续审查：
 
 - Phase 4.1、4.2、4.5 依赖用户重新提供设计样板图，不能无标尺抽 token 或做还原度对比。
-- Phase 4.4 `sortable-grid.tsx` 拆分仍未执行，文件仍是 UI/拖拽高风险热点。
 - Phase 5.3 `V1.0.4` 版本升级、扩展 zip 和 GitHub Release 尚未发布。
 - Supabase SQL 触发器迁移和双设备真实账号验收仍需用户备份后人工确认。
 
@@ -38,14 +38,14 @@
 
 | 需求 | 当前进度 | 主要文件 | 备注 |
 |---|---|---|---|
-| 个人网页收藏墙 | 已实现，高风险需持续回归 | `src/components/layout/sortable-grid.tsx`, `src/lib/store.ts` | 核心产品形态已可用 |
+| 个人网页收藏墙 | 已实现，高风险需持续回归 | `src/components/layout/sortable-grid/`, `src/lib/store.ts` | 核心产品形态已可用 |
 | 分项 / 分类 / 分组 / 网页四层组织 | 已实现 | `src/lib/types.ts`, `src/lib/store.ts` | 分项是后期补上的维度 |
-| 分类、分组、网页拖拽排序 | 已实现但反复回归 | `sortable-grid.tsx` | 需要重点 code review 事件边界 |
-| 分类/分组 resize 和紧凑布局 | 已实现但反复调过 | `sortable-grid.tsx`, `globals.css`, `extension.css` | 右侧留白、wrap、fixed columns 都改过多次 |
-| 顶部分项编辑和排序 | 已实现，需真实 UI 复验 | `sortable-grid.tsx`, `store.ts` | `主页` 固定，其他分项可拖 |
-| 分项新增/改名去系统弹窗 | 已实现 | `sortable-grid.tsx` | 不应再出现 `window.prompt` |
-| 分类轻量编辑 + 高级设置 | 已实现，交互仍需审 | `sortable-grid.tsx`, `category-dialog.tsx` | 普通编辑不应直接弹图标/颜色大框 |
-| 删除误触防护 | 已修过，需重点回归 | `sortable-grid.tsx` | 编辑模式点击 tab 不得触发删除 |
+| 分类、分组、网页拖拽排序 | 已实现但反复回归 | `src/components/layout/sortable-grid/` | 需要重点 code review 事件边界 |
+| 分类/分组 resize 和紧凑布局 | 已实现但反复调过 | `src/components/layout/sortable-grid/`, `globals.css`, `extension.css` | 右侧留白、wrap、fixed columns 都改过多次 |
+| 顶部分项编辑和排序 | 已实现，需真实 UI 复验 | `top-nav.tsx`, `store.ts` | `主页` 固定，其他分项可拖 |
+| 分项新增/改名去系统弹窗 | 已实现 | `top-nav.tsx` | 不应再出现 `window.prompt` |
+| 分类轻量编辑 + 高级设置 | 已实现，交互仍需审 | `src/components/layout/sortable-grid/`, `category-dialog.tsx` | 普通编辑不应直接弹图标/颜色大框 |
+| 删除误触防护 | 已修过，需重点回归 | `top-nav.tsx`, `src/components/layout/sortable-grid/` | 编辑模式点击 tab 不得触发删除 |
 | Chrome 扩展新标签页 | 已实现 | `extension/` | Vite + MV3 |
 | Chrome 右键菜单收集 | 已实现，需真实扩展复验 | `extension/background.js` | 图标和 target 都需复查 |
 | 浮窗小松鼠收集 | 已实现但高风险 | `extension/src/content/floating-capture.ts` | 注入、暂停、拖动、保存目标都反复改过 |
@@ -91,7 +91,7 @@
 
 自评：
 
-- 这里补丁多，建议 Claude 重点看 `sortable-grid.tsx` 是否过于臃肿。
+- 原 `sortable-grid.tsx` 已拆成目录模块，但事件边界仍是重点审查对象。
 - 拖拽意图应按层级解析，不应只看 pointer 下的单个元素。
 - UI 改动必须带真实浏览器双视口验证。
 
@@ -199,7 +199,7 @@
 
 ### 5.2 做得不好的部分
 
-- 多轮补丁让 `sortable-grid.tsx` 和浮窗链路复杂度偏高。
+- 多轮补丁让收藏墙拖拽目录模块和浮窗链路复杂度偏高。
 - 有些修复先追现象，再补根因，工程边界不够干净。
 - Release、manifest、public extension-dist、版本文件多处同步，容易漏。
 - 部分功能“代码完成”早于“真实用户环境验证”，这在 Chrome 扩展和云同步里风险很高。
@@ -233,12 +233,17 @@
 
 ### P1：再看 UI 和壁纸
 
-1. `src/components/layout/sortable-grid.tsx`
-2. `src/components/nav/top-nav.tsx`
-3. `src/components/auth/user-menu.tsx`
-4. `src/app/globals.css`
-5. `extension/src/extension.css`
-6. `src/lib/wallpaper-*`
+1. `src/components/layout/sortable-grid/index.tsx`
+2. `src/components/layout/sortable-grid/category-block.tsx`
+3. `src/components/layout/sortable-grid/sub-group-block.tsx`
+4. `src/components/layout/sortable-grid/ungrouped-block.tsx`
+5. `src/components/layout/sortable-grid/sortable-card.tsx`
+6. `src/components/layout/sortable-grid/layout-math.ts`
+7. `src/components/nav/top-nav.tsx`
+8. `src/components/auth/user-menu.tsx`
+9. `src/app/globals.css`
+10. `extension/src/extension.css`
+11. `src/lib/wallpaper-*`
 
 输出重点：
 

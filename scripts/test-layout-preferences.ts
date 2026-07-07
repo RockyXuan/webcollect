@@ -64,7 +64,10 @@ assert.match(
   "extension category headers should clip their own glass background to the top rounded corners"
 );
 
-const sortableSource = readFileSync("src/components/layout/sortable-grid.tsx", "utf8");
+const sortableSource = [
+  readFileSync("src/components/layout/sortable-grid/index.tsx", "utf8"),
+  readFileSync("src/components/layout/sortable-grid/layout-math.ts", "utf8"),
+].join("\n");
 assert.doesNotMatch(
   sortableSource,
   /window\.alert|alertLayoutLocked/,

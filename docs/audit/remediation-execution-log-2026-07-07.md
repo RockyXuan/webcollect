@@ -675,7 +675,6 @@ Phase 2 代码侧状态：
 仍未完成：
 
 - Phase 4.1、4.2、4.5 等 UI 还原度任务仍等待用户补 `docs/design/mockups/` 样板图。
-- Phase 4.4 `sortable-grid.tsx` 拆分尚未执行。
 - Phase 5.3 `V1.0.4` 发版尚未执行。
 
 本地验证：
@@ -684,3 +683,43 @@ Phase 2 代码侧状态：
 - `corepack pnpm@9.0.0 ts-check` passed.
 - `corepack pnpm@9.0.0 lint` passed with 0 warnings.
 - `git diff --check` passed.
+
+## Step 4.4 状态：拆分收藏墙 Sortable Grid
+
+已完成：
+
+- 删除原单文件 `src/components/layout/sortable-grid.tsx`，改为目录模块 `src/components/layout/sortable-grid/`。
+- 新结构按 Fable 方案拆为：
+  - `index.tsx`：保留 `SortableGrid` DnD shell、意图解析、overlay、未分类区域装配。
+  - `category-block.tsx`：父分类块、分类轻量编辑、高级设置入口、删除/降级确认。
+  - `sub-group-block.tsx`：父分类内分组块、分组排序/resize、分组内卡片列表。
+  - `ungrouped-block.tsx`：未分类分组块、升级为分类、独立 resize。
+  - `sortable-card.tsx`：网页卡片 sortable wrapper。
+  - `layout-math.ts`：ID 前缀、collision detection、布局列数、rem 宽度、锁定提示工具。
+- 保留目录级 import 兼容：`@/components/layout/sortable-grid` 仍导出 `SortableGrid` 和布局测试需要的纯函数。
+- 新增 `scripts/test-grid-layout.ts`，锁定拆分后的文件存在、旧单文件不存在、组件不再内联在 `index.tsx`、布局纯函数位于 `layout-math.ts`。
+- 更新 `scripts/test-layout-preferences.ts`、`scripts/test-category-light-editing.ts`、`scripts/test-render-performance-guards.ts`，让测试读取拆分后的真实文件，同时保持原验收标准。
+
+本地验证：
+
+- `node --import tsx scripts/test-grid-layout.ts` passed.
+- `node --import tsx scripts/test-layout-preferences.ts` passed.
+- `node --import tsx scripts/test-layout-sizing.ts` passed.
+- `node --import tsx scripts/test-resolution-layout.ts` passed.
+- `node --import tsx scripts/test-section-tabs-editing.ts` passed.
+- `node --import tsx scripts/test-category-light-editing.ts` passed.
+- `node --import tsx scripts/test-floating-capture-targets.ts` passed.
+- `node --import tsx scripts/test-floating-capture-drain.ts` passed.
+- `node --import tsx scripts/test-floating-capture-health.ts` passed.
+- `node --import tsx scripts/test-floating-capture-metadata.ts` passed.
+- Full `for script in scripts/test-*.ts` loop passed.
+- `corepack pnpm@9.0.0 ts-check` passed.
+- `corepack pnpm@9.0.0 lint` passed.
+- `corepack pnpm@9.0.0 build:ext` passed; Vite only reported existing bundle-size/dynamic-import warnings.
+- `git diff --check` passed.
+
+仍未完成：
+
+- Phase 4.1、4.2、4.5 等 UI 还原度任务仍等待用户补 `docs/design/mockups/` 样板图。
+- 本步尚未做真实浏览器拖拽/resize 视觉验收；当前证据是源码拆分、脚本回归、类型/lint/扩展构建。
+- Phase 5.3 `V1.0.4` 发版尚未执行。

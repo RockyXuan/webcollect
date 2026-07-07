@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const storeSource = readFileSync("src/lib/store.ts", "utf8");
-const sortableSource = readFileSync("src/components/layout/sortable-grid.tsx", "utf8");
+const sortableSource = [
+  readFileSync("src/components/layout/sortable-grid/category-block.tsx", "utf8"),
+  readFileSync("src/components/layout/sortable-grid/sub-group-block.tsx", "utf8"),
+  readFileSync("src/components/layout/sortable-grid/ungrouped-block.tsx", "utf8"),
+  readFileSync("src/components/layout/sortable-grid/sortable-card.tsx", "utf8"),
+].join("\n");
 const hotRecommendationSource = readFileSync("src/components/hot-recommendation.tsx", "utf8");
 
 const forbiddenStorePatterns = [
