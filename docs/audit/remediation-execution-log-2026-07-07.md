@@ -497,3 +497,32 @@ Phase 2 代码侧状态：
 - `corepack pnpm@9.0.0 lint` passed with 0 warnings.
 - `corepack pnpm@9.0.0 build:ext` passed.
 - `git diff --check` passed.
+
+## Step 3.3 状态：实现“每次打开换一张”
+
+已完成：
+
+- `wallpaper-store.initialize` 在 `prefs.rotationInterval === "open"` 时不再优先复用 `currentWallpaperId`。
+- “每次打开换一张”会通过 `pickWallpaperAvoidingRecent` 从当前主题池中避开当前壁纸和最近壁纸。
+- 其他轮换模式仍保留原逻辑：优先复用当前壁纸，必要时再选新壁纸。
+
+新增验收：
+
+- 更新 `scripts/test-wallpaper-data.ts`。
+- 验证 `initialize` 对 `"open"` 分支调用 `pickWallpaperAvoidingRecent(pool, prefs.currentWallpaperId, prefs.recentAssetIds)`。
+
+验证结果：
+
+- `node --import tsx scripts/test-wallpaper-data.ts` passed.
+- `node --import tsx scripts/test-wallpaper-sources.ts` passed.
+- `node --import tsx scripts/test-sync-merge.ts` passed.
+- `node --import tsx scripts/test-floating-capture-targets.ts` passed.
+- `node --import tsx scripts/test-floating-capture-drain.ts` passed.
+- `node --import tsx scripts/test-floating-capture-health.ts` passed.
+- `node --import tsx scripts/test-floating-capture-metadata.ts` passed.
+- `node --import tsx scripts/test-description-translation.ts` passed.
+- `node --import tsx scripts/test-extension-branding.ts` passed.
+- `corepack pnpm@9.0.0 ts-check` passed.
+- `corepack pnpm@9.0.0 lint` passed with 0 warnings.
+- `corepack pnpm@9.0.0 build:ext` passed.
+- `git diff --check` passed.

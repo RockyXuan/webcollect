@@ -196,10 +196,17 @@ assert.equal(getDisplayUrl({ ...valid, imageUrl: "/assets/wallpapers/local.jpg" 
 
 const wallpaperShellSource = readFileSync("src/components/wallpaper/wallpaper-shell.tsx", "utf8");
 const wallpaperSourcesSource = readFileSync("src/lib/wallpaper-sources.ts", "utf8");
+const wallpaperStoreSource = readFileSync("src/lib/wallpaper-store.ts", "utf8");
 assert.ok(wallpaperShellSource.includes("backgroundImage: `url(\"${displayUrl}\")`"));
 assert.ok(wallpaperShellSource.includes("image.src = displayUrl"));
 assert.ok(wallpaperSourcesSource.includes("const displayUrl = getDisplayUrl(item);"));
 assert.equal(wallpaperSourcesSource.includes('cache: "reload"'), false);
+assert.ok(wallpaperStoreSource.includes('prefs.rotationInterval === "open"'));
+assert.match(
+  wallpaperStoreSource,
+  /prefs\.rotationInterval === "open"[\s\S]*?pickWallpaperAvoidingRecent\(pool,\s*prefs\.currentWallpaperId,\s*prefs\.recentAssetIds\)/,
+  "open rotation should pick a fresh wallpaper during initialize instead of reusing currentWallpaperId"
+);
 
 const filtered = filterUsableWallpapers([
   valid,

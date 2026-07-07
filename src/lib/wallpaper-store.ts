@@ -112,9 +112,12 @@ export const useWallpaperStore = create<WallpaperState>((set, get) => ({
     ]);
     const wallpapers = pruneWallpaperLibrary(mergeWallpaperLibrary(FALLBACK_WALLPAPERS, storedLibrary));
     const pool = getWallpaperPool(wallpapers, prefs);
-    const preferredCurrent = pool.find((item) => item.id === prefs.currentWallpaperId)
-      || pickWallpaperAvoidingRecent(pool, prefs.currentWallpaperId, prefs.recentAssetIds)
-      || getCurrentWallpaper(wallpapers, prefs.currentWallpaperId, prefs);
+    const preferredCurrent = prefs.rotationInterval === "open"
+      ? pickWallpaperAvoidingRecent(pool, prefs.currentWallpaperId, prefs.recentAssetIds)
+        || getCurrentWallpaper(wallpapers, null, prefs)
+      : pool.find((item) => item.id === prefs.currentWallpaperId)
+        || pickWallpaperAvoidingRecent(pool, prefs.currentWallpaperId, prefs.recentAssetIds)
+        || getCurrentWallpaper(wallpapers, prefs.currentWallpaperId, prefs);
     const nextPrefs = applyWallpaperDisplay(prefs, preferredCurrent || getCurrentWallpaper(wallpapers, prefs.currentWallpaperId, prefs));
 
     set({
