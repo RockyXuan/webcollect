@@ -1,5 +1,6 @@
 import localforage from "localforage";
 import type { WebCard, Category, HiddenSite, LinkOpenMode, RecycleBinItem, CollectionSection, PinnedBookmarkItem, CategoryLayoutPreference } from "./types";
+import { DEFAULT_SEARCH_ENGINE_ID, isSearchEngineId, type SearchEngineId } from "./search-engines";
 import {
   DEFAULT_VISUAL_SCALE,
   VISUAL_SCALE_BASELINE_MIGRATION_KEY,
@@ -320,6 +321,7 @@ const CATEGORY_WIDTHS_KEY = "categoryWidths";
 const CATEGORY_LAYOUTS_KEY = "categoryLayouts";
 const VISUAL_SCALE_KEY = "visualScale";
 const LINK_OPEN_MODE_KEY = "linkOpenMode";
+const SEARCH_ENGINE_KEY = "searchEngine";
 
 export async function getCategoryWidths(): Promise<Record<string, number>> {
   return (await localforage.getItem<Record<string, number>>(CATEGORY_WIDTHS_KEY)) || {};
@@ -398,6 +400,16 @@ export async function getLinkOpenMode(): Promise<LinkOpenMode> {
 
 export async function saveLinkOpenMode(mode: LinkOpenMode): Promise<void> {
   await localforage.setItem(LINK_OPEN_MODE_KEY, mode);
+  await touchLocalSnapshot();
+}
+
+export async function getSearchEngine(): Promise<SearchEngineId> {
+  const engine = await localforage.getItem<unknown>(SEARCH_ENGINE_KEY);
+  return isSearchEngineId(engine) ? engine : DEFAULT_SEARCH_ENGINE_ID;
+}
+
+export async function saveSearchEngine(engine: SearchEngineId): Promise<void> {
+  await localforage.setItem(SEARCH_ENGINE_KEY, isSearchEngineId(engine) ? engine : DEFAULT_SEARCH_ENGINE_ID);
   await touchLocalSnapshot();
 }
 

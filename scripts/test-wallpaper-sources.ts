@@ -75,22 +75,25 @@ async function fetchMock(input: string): Promise<Response> {
 
 async function main(): Promise<void> {
   assert.equal(
-    getDisplayUrl(makeWallpaperWithWidth(2560), 2560),
+    getDisplayUrl(makeWallpaperWithWidth(1800), 2560),
     wikimediaImageUrl,
-    "Wikimedia thumb requests must not ask for a width equal to the source width"
-  );
-  assert.equal(
-    getDisplayUrl(makeWallpaperWithWidth(2000), 2560),
-    wikimediaImageUrl,
-    "Wikimedia thumb requests must not upscale smaller source images"
+    "Wikimedia display should keep original images that are already no wider than the safe display width"
   );
   assert.ok(
-    getDisplayUrl(makeWallpaperWithWidth(0), 2560).includes("/thumb/a/ab/Featured_Test.jpg/2560px-Featured_Test.jpg"),
-    "Unknown source width should still use the requested display width"
+    getDisplayUrl(makeWallpaperWithWidth(2560), 2560).includes("/thumb/a/ab/Featured_Test.jpg/1920px-Featured_Test.jpg"),
+    "Wikimedia display should clamp unsupported 2560px requests down to the safe 1920px thumbnail size"
   );
   assert.ok(
-    getDisplayUrl(makeWallpaperWithWidth(4200), 2560).includes("/thumb/a/ab/Featured_Test.jpg/2560px-Featured_Test.jpg"),
-    "Wider source images should use the target display width"
+    getDisplayUrl(makeWallpaperWithWidth(2000), 2560).includes("/thumb/a/ab/Featured_Test.jpg/1920px-Featured_Test.jpg"),
+    "Wikimedia display should avoid upscaling while still using the safe 1920px thumbnail size"
+  );
+  assert.ok(
+    getDisplayUrl(makeWallpaperWithWidth(0), 2560).includes("/thumb/a/ab/Featured_Test.jpg/1920px-Featured_Test.jpg"),
+    "Unknown source width should clamp unsupported target widths to the safe 1920px thumbnail size"
+  );
+  assert.ok(
+    getDisplayUrl(makeWallpaperWithWidth(4200), 2560).includes("/thumb/a/ab/Featured_Test.jpg/1920px-Featured_Test.jpg"),
+    "Wider source images should use the safe Wikimedia display width"
   );
 
   const remote = await fetchRemoteWallpapers(

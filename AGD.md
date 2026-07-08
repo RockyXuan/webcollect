@@ -8,7 +8,7 @@
 当前最新已发布版本：`V1.0.3 / 2026年7月2日`
 当前 main 已知基线提交：`a779f26`（Claude Fable 审查时的 main）
 当前整改分支：`fix/sync-architecture`
-当前整改分支最新状态：本文件随整改分支持续更新；Fable 第二轮 R1 代码项已完成，最新点以 `git log -1 --oneline` 为准。
+当前整改分支最新状态：本文件随整改分支持续更新；Fable 第二轮 R1 代码项已完成，2026-07-08 已补 R1.2 真实 Chrome 远程壁纸验收，最新点以 `git log -1 --oneline` 为准。
 
 ## 2026-07-07 Fable 整改执行状态
 
@@ -20,6 +20,8 @@
 - Phase 4.4 已按 Fable 方案拆分原 `sortable-grid.tsx`：DnD shell、分类块、分组块、未分类块、卡片块和布局数学已分离，并新增 `scripts/test-grid-layout.ts` 防回归；已补 Playwright 浏览器验收，覆盖编辑模式、误删防护、resize 收缩/恢复和分组拖拽排序。
 - Phase 5.1 已新增 GitHub Actions CI。
 - Fable 第二轮 R1 已完成：启动新鲜度 marker、Wikimedia 缩略图降级、wallpaperPrefs 稳定设置同步瘦身。
+- 2026-07-08 补充：R1.2 真实 Chrome headless 验收发现 Wikimedia `2560px-*` 仍返回 400，已把展示缩略图钳制到 Wikimedia 可用的 `1920px-*` 标准尺寸；5 张远程样本浏览器加载均为 HTTP 200。
+- 2026-07-08 补充：搜索框新增搜索引擎选择（默认 Google，可选百度/Bing），Enter 和外部搜索结果会按当前选择打开；壁纸设置新增“启动壁纸模式”开关，关闭后下次打开新页面直接进入主页。
 - 当前尚未合并回 `main`，也尚未发布 `V1.0.4` Release；发版前仍需用户完成 R2 Supabase SQL 迁移与双设备真实同步验收。
 
 ## 先读这个
@@ -71,6 +73,7 @@ WebCollect 是个人网页收藏工作台：用户可以用 Web 页面和 Chrome
 - 当前 UI 显示版本和日期：`src/lib/app-version.ts`。
 - 版本一致性测试：`scripts/test-extension-branding.ts`。
 - 扩展构建命令：`corepack pnpm@9.0.0 build:ext`。
+- 当前整改分支包含下一补丁候选功能，但尚未发新版 Release；正式合并/发布时按 Fable R3 升到 `V1.0.4` 并更新日期、manifest、public extension copy 和 Release zip。
 
 ### 3. 小松鼠品牌统一
 

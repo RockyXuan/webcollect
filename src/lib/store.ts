@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { WebCard, Category, HiddenSite, HideDuration, LinkOpenMode, RecycleBinItem, CollectionSection, PinnedBookmarkItem, CategoryLayoutPreference } from "./types";
+import type { SearchEngineId } from "./search-engines";
 import {
   getCards,
   saveCards,
@@ -26,6 +27,8 @@ import {
   saveVisualScale,
   getLinkOpenMode,
   saveLinkOpenMode,
+  getSearchEngine,
+  saveSearchEngine,
   getSections,
   saveSections,
   getActiveSectionId,
@@ -203,6 +206,8 @@ interface AppState {
   setVisualScale: (scale: number) => void;
   linkOpenMode: LinkOpenMode;
   setLinkOpenMode: (mode: LinkOpenMode) => void;
+  searchEngine: SearchEngineId;
+  setSearchEngine: (engine: SearchEngineId) => void;
 
   // Recycle bin
   recycleBin: RecycleBinItem[];
@@ -233,12 +238,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   categoryLayouts: {} as Record<string, CategoryLayoutPreference>,
   visualScale: 100,
   linkOpenMode: "new-background-tab",
+  searchEngine: "google",
 
   loadData: async (options) => {
     const showLoading = options?.showLoading ?? true;
     const previousState = get();
     if (showLoading) set({ isLoading: true });
-    const [storedCards, initCategories, init, hiddenSites, pinnedIds, pinnedBookmarkItems, widths, layouts, visualScale, linkOpenMode, storedSections, storedActiveSectionId, workspaceResetAt] = await Promise.all([
+    const [storedCards, initCategories, init, hiddenSites, pinnedIds, pinnedBookmarkItems, widths, layouts, visualScale, linkOpenMode, searchEngine, storedSections, storedActiveSectionId, workspaceResetAt] = await Promise.all([
       getCards(),
       getCategories(),
       isInitialized(),
@@ -249,6 +255,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       getCategoryLayouts(),
       getVisualScale(),
       getLinkOpenMode(),
+      getSearchEngine(),
       getSections(),
       getActiveSectionId(),
       getWorkspaceResetAt(),
@@ -299,6 +306,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       categoryLayouts: layouts,
       visualScale,
       linkOpenMode,
+      searchEngine,
       initialized: init,
       isLoading: false,
     };
@@ -853,6 +861,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   setLinkOpenMode: (mode) => {
     saveLinkOpenMode(mode);
     set({ linkOpenMode: mode });
+  },
+
+  setSearchEngine: (engine) => {
+    saveSearchEngine(engine);
+    set({ searchEngine: engine });
   },
 
   // Recycle bin methods

@@ -40,6 +40,9 @@ assert.ok(shellSource.includes("aria-label=\"壁纸设置\""), "WallpaperShell s
 assert.ok(shellSource.includes('window.addEventListener("online", refreshIfOnline)'), "WallpaperShell should retry wallpaper refresh when network returns");
 assert.ok(shellSource.includes('window.addEventListener("focus", refreshIfOnline)'), "WallpaperShell should refresh-check when the wallpaper page regains focus");
 assert.ok(settingsSource.includes("THEME_OPTIONS"), "Wallpaper settings should expose theme mode choices");
+assert.ok(settingsSource.includes("启动壁纸模式"), "Wallpaper settings should expose a direct wallpaper-mode switch");
+assert.ok(settingsSource.includes('checked={prefs.defaultMode === "wallpaper"}'), "Wallpaper mode switch should reflect the saved defaultMode");
+assert.ok(settingsSource.includes('defaultMode: event.target.checked ? "wallpaper" : "collection"'), "Wallpaper mode switch should persist collection-first startup when off");
 assert.ok(settingsSource.includes("Auto Mix"), "Wallpaper settings should include Auto Mix");
 assert.ok(settingsSource.includes("TV"), "Wallpaper settings should include TV mode");
 assert.ok(settingsSource.includes("Pets"), "Wallpaper settings should include Pets mode");

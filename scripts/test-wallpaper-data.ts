@@ -26,6 +26,7 @@ import {
   WALLPAPER_CACHE_LIMIT,
   WALLPAPER_LEGACY_CACHE_NAMES,
   WALLPAPER_REFRESH_INTERVAL_MS,
+  WIKIMEDIA_ALLOWED_DISPLAY_WIDTHS,
   WIKIMEDIA_DISPLAY_WIDTH,
 } from "../src/lib/wallpaper-sources";
 import { ZOOM_CURATED_WALLPAPERS } from "../src/lib/zoom-curated-wallpapers";
@@ -45,7 +46,8 @@ assert.equal(WALLPAPER_CACHE_LIMIT, 8);
 assert.equal(WALLPAPER_CACHE_NAME, "webcollect-wallpapers-v2");
 assert.ok(WALLPAPER_LEGACY_CACHE_NAMES.includes("webcollect-wallpapers-v1"));
 assert.equal(WALLPAPER_REFRESH_INTERVAL_MS, 6 * 60 * 60 * 1000);
-assert.equal(WIKIMEDIA_DISPLAY_WIDTH, 2560);
+assert.equal(WIKIMEDIA_DISPLAY_WIDTH, 1920);
+assert.deepEqual(WIKIMEDIA_ALLOWED_DISPLAY_WIDTHS.slice(0, 3), [1920, 1280, 1024]);
 assert.deepEqual(DEFAULT_WALLPAPER_ENABLED_CATEGORIES, [
   "landscape",
   "landmark",
@@ -190,7 +192,7 @@ const wikimediaOriginal = {
   thumbnailUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Example_original.jpg/640px-Example_original.jpg",
 };
 const wikimediaDisplayUrl = getDisplayUrl(wikimediaOriginal);
-assert.match(wikimediaDisplayUrl, /\/thumb\/a\/ab\/Example_original\.jpg\/2560px-Example_original\.jpg$/);
+assert.match(wikimediaDisplayUrl, /\/thumb\/a\/ab\/Example_original\.jpg\/1920px-Example_original\.jpg$/);
 assert.equal(wikimediaOriginal.imageUrl.includes("/thumb/"), false, "source imageUrl should remain the original asset URL");
 assert.equal(getDisplayUrl({ ...valid, imageUrl: "/assets/wallpapers/local.jpg" }), "/assets/wallpapers/local.jpg");
 

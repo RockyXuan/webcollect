@@ -11,6 +11,7 @@ import {
   getPinnedBookmarkItems,
   getPinnedCategoryIds,
   getRecycleBin,
+  getSearchEngine,
   getSections,
   getVisualScale,
   getWorkspaceResetAt,
@@ -26,6 +27,7 @@ import {
   savePinnedBookmarkItems,
   savePinnedCategoryIds,
   saveRecycleBin,
+  saveSearchEngine,
   saveSections,
   saveVisualScale,
   saveWorkspaceResetAt,
@@ -45,6 +47,7 @@ import {
   type WarehouseCategory,
 } from "@/lib/db-warehouse";
 import type { Category, CategoryLayoutPreference, CollectionSection, HiddenSite, LinkOpenMode, PinnedBookmarkItem, RecycleBinItem, WebCard } from "@/lib/types";
+import { DEFAULT_SEARCH_ENGINE_ID, isSearchEngineId, type SearchEngineId } from "@/lib/search-engines";
 
 localforage.config({
   name: "WebCollect",
@@ -76,6 +79,7 @@ export interface LocalSnapshotData {
   categoryLayouts?: Record<string, CategoryLayoutPreference>;
   visualScale: number;
   linkOpenMode: LinkOpenMode;
+  searchEngine?: SearchEngineId;
   sections: CollectionSection[];
   activeSectionId: string | null;
   recycleBin: RecycleBinItem[];
@@ -337,6 +341,7 @@ async function readCurrentSnapshotData(): Promise<LocalSnapshotData> {
     categoryLayouts: await getCategoryLayouts(),
     visualScale: await getVisualScale(),
     linkOpenMode: await getLinkOpenMode(),
+    searchEngine: await getSearchEngine(),
     sections: await getSections(),
     activeSectionId: await getActiveSectionId(),
     recycleBin: await getRecycleBin(),
@@ -539,6 +544,7 @@ export async function createLocalDataSnapshot(
     categoryLayouts: await getCategoryLayouts(),
     visualScale: await getVisualScale(),
     linkOpenMode: await getLinkOpenMode(),
+    searchEngine: await getSearchEngine(),
     sections: await getSections(),
     activeSectionId: await getActiveSectionId(),
     recycleBin: await getRecycleBin(),
@@ -622,6 +628,7 @@ export async function saveVersionAndClearLocalData(): Promise<LocalSnapshotEntry
     await saveCategoryLayouts({});
     await saveVisualScale(100);
     await saveLinkOpenMode("new-background-tab");
+    await saveSearchEngine(DEFAULT_SEARCH_ENGINE_ID);
     await saveSections([defaultSection]);
     await saveActiveSectionId(defaultSection.id);
     await saveRecycleBin([]);
@@ -648,6 +655,7 @@ export async function restoreSnapshotData(data: LocalSnapshotData): Promise<void
     await saveCategoryLayouts(data.categoryLayouts || {});
     await saveVisualScale(data.visualScale);
     await saveLinkOpenMode(data.linkOpenMode);
+    await saveSearchEngine(isSearchEngineId(data.searchEngine) ? data.searchEngine : DEFAULT_SEARCH_ENGINE_ID);
     await saveSections(data.sections);
     if (data.activeSectionId) {
       await saveActiveSectionId(data.activeSectionId);

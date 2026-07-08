@@ -299,12 +299,33 @@
   transition: background-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
 }
 
-.wc-search-result + .wc-search-result-google,
-.wc-search-result-google + .wc-search-result:not(.wc-search-result-google) {
+.wc-search-engine-select {
+  height: 30px;
+  max-width: 92px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(147, 197, 253, 0.34);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.76);
+  padding: 0 26px 0 10px;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1;
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+.wc-search-engine-select:focus {
+  border-color: rgba(37, 99, 235, 0.52);
+  box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.22);
+}
+
+.wc-search-result + .wc-search-result-external,
+.wc-search-result-external + .wc-search-result:not(.wc-search-result-external) {
   margin-top: 6px;
 }
 
-.wc-search-result-google {
+.wc-search-result-external {
   background: linear-gradient(135deg, rgba(239, 246, 255, 0.92), rgba(245, 243, 255, 0.80));
   border: 1px solid rgba(147, 197, 253, 0.36);
 }
@@ -1284,6 +1305,50 @@
   border-color: rgba(37, 99, 235, 0.45);
   background: rgba(219, 234, 254, 0.86);
   color: #1d4ed8;
+}
+
+.wc-wallpaper-mode-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid rgba(203, 213, 225, 0.85);
+  border-radius: 1.1rem;
+  background: rgba(248, 250, 252, 0.88);
+  padding: 0.85rem 0.95rem;
+}
+
+.wc-wallpaper-mode-switch {
+  width: 2.95rem;
+  height: 1.62rem;
+  flex: 0 0 auto;
+  appearance: none;
+  cursor: pointer;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 999px;
+  background: rgba(203, 213, 225, 0.88);
+  padding: 0.18rem;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.wc-wallpaper-mode-switch::before {
+  display: block;
+  width: 1.12rem;
+  height: 1.12rem;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.18);
+  transition: transform 0.18s ease;
+  content: "";
+}
+
+.wc-wallpaper-mode-switch:checked {
+  border-color: rgba(37, 99, 235, 0.52);
+  background: #2563eb;
+}
+
+.wc-wallpaper-mode-switch:checked::before {
+  transform: translateX(1.32rem);
 }
 
 .wc-wallpaper-select {

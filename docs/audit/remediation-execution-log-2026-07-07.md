@@ -677,6 +677,61 @@ Phase 2 代码侧状态：
 - Phase 4.1、4.2、4.5 等 UI 还原度任务仍等待用户补 `docs/design/mockups/` 样板图。
 - Phase 5.3 `V1.0.4` 发版尚未执行。
 
+## 2026-07-08 Follow-up：R1.2 远程壁纸、搜索引擎选择、壁纸模式开关
+
+用户追加要求：
+
+- 补上 R1.2 “真实浏览器轮换 5 张远程壁纸无 400”验收。
+- 搜索框增加搜索引擎选择，默认 Google，可选百度、Bing；输入后按当前选择做外部搜索。
+- 壁纸设置里增加壁纸模式开关；关闭后下次新页面直接进入主页，不再先进入壁纸页。
+
+已完成：
+
+- `getDisplayUrl()` 继续保留 Wikimedia thumb 管线，但把默认展示尺寸从不被 Wikimedia 接受的 `2560px` 改为安全标准尺寸 `1920px`。
+- 新增 `WIKIMEDIA_ALLOWED_DISPLAY_WIDTHS`，即使后续调用者传入 `2560`，也会钳制到 `1920/1280/1024/...` 等允许尺寸，避免再次生成 400 URL。
+- 搜索偏好新增 `searchEngine`，写入 IndexedDB、Zustand store 和本地快照；旧数据默认回到 Google。
+- 顶部搜索框新增搜索引擎选择器，外部搜索结果和 Enter 行为都走 `buildSearchEngineUrl(searchEngine, query)`。
+- 壁纸设置把原“默认打开”下拉改成“启动壁纸模式”开关；关闭后持久化 `defaultMode: "collection"`，下次初始化直接进入收藏墙。
+
+真实浏览器验收：
+
+- 使用独立 Chrome headless，不使用用户主 Chrome。
+- 先用当前项目逻辑生成 5 个 Wikimedia 展示 URL，旧逻辑均为 `2560px-*`，Chrome netlog 记录 5/5 HTTP 400。
+- 修复后同一批样本生成 `1920px-*`，Chrome DOM 显示 `title=all-loaded`，5 张图片均 `naturalWidth: 1920`。
+- 修复后 netlog 记录 5/5 HTTP 200，样本包括：
+  - `zoom-hubble-carina-panorama`
+  - `zoom-eso-carina-nebula`
+  - `zoom-wle-karynzharyk-valley`
+  - `zoom-wle-savsat-autumn`
+  - `zoom-wle-kerkennah-dawn`
+- 使用独立 Chrome headless + CDP 打开 `http://localhost:5012/` 做 UI 验收：
+  - 壁纸设置按钮可打开设置框。
+  - `启动壁纸模式` 开关可见，点击后 checkbox 变为关闭状态。
+  - 进入主页后，搜索框选择器包含 `Google / 百度 / Bing`。
+  - 切到百度并输入 `docu.md` 后，搜索面板显示 `百度 搜索 docu.md`，Enter 提示也变为百度。
+  - 本地未配置 Supabase 环境，`/api/supabase-config` 返回 503 属预期本地环境提示，不影响本次 UI 验收。
+
+新增/更新测试：
+
+- `scripts/test-wallpaper-sources.ts`：验证 2560 请求会被钳制到 1920，低宽原图仍不放大。
+- `scripts/test-wallpaper-data.ts`：更新 Wikimedia 展示宽度合同为 1920。
+- `scripts/test-workspace-search.ts`：覆盖 Google / 百度 / Bing URL 生成。
+- `scripts/test-search-engine-preferences.ts`：覆盖搜索引擎持久化、TopNav UI、快照恢复链路。
+- `scripts/test-wallpaper-wiring.ts`：覆盖“启动壁纸模式”开关和 `defaultMode` 写入。
+
+验证结果（本节追加时）：
+
+- `node --import tsx scripts/test-wallpaper-sources.ts` passed.
+- `node --import tsx scripts/test-wallpaper-data.ts` passed.
+- `node --import tsx scripts/test-wallpaper-wiring.ts` passed.
+- `node --import tsx scripts/test-search-engine-preferences.ts` passed.
+- `node --import tsx scripts/test-workspace-search.ts` passed.
+
+仍未完成：
+
+- R2 Supabase SQL 迁移和双设备真实同步验收仍需用户在真实 Supabase 项目中配合完成。
+- 当前分支仍未合并 `main`，也尚未发布 `V1.0.4`。
+
 ## R1.1 状态：启动新鲜度 marker 对齐
 
 来源：

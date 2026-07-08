@@ -4,6 +4,13 @@ import {
   searchWorkspace,
   tokenizeSearchQuery,
 } from "../src/lib/workspace-search";
+import {
+  DEFAULT_SEARCH_ENGINE_ID,
+  SEARCH_ENGINE_OPTIONS,
+  buildSearchEngineUrl,
+  getSearchEngineOption,
+  isSearchEngineId,
+} from "../src/lib/search-engines";
 import type { Category, CollectionSection, WebCard } from "../src/lib/types";
 
 const now = 1_777_777_777;
@@ -99,5 +106,14 @@ assert.equal(noteResults.cards[0]?.card.id, "card-vpn");
 
 const sectionResults = searchWorkspace({ cards, categories, sections }, "hodl defi");
 assert.equal(sectionResults.categories[0]?.category.id, "cat-defi");
+
+assert.equal(DEFAULT_SEARCH_ENGINE_ID, "google");
+assert.deepEqual(SEARCH_ENGINE_OPTIONS.map((option) => option.id), ["google", "baidu", "bing"]);
+assert.equal(isSearchEngineId("google"), true);
+assert.equal(isSearchEngineId("duckduckgo"), false);
+assert.equal(getSearchEngineOption("baidu").label, "百度");
+assert.equal(buildSearchEngineUrl("google", "web collect"), "https://www.google.com/search?q=web%20collect");
+assert.equal(buildSearchEngineUrl("baidu", "网页收藏"), "https://www.baidu.com/s?wd=%E7%BD%91%E9%A1%B5%E6%94%B6%E8%97%8F");
+assert.equal(buildSearchEngineUrl("bing", "AI 工具"), "https://www.bing.com/search?q=AI%20%E5%B7%A5%E5%85%B7");
 
 console.log("workspace-search tests passed");

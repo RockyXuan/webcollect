@@ -51,6 +51,13 @@ import { useAuthStore } from "@/lib/auth-store";
 import { saveCloudWorkspaceSnapshot } from "@/lib/cloud-snapshots";
 import { createLocalDataSnapshot } from "@/lib/local-snapshots";
 import { openWebCollectUrl } from "@/lib/platform";
+import {
+  SEARCH_ENGINE_OPTIONS,
+  buildSearchEngineUrl,
+  getSearchEngineOption,
+  isSearchEngineId,
+  type SearchEngineId,
+} from "@/lib/search-engines";
 import { useAppStore } from "@/lib/store";
 import { getRenderedVisualScale } from "@/lib/visual-scale";
 import { searchWorkspace } from "@/lib/workspace-search";
@@ -67,7 +74,7 @@ interface TopNavProps {
 
 type SearchPanelItem = {
   key: string;
-  type: "google" | "card" | "category" | "section";
+  type: "search" | "card" | "category" | "section";
   label: string;
   meta: string;
   detail?: string;
@@ -210,6 +217,8 @@ export function TopNav({
     deleteSection,
     loadData,
     linkOpenMode,
+    searchEngine,
+    setSearchEngine,
   } = useAppStore();
   const recycleBinCount = useAppStore((s) => s.recycleBin.length);
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
@@ -256,14 +265,15 @@ export function TopNav({
 
   const searchItems = useMemo<SearchPanelItem[]>(() => {
     if (!trimmedSearchQuery) return [];
+    const searchEngineOption = getSearchEngineOption(searchEngine);
 
     const items: SearchPanelItem[] = [
       {
-        key: "google",
-        type: "google",
-        label: `Google 搜索 ${trimmedSearchQuery}`,
+        key: `search:${searchEngineOption.id}`,
+        type: "search",
+        label: `${searchEngineOption.label} 搜索 ${trimmedSearchQuery}`,
         meta: "外部搜索",
-        detail: "先查全网，再看 WebCollect 内部收藏",
+        detail: searchEngineOption.hint,
       },
     ];
 
@@ -306,7 +316,7 @@ export function TopNav({
     }
 
     return items;
-  }, [trimmedSearchQuery, workspaceSearchResults]);
+  }, [searchEngine, trimmedSearchQuery, workspaceSearchResults]);
 
   useEffect(() => {
     setActiveSearchIndex(0);
@@ -324,9 +334,9 @@ export function TopNav({
 
   const handleSearchItemSelect = useCallback(
     (item: SearchPanelItem) => {
-      if (item.type === "google") {
+      if (item.type === "search") {
         openWebCollectUrl(
-          `https://www.google.com/search?q=${encodeURIComponent(trimmedSearchQuery)}`,
+          buildSearchEngineUrl(searchEngine, trimmedSearchQuery),
           "new-active-tab"
         );
         setIsSearchPanelOpen(false);
@@ -349,8 +359,14 @@ export function TopNav({
 
       setIsSearchPanelOpen(false);
     },
-    [linkOpenMode, revealSearchTarget, setActiveSection, trimmedSearchQuery]
+    [linkOpenMode, revealSearchTarget, searchEngine, setActiveSection, trimmedSearchQuery]
   );
+
+  const handleSearchEngineChange = (engine: SearchEngineId) => {
+    setSearchEngine(engine);
+    searchInputRef.current?.focus();
+    setIsSearchPanelOpen(Boolean(trimmedSearchQuery));
+  };
 
   const handleSearchKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
     if (!isSearchPanelOpen || searchItems.length === 0) return;
@@ -505,6 +521,25 @@ export function TopNav({
                 onKeyDown={handleSearchKeyDown}
                 className="min-w-0 flex-1 bg-transparent text-sm font-medium text-slate-800 placeholder:text-slate-400 outline-none"
               />
+              <select
+                aria-label="选择搜索引擎"
+                className="wc-search-engine-select"
+                value={searchEngine}
+                onChange={(event) => {
+                  const nextEngine = event.target.value;
+                  if (isSearchEngineId(nextEngine)) {
+                    handleSearchEngineChange(nextEngine);
+                  }
+                }}
+                onMouseDown={(event) => event.stopPropagation()}
+                onClick={(event) => event.stopPropagation()}
+              >
+                {SEARCH_ENGINE_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.shortLabel}
+                  </option>
+                ))}
+              </select>
               <span className="hidden items-center gap-1 rounded-xl bg-slate-100/80 px-2 py-1 text-[11px] font-bold text-slate-400 md:inline-flex">
                 <Command className="h-3 w-3" />
                 K
@@ -516,7 +551,7 @@ export function TopNav({
                 {searchItems.map((item, index) => {
                   const active = index === activeSearchIndex;
                   const Icon =
-                    item.type === "google"
+                    item.type === "search"
                       ? Globe2
                       : item.type === "card"
                         ? FileText
@@ -528,7 +563,7 @@ export function TopNav({
                       key={item.key}
                       type="button"
                       className={`wc-search-result ${active ? "wc-search-result-active" : ""} ${
-                        item.type === "google" ? "wc-search-result-google" : ""
+                        item.type === "search" ? "wc-search-result-external" : ""
                       }`}
                       onMouseEnter={() => setActiveSearchIndex(index)}
                       onMouseDown={(event) => event.preventDefault()}
@@ -544,13 +579,13 @@ export function TopNav({
                           {item.detail ? ` · ${item.detail}` : ""}
                         </span>
                       </span>
-                      {item.type === "google" && <ArrowUpRight className="h-4 w-4 text-blue-500" />}
+                      {item.type === "search" && <ArrowUpRight className="h-4 w-4 text-blue-500" />}
                     </button>
                   );
                 })}
                 {workspaceSearchResults && workspaceSearchResults.total === 0 && (
                   <div className="wc-search-empty">
-                    WebCollect 内暂无匹配，按 Enter 可 Google 搜索
+                    WebCollect 内暂无匹配，按 Enter 可用 {getSearchEngineOption(searchEngine).label} 搜索
                   </div>
                 )}
               </div>

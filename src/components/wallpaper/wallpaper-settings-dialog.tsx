@@ -106,7 +106,7 @@ export function WallpaperSettingsDialog({
 
         <div className="space-y-5 py-2">
           <section className="space-y-2">
-            <p className="text-sm font-bold text-slate-800">壁纸模式</p>
+            <p className="text-sm font-bold text-slate-800">壁纸主题</p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {THEME_OPTIONS.map((option) => {
                 const active = prefs.themeMode === option.id;
@@ -123,6 +123,21 @@ export function WallpaperSettingsDialog({
               })}
             </div>
           </section>
+
+          <label className="wc-wallpaper-mode-toggle">
+            <span className="min-w-0">
+              <span className="block text-sm font-extrabold text-slate-800">启动壁纸模式</span>
+              <span className="block text-xs font-semibold text-slate-500">
+                关闭后，下次打开新页面会直接进入主页。
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              checked={prefs.defaultMode === "wallpaper"}
+              onChange={(event) => onUpdatePrefs({ defaultMode: event.target.checked ? "wallpaper" : "collection" })}
+              className="wc-wallpaper-mode-switch"
+            />
+          </label>
 
           <section className="space-y-2">
             <p className="text-sm font-bold text-slate-800">壁纸分类</p>
@@ -143,7 +158,7 @@ export function WallpaperSettingsDialog({
             </div>
           </section>
 
-          <section className="grid gap-3 sm:grid-cols-2">
+          <section className="grid gap-3">
             <label className="space-y-2 text-sm font-bold text-slate-800">
               <span>轮播间隔</span>
               <select
@@ -156,18 +171,6 @@ export function WallpaperSettingsDialog({
                     {option.label}
                   </option>
                 ))}
-              </select>
-            </label>
-
-            <label className="space-y-2 text-sm font-bold text-slate-800">
-              <span>默认打开</span>
-              <select
-                className="wc-wallpaper-select"
-                value={prefs.defaultMode}
-                onChange={(event) => onUpdatePrefs({ defaultMode: event.target.value === "collection" ? "collection" : "wallpaper" })}
-              >
-                <option value="wallpaper">先看壁纸</option>
-                <option value="collection">直接进收藏墙</option>
               </select>
             </label>
           </section>

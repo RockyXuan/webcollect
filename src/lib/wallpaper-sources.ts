@@ -15,7 +15,8 @@ export const WALLPAPER_BACKGROUND_CHECK_MS = 30 * 60 * 1000;
 export const WALLPAPER_CACHE_LIMIT = 8;
 export const WALLPAPER_CACHE_NAME = "webcollect-wallpapers-v2";
 export const WALLPAPER_LEGACY_CACHE_NAMES = ["webcollect-wallpapers-v1"];
-export const WIKIMEDIA_DISPLAY_WIDTH = 2560;
+export const WIKIMEDIA_DISPLAY_WIDTH = 1920;
+export const WIKIMEDIA_ALLOWED_DISPLAY_WIDTHS = [1920, 1280, 1024, 800, 640, 320];
 export const ZOOM_WALLPAPER_MIN_WIDTH = 3000;
 export const ZOOM_WALLPAPER_MIN_HEIGHT = 1600;
 export const ZOOM_WALLPAPER_MIN_RATIO = 1.45;
@@ -139,8 +140,12 @@ export function getDisplayUrl(item: WallpaperItem, targetWidth = WIKIMEDIA_DISPL
       const segments = url.pathname.split("/");
       const fileName = segments[segments.length - 1];
       if (!fileName) return item.imageUrl;
-      if (item.width > 0 && item.width <= targetWidth) return item.imageUrl;
-      const displayWidth = item.width > 0 ? Math.min(targetWidth, item.width - 1) : targetWidth;
+      const safeTargetWidth = Math.min(
+        Number.isFinite(targetWidth) && targetWidth > 0 ? Math.floor(targetWidth) : WIKIMEDIA_DISPLAY_WIDTH,
+        WIKIMEDIA_DISPLAY_WIDTH
+      );
+      if (item.width > 0 && item.width <= safeTargetWidth) return item.imageUrl;
+      const displayWidth = getWikimediaDisplayWidth(item.width, targetWidth);
       const prefix = segments.slice(0, 3).join("/");
       const rest = segments.slice(3).join("/");
       url.pathname = `${prefix}/thumb/${rest}/${displayWidth}px-${fileName}`;
@@ -150,6 +155,14 @@ export function getDisplayUrl(item: WallpaperItem, targetWidth = WIKIMEDIA_DISPL
     return item.imageUrl;
   }
   return item.imageUrl;
+}
+
+function getWikimediaDisplayWidth(sourceWidth: number, targetWidth: number): number {
+  const requested = Number.isFinite(targetWidth) && targetWidth > 0 ? Math.floor(targetWidth) : WIKIMEDIA_DISPLAY_WIDTH;
+  const maxWidth = sourceWidth > 0
+    ? Math.min(requested, Math.max(1, sourceWidth - 1))
+    : requested;
+  return WIKIMEDIA_ALLOWED_DISPLAY_WIDTHS.find((width) => width <= maxWidth) || WIKIMEDIA_ALLOWED_DISPLAY_WIDTHS[WIKIMEDIA_ALLOWED_DISPLAY_WIDTHS.length - 1];
 }
 
 function isOriginalSizedImageUrl(url: string): boolean {
