@@ -29,7 +29,7 @@ Target release: `V1.1.0`
 | DATA-01 | P0 | Sync | Cloud-only rows can resurrect locally deleted cards/categories. | Open |
 | DATA-02 | P0 | Sync | Preference unions prevent unpin, unhide, and recycle-bin empty from propagating. | Open |
 | DATA-03 | P0 | Concurrency | Whole-array IndexedDB and `chrome.storage` read-modify-write operations can lose concurrent updates. | Open |
-| DATA-04 | P0 | Migration | Name-based and fixed-count heuristics can delete legitimate user data before a snapshot. | Open |
+| DATA-04 | P0 | Migration | Name-based heuristics deleted legitimate categories, rewrote descriptions, and ran without a pre-migration snapshot. | Fixed with behavioral tests |
 | SEC-01 | P0 | Server fetch | Metadata and safety routes can request localhost/private-network URLs. | Open |
 | SEC-02 | P1 | Dependencies | Production dependency audit contains critical/high advisories and unused large dependency trees. | Open |
 | UI-01 | P1 | Responsive | Fixed 2048px canvas with a minimum zoom clipped 1024px and 390px viewports. Vitest plus Playwright now cover five target sizes. | Fixed and browser-verified |
@@ -51,3 +51,10 @@ Every finding must have a failing behavioral test, the smallest root-cause fix, 
 - Fix: removed global CSS `zoom`, made the collection canvas fluid, and limited wide-screen enhancements to viewports at least 1440px wide.
 - Focused verification: five Vitest cases and five Playwright Chromium cases pass at 2048x1152, 1440x900, 1280x720, 1024x768, and 390x844.
 - Data impact: none. Seed data and persisted workspace data were not read or changed by the tests.
+
+### DATA-04 migration safety
+
+- Before: all three migration safety tests failed. Empty categories named like seed templates were removed, `Recovered <uuid>` content was relocated, pre-reset rows were filtered, and no pre-migration snapshot existed.
+- Fix: local schema v2 snapshots first and only performs additive or visibility-preserving repairs. Automatic name-based deletion, description translation, recovered-category deletion, reset-time filtering, and direct-card reparenting were removed.
+- Focused verification: migration safety tests, startup idempotency test, TypeScript, and ESLint pass.
+- Data impact: the migration no longer deletes or semantically rewrites user-owned content.

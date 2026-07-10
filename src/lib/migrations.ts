@@ -8,9 +8,9 @@ import {
   saveSections,
   withoutLocalChangeEvents,
 } from "./db";
-import { localizeCardDescriptions } from "./description-translation";
+import { createLocalDataSnapshot } from "./local-snapshots";
 
-export const CURRENT_LOCAL_DATA_SCHEMA_VERSION = 1;
+export const CURRENT_LOCAL_DATA_SCHEMA_VERSION = 2;
 const DEFAULT_SECTION_ID = "section-default";
 
 interface LocalMigrationInput {
@@ -54,73 +54,6 @@ export function getDefaultSectionId(sections: CollectionSection[]): string {
 
 function sameSnapshot<T>(left: T, right: T): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
-}
-
-function pruneEmptyDuplicateCategories(categories: Category[], cards: WebCard[]): Category[] {
-  const cardCountByCategory = new Map<string, number>();
-  for (const card of cards) {
-    cardCountByCategory.set(card.categoryId, (cardCountByCategory.get(card.categoryId) || 0) + 1);
-  }
-  const childCountByCategory = new Map<string, number>();
-  for (const category of categories) {
-    if (category.parentId) {
-      childCountByCategory.set(category.parentId, (childCountByCategory.get(category.parentId) || 0) + 1);
-    }
-  }
-
-  const bySemanticKey = new Map<string, Category[]>();
-  for (const category of categories) {
-    const sectionId = category.sectionId || DEFAULT_SECTION_ID;
-    const parentName = category.parentId
-      ? categories.find((item) => item.id === category.parentId)?.name || ""
-      : "";
-    const key = [
-      sectionId,
-      category.parentId ? `group:${parentName}` : category.isParent ? "parent" : "root",
-      category.name.trim().toLowerCase(),
-    ].join("|");
-    const group = bySemanticKey.get(key) || [];
-    group.push(category);
-    bySemanticKey.set(key, group);
-  }
-
-  const removeIds = new Set<string>();
-  for (const group of bySemanticKey.values()) {
-    if (group.length < 2) continue;
-    const nonEmpty = group.filter(
-      (category) => (cardCountByCategory.get(category.id) || 0) > 0 || (childCountByCategory.get(category.id) || 0) > 0
-    );
-    if (nonEmpty.length === 0) continue;
-    for (const category of group) {
-      const isEmpty = (cardCountByCategory.get(category.id) || 0) === 0 && (childCountByCategory.get(category.id) || 0) === 0;
-      if (isEmpty) removeIds.add(category.id);
-    }
-  }
-
-  if (removeIds.size === 0) return categories;
-  return categories.filter((category) => !removeIds.has(category.id));
-}
-
-function pruneEmptySeedTemplates(categories: Category[], cards: WebCard[]): Category[] {
-  const seedTemplateIds = new Set(["cat-work", "cat-ai", "cat-dev", "cat-1", "cat-2", "cat-3", "cat-4", "cat-5"]);
-  const seedTemplateNames = new Set(["\u5de5\u4f5c", "AI", "\u5f00\u53d1", "\u5e38\u7528", "AI\u5de5\u5177", "\u8bbe\u8ba1\u7075\u611f", "\u5f00\u53d1\u8005", "\u9605\u8bfb"]);
-  const cardCountByCategory = new Map<string, number>();
-  for (const card of cards) {
-    cardCountByCategory.set(card.categoryId, (cardCountByCategory.get(card.categoryId) || 0) + 1);
-  }
-  const childCountByCategory = new Map<string, number>();
-  for (const category of categories) {
-    if (category.parentId) {
-      childCountByCategory.set(category.parentId, (childCountByCategory.get(category.parentId) || 0) + 1);
-    }
-  }
-
-  return categories.filter((category) => {
-    const hasCards = (cardCountByCategory.get(category.id) || 0) > 0;
-    const hasChildren = (childCountByCategory.get(category.id) || 0) > 0;
-    const isSeedTemplate = seedTemplateIds.has(category.id) || seedTemplateNames.has(category.name.trim());
-    return !isSeedTemplate || hasCards || hasChildren;
-  });
 }
 
 export function ensureParentDirectCardsAreVisible(
@@ -211,35 +144,6 @@ function ensureInboxForSection(
     inboxId,
     changed: true,
   };
-}
-
-function removeRecoveredMainData(
-  categories: Category[],
-  cards: WebCard[],
-  activeSectionId: string
-): { categories: Category[]; cards: WebCard[]; changed: boolean } {
-  const recoveredIds = new Set(
-    categories
-      .filter((category) => /^Recovered\s+[0-9a-f-]+$/i.test(category.name.trim()))
-      .map((category) => category.id)
-  );
-  if (recoveredIds.size === 0) {
-    return { categories, cards, changed: false };
-  }
-
-  const nextCategories = categories.filter((category) => !recoveredIds.has(category.id));
-  const now = Date.now();
-  const inbox = ensureInboxForSection(nextCategories, activeSectionId, now);
-  let nextOrder = cards
-    .filter((card) => card.categoryId === inbox.inboxId)
-    .reduce((max, card) => Math.max(max, card.order), -1);
-  const nextCards = cards.map((card) => {
-    if (!recoveredIds.has(card.categoryId)) return card;
-    nextOrder += 1;
-    return { ...card, categoryId: inbox.inboxId, order: nextOrder, updatedAt: now };
-  });
-
-  return { categories: inbox.categories, cards: nextCards, changed: true };
 }
 
 export function ensureSectionInboxes(categories: Category[], sections: CollectionSection[]): Category[] {
@@ -376,20 +280,20 @@ export async function runLocalMigrations(input: LocalMigrationInput): Promise<Lo
   const originalSections = input.sections;
   const originalActiveSectionId = input.activeSectionId;
 
-  let cards = input.workspaceResetAt > 0
-    ? input.cards.filter((card) => (card.updatedAt || card.createdAt || 0) >= input.workspaceResetAt)
-    : input.cards;
-  let categories = input.workspaceResetAt > 0
-    ? input.categories.filter((category) => category.id === "cat-inbox" || (category.updatedAt || category.createdAt || 0) >= input.workspaceResetAt)
-    : input.categories;
-  let sections = input.workspaceResetAt > 0
-    ? input.sections.filter((section) =>
-      section.id === DEFAULT_SECTION_ID || (section.updatedAt || section.createdAt || 0) >= input.workspaceResetAt
-    )
-    : input.sections;
-
   const storedVersion = await getDataSchemaVersion();
   const shouldRunVersionedMigrations = storedVersion < CURRENT_LOCAL_DATA_SCHEMA_VERSION;
+  if (shouldRunVersionedMigrations) {
+    await createLocalDataSnapshot(
+      `before-local-migration-v${CURRENT_LOCAL_DATA_SCHEMA_VERSION}`,
+      `本地数据升级 V${CURRENT_LOCAL_DATA_SCHEMA_VERSION} 前自动备份`,
+      { force: true }
+    );
+  }
+
+  let cards = input.cards;
+  let categories = input.categories;
+  let sections = input.sections;
+  void input.workspaceResetAt;
 
   if (shouldRunVersionedMigrations) {
     sections = sections.map(normalizeSectionName);
@@ -416,26 +320,10 @@ export async function runLocalMigrations(input: LocalMigrationInput): Promise<Lo
     categories = visibilityRepair.categories;
     cards = visibilityRepair.cards;
 
-    const localizedDescriptions = localizeCardDescriptions(cards);
-    cards = localizedDescriptions.cards;
-
     cards = fillMissingFavicons(cards);
     categories = ensureSectionInboxes(categories, sections);
 
-    const cleanedMainData = removeRecoveredMainData(categories, cards, activeSectionId);
-    categories = cleanedMainData.categories;
-    cards = cleanedMainData.cards;
-
     categories = migrateLegacyParents(categories);
-
-    const visibleParentRepair = ensureParentDirectCardsAreVisible(categories, cards, activeSectionId);
-    categories = visibleParentRepair.categories;
-    cards = visibleParentRepair.cards;
-
-    categories = ensureSectionInboxes(
-      pruneEmptySeedTemplates(pruneEmptyDuplicateCategories(categories, cards), cards),
-      sections
-    );
   }
 
   const shouldSaveCards = !sameSnapshot(cards, originalCards);
