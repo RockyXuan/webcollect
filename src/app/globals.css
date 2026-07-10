@@ -179,18 +179,14 @@
 }
 
 .wc-resolution-viewport {
-  display: flex;
   min-height: 100vh;
-  justify-content: center;
   overflow-x: hidden;
 }
 
 .wc-resolution-canvas {
-  width: var(--wc-resolution-width, 2048px);
-  min-width: var(--wc-resolution-width, 2048px);
-  max-width: var(--wc-resolution-width, 2048px);
-  min-height: var(--wc-resolution-min-height, 1152px);
-  zoom: var(--wc-resolution-scale, 1);
+  width: 100%;
+  min-width: 0;
+  min-height: 100vh;
 }
 
 .wc-app-header {
@@ -2173,6 +2169,7 @@
   }
 }
 
+@media (min-width: 1440px) {
 .wc-resolution-canvas {
   --wc-site-tile-width: 14.75rem;
   --wc-site-tile-edit-width: var(--wc-site-tile-width);
@@ -2252,6 +2249,7 @@
   border-radius: 16px;
   padding-inline: 18px;
   font-size: 0.9rem;
+}
 }
 
 /* Category block resize handles */

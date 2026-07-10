@@ -37,6 +37,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Run behavioral tests
+        run: pnpm test
+
       - name: Run script tests
         shell: bash
         run: |
@@ -48,3 +51,9 @@ jobs:
 
       - name: Build Chrome extension
         run: pnpm build:ext
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run browser regression tests
+        run: pnpm test:e2e
