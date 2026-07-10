@@ -3,12 +3,13 @@ import type { WebCard, Category, HiddenSite, HideDuration, LinkOpenMode, Recycle
 import type { SearchEngineId } from "./search-engines";
 import {
   getCards,
-  saveCards,
+  saveCardsRebased,
   addCard as dbAddCard,
   updateCard as dbUpdateCard,
   deleteCard as dbDeleteCard,
   getCategories,
   saveCategories,
+  saveCategoriesRebased,
   addCategory as dbAddCategory,
   updateCategory as dbUpdateCategory,
   deleteCategory as dbDeleteCategory,
@@ -30,7 +31,7 @@ import {
   getSearchEngine,
   saveSearchEngine,
   getSections,
-  saveSections,
+  saveSectionsRebased,
   getActiveSectionId,
   saveActiveSectionId,
   getRecycleBin,
@@ -56,6 +57,10 @@ import {
 } from "./pinned-bookmarks";
 
 const DEFAULT_SECTION_ID = "section-default";
+
+function cloneEntitySnapshot<T extends object>(items: T[]): T[] {
+  return items.map((item) => ({ ...item }));
+}
 
 interface LoadDataOptions {
   showLoading?: boolean;
@@ -350,20 +355,20 @@ export const useAppStore = create<AppState>((set, get) => ({
       nextCategories.length !== existingCategories.length ||
       nextCategories.some((category, index) => category !== existingCategories[index])
     ) {
-      await saveCategories(nextCategories);
-      set({ categories: nextCategories });
+      const persistedCategories = await saveCategoriesRebased(existingCategories, nextCategories);
+      set({ categories: persistedCategories });
     }
-    await saveSections(nextSections);
+    const persistedSections = await saveSectionsRebased(sections, nextSections);
     await saveActiveSectionId(nextSection.id);
-    set({ sections: nextSections, activeSectionId: nextSection.id, activeCategoryId: "all", searchQuery: "" });
+    set({ sections: persistedSections, activeSectionId: nextSection.id, activeCategoryId: "all", searchQuery: "" });
   },
   updateSection: async (section) => {
     const sections = await getSections();
     const nextSections = sections.map((item) =>
       item.id === section.id ? { ...section, updatedAt: Date.now() } : item
     );
-    await saveSections(nextSections);
-    set({ sections: nextSections });
+    const persistedSections = await saveSectionsRebased(sections, nextSections);
+    set({ sections: persistedSections });
   },
   reorderSections: async (orderedIds) => {
     const sections = await getSections();
@@ -388,8 +393,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const nextSections = ordered.map((section, order) => (
       section.order === order ? section : { ...section, order, updatedAt: now }
     ));
-    await saveSections(nextSections);
-    set({ sections: nextSections });
+    const persistedSections = await saveSectionsRebased(sections, nextSections);
+    set({ sections: persistedSections });
   },
   deleteSection: async (id) => {
     if (id === DEFAULT_SECTION_ID) return;
@@ -429,14 +434,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
     const nextActiveSectionId = get().activeSectionId === id ? fallbackSectionId : get().activeSectionId;
 
-    await saveCategories(nextCategories);
-    await saveSections(nextSections);
+    const persistedCategories = await saveCategoriesRebased(categories, nextCategories);
+    const persistedSections = await saveSectionsRebased(sections, nextSections);
     if (nextActiveSectionId !== get().activeSectionId) {
       await saveActiveSectionId(nextActiveSectionId);
     }
     set({
-      categories: nextCategories,
-      sections: nextSections,
+      categories: persistedCategories,
+      sections: persistedSections,
       activeSectionId: nextActiveSectionId,
       activeCategoryId: "all",
       searchQuery: "",
@@ -463,6 +468,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   moveCard: async (cardId, targetCategoryId, newOrder) => {
     const cards = await getCards();
+    const cardBaseline = cloneEntitySnapshot(cards);
     const categories = await getCategories();
     const resolved = await resolveCardDropCategoryId(categories, targetCategoryId, get().activeSectionId);
     const finalCategoryId = resolved.categoryId;
@@ -488,12 +494,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       return reordered ? { ...c, order: reordered.order, categoryId: reordered.categoryId } : c;
     });
 
-    await saveCards(allCards);
-    set({ cards: allCards, categories: resolved.categories });
+    const persistedCards = await saveCardsRebased(cardBaseline, allCards);
+    set({ cards: persistedCards, categories: resolved.categories });
   },
 
   reorderCards: async (cardId, targetCategoryId, newOrder) => {
     const cards = await getCards();
+    const cardBaseline = cloneEntitySnapshot(cards);
     const categories = await getCategories();
     const resolved = await resolveCardDropCategoryId(categories, targetCategoryId, get().activeSectionId);
     const finalCategoryId = resolved.categoryId;
@@ -512,8 +519,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       c.order = i;
     });
 
-    await saveCards(cards);
-    set({ cards, categories: resolved.categories });
+    const persistedCards = await saveCardsRebased(cardBaseline, cards);
+    set({ cards: persistedCards, categories: resolved.categories });
   },
 
   addCategory: async (cat) => {
@@ -541,6 +548,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   reorderCategories: async (orderedIds) => {
     const categories = await getCategories();
+    const categoryBaseline = cloneEntitySnapshot(categories);
     const now = Date.now();
     orderedIds.forEach((id, order) => {
       const cat = categories.find((c) => c.id === id);
@@ -549,13 +557,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         cat.updatedAt = now;
       }
     });
-    await saveCategories(categories);
-    set({ categories });
+    const persistedCategories = await saveCategoriesRebased(categoryBaseline, categories);
+    set({ categories: persistedCategories });
   },
 
   // Move a standalone category into a parent (demotion: 鍒嗙被 鈫?鍒嗙粍)
   moveCategoryToParent: async (categoryId: string, parentId: string, insertIndex?: number) => {
     const categories = await getCategories();
+    const categoryBaseline = cloneEntitySnapshot(categories);
     const cat = categories.find((c) => c.id === categoryId);
     const parent = categories.find((c) => c.id === parentId);
     if (!cat) return;
@@ -581,14 +590,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       sibling.sectionId = parent?.sectionId || sibling.sectionId || get().activeSectionId;
       sibling.updatedAt = now;
     });
-    await saveCategories(categories);
-    set({ categories });
+    const persistedCategories = await saveCategoriesRebased(categoryBaseline, categories);
+    set({ categories: persistedCategories });
   },
 
   // Remove a sub-group from its parent (promotion: 鍒嗙粍 鈫?椤剁骇鍒嗙被)
   detachCategoryFromParent: async (categoryId: string) => {
     const categories = await getCategories();
     const cards = await getCards();
+    const categoryBaseline = cloneEntitySnapshot(categories);
+    const cardBaseline = cloneEntitySnapshot(cards);
     const cat = categories.find((c) => c.id === categoryId);
     if (!cat) return;
     delete cat.parentId;
@@ -601,33 +612,38 @@ export const useAppStore = create<AppState>((set, get) => ({
       .sort((a, b) => a.order - b.order);
     cat.order = topLevel.length > 0 ? Math.max(...topLevel.map((t) => t.order)) + 1 : 0;
     const repaired = ensureParentDirectCardsAreVisible(categories, cards, get().activeSectionId);
-    await saveCategories(repaired.categories);
+    const persistedCategories = await saveCategoriesRebased(categoryBaseline, repaired.categories);
+    let persistedCards = cards;
     if (repaired.changed) {
-      await saveCards(repaired.cards);
+      persistedCards = await saveCardsRebased(cardBaseline, repaired.cards);
     }
-    set({ cards: repaired.cards, categories: repaired.categories });
+    set({ cards: persistedCards, categories: persistedCategories });
   },
 
   // Promote an ungrouped item to a parent category
   promoteToParent: async (categoryId: string) => {
     const categories = await getCategories();
     const cards = await getCards();
+    const categoryBaseline = cloneEntitySnapshot(categories);
+    const cardBaseline = cloneEntitySnapshot(cards);
     const cat = categories.find((c) => c.id === categoryId);
     if (!cat) return;
     cat.isParent = true;
     cat.sectionId = cat.sectionId || get().activeSectionId;
     cat.updatedAt = Date.now();
     const repaired = ensureParentDirectCardsAreVisible(categories, cards, get().activeSectionId);
-    await saveCategories(repaired.categories);
+    const persistedCategories = await saveCategoriesRebased(categoryBaseline, repaired.categories);
+    let persistedCards = cards;
     if (repaired.changed) {
-      await saveCards(repaired.cards);
+      persistedCards = await saveCardsRebased(cardBaseline, repaired.cards);
     }
-    set({ cards: repaired.cards, categories: repaired.categories });
+    set({ cards: persistedCards, categories: persistedCategories });
   },
 
   // Demote a parent category: remove isParent, detach all sub-groups
   demoteParentCategory: async (categoryId: string) => {
     const categories = await getCategories();
+    const categoryBaseline = cloneEntitySnapshot(categories);
     const cat = categories.find((c) => c.id === categoryId);
     if (!cat) return;
     cat.isParent = false;
@@ -641,8 +657,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         sub.updatedAt = Date.now();
       }
     }
-    await saveCategories(categories);
-    set({ categories });
+    const persistedCategories = await saveCategoriesRebased(categoryBaseline, categories);
+    set({ categories: persistedCategories });
   },
 
   moveCategoryToSection: async (categoryId: string, targetSectionId: string) => {
@@ -680,8 +696,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       return moved;
     });
 
-    await saveCategories(nextCategories);
-    set({ categories: nextCategories });
+    const persistedCategories = await saveCategoriesRebased(categories, nextCategories);
+    set({ categories: persistedCategories });
   },
 
   moveCardToSection: async (cardId: string, targetSectionId: string, targetCategoryId?: string) => {
@@ -723,8 +739,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         ? { ...item, categoryId: finalCategoryId as string, updatedAt: Date.now() }
         : item
     );
-    await saveCards(nextCards);
-    set({ cards: nextCards, categories: nextCategories });
+    const persistedCards = await saveCardsRebased(cards, nextCards);
+    set({ cards: persistedCards, categories: nextCategories });
   },
 
   // Hidden sites management (per-user preferences)
@@ -902,9 +918,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Remove from main data
     const newCategories = categories.filter(c => !categoryIds.includes(c.id));
     const newCards = cards.filter(c => !categoryIds.includes(c.categoryId));
-    set({ categories: newCategories, cards: newCards });
-    await saveCategories(newCategories);
-    await saveCards(newCards);
+    const [persistedCategories, persistedCards] = await Promise.all([
+      saveCategoriesRebased(categories, newCategories),
+      saveCardsRebased(cards, newCards),
+    ]);
+    set({ categories: persistedCategories, cards: persistedCards });
     await get().loadRecycleBin();
   },
 
@@ -930,9 +948,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const newCategories = categories.filter(c => c.id !== id);
     const newCards = cards.filter(c => c.categoryId !== id);
-    set({ categories: newCategories, cards: newCards });
-    await saveCategories(newCategories);
-    await saveCards(newCards);
+    const [persistedCategories, persistedCards] = await Promise.all([
+      saveCategoriesRebased(categories, newCategories),
+      saveCardsRebased(cards, newCards),
+    ]);
+    set({ categories: persistedCategories, cards: persistedCards });
     await get().loadRecycleBin();
   },
 
@@ -954,8 +974,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     await addToRecycleBin([binItem]);
 
     const newCards = cards.filter(c => c.id !== id);
-    set({ cards: newCards });
-    await saveCards(newCards);
+    const persistedCards = await saveCardsRebased(cards, newCards);
+    set({ cards: persistedCards });
     await get().loadRecycleBin();
   },
 
@@ -977,9 +997,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     const newCategories = [...categories, ...restoredCategories];
     const newCards = [...cards, ...restoredCards];
 
-    set({ categories: newCategories, cards: newCards });
-    await saveCategories(newCategories);
-    await saveCards(newCards);
+    const [persistedCategories, persistedCards] = await Promise.all([
+      saveCategoriesRebased(categories, newCategories),
+      saveCardsRebased(cards, newCards),
+    ]);
+    set({ categories: persistedCategories, cards: persistedCards });
 
     // Remove from bin
     await removeFromRecycleBin([id]);

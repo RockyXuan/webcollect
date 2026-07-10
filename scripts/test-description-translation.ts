@@ -74,15 +74,11 @@ assert.equal(isEnglishOnlyDescription(localizedCard.shortDesc), false);
 
 const migrationsSource = readFileSync("src/lib/migrations.ts", "utf8");
 assert.ok(
-  migrationsSource.includes("localizeCardDescriptions(cards)"),
-  "local data migrations should migrate existing English descriptions"
+  !migrationsSource.includes("localizeCardDescriptions(cards)"),
+  "local data migrations must not silently translate existing descriptions"
 );
 
 const contentSource = readFileSync("extension/src/content/floating-capture.ts", "utf8");
-assert.ok(
-  contentSource.includes("localizeDescriptionText"),
-  "floating capture should localize descriptions before showing and saving"
-);
 assert.match(
   contentSource,
   /data-action="translate-description"[\s\S]*>翻译<\/button>/,
@@ -93,5 +89,15 @@ assert.match(
   /descriptionInput\.value\s*=\s*localizeDescriptionText\(descriptionInput\.value\.trim\(\),\s*{\s*title:\s*titleInput\.value\.trim\(\),\s*url:\s*urlInput\.value\.trim\(\),\s*}\s*\)/,
   "manual translate should localize the current description using the current title and url"
 );
+assert.equal(
+  (contentSource.match(/localizeDescriptionText\(/g) || []).length,
+  1,
+  "floating capture should only translate after the explicit translate action"
+);
+
+const queueSource = readFileSync("src/lib/floating-capture.ts", "utf8");
+const cardDialogSource = readFileSync("src/components/dialogs/card-dialog.tsx", "utf8");
+assert.equal(queueSource.includes("localizeDescriptionText"), false, "queue replay must preserve the captured source text");
+assert.equal(cardDialogSource.includes("localizeDescriptionText"), false, "card save must preserve the entered source text");
 
 console.log("description translation tests passed");

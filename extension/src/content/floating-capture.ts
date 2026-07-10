@@ -1012,7 +1012,7 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
     return {
       url: pageUrl,
       title: compactCaptureTitle(metaTitle, titleFromUrl(pageUrl)),
-      description: localizeDescriptionText(metaDescription, { title: metaTitle, url: pageUrl }),
+      description: metaDescription,
       sourceType,
       sourcePageUrl: pageUrl,
       sourcePageTitle: document.title,
@@ -1024,10 +1024,7 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
     const selectedUrl = extractFirstUrl(selectedText);
     if (!selectedUrl) return null;
     const rawDescription = selectedText.length > 240 ? `${selectedText.slice(0, 240)}...` : selectedText;
-    const description = localizeDescriptionText(rawDescription, {
-      title: selectedText,
-      url: selectedUrl,
-    });
+    const description = rawDescription;
     return {
       url: selectedUrl,
       title: compactCaptureTitle(selectedText, titleFromUrl(selectedUrl)),
@@ -1199,12 +1196,8 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
       titleInput.value = fetchedTitle;
     }
     if (response.data.description) {
-      const localizedDescription = localizeDescriptionText(response.data.description, {
-        title: fetchedTitle || response.data.title || titleInput.value,
-        url: draft.url,
-      });
-      if (shouldReplaceCaptureDescription(descriptionInput.value, localizedDescription, draft, fetchedTitle)) {
-        descriptionInput.value = localizedDescription;
+      if (shouldReplaceCaptureDescription(descriptionInput.value, response.data.description, draft, fetchedTitle)) {
+        descriptionInput.value = response.data.description;
       }
     }
     if (response.data.image) panel.dataset.imageUrl = response.data.image;
@@ -1226,10 +1219,7 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
     window.requestAnimationFrame(applyPanelPosition);
     titleInput.value = compactCaptureTitle(draft.title || "", titleFromUrl(draft.url));
     urlInput.value = draft.url || "";
-    descriptionInput.value = localizeDescriptionText(draft.description || "", {
-      title: draft.title,
-      url: draft.url,
-    });
+    descriptionInput.value = draft.description || "";
     panel.dataset.sourceType = draft.sourceType;
     panel.dataset.sourcePageUrl = draft.sourcePageUrl || window.location.href;
     panel.dataset.sourcePageTitle = draft.sourcePageTitle || document.title || "";
@@ -1327,10 +1317,7 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
     const draft: CaptureDraft = {
       url: normalizedUrl,
       title,
-      description: localizeDescriptionText(descriptionInput.value.trim(), {
-        title,
-        url: normalizedUrl,
-      }),
+      description: descriptionInput.value.trim(),
       imageUrl: panel.dataset.imageUrl || "",
       favicon: panel.dataset.favicon || "",
       sourceType: (panel.dataset.sourceType as CaptureSourceType) || "floating-button",

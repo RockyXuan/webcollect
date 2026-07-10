@@ -1,5 +1,5 @@
 import localforage from "localforage";
-import type { WebCard, Category, HiddenSite, LinkOpenMode, RecycleBinItem, CollectionSection, PinnedBookmarkItem, CategoryLayoutPreference } from "./types";
+import type { WebCard, Category, HiddenSite, LinkOpenMode, RecycleBinItem, CollectionSection, PinnedBookmarkItem, CategoryLayoutPreference, SyncEntityType, SyncTombstone, SyncPreferenceRevisions, SyncVersionStamp } from "./types";
 import { DEFAULT_SEARCH_ENGINE_ID, isSearchEngineId, type SearchEngineId } from "./search-engines";
 import {
   DEFAULT_VISUAL_SCALE,
@@ -8,6 +8,7 @@ import {
   shouldMigrateLegacyNinetyScale,
 } from "./visual-scale";
 import { withStorageLock } from "./storage-lock";
+import { normalizeSyncRevision } from "./sync-revisions";
 
 localforage.config({
   name: "WebCollect",
@@ -24,9 +25,14 @@ const WORKSPACE_RESET_AT_KEY = "currentWorkspaceResetAt";
 const LOCAL_UPDATED_AT_KEY = "localSnapshotUpdatedAt";
 const LOCAL_SYNCED_AT_KEY = "localSnapshotSyncedAt";
 const LAST_SEEN_CLOUD_SNAPSHOT_UPDATED_AT_KEY = "lastSeenCloudSnapshotUpdatedAt";
+const LAST_SEEN_CLOUD_WORKSPACE_VERSION_KEY = "lastSeenCloudWorkspaceVersion";
 const LOCAL_UPDATED_SIGNAL_KEY = "webcollect_local_snapshot_updated_at";
 const SYNC_DIRTY_SETS_KEY = "syncDirtySets";
 const DATA_SCHEMA_VERSION_KEY = "localDataSchemaVersion";
+const SYNC_DEVICE_ID_KEY = "syncDeviceId";
+const SYNC_LAMPORT_COUNTER_KEY = "syncLamportCounter";
+const SYNC_TOMBSTONES_KEY = "syncTombstones";
+const SYNC_PREFERENCE_REVISIONS_KEY = "syncPreferenceRevisions";
 
 let localChangeSilenceDepth = 0;
 
@@ -55,14 +61,209 @@ function dirtyKeyForKind(kind: SyncDirtyKind): keyof SyncDirtySets {
 }
 
 function stableSnapshot(value: unknown): string {
-  return JSON.stringify(value);
+  if (!value || typeof value !== "object" || Array.isArray(value)) return JSON.stringify(value);
+  const rest = { ...(value as Record<string, unknown>) };
+  delete rest.syncRevision;
+  delete rest.syncDeviceId;
+  return JSON.stringify(rest);
 }
 
 function changedItemIds<T extends { id: string }>(previous: T[], next: T[]): string[] {
   const previousById = new Map(previous.map((item) => [item.id, stableSnapshot(item)]));
-  return next
-    .filter((item) => previousById.get(item.id) !== stableSnapshot(item))
-    .map((item) => item.id);
+  const nextById = new Map(next.map((item) => [item.id, stableSnapshot(item)]));
+  return [...new Set([
+    ...next.filter((item) => previousById.get(item.id) !== stableSnapshot(item)).map((item) => item.id),
+    ...previous.filter((item) => !nextById.has(item.id)).map((item) => item.id),
+  ])];
+}
+
+function rebaseEntitySnapshot<T extends { id: string }>(baseline: T[], desired: T[], current: T[]): T[] {
+  const baselineById = new Map(baseline.map((item) => [item.id, item]));
+  const desiredById = new Map(desired.map((item) => [item.id, item]));
+  const currentById = new Map(current.map((item) => [item.id, item]));
+
+  for (const item of baseline) {
+    if (!desiredById.has(item.id)) currentById.delete(item.id);
+  }
+  for (const item of desired) {
+    const baselineItem = baselineById.get(item.id);
+    if (!baselineItem || stableSnapshot(baselineItem) !== stableSnapshot(item)) {
+      currentById.set(item.id, item);
+    }
+  }
+
+  const desiredOrder = new Map(desired.map((item, index) => [item.id, index]));
+  const currentOrder = new Map(current.map((item, index) => [item.id, index]));
+  return [...currentById.values()].sort((left, right) => {
+    const leftDesired = desiredOrder.get(left.id);
+    const rightDesired = desiredOrder.get(right.id);
+    if (leftDesired !== undefined && rightDesired !== undefined) return leftDesired - rightDesired;
+    if (leftDesired !== undefined) return -1;
+    if (rightDesired !== undefined) return 1;
+    return (currentOrder.get(left.id) || 0) - (currentOrder.get(right.id) || 0);
+  });
+}
+
+function createSyncDeviceId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  return `device-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function normalizeSyncPreferenceRevisions(value: unknown): SyncPreferenceRevisions {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const revisions: SyncPreferenceRevisions = {};
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+    const candidate = raw as Partial<SyncVersionStamp>;
+    const syncRevision = normalizeSyncRevision(candidate.syncRevision);
+    if (syncRevision === 0 || typeof candidate.syncDeviceId !== "string") continue;
+    revisions[key] = { syncRevision, syncDeviceId: candidate.syncDeviceId };
+  }
+  return revisions;
+}
+
+export async function getSyncPreferenceRevisions(): Promise<SyncPreferenceRevisions> {
+  return normalizeSyncPreferenceRevisions(
+    await localforage.getItem<unknown>(SYNC_PREFERENCE_REVISIONS_KEY)
+  );
+}
+
+export async function saveSyncPreferenceRevisions(revisions: SyncPreferenceRevisions): Promise<void> {
+  await withStorageLock("sync-revisions", () =>
+    localforage
+      .setItem(SYNC_PREFERENCE_REVISIONS_KEY, normalizeSyncPreferenceRevisions(revisions))
+      .then(() => undefined)
+  );
+}
+
+export async function markSyncPreferenceChanged(key: string): Promise<SyncVersionStamp | null> {
+  if (localChangeSilenceDepth > 0) return null;
+  return withStorageLock("sync-revisions", async () => {
+    let deviceId = await localforage.getItem<string>(SYNC_DEVICE_ID_KEY);
+    if (!deviceId) {
+      deviceId = createSyncDeviceId();
+      await localforage.setItem(SYNC_DEVICE_ID_KEY, deviceId);
+    }
+    const revisions = normalizeSyncPreferenceRevisions(
+      await localforage.getItem<unknown>(SYNC_PREFERENCE_REVISIONS_KEY)
+    );
+    const counter = Math.max(
+      normalizeSyncRevision(await localforage.getItem<number>(SYNC_LAMPORT_COUNTER_KEY) || 0),
+      normalizeSyncRevision(revisions[key]?.syncRevision)
+    ) + 1;
+    const version = { syncRevision: counter, syncDeviceId: deviceId };
+    revisions[key] = version;
+    await Promise.all([
+      localforage.setItem(SYNC_LAMPORT_COUNTER_KEY, counter),
+      localforage.setItem(SYNC_PREFERENCE_REVISIONS_KEY, revisions),
+    ]);
+    return version;
+  });
+}
+
+async function saveTrackedPreference<T>(storageKey: string, syncKey: string, value: T): Promise<boolean> {
+  const changed = await withStorageLock(`preference:${storageKey}`, async () => {
+    const previous = await localforage.getItem<unknown>(storageKey);
+    if (stableSnapshot(previous) === stableSnapshot(value)) return false;
+    await localforage.setItem(storageKey, value);
+    await markSyncPreferenceChanged(syncKey);
+    return true;
+  });
+  if (changed) await touchLocalSnapshot();
+  return changed;
+}
+
+function normalizeSyncTombstones(value: unknown): SyncTombstone[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is SyncTombstone => {
+    if (!item || typeof item !== "object") return false;
+    const raw = item as Partial<SyncTombstone>;
+    return (raw.entityType === "card" || raw.entityType === "category")
+      && typeof raw.entityId === "string"
+      && typeof raw.deletedAt === "number"
+      && normalizeSyncRevision(raw.syncRevision) > 0
+      && typeof raw.syncDeviceId === "string";
+  });
+}
+
+export async function getSyncTombstones(): Promise<SyncTombstone[]> {
+  return normalizeSyncTombstones(await localforage.getItem<unknown>(SYNC_TOMBSTONES_KEY));
+}
+
+export async function saveSyncTombstones(tombstones: SyncTombstone[]): Promise<void> {
+  await withStorageLock("sync-revisions", () =>
+    localforage.setItem(SYNC_TOMBSTONES_KEY, normalizeSyncTombstones(tombstones)).then(() => undefined)
+  );
+}
+
+type SyncableEntity = { id: string; syncRevision?: number; syncDeviceId?: string };
+
+async function prepareSyncEntitiesForLocalSave<T extends SyncableEntity>(
+  entityType: SyncEntityType,
+  previous: T[],
+  next: T[]
+): Promise<T[]> {
+  if (localChangeSilenceDepth > 0) return next;
+
+  return withStorageLock("sync-revisions", async () => {
+    let deviceId = await localforage.getItem<string>(SYNC_DEVICE_ID_KEY);
+    if (!deviceId) {
+      deviceId = createSyncDeviceId();
+      await localforage.setItem(SYNC_DEVICE_ID_KEY, deviceId);
+    }
+    let counter = normalizeSyncRevision(await localforage.getItem<number>(SYNC_LAMPORT_COUNTER_KEY) || 0);
+    const tombstones = normalizeSyncTombstones(await localforage.getItem<unknown>(SYNC_TOMBSTONES_KEY));
+    const tombstoneById = new Map(
+      tombstones.filter((item) => item.entityType === entityType).map((item) => [item.entityId, item])
+    );
+    const previousById = new Map(previous.map((item) => [item.id, item]));
+    const nextIds = new Set(next.map((item) => item.id));
+
+    function nextVersion(observed = 0): { syncRevision: number; syncDeviceId: string } {
+      counter = Math.max(counter, normalizeSyncRevision(observed)) + 1;
+      return { syncRevision: counter, syncDeviceId: deviceId as string };
+    }
+
+    const prepared = next.map((item) => {
+      const prior = previousById.get(item.id);
+      if (prior && stableSnapshot(prior) === stableSnapshot(item)) {
+        return {
+          ...item,
+          syncRevision: item.syncRevision ?? prior.syncRevision,
+          syncDeviceId: item.syncDeviceId ?? prior.syncDeviceId,
+        };
+      }
+      const tombstone = tombstoneById.get(item.id);
+      const observed = Math.max(
+        normalizeSyncRevision(item.syncRevision),
+        normalizeSyncRevision(prior?.syncRevision),
+        normalizeSyncRevision(tombstone?.syncRevision)
+      );
+      return { ...item, ...nextVersion(observed) };
+    });
+
+    for (const prior of previous) {
+      if (nextIds.has(prior.id)) continue;
+      const currentTombstone = tombstoneById.get(prior.id);
+      const version = nextVersion(Math.max(
+        normalizeSyncRevision(prior.syncRevision),
+        normalizeSyncRevision(currentTombstone?.syncRevision)
+      ));
+      tombstoneById.set(prior.id, {
+        entityType,
+        entityId: prior.id,
+        deletedAt: Date.now(),
+        ...version,
+      });
+    }
+
+    const otherTombstones = tombstones.filter((item) => item.entityType !== entityType);
+    await Promise.all([
+      localforage.setItem(SYNC_LAMPORT_COUNTER_KEY, counter),
+      localforage.setItem(SYNC_TOMBSTONES_KEY, [...otherTombstones, ...tombstoneById.values()]),
+    ]);
+    return prepared;
+  });
 }
 
 export async function getSyncDirtySets(): Promise<SyncDirtySets> {
@@ -159,14 +360,23 @@ export async function saveLastSeenCloudSnapshotUpdatedAt(timestamp: number): Pro
   await localforage.setItem(LAST_SEEN_CLOUD_SNAPSHOT_UPDATED_AT_KEY, timestamp);
 }
 
+export async function getLastSeenCloudWorkspaceVersion(): Promise<number | null> {
+  const value = await localforage.getItem<number>(LAST_SEEN_CLOUD_WORKSPACE_VERSION_KEY);
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+export async function saveLastSeenCloudWorkspaceVersion(version: number): Promise<void> {
+  if (!Number.isSafeInteger(version) || version < 0) return;
+  await localforage.setItem(LAST_SEEN_CLOUD_WORKSPACE_VERSION_KEY, version);
+}
+
 export async function getWorkspaceResetAt(): Promise<number> {
   const value = await localforage.getItem<number>(WORKSPACE_RESET_AT_KEY);
   return typeof value === "number" ? value : 0;
 }
 
 export async function saveWorkspaceResetAt(timestamp: number): Promise<void> {
-  await localforage.setItem(WORKSPACE_RESET_AT_KEY, timestamp);
-  await touchLocalSnapshot();
+  await saveTrackedPreference(WORKSPACE_RESET_AT_KEY, "currentWorkspaceResetAt", timestamp);
 }
 
 export async function withoutLocalChangeEvents<T>(fn: () => Promise<T>): Promise<T> {
@@ -180,14 +390,23 @@ export async function withoutLocalChangeEvents<T>(fn: () => Promise<T>): Promise
 
 export async function getCards(): Promise<WebCard[]> {
   const cards = (await localforage.getItem<WebCard[]>(CARDS_KEY)) || [];
-  return cards.sort((a, b) => a.order - b.order);
+  return [...cards].sort((a, b) => a.order - b.order);
 }
 
 export async function saveCards(cards: WebCard[]): Promise<void> {
   const previous = (await localforage.getItem<WebCard[]>(CARDS_KEY)) || [];
-  await localforage.setItem(CARDS_KEY, cards);
+  const prepared = await prepareSyncEntitiesForLocalSave("card", previous, cards);
+  await localforage.setItem(CARDS_KEY, prepared);
   await markDirtyIds("card", changedItemIds(previous, cards));
   await touchLocalSnapshot();
+}
+
+export async function saveCardsRebased(baseline: WebCard[], desired: WebCard[]): Promise<WebCard[]> {
+  return withStorageLock("cards-rmw", async () => {
+    const current = await getCards();
+    await saveCards(rebaseEntitySnapshot(baseline, desired, current));
+    return getCards();
+  });
 }
 
 export async function addCard(card: WebCard): Promise<void> {
@@ -218,14 +437,28 @@ export async function deleteCard(id: string): Promise<void> {
 
 export async function getCategories(): Promise<Category[]> {
   const cats = (await localforage.getItem<Category[]>(CATEGORIES_KEY)) || [];
-  return cats.sort((a, b) => a.order - b.order);
+  return [...cats].sort((a, b) => a.order - b.order);
 }
 
 export async function saveCategories(categories: Category[]): Promise<void> {
   const previous = (await localforage.getItem<Category[]>(CATEGORIES_KEY)) || [];
-  await localforage.setItem(CATEGORIES_KEY, categories);
+  const prepared = await prepareSyncEntitiesForLocalSave("category", previous, categories);
+  await localforage.setItem(CATEGORIES_KEY, prepared);
+  const previousSections = Object.fromEntries(previous.map((category) => [category.id, category.sectionId || "section-default"]));
+  const nextSections = Object.fromEntries(categories.map((category) => [category.id, category.sectionId || "section-default"]));
+  if (stableSnapshot(previousSections) !== stableSnapshot(nextSections)) {
+    await markSyncPreferenceChanged("categorySectionIds");
+  }
   await markDirtyIds("category", changedItemIds(previous, categories));
   await touchLocalSnapshot();
+}
+
+export async function saveCategoriesRebased(baseline: Category[], desired: Category[]): Promise<Category[]> {
+  return withStorageLock("categories-rmw", async () => {
+    const current = await getCategories();
+    await saveCategories(rebaseEntitySnapshot(baseline, desired, current));
+    return getCategories();
+  });
 }
 
 export async function addCategory(category: Category): Promise<void> {
@@ -284,18 +517,27 @@ export async function getHiddenSites(): Promise<HiddenSite[]> {
 }
 
 export async function saveHiddenSites(sites: HiddenSite[]): Promise<void> {
-  await localforage.setItem(HIDDEN_SITES_KEY, sites);
-  await touchLocalSnapshot();
+  await saveTrackedPreference(HIDDEN_SITES_KEY, "hiddenSites", sites);
 }
 
 export async function getSections(): Promise<CollectionSection[]> {
   const sections = (await localforage.getItem<CollectionSection[]>(SECTIONS_KEY)) || [];
-  return sections.sort((a, b) => a.order - b.order);
+  return [...sections].sort((a, b) => a.order - b.order);
 }
 
 export async function saveSections(sections: CollectionSection[]): Promise<void> {
-  await localforage.setItem(SECTIONS_KEY, sections);
-  await touchLocalSnapshot();
+  await saveTrackedPreference(SECTIONS_KEY, "collectionSections", sections);
+}
+
+export async function saveSectionsRebased(
+  baseline: CollectionSection[],
+  desired: CollectionSection[]
+): Promise<CollectionSection[]> {
+  return withStorageLock("sections-rmw", async () => {
+    const current = await getSections();
+    await saveSections(rebaseEntitySnapshot(baseline, desired, current));
+    return getSections();
+  });
 }
 
 export async function getActiveSectionId(): Promise<string | null> {
@@ -303,8 +545,7 @@ export async function getActiveSectionId(): Promise<string | null> {
 }
 
 export async function saveActiveSectionId(sectionId: string): Promise<void> {
-  await localforage.setItem(ACTIVE_SECTION_KEY, sectionId);
-  await touchLocalSnapshot();
+  await saveTrackedPreference(ACTIVE_SECTION_KEY, "activeCollectionSectionId", sectionId);
 }
 
 const PINNED_CATEGORIES_KEY = "pinnedCategoryIds";
@@ -316,8 +557,7 @@ export async function getPinnedCategoryIds(): Promise<string[]> {
 }
 
 export async function savePinnedCategoryIds(ids: string[]): Promise<void> {
-  await localforage.setItem(PINNED_CATEGORIES_KEY, ids);
-  await touchLocalSnapshot();
+  await saveTrackedPreference(PINNED_CATEGORIES_KEY, "pinnedCategoryIds", ids);
 }
 
 export async function getPinnedBookmarkItems(): Promise<PinnedBookmarkItem[]> {
@@ -329,9 +569,10 @@ export async function getPinnedBookmarkItemsUpdatedAt(): Promise<number> {
 }
 
 export async function savePinnedBookmarkItems(items: PinnedBookmarkItem[], updatedAt = Date.now()): Promise<void> {
-  await localforage.setItem(PINNED_BOOKMARK_ITEMS_KEY, items);
-  await localforage.setItem(PINNED_BOOKMARK_ITEMS_UPDATED_AT_KEY, updatedAt);
-  await touchLocalSnapshot();
+  await Promise.all([
+    saveTrackedPreference(PINNED_BOOKMARK_ITEMS_KEY, "pinnedBookmarkItems", items),
+    saveTrackedPreference(PINNED_BOOKMARK_ITEMS_UPDATED_AT_KEY, "pinnedBookmarkItemsUpdatedAt", updatedAt),
+  ]);
 }
 
 const CATEGORY_WIDTHS_KEY = "categoryWidths";
@@ -345,8 +586,7 @@ export async function getCategoryWidths(): Promise<Record<string, number>> {
 }
 
 export async function saveCategoryWidths(widths: Record<string, number>): Promise<void> {
-  await localforage.setItem(CATEGORY_WIDTHS_KEY, widths);
-  await touchLocalSnapshot();
+  await saveTrackedPreference(CATEGORY_WIDTHS_KEY, "categoryWidths", widths);
 }
 
 function normalizeCategoryLayout(value: unknown): CategoryLayoutPreference | null {
@@ -386,8 +626,7 @@ export async function getCategoryLayouts(): Promise<Record<string, CategoryLayou
 }
 
 export async function saveCategoryLayouts(layouts: Record<string, CategoryLayoutPreference>): Promise<void> {
-  await localforage.setItem(CATEGORY_LAYOUTS_KEY, layouts);
-  await touchLocalSnapshot();
+  await saveTrackedPreference(CATEGORY_LAYOUTS_KEY, "categoryLayouts", layouts);
 }
 
 export async function getVisualScale(): Promise<number> {
@@ -403,8 +642,7 @@ export async function getVisualScale(): Promise<number> {
 }
 
 export async function saveVisualScale(scale: number): Promise<void> {
-  await localforage.setItem(VISUAL_SCALE_KEY, clampVisualScale(scale));
-  await touchLocalSnapshot();
+  await saveTrackedPreference(VISUAL_SCALE_KEY, "visualScale", clampVisualScale(scale));
 }
 
 export async function getLinkOpenMode(): Promise<LinkOpenMode> {
@@ -416,8 +654,7 @@ export async function getLinkOpenMode(): Promise<LinkOpenMode> {
 }
 
 export async function saveLinkOpenMode(mode: LinkOpenMode): Promise<void> {
-  await localforage.setItem(LINK_OPEN_MODE_KEY, mode);
-  await touchLocalSnapshot();
+  await saveTrackedPreference(LINK_OPEN_MODE_KEY, "linkOpenMode", mode);
 }
 
 export async function getSearchEngine(): Promise<SearchEngineId> {
@@ -426,8 +663,11 @@ export async function getSearchEngine(): Promise<SearchEngineId> {
 }
 
 export async function saveSearchEngine(engine: SearchEngineId): Promise<void> {
-  await localforage.setItem(SEARCH_ENGINE_KEY, isSearchEngineId(engine) ? engine : DEFAULT_SEARCH_ENGINE_ID);
-  await touchLocalSnapshot();
+  await saveTrackedPreference(
+    SEARCH_ENGINE_KEY,
+    "searchEngine",
+    isSearchEngineId(engine) ? engine : DEFAULT_SEARCH_ENGINE_ID
+  );
 }
 
 // ============ Recycle Bin ============
@@ -439,8 +679,7 @@ export async function getRecycleBin(): Promise<RecycleBinItem[]> {
 }
 
 export async function saveRecycleBin(items: RecycleBinItem[]): Promise<void> {
-  await localforage.setItem(RECYCLE_BIN_KEY, items);
-  await touchLocalSnapshot();
+  await saveTrackedPreference(RECYCLE_BIN_KEY, "recycleBin", items);
 }
 
 export async function getRecycleBinItem(id: string): Promise<RecycleBinItem | null> {

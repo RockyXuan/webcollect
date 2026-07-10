@@ -12,6 +12,8 @@ export const categories = pgTable("categories", {
 	parentId: uuid("parent_id"),
 	isParent: boolean("is_parent").default(false),
 	order: integer().default(0),
+	syncRevision: bigint("sync_revision", { mode: "number" }).default(0).notNull(),
+	syncDeviceId: text("sync_device_id").default('legacy').notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
@@ -32,6 +34,8 @@ export const userPreferences = pgTable("user_preferences", {
 	userId: uuid("user_id").notNull(),
 	key: text().notNull(),
 	value: jsonb().notNull(),
+	syncRevision: bigint("sync_revision", { mode: "number" }).default(0).notNull(),
+	syncDeviceId: text("sync_device_id").default('legacy').notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	foreignKey({
@@ -68,6 +72,37 @@ export const workspaceSnapshots = pgTable("workspace_snapshots", {
 	unique("workspace_snapshots_user_kind_day_unique").on(table.userId, table.kind, table.dayKey),
 ]);
 
+export const workspaceTombstones = pgTable("workspace_tombstones", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	userId: uuid("user_id").notNull(),
+	entityType: text("entity_type").notNull(),
+	entityId: uuid("entity_id").notNull(),
+	deletedAt: timestamp("deleted_at", { withTimezone: true, mode: 'string' }).notNull(),
+	syncRevision: bigint("sync_revision", { mode: "number" }).notNull(),
+	syncDeviceId: text("sync_device_id").notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [users.id],
+			name: "workspace_tombstones_user_id_users_id_fk"
+		}).onDelete("cascade"),
+	unique("workspace_tombstones_user_entity_unique").on(table.userId, table.entityType, table.entityId),
+]);
+
+export const workspaceVersions = pgTable("workspace_versions", {
+	userId: uuid("user_id").primaryKey().notNull(),
+	version: bigint({ mode: "number" }).default(0).notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [users.id],
+			name: "workspace_versions_user_id_users_id_fk"
+		}).onDelete("cascade"),
+]);
+
 export const cards = pgTable("cards", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	userId: uuid("user_id").notNull(),
@@ -80,6 +115,8 @@ export const cards = pgTable("cards", {
 	abbreviation: text().default(''),
 	imageUrl: text("image_url").default(''),
 	order: integer().default(0),
+	syncRevision: bigint("sync_revision", { mode: "number" }).default(0).notNull(),
+	syncDeviceId: text("sync_device_id").default('legacy').notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [

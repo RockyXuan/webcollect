@@ -26,9 +26,9 @@ Target release: `V1.1.0`
 
 | ID | Priority | Area | Evidence | Status |
 | --- | --- | --- | --- | --- |
-| DATA-01 | P0 | Sync | Cloud-only rows can resurrect locally deleted cards/categories. | Open |
-| DATA-02 | P0 | Sync | Preference unions prevent unpin, unhide, and recycle-bin empty from propagating. | Open |
-| DATA-03 | P0 | Concurrency | IndexedDB and `chrome.storage` read-modify-write operations lost concurrent updates. Atomic mutation paths are fixed; revision conflict handling remains in DATA-01/02. | Partial: local and queue writes fixed |
+| DATA-01 | P0 | Sync | Cloud-only rows can resurrect locally deleted cards/categories. | Code fixed and isolated tests passed; live Supabase migration/dual-device gate pending |
+| DATA-02 | P0 | Sync | Preference unions prevent unpin, unhide, and recycle-bin empty from propagating. | Code fixed and isolated tests passed; live Supabase migration/dual-device gate pending |
+| DATA-03 | P0 | Concurrency | IndexedDB and `chrome.storage` read-modify-write operations lost concurrent updates. | Fixed with lock, queue, and stale-snapshot rebase tests |
 | DATA-04 | P0 | Migration | Name-based heuristics deleted legitimate categories, rewrote descriptions, and ran without a pre-migration snapshot. | Fixed with behavioral tests |
 | DATA-05 | P1 | Recovery | Snapshot health used personal crypto keywords and fixed minimum workspace sizes. | Fixed with relative structural tests |
 | SEC-01 | P0 | Server fetch | Metadata and safety routes can request localhost/private-network URLs. | Open |
@@ -67,9 +67,28 @@ Every finding must have a failing behavioral test, the smallest root-cause fix, 
 - Focused verification: valid small workspace, orphaned-card, small collapsed workspace, and already-healthy workspace tests pass.
 - Data impact: recovery remains confirmation-only and never applies a snapshot automatically.
 
+### DATA-01 revisioned deletion and restore
+
+- Before: deleting an entity removed the local/cloud active row, but a stale device still held an ordinary row and could upload it again.
+- Fix: cards and categories now carry a Lamport revision plus stable device ID. A deletion writes a revisioned tombstone before removing the cloud row; a deliberate restore must produce a higher revision than that tombstone.
+- Database contract: `migrations/2026-07-10-sync-revisions.sql` is additive/idempotent and creates `workspace_tombstones` plus row revision columns. It has not been executed against the live project because the required exports and user confirmation are still pending.
+- Focused verification: delete, stale-device sync, deliberate restore, legacy timestamp fallback, deterministic device tie-breaking, TypeScript, and ESLint pass.
+
+### DATA-02 revisioned incremental preferences
+
+- Before: array unions made empty values impossible to propagate, so unpin, unhide, recycle-bin clear, empty layouts, and disabled wallpaper settings could return on another device. Every sync also rewrote the full preference set.
+- Fix: each preference key has an independent Lamport revision. Empty arrays, empty objects, defaults, and `false` are explicit values. Cloud writes are filtered to genuinely newer/different keys, and startup freshness reads one `workspace_versions` row with a legacy-table fallback.
+- Coverage: hidden sites, pinned categories/bookmarks, layouts, scale, link mode, search engine, sections, category-to-section mapping, recycle bin, warehouse state, and wallpaper settings use the same resolver.
+- Focused verification: local no-op writes do not advance revisions; device A clear/unpin/unhide wins; stale device B cannot restore old non-empty values; 31 legacy scripts and 24 Vitest cases pass.
+
 ### DATA-03 concurrent local writes
 
 - Before: two simultaneous card captures or category additions retained only the second item. Recycle-bin and dirty-set updates had the same read-modify-write race.
-- Fix: added a cross-tab Web Locks wrapper with an in-process fallback around atomic IndexedDB mutations. Floating-capture queue writes now run through one background mutation queue and preserve captures created after a new-tab drain started.
-- Focused verification: concurrent card, category, recycle-bin, dirty-set, and queue-replacement tests pass; extension build and floating-capture target/health scripts pass.
-- Remaining: full-array conflicts between independently edited tabs are handled by the revision/tombstone protocol in the next receipt.
+- Fix: added a cross-tab Web Locks wrapper with an in-process fallback around atomic IndexedDB mutations. Floating-capture queue writes run through one background mutation queue and preserve captures created after a new-tab drain started. Whole-array drag/restore operations now replay only their delta against the latest locked snapshot.
+- Focused verification: concurrent card, category, section, recycle-bin, dirty-set, stale whole-array, and queue-replacement tests pass; floating-capture target/health scripts pass.
+
+### Snapshot completeness and restore semantics
+
+- Local snapshots now include wallpaper settings/library, sync tombstones, per-preference revisions, extension floating-capture settings, and the full capture queue including failed items.
+- User-initiated clear, full restore, and structure restore are no longer wrapped in sync-suppression. They create higher revisions/tombstones so the restored or cleared state can propagate instead of being immediately overwritten by old cloud data.
+- Old snapshot revision metadata is retained for forensic export but is not blindly restored over newer local counters.

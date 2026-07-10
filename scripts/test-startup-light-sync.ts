@@ -3,10 +3,9 @@ import { readFileSync } from "node:fs";
 import localforage from "localforage";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-type PreferenceRow = {
+type WorkspaceVersionRow = {
   user_id: string;
-  key: string;
-  value: unknown;
+  version: number;
 };
 
 const userId = "user-startup-light-sync";
@@ -29,8 +28,8 @@ Object.assign(localforage, {
   },
 });
 
-class FakePreferenceQuery {
-  private filters: Array<{ column: keyof PreferenceRow; value: unknown }> = [];
+class FakeWorkspaceVersionQuery {
+  private filters: Array<{ column: keyof WorkspaceVersionRow; value: unknown }> = [];
   private limitCount: number | null = null;
 
   constructor(private readonly db: FakeSupabaseClient) {}
@@ -39,7 +38,7 @@ class FakePreferenceQuery {
     return this;
   }
 
-  eq(column: keyof PreferenceRow, value: unknown): this {
+  eq(column: keyof WorkspaceVersionRow, value: unknown): this {
     this.filters.push({ column, value });
     return this;
   }
@@ -49,16 +48,16 @@ class FakePreferenceQuery {
     return this;
   }
 
-  then<TResult1 = { data: PreferenceRow[]; error: null }, TResult2 = never>(
-    onfulfilled?: ((value: { data: PreferenceRow[]; error: null }) => TResult1 | PromiseLike<TResult1>) | null,
+  then<TResult1 = { data: WorkspaceVersionRow[]; error: null }, TResult2 = never>(
+    onfulfilled?: ((value: { data: WorkspaceVersionRow[]; error: null }) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
   ): Promise<TResult1 | TResult2> {
     return this.execute().then(onfulfilled, onrejected);
   }
 
-  private async execute(): Promise<{ data: PreferenceRow[]; error: null }> {
+  private async execute(): Promise<{ data: WorkspaceVersionRow[]; error: null }> {
     this.db.selectRequests += 1;
-    let rows = this.db.preferences.filter((row) =>
+    let rows = this.db.workspaceVersions.filter((row) =>
       this.filters.every((filter) => row[filter.column] === filter.value)
     );
     if (this.limitCount !== null) rows = rows.slice(0, this.limitCount);
@@ -70,12 +69,12 @@ class FakePreferenceQuery {
 }
 
 class FakeSupabaseClient {
-  preferences: PreferenceRow[] = [];
+  workspaceVersions: WorkspaceVersionRow[] = [];
   selectRequests = 0;
 
-  from(table: string): FakePreferenceQuery {
-    assert.equal(table, "user_preferences", "startup freshness check should only read user_preferences");
-    return new FakePreferenceQuery(this);
+  from(table: string): FakeWorkspaceVersionQuery {
+    assert.equal(table, "workspace_versions", "startup freshness check should only read workspace_versions");
+    return new FakeWorkspaceVersionQuery(this);
   }
 
   requestCount(): number {
@@ -104,16 +103,16 @@ async function main(): Promise<void> {
   );
 
   const fake = new FakeSupabaseClient();
-  fake.preferences.push({
+  fake.workspaceVersions.push({
     user_id: userId,
-    key: "localSnapshotUpdatedAt",
-    value: baseTime,
+    version: 7,
   });
   supabase.__setBrowserSupabaseClientForTest(fake as unknown as SupabaseClient);
   memoryStore.clear();
   await localforage.setItem("localSnapshotUpdatedAt", baseTime);
   await localforage.setItem("localSnapshotSyncedAt", baseTime);
   await localforage.setItem("lastSeenCloudSnapshotUpdatedAt", baseTime);
+  await localforage.setItem("lastSeenCloudWorkspaceVersion", 7);
 
   auth.useAuthStore.setState({
     user: {

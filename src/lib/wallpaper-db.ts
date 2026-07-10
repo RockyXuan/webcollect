@@ -8,6 +8,7 @@ import {
   type WallpaperThemeMode,
 } from "./wallpaper-types";
 import { DEFAULT_WALLPAPER_PREFS, FALLBACK_WALLPAPERS, filterUsableWallpapers, mergeWallpaperLibrary, pruneWallpaperLibrary } from "./wallpaper-sources";
+import { markLocalSnapshotChanged, markSyncPreferenceChanged } from "./db";
 
 const wallpaperDb = localforage.createInstance({
   name: "WebCollect",
@@ -128,11 +129,22 @@ export async function getWallpaperPrefs(): Promise<WallpaperPrefs> {
 
 export async function saveWallpaperPrefs(prefs: Partial<WallpaperPrefs>): Promise<void> {
   const previous = await wallpaperDb.getItem<Partial<WallpaperPrefs>>(WALLPAPER_PREFS_KEY);
-  await wallpaperDb.setItem(WALLPAPER_PREFS_KEY, prepareWallpaperPrefsForSave(previous, prefs));
+  const prepared = prepareWallpaperPrefsForSave(previous, prefs);
+  await wallpaperDb.setItem(WALLPAPER_PREFS_KEY, prepared);
+  if (!sameSyncedSettings(toWallpaperSyncedSettings(previous || {}), toWallpaperSyncedSettings(prepared))) {
+    await markSyncPreferenceChanged("wallpaperPrefs");
+    await markLocalSnapshotChanged();
+  }
 }
 
 export async function saveSyncedWallpaperPrefs(prefs: Partial<WallpaperPrefs>): Promise<void> {
-  await wallpaperDb.setItem(WALLPAPER_PREFS_KEY, normalizeWallpaperPrefs(prefs));
+  const previous = await wallpaperDb.getItem<Partial<WallpaperPrefs>>(WALLPAPER_PREFS_KEY);
+  const prepared = normalizeWallpaperPrefs(prefs);
+  await wallpaperDb.setItem(WALLPAPER_PREFS_KEY, prepared);
+  if (!sameSyncedSettings(toWallpaperSyncedSettings(previous || {}), toWallpaperSyncedSettings(prepared))) {
+    await markSyncPreferenceChanged("wallpaperPrefs");
+    await markLocalSnapshotChanged();
+  }
 }
 
 export async function getWallpaperLibrary(): Promise<WallpaperItem[]> {

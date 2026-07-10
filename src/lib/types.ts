@@ -11,6 +11,8 @@ export interface WebCard {
   order: number;
   createdAt: number;
   updatedAt: number;
+  syncRevision?: number;
+  syncDeviceId?: string;
 }
 
 export type PinnedBookmarkDisplayMode = "icon" | "label" | "both";
@@ -36,7 +38,26 @@ export interface Category {
   sectionId?: string;
   parentId?: string; // 父分类ID，有此字段表示是"分组"(子分类)，无此字段表示是"分类"(顶级)
   isParent?: boolean; // true = 顶级分类（如"开发"、"工作"），false/undefined = 分组（可降级到父分类下）
+  syncRevision?: number;
+  syncDeviceId?: string;
 }
+
+export type SyncEntityType = "card" | "category";
+
+export interface SyncTombstone {
+  entityType: SyncEntityType;
+  entityId: string;
+  deletedAt: number;
+  syncRevision: number;
+  syncDeviceId: string;
+}
+
+export interface SyncVersionStamp {
+  syncRevision: number;
+  syncDeviceId: string;
+}
+
+export type SyncPreferenceRevisions = Record<string, SyncVersionStamp>;
 
 export interface CollectionSection {
   id: string;

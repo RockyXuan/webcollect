@@ -20,6 +20,8 @@ import {
   getLastSeenCloudSnapshotUpdatedAt,
   getLocalSnapshotSyncedAt,
   getLocalSnapshotUpdatedAt,
+  getLastSeenCloudWorkspaceVersion,
+  saveLastSeenCloudWorkspaceVersion,
 } from "@/lib/db";
 import { createLocalDataSnapshot, type LocalSnapshotEntry } from "@/lib/local-snapshots";
 
@@ -180,6 +182,38 @@ async function readCloudSnapshotUpdatedAt(userId: string): Promise<number> {
   return normalizeNumberPreference((rows[0] as { value?: unknown } | undefined)?.value);
 }
 
+interface CloudWorkspaceVersionResult {
+  version: number;
+  legacyFallback: boolean;
+}
+
+function isMissingWorkspaceVersionTable(message: string): boolean {
+  return /workspace_versions/i.test(message)
+    && (/schema cache/i.test(message) || /does not exist/i.test(message));
+}
+
+async function readCloudWorkspaceVersion(userId: string): Promise<CloudWorkspaceVersionResult> {
+  const client = getBrowserSupabaseClient();
+  const { data, error } = await client
+    .from("workspace_versions")
+    .select("version")
+    .eq("user_id", userId)
+    .limit(1);
+
+  if (error) {
+    if (isMissingWorkspaceVersionTable(error.message)) {
+      return { version: await readCloudSnapshotUpdatedAt(userId), legacyFallback: true };
+    }
+    throw new Error(`Failed to read cloud workspace version: ${error.message}`);
+  }
+
+  const rows = Array.isArray(data) ? data : [];
+  return {
+    version: normalizeNumberPreference((rows[0] as { version?: unknown } | undefined)?.version),
+    legacyFallback: false,
+  };
+}
+
 async function maybeUploadCloudSafetySnapshot(userId: string, snapshot: LocalSnapshotEntry): Promise<void> {
   const snapshotHash = buildSafetySnapshotHash(snapshot);
   const now = Date.now();
@@ -251,19 +285,25 @@ export async function triggerSync(userId: string): Promise<void> {
     const [
       localSnapshotUpdatedAt,
       localSnapshotSyncedAt,
-      cloudSnapshotUpdatedAt,
       lastSeenCloudSnapshotUpdatedAt,
+      lastSeenCloudWorkspaceVersion,
+      cloudWorkspaceVersion,
     ] = await Promise.all([
       getLocalSnapshotUpdatedAt(),
       getLocalSnapshotSyncedAt(),
-      readCloudSnapshotUpdatedAt(userId),
       getLastSeenCloudSnapshotUpdatedAt(),
+      getLastSeenCloudWorkspaceVersion(),
+      readCloudWorkspaceVersion(userId),
     ]);
+    const cloudFreshness = cloudWorkspaceVersion.version;
+    const lastSeenCloudFreshness = cloudWorkspaceVersion.legacyFallback
+      ? lastSeenCloudSnapshotUpdatedAt
+      : lastSeenCloudWorkspaceVersion ?? -1;
     const action = decideStartupSyncAction(
       localSnapshotUpdatedAt,
       localSnapshotSyncedAt,
-      cloudSnapshotUpdatedAt,
-      lastSeenCloudSnapshotUpdatedAt
+      cloudFreshness,
+      lastSeenCloudFreshness
     );
 
     if (action === "sync") {
@@ -271,6 +311,13 @@ export async function triggerSync(userId: string): Promise<void> {
       await useAppStore.getState().loadData({ showLoading: false, preserveOnCollapse: true });
     } else if (action === "push") {
       await pushLocalSnapshotToCloud(userId);
+    }
+
+    if (!cloudWorkspaceVersion.legacyFallback) {
+      const observedVersion = action === "none"
+        ? cloudWorkspaceVersion.version
+        : (await readCloudWorkspaceVersion(userId)).version;
+      await saveLastSeenCloudWorkspaceVersion(observedVersion);
     }
 
     store.setState({ syncStatus: "success", lastSyncAt: Date.now(), error: null });

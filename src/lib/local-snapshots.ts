@@ -15,6 +15,8 @@ import {
   getSections,
   getVisualScale,
   getWorkspaceResetAt,
+  getSyncTombstones,
+  getSyncPreferenceRevisions,
   markLocalSnapshotChanged,
   saveActiveSectionId,
   saveCards,
@@ -32,7 +34,6 @@ import {
   saveVisualScale,
   saveWorkspaceResetAt,
   setInitialized,
-  withoutLocalChangeEvents,
 } from "@/lib/db";
 import {
   getImportBatches,
@@ -46,8 +47,9 @@ import {
   type WarehouseCard,
   type WarehouseCategory,
 } from "@/lib/db-warehouse";
-import type { Category, CategoryLayoutPreference, CollectionSection, HiddenSite, LinkOpenMode, PinnedBookmarkItem, RecycleBinItem, WebCard } from "@/lib/types";
+import type { Category, CategoryLayoutPreference, CollectionSection, HiddenSite, LinkOpenMode, PinnedBookmarkItem, RecycleBinItem, SyncPreferenceRevisions, SyncTombstone, WebCard } from "@/lib/types";
 import { DEFAULT_SEARCH_ENGINE_ID, isSearchEngineId, type SearchEngineId } from "@/lib/search-engines";
+import type { WallpaperItem, WallpaperPrefs } from "@/lib/wallpaper-types";
 
 localforage.config({
   name: "WebCollect",
@@ -58,6 +60,13 @@ const SNAPSHOT_HISTORY_KEY = "localSnapshotHistory";
 const MAX_SYSTEM_SNAPSHOT_DAYS = 20;
 const SAME_REASON_THROTTLE_MS = 90 * 1000;
 const DEFAULT_SECTION_ID = "section-default";
+const CAPTURE_QUEUE_KEY = "webcollect.capture.queue";
+const CAPTURE_PREFS_KEY = "webcollect.capture.prefs";
+
+export interface ExtensionCaptureSnapshot {
+  prefs: unknown;
+  queue: unknown[];
+}
 
 export interface LocalSnapshotCounts {
   sections: number;
@@ -89,6 +98,11 @@ export interface LocalSnapshotData {
   warehouseUpdatedAt: number;
   workspaceResetAt: number;
   localSnapshotUpdatedAt: number;
+  wallpaperPrefs?: WallpaperPrefs;
+  wallpaperLibrary?: WallpaperItem[];
+  syncTombstones?: SyncTombstone[];
+  syncPreferenceRevisions?: SyncPreferenceRevisions;
+  extensionCapture?: ExtensionCaptureSnapshot | null;
 }
 
 export interface LocalSnapshotEntry {
@@ -123,6 +137,76 @@ export interface LocalSnapshotAssessment {
 function createSnapshotId(): string {
   const suffix = Math.random().toString(36).slice(2, 8);
   return `snapshot-${Date.now()}-${suffix}`;
+}
+
+function hasChromeStorage(): boolean {
+  return typeof chrome !== "undefined" && !!chrome.storage?.local;
+}
+
+async function readExtensionCaptureSnapshot(): Promise<ExtensionCaptureSnapshot | null> {
+  if (!hasChromeStorage()) return null;
+  return new Promise((resolve) => {
+    chrome.storage.local.get([CAPTURE_PREFS_KEY, CAPTURE_QUEUE_KEY], (result) => {
+      if (chrome.runtime.lastError) {
+        console.warn("[Snapshot] Unable to read extension capture state:", chrome.runtime.lastError.message);
+        resolve(null);
+        return;
+      }
+      resolve({
+        prefs: result[CAPTURE_PREFS_KEY] ?? null,
+        queue: Array.isArray(result[CAPTURE_QUEUE_KEY]) ? result[CAPTURE_QUEUE_KEY] : [],
+      });
+    });
+  });
+}
+
+async function restoreExtensionCaptureSnapshot(snapshot: ExtensionCaptureSnapshot | null | undefined): Promise<void> {
+  if (!snapshot || !hasChromeStorage()) return;
+  await new Promise<void>((resolve, reject) => {
+    chrome.storage.local.set({ [CAPTURE_PREFS_KEY]: snapshot.prefs }, () => {
+      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+      else resolve();
+    });
+  });
+  const current = await readExtensionCaptureSnapshot();
+  const readIds = (current?.queue || [])
+    .map((item) => item && typeof item === "object" ? (item as { id?: unknown }).id : null)
+    .filter((id): id is string => typeof id === "string");
+  await new Promise<void>((resolve, reject) => {
+    chrome.runtime.sendMessage({
+      type: "CAPTURE_QUEUE_REPLACE",
+      readIds,
+      replacementQueue: snapshot.queue,
+    }, () => {
+      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+      else resolve();
+    });
+  });
+}
+
+async function readWallpaperSnapshot(): Promise<{
+  wallpaperPrefs?: WallpaperPrefs;
+  wallpaperLibrary?: WallpaperItem[];
+}> {
+  if (typeof indexedDB === "undefined") return {};
+  try {
+    const { getWallpaperLibrary, getWallpaperPrefs } = await import("@/lib/wallpaper-db");
+    const [wallpaperPrefs, wallpaperLibrary] = await Promise.all([
+      getWallpaperPrefs(),
+      getWallpaperLibrary(),
+    ]);
+    return { wallpaperPrefs, wallpaperLibrary };
+  } catch (error) {
+    console.warn("[Snapshot] Wallpaper storage is unavailable:", error);
+    return {};
+  }
+}
+
+async function restoreWallpaperSnapshot(data: LocalSnapshotData): Promise<void> {
+  if (!data.wallpaperPrefs && !data.wallpaperLibrary) return;
+  const { saveWallpaperLibrary, saveWallpaperPrefs } = await import("@/lib/wallpaper-db");
+  if (data.wallpaperPrefs) await saveWallpaperPrefs(data.wallpaperPrefs);
+  if (data.wallpaperLibrary) await saveWallpaperLibrary(data.wallpaperLibrary);
 }
 
 function countSnapshotData(data: LocalSnapshotData): LocalSnapshotCounts {
@@ -201,6 +285,20 @@ function makeSnapshotSignature(entry: LocalSnapshotEntry): string {
       batch.categoryCount,
       batch.cardCount,
     ]),
+    wallpaperPrefs: data.wallpaperPrefs || null,
+    wallpaperLibrary: (data.wallpaperLibrary || []).map((item) => [
+      item.id,
+      item.source,
+      item.fetchedAt,
+    ]),
+    syncTombstones: (data.syncTombstones || []).map((item) => [
+      item.entityType,
+      item.entityId,
+      item.syncRevision,
+      item.syncDeviceId,
+    ]),
+    syncPreferenceRevisions: data.syncPreferenceRevisions || {},
+    extensionCapture: data.extensionCapture || null,
   });
 }
 
@@ -312,6 +410,12 @@ export function assessLocalDataSnapshot(snapshot: LocalSnapshotEntry): LocalSnap
 }
 
 async function readCurrentSnapshotData(): Promise<LocalSnapshotData> {
+  const [wallpaper, syncTombstones, syncPreferenceRevisions, extensionCapture] = await Promise.all([
+    readWallpaperSnapshot(),
+    getSyncTombstones(),
+    getSyncPreferenceRevisions(),
+    readExtensionCaptureSnapshot(),
+  ]);
   return {
     cards: await getCards(),
     categories: await getCategories(),
@@ -332,6 +436,11 @@ async function readCurrentSnapshotData(): Promise<LocalSnapshotData> {
     warehouseUpdatedAt: await getWarehouseUpdatedAt(),
     workspaceResetAt: await getWorkspaceResetAt(),
     localSnapshotUpdatedAt: await getLocalSnapshotUpdatedAt(),
+    wallpaperPrefs: wallpaper.wallpaperPrefs,
+    wallpaperLibrary: wallpaper.wallpaperLibrary,
+    syncTombstones,
+    syncPreferenceRevisions,
+    extensionCapture,
   };
 }
 
@@ -515,27 +624,7 @@ export async function createLocalDataSnapshot(
   label = reason,
   options: { force?: boolean } = {}
 ): Promise<LocalSnapshotEntry | null> {
-  const data: LocalSnapshotData = {
-    cards: await getCards(),
-    categories: await getCategories(),
-    hiddenSites: await getHiddenSites(),
-    pinnedCategoryIds: await getPinnedCategoryIds(),
-    pinnedBookmarkItems: await getPinnedBookmarkItems(),
-    categoryWidths: await getCategoryWidths(),
-    categoryLayouts: await getCategoryLayouts(),
-    visualScale: await getVisualScale(),
-    linkOpenMode: await getLinkOpenMode(),
-    searchEngine: await getSearchEngine(),
-    sections: await getSections(),
-    activeSectionId: await getActiveSectionId(),
-    recycleBin: await getRecycleBin(),
-    warehouseCards: await getWarehouseCards(),
-    warehouseCategories: await getWarehouseCategories(),
-    warehouseImportBatches: await getImportBatches(),
-    warehouseUpdatedAt: await getWarehouseUpdatedAt(),
-    workspaceResetAt: await getWorkspaceResetAt(),
-    localSnapshotUpdatedAt: await getLocalSnapshotUpdatedAt(),
-  };
+  const data = await readCurrentSnapshotData();
   const counts = countSnapshotData(data);
   if (!options.force && snapshotScore(counts) === 0) {
     return null;
@@ -599,26 +688,24 @@ export async function saveVersionAndClearLocalData(): Promise<LocalSnapshotEntry
     sectionId: DEFAULT_SECTION_ID,
   };
 
-  await withoutLocalChangeEvents(async () => {
-    await saveCards([]);
-    await saveCategories([inboxCategory]);
-    await saveHiddenSites([]);
-    await savePinnedCategoryIds([]);
-    await savePinnedBookmarkItems([]);
-    await saveCategoryWidths({});
-    await saveCategoryLayouts({});
-    await saveVisualScale(100);
-    await saveLinkOpenMode("new-background-tab");
-    await saveSearchEngine(DEFAULT_SEARCH_ENGINE_ID);
-    await saveSections([defaultSection]);
-    await saveActiveSectionId(defaultSection.id);
-    await saveRecycleBin([]);
-    await saveWarehouseCards([]);
-    await saveWarehouseCategories([]);
-    await saveImportBatches([]);
-    await saveWorkspaceResetAt(now);
-    await setInitialized();
-  });
+  await saveCards([]);
+  await saveCategories([inboxCategory]);
+  await saveHiddenSites([]);
+  await savePinnedCategoryIds([]);
+  await savePinnedBookmarkItems([]);
+  await saveCategoryWidths({});
+  await saveCategoryLayouts({});
+  await saveVisualScale(100);
+  await saveLinkOpenMode("new-background-tab");
+  await saveSearchEngine(DEFAULT_SEARCH_ENGINE_ID);
+  await saveSections([defaultSection]);
+  await saveActiveSectionId(defaultSection.id);
+  await saveRecycleBin([]);
+  await saveWarehouseCards([]);
+  await saveWarehouseCategories([]);
+  await saveImportBatches([]);
+  await saveWorkspaceResetAt(now);
+  await setInitialized();
 
   await saveLocalSnapshotSyncedAt(0);
   await markLocalSnapshotChanged();
@@ -626,27 +713,27 @@ export async function saveVersionAndClearLocalData(): Promise<LocalSnapshotEntry
 }
 
 export async function restoreSnapshotData(data: LocalSnapshotData): Promise<void> {
-  await withoutLocalChangeEvents(async () => {
-    await saveCards(data.cards);
-    await saveCategories(data.categories);
-    await saveHiddenSites(data.hiddenSites);
-    await savePinnedCategoryIds(data.pinnedCategoryIds);
-    await savePinnedBookmarkItems(data.pinnedBookmarkItems || []);
-    await saveCategoryWidths(data.categoryWidths);
-    await saveCategoryLayouts(data.categoryLayouts || {});
-    await saveVisualScale(data.visualScale);
-    await saveLinkOpenMode(data.linkOpenMode);
-    await saveSearchEngine(isSearchEngineId(data.searchEngine) ? data.searchEngine : DEFAULT_SEARCH_ENGINE_ID);
-    await saveSections(data.sections);
-    if (data.activeSectionId) {
-      await saveActiveSectionId(data.activeSectionId);
-    }
-    await saveRecycleBin(data.recycleBin);
-    await saveWarehouseCards(data.warehouseCards);
-    await saveWarehouseCategories(data.warehouseCategories);
-    await saveImportBatches(data.warehouseImportBatches);
-    await saveWorkspaceResetAt(data.workspaceResetAt || 0);
-  });
+  await saveCards(data.cards);
+  await saveCategories(data.categories);
+  await saveHiddenSites(data.hiddenSites);
+  await savePinnedCategoryIds(data.pinnedCategoryIds);
+  await savePinnedBookmarkItems(data.pinnedBookmarkItems || []);
+  await saveCategoryWidths(data.categoryWidths);
+  await saveCategoryLayouts(data.categoryLayouts || {});
+  await saveVisualScale(data.visualScale);
+  await saveLinkOpenMode(data.linkOpenMode);
+  await saveSearchEngine(isSearchEngineId(data.searchEngine) ? data.searchEngine : DEFAULT_SEARCH_ENGINE_ID);
+  await saveSections(data.sections);
+  if (data.activeSectionId) {
+    await saveActiveSectionId(data.activeSectionId);
+  }
+  await saveRecycleBin(data.recycleBin);
+  await saveWarehouseCards(data.warehouseCards);
+  await saveWarehouseCategories(data.warehouseCategories);
+  await saveImportBatches(data.warehouseImportBatches);
+  await saveWorkspaceResetAt(data.workspaceResetAt || 0);
+  await restoreWallpaperSnapshot(data);
+  await restoreExtensionCaptureSnapshot(data.extensionCapture);
 
   await saveLocalSnapshotSyncedAt(0);
   await markLocalSnapshotChanged();
@@ -791,16 +878,14 @@ export async function restoreStructureFromSnapshotEntry(snapshot: LocalSnapshotE
     return card;
   });
 
-  await withoutLocalChangeEvents(async () => {
-    await saveSections(sectionList);
-    await saveCategories(nextCategories);
-    await saveCards(nextCards);
-    if (current.activeSectionId && validSectionIds.has(current.activeSectionId)) {
-      await saveActiveSectionId(current.activeSectionId);
-    } else {
-      await saveActiveSectionId(DEFAULT_SECTION_ID);
-    }
-  });
+  await saveSections(sectionList);
+  await saveCategories(nextCategories);
+  await saveCards(nextCards);
+  if (current.activeSectionId && validSectionIds.has(current.activeSectionId)) {
+    await saveActiveSectionId(current.activeSectionId);
+  } else {
+    await saveActiveSectionId(DEFAULT_SECTION_ID);
+  }
 
   await saveLocalSnapshotSyncedAt(0);
   await markLocalSnapshotChanged();

@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Category, WebCard } from "../src/lib/types";
 
 type Row = Record<string, unknown>;
-type TableName = "categories" | "cards" | "user_preferences";
+type TableName = "categories" | "cards" | "user_preferences" | "workspace_tombstones";
 
 const userId = "user-sync-test";
 const baseTime = 1_777_200_000_000;
@@ -115,6 +115,7 @@ class FakeSupabaseClient {
     categories: [],
     cards: [],
     user_preferences: [],
+    workspace_tombstones: [],
   };
 
   readonly operations = {
@@ -125,6 +126,7 @@ class FakeSupabaseClient {
       categories: 0,
       cards: 0,
       user_preferences: 0,
+      workspace_tombstones: 0,
     } as Record<TableName, number>,
     insert: 0,
     update: 0,
@@ -200,7 +202,7 @@ class FakeSupabaseClient {
   private withTimestamps(table: TableName, row: Row): Row {
     const nowIso = new Date(Date.now()).toISOString();
     const id = typeof row.id === "string" ? row.id : `${table}-${this.tables[table].length + 1}`;
-    if (table === "user_preferences") {
+    if (table === "user_preferences" || table === "workspace_tombstones") {
       return {
         id,
         updated_at: nowIso,
@@ -401,6 +403,85 @@ async function main(): Promise<void> {
 
   {
     const fake = new FakeSupabaseClient();
+    const sharedCategory = category();
+    const sharedCard = card({ title: "Delete and restore" });
+    fake.tables.categories.push(cloudCategory(sharedCategory));
+    fake.tables.cards.push(cloudCard(sharedCard));
+    supabase.__setBrowserSupabaseClientForTest(fake as unknown as SupabaseClient);
+
+    await resetLocal(db);
+    await db.withoutLocalChangeEvents(async () => {
+      await db.saveCategories([sharedCategory]);
+      await db.saveCards([sharedCard]);
+    });
+    await db.clearSyncDirtySets();
+    const staleDeviceStore = captureLocalStore();
+
+    await db.deleteCard(sharedCard.id);
+    await sync.syncData(userId);
+    assert.equal(fake.tables.cards.length, 0, "a synced tombstone should remove the active cloud card");
+    assert.equal(fake.tables.workspace_tombstones.length, 1, "card deletion should be persisted before removing cloud content");
+
+    restoreLocalStore(staleDeviceStore);
+    await sync.syncData(userId);
+    assert.equal((await db.getCards()).length, 0, "a stale device must not resurrect a cloud-tombstoned card");
+
+    await db.addCard(sharedCard);
+    const restoredRevision = (await db.getCards())[0]?.syncRevision || 0;
+    const tombstoneRevision = Number(fake.tables.workspace_tombstones[0]?.sync_revision || 0);
+    assert.ok(
+      restoredRevision > tombstoneRevision,
+      `restore should create a revision newer than the tombstone (restore=${restoredRevision}, tombstone=${tombstoneRevision})`
+    );
+    await sync.syncData(userId);
+    assert.equal(fake.tables.cards.length, 1, "a deliberate newer restore should recreate the cloud card");
+  }
+
+  {
+    const fake = new FakeSupabaseClient();
+    const hiddenSite = {
+      siteId: "site-a",
+      siteUrl: "https://example.com",
+      hiddenAt: baseTime,
+      duration: "permanent" as const,
+    };
+    const recycleItem = {
+      id: "recycle-a",
+      type: "card" as const,
+      name: "Old item",
+      deletedAt: baseTime,
+      categories: [],
+      cards: [],
+    };
+    supabase.__setBrowserSupabaseClientForTest(fake as unknown as SupabaseClient);
+    await resetLocal(db);
+
+    await db.savePinnedCategoryIds(["category-a"]);
+    await db.saveHiddenSites([hiddenSite]);
+    await db.saveRecycleBin([recycleItem]);
+    const staleDeviceStore = captureLocalStore();
+
+    await db.savePinnedCategoryIds([]);
+    await db.saveHiddenSites([]);
+    await db.clearRecycleBin();
+    await sync.syncData(userId);
+
+    for (const key of ["pinnedCategoryIds", "hiddenSites", "recycleBin"]) {
+      const row = fake.tables.user_preferences.find((preference) => preference.key === key);
+      assert.deepEqual(row?.value, [], `${key} should push an explicit empty value to cloud`);
+      assert.ok(Number(row?.sync_revision || 0) > 0, `${key} should carry a Lamport revision`);
+    }
+
+    restoreLocalStore(staleDeviceStore);
+    await sync.syncData(userId);
+
+    assert.deepEqual(await db.getPinnedCategoryIds(), [], "a stale device must not restore an old pin");
+    assert.deepEqual(await db.getHiddenSites(), [], "a stale device must not restore an old hidden site");
+    assert.deepEqual(await db.getRecycleBin(), [], "a stale device must not restore a cleared recycle bin");
+  }
+
+  {
+    const fake = new FakeSupabaseClient();
     const olderLocalCard = card({ title: "Older Local", updatedAt: baseTime + 1_000 });
     const newerCloudCard = card({ title: "Newer Cloud", updatedAt: baseTime + 2_000 });
     const sharedCategory = category({ updatedAt: baseTime + 1_000 });
@@ -408,8 +489,10 @@ async function main(): Promise<void> {
     fake.tables.cards.push(cloudCard(newerCloudCard));
     supabase.__setBrowserSupabaseClientForTest(fake as unknown as SupabaseClient);
     await resetLocal(db);
-    await db.saveCategories([sharedCategory]);
-    await db.saveCards([olderLocalCard]);
+    await db.withoutLocalChangeEvents(async () => {
+      await db.saveCategories([sharedCategory]);
+      await db.saveCards([olderLocalCard]);
+    });
 
     await sync.syncData(userId);
 
@@ -487,7 +570,11 @@ async function main(): Promise<void> {
       sync.syncData(userId),
     ]);
 
-    assert.equal(fake.operations.select, 3, "concurrent top-level syncData calls should share one in-flight run");
+    assert.equal(
+      fake.operations.select,
+      4,
+      "concurrent top-level syncData calls should share one in-flight run across all four sync tables"
+    );
   }
 
   {
@@ -523,7 +610,10 @@ async function main(): Promise<void> {
     await sync.syncData(userId);
 
     assert.equal(injectedWrites, 3, "test should keep writing through the max allowed recursion depth");
-    assert.ok(fake.operations.select <= 9, `recursive sync/push should stop after depth 2, got ${fake.operations.select} selects`);
+    assert.ok(
+      fake.operations.select <= 4 * 3,
+      `recursive sync/push should stop after depth 2 across four sync tables, got ${fake.operations.select} selects`
+    );
   }
 
   {

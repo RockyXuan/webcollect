@@ -9,6 +9,8 @@ import {
   getRecycleBin,
   getSyncDirtySets,
   markDirty,
+  saveCardsRebased,
+  saveCategoriesRebased,
 } from "@/lib/db";
 import type { Category, RecycleBinItem, WebCard } from "@/lib/types";
 
@@ -74,5 +76,31 @@ describe("atomic local storage mutations", () => {
     expect((await getCategories()).map((item) => item.id).sort()).toEqual(["category-a", "category-b"]);
     expect((await getRecycleBin()).map((item) => item.id).sort()).toEqual(["bin-a", "bin-b"]);
     expect((await getSyncDirtySets()).cards).toEqual(expect.arrayContaining(["dirty-a", "dirty-b"]));
+  });
+
+  it("rebases two whole-array edits made from the same stale snapshot", async () => {
+    const initialCard = card("card-initial");
+    const initialCategory = category("category-initial");
+    await Promise.all([addCard(initialCard), addCategory(initialCategory)]);
+    const cardBaseline = await getCards();
+    const categoryBaseline = await getCategories();
+
+    await Promise.all([
+      saveCardsRebased(cardBaseline, [...cardBaseline, card("card-a")]),
+      saveCardsRebased(cardBaseline, [...cardBaseline, card("card-b")]),
+      saveCategoriesRebased(categoryBaseline, [...categoryBaseline, category("category-a")]),
+      saveCategoriesRebased(categoryBaseline, [...categoryBaseline, category("category-b")]),
+    ]);
+
+    expect((await getCards()).map((item) => item.id).sort()).toEqual([
+      "card-a",
+      "card-b",
+      "card-initial",
+    ]);
+    expect((await getCategories()).map((item) => item.id).sort()).toEqual([
+      "category-a",
+      "category-b",
+      "category-initial",
+    ]);
   });
 });

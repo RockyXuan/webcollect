@@ -2,8 +2,8 @@
  * Sync service for local IndexedDB and Supabase.
  *
  * The service syncs whole local snapshots, but cloud writes are narrowed to
- * dirty/local-only/newer rows. Row conflict resolution is Last-Write-Wins based
- * on each card/category's client-provided updatedAt timestamp.
+ * dirty/local-only/newer rows. Card/category conflicts use deterministic
+ * Lamport revisions and device IDs, with timestamps only for legacy rows.
  */
 
 import { getBrowserSupabaseClient, initBrowserSupabase } from "@/lib/supabase-browser";
@@ -43,6 +43,12 @@ import {
   withoutLocalChangeEvents,
   getSyncDirtySets,
   clearSyncDirtyIds,
+  getSyncTombstones,
+  saveSyncTombstones,
+  getSyncPreferenceRevisions,
+  saveSyncPreferenceRevisions,
+  getSearchEngine,
+  saveSearchEngine,
 } from "@/lib/db";
 import {
   getWarehouseCards,
@@ -66,8 +72,11 @@ import { useWallpaperStore } from "@/lib/wallpaper-store";
 import { createLocalDataSnapshot, getLocalDataSnapshots } from "@/lib/local-snapshots";
 import { normalizePinnedBookmarkItems } from "@/lib/pinned-bookmarks";
 import { allDefaultCategories } from "@/lib/seed";
-import type { WebCard, Category, HiddenSite, LinkOpenMode, CollectionSection, RecycleBinItem, PinnedBookmarkItem, CategoryLayoutPreference } from "@/lib/types";
+import type { WebCard, Category, HiddenSite, LinkOpenMode, CollectionSection, RecycleBinItem, PinnedBookmarkItem, CategoryLayoutPreference, SyncEntityType, SyncTombstone, SyncPreferenceRevisions, SyncVersionStamp } from "@/lib/types";
 import type { WallpaperPrefs, WallpaperSyncedSettings } from "@/lib/wallpaper-types";
+import { compareSyncVersions } from "@/lib/sync-revisions";
+import { resolvePreferenceByRevision } from "@/lib/preference-sync";
+import { DEFAULT_SEARCH_ENGINE_ID, isSearchEngineId, type SearchEngineId } from "@/lib/search-engines";
 
 // Types
 
@@ -82,6 +91,8 @@ interface CloudCategory {
   order: number | null;
   updated_at: string;
   created_at: string;
+  sync_revision?: number | null;
+  sync_device_id?: string | null;
 }
 
 interface CloudCard {
@@ -98,6 +109,8 @@ interface CloudCard {
   order: number | null;
   updated_at: string;
   created_at: string;
+  sync_revision?: number | null;
+  sync_device_id?: string | null;
 }
 
 interface CloudPreference {
@@ -106,6 +119,19 @@ interface CloudPreference {
   key: string;
   value: unknown;
   updated_at: string;
+  sync_revision?: number | null;
+  sync_device_id?: string | null;
+}
+
+interface CloudTombstone {
+  id?: string;
+  user_id: string;
+  entity_type: SyncEntityType;
+  entity_id: string;
+  deleted_at: string;
+  sync_revision: number;
+  sync_device_id: string;
+  updated_at?: string;
 }
 
 interface SyncBackup {
@@ -124,7 +150,12 @@ interface WallpaperPrefsMergeResult {
   shouldApplyCloud: boolean;
 }
 
-type CloudPreferenceMap = Record<string, { value: unknown; updatedAt: string }>;
+type CloudPreferenceMap = Record<string, {
+  value: unknown;
+  updatedAt: string;
+  syncRevision: number;
+  syncDeviceId: string;
+}>;
 
 const MAX_SYNC_RECURSION_DEPTH = 2;
 
@@ -280,6 +311,8 @@ function cloudToLocalCategory(c: CloudCategory): Category {
     updatedAt: new Date(c.updated_at).getTime(),
     parentId: c.parent_id ?? undefined,
     isParent: c.is_parent ?? undefined,
+    syncRevision: c.sync_revision ?? undefined,
+    syncDeviceId: c.sync_device_id ?? undefined,
   };
 }
 
@@ -298,6 +331,8 @@ function localToCloudCategory(c: Category, userId: string): Omit<CloudCategory, 
     is_parent: c.isParent ?? null,
     order: c.order,
     updated_at: toCloudUpdatedAt(c),
+    sync_revision: c.syncRevision || 0,
+    sync_device_id: c.syncDeviceId || "legacy",
   };
 }
 
@@ -312,15 +347,6 @@ function getCategoryParentDepth(
   if (!parent) return 0;
   seen.add(category.id);
   return 1 + getCategoryParentDepth(parent, categoryById, seen);
-}
-
-function sortCategoriesByParentDepth(categories: Category[]): Category[] {
-  const categoryById = new Map(categories.map((category) => [category.id, category]));
-  return [...categories].sort((a, b) => {
-    const depthDiff = getCategoryParentDepth(a, categoryById) - getCategoryParentDepth(b, categoryById);
-    if (depthDiff !== 0) return depthDiff;
-    return (a.order ?? 0) - (b.order ?? 0);
-  });
 }
 
 function groupCategoriesByParentDepth(categories: Category[]): Category[][] {
@@ -374,6 +400,8 @@ function cloudToLocalCard(c: CloudCard): WebCard {
     order: c.order ?? 0,
     createdAt: new Date(c.created_at).getTime(),
     updatedAt: new Date(c.updated_at).getTime(),
+    syncRevision: c.sync_revision ?? undefined,
+    syncDeviceId: c.sync_device_id ?? undefined,
   };
 }
 
@@ -391,6 +419,8 @@ function localToCloudCard(c: WebCard, userId: string): Omit<CloudCard, "created_
     image_url: c.imageUrl || null,
     order: c.order,
     updated_at: toCloudUpdatedAt(c),
+    sync_revision: c.syncRevision || 0,
+    sync_device_id: c.syncDeviceId || "legacy",
   };
 }
 
@@ -443,10 +473,9 @@ interface MergeResult<T extends { id: string }> {
   cloudOnly: T[];     // items only in cloud 鈫?add to local
 }
 
-function mergeByTimestamp<T extends { id: string }>(
+function mergeBySyncVersion<T extends { id: string; syncRevision?: number; syncDeviceId?: string; updatedAt?: number; createdAt?: number }>(
   localItems: T[],
-  cloudItems: T[],
-  getTimestamp: (item: T) => number
+  cloudItems: T[]
 ): MergeResult<T> {
   const localMap = new Map(localItems.map((item) => [item.id, item]));
   const cloudMap = new Map(cloudItems.map((item) => [item.id, item]));
@@ -461,9 +490,8 @@ function mergeByTimestamp<T extends { id: string }>(
   for (const [id, localItem] of localMap) {
     const cloudItem = cloudMap.get(id);
     if (cloudItem) {
-      const localTs = getTimestamp(localItem);
-      const cloudTs = getTimestamp(cloudItem);
-      if (cloudTs > localTs) {
+      const comparison = compareSyncVersions(cloudItem, localItem);
+      if (comparison > 0) {
         // Cloud is newer
         merged.push(cloudItem);
         cloudToPull.push(cloudItem);
@@ -471,7 +499,7 @@ function mergeByTimestamp<T extends { id: string }>(
         // Local is newer, or equal. Equal timestamps intentionally keep the
         // local row so a no-op cloud sync cannot roll back the current tab.
         merged.push(localItem);
-        if (localTs > cloudTs) {
+        if (comparison < 0) {
           localToPush.push(localItem);
         }
       }
@@ -493,12 +521,78 @@ function mergeByTimestamp<T extends { id: string }>(
   return { merged, cloudToPull, localToPush, localOnly, cloudOnly };
 }
 
-function resolveDedupedIds(ids: Iterable<string>, idMap: Map<string, string>): Set<string> {
-  const resolved = new Set<string>();
-  for (const id of ids) {
-    resolved.add(idMap.get(id) || id);
+function cloudToLocalTombstone(row: CloudTombstone): SyncTombstone {
+  return {
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    deletedAt: new Date(row.deleted_at).getTime(),
+    syncRevision: row.sync_revision,
+    syncDeviceId: row.sync_device_id,
+  };
+}
+
+function mergeSyncTombstones(local: SyncTombstone[], cloud: SyncTombstone[]): SyncTombstone[] {
+  const merged = new Map<string, SyncTombstone>();
+  for (const tombstone of [...cloud, ...local]) {
+    const key = `${tombstone.entityType}:${tombstone.entityId}`;
+    const current = merged.get(key);
+    if (!current || compareSyncVersions(tombstone, current) > 0) {
+      merged.set(key, tombstone);
+    }
   }
-  return resolved;
+  return [...merged.values()];
+}
+
+function tombstoneMapForType(
+  tombstones: SyncTombstone[],
+  entityType: SyncEntityType
+): Map<string, SyncTombstone> {
+  return new Map(
+    tombstones
+      .filter((tombstone) => tombstone.entityType === entityType)
+      .map((tombstone) => [tombstone.entityId, tombstone])
+  );
+}
+
+function filterEntitiesSupersededByTombstones<
+  T extends { id: string; syncRevision?: number; syncDeviceId?: string; updatedAt?: number; createdAt?: number }
+>(entities: T[], tombstones: Map<string, SyncTombstone>): T[] {
+  return entities.filter((entity) => {
+    const tombstone = tombstones.get(entity.id);
+    return !tombstone || compareSyncVersions(entity, tombstone) > 0;
+  });
+}
+
+async function upsertSyncTombstones(
+  client: SupabaseClient,
+  userId: string,
+  tombstones: SyncTombstone[],
+  cloudTombstones: SyncTombstone[] = []
+): Promise<void> {
+  const cloudByKey = new Map(
+    cloudTombstones.map((tombstone) => [`${tombstone.entityType}:${tombstone.entityId}`, tombstone])
+  );
+  const rows = tombstones.filter((tombstone) => {
+    const cloud = cloudByKey.get(`${tombstone.entityType}:${tombstone.entityId}`);
+    if (!cloud) return true;
+    const comparison = compareSyncVersions(tombstone, cloud);
+    return comparison > 0 || (
+      comparison === 0
+      && (tombstone.deletedAt !== cloud.deletedAt || tombstone.syncDeviceId !== cloud.syncDeviceId)
+    );
+  }).map((tombstone) => ({
+    user_id: userId,
+    entity_type: tombstone.entityType,
+    entity_id: tombstone.entityId,
+    deleted_at: new Date(tombstone.deletedAt).toISOString(),
+    sync_revision: tombstone.syncRevision,
+    sync_device_id: tombstone.syncDeviceId,
+  }));
+  if (rows.length === 0) return;
+  const { error } = await client
+    .from("workspace_tombstones")
+    .upsert(rows, { onConflict: "user_id,entity_type,entity_id" });
+  if (error) throw formatCloudLoadError("删除记录", error.message);
 }
 
 function mergePushCandidateIds<T extends { id: string }>(
@@ -558,7 +652,9 @@ function cloudCategoryMatchesLocal(category: Category, cloudCategory: CloudCateg
     (cloudCategory.color ?? null) === local.color &&
     (cloudCategory.parent_id ?? null) === local.parent_id &&
     (cloudCategory.is_parent ?? null) === local.is_parent &&
-    (cloudCategory.order ?? 0) === (local.order ?? 0)
+    (cloudCategory.order ?? 0) === (local.order ?? 0) &&
+    (cloudCategory.sync_revision ?? 0) === (local.sync_revision ?? 0) &&
+    (cloudCategory.sync_device_id || "legacy") === (local.sync_device_id || "legacy")
   );
 }
 
@@ -576,11 +672,16 @@ function cloudCardMatchesLocal(card: WebCard, cloudCard: CloudCard | undefined, 
     (cloudCard.note ?? null) === local.note &&
     (cloudCard.abbreviation ?? null) === local.abbreviation &&
     (cloudCard.image_url ?? null) === local.image_url &&
-    (cloudCard.order ?? 0) === (local.order ?? 0)
+    (cloudCard.order ?? 0) === (local.order ?? 0) &&
+    (cloudCard.sync_revision ?? 0) === (local.sync_revision ?? 0) &&
+    (cloudCard.sync_device_id || "legacy") === (local.sync_device_id || "legacy")
   );
 }
 
-function collectLocalSnapshotPushIds<T extends { id: string; createdAt: number; updatedAt?: number }, CloudRow extends { updated_at: string }>(
+function collectLocalSnapshotPushIds<
+  T extends { id: string; createdAt: number; updatedAt?: number; syncRevision?: number; syncDeviceId?: string },
+  CloudRow extends { updated_at: string; sync_revision?: number | null; sync_device_id?: string | null }
+>(
   localRows: T[],
   cloudById: Map<string, CloudRow>,
   dirtyIds: Set<string>
@@ -588,234 +689,16 @@ function collectLocalSnapshotPushIds<T extends { id: string; createdAt: number; 
   const candidateIds = new Set<string>();
   for (const row of localRows) {
     const cloudRow = cloudById.get(row.id);
-    const localUpdatedAt = row.updatedAt || row.createdAt || 0;
-    const cloudUpdatedAt = cloudRow ? new Date(cloudRow.updated_at).getTime() : 0;
-    if (dirtyIds.has(row.id) || !cloudRow || localUpdatedAt > cloudUpdatedAt) {
+    const localWins = cloudRow && compareSyncVersions(row, {
+      syncRevision: cloudRow.sync_revision ?? undefined,
+      syncDeviceId: cloudRow.sync_device_id ?? undefined,
+      updatedAt: new Date(cloudRow.updated_at).getTime(),
+    }) > 0;
+    if (dirtyIds.has(row.id) || !cloudRow || localWins) {
       candidateIds.add(row.id);
     }
   }
   return candidateIds;
-}
-
-function normalizeText(value: string | undefined): string {
-  return (value || "").trim().toLowerCase();
-}
-
-function normalizeUrl(value: string): string {
-  try {
-    const url = new URL(value);
-    url.hash = "";
-    url.search = "";
-    return url.toString().replace(/\/$/, "").toLowerCase();
-  } catch {
-    return value.trim().replace(/\/$/, "").toLowerCase();
-  }
-}
-
-interface DefaultDuplicateCleanupResult {
-  categories: Category[];
-  cards: WebCard[];
-  removedCards: number;
-  removedCategories: number;
-  removedCardIds: string[];
-  removedCategoryIds: string[];
-}
-
-function cleanDefaultSectionDuplicateCards(
-  categories: Category[],
-  cards: WebCard[]
-): DefaultDuplicateCleanupResult {
-  const categoryById = new Map(categories.map((category) => [category.id, category]));
-  const cardsByUrl = new Map<string, WebCard[]>();
-
-  for (const card of cards) {
-    const key = normalizeUrl(card.url);
-    if (!key) continue;
-    const group = cardsByUrl.get(key) || [];
-    group.push(card);
-    cardsByUrl.set(key, group);
-  }
-
-  const duplicateHomeCardIds = new Set<string>();
-  for (const group of cardsByUrl.values()) {
-    const hasNonDefault = group.some((card) => {
-      const category = categoryById.get(card.categoryId);
-      return category && (category.sectionId || "section-default") !== "section-default";
-    });
-    if (!hasNonDefault) continue;
-
-    for (const card of group) {
-      const category = categoryById.get(card.categoryId);
-      if ((category?.sectionId || "section-default") === "section-default") {
-        duplicateHomeCardIds.add(card.id);
-      }
-    }
-  }
-
-  // Avoid pruning a deliberate small cross-section shortcut. The broken state
-  // has hundreds of homepage duplicates, while normal use should only have a few.
-  if (duplicateHomeCardIds.size < 12) {
-    return {
-      categories,
-      cards,
-      removedCards: 0,
-      removedCategories: 0,
-      removedCardIds: [],
-      removedCategoryIds: [],
-    };
-  }
-
-  const nextCards = cards.filter((card) => !duplicateHomeCardIds.has(card.id));
-  const reachableCategoryIds = new Set<string>();
-
-  function markCategoryAndParents(categoryId: string | undefined): void {
-    if (!categoryId || reachableCategoryIds.has(categoryId)) return;
-    const category = categoryById.get(categoryId);
-    if (!category) return;
-    reachableCategoryIds.add(category.id);
-    markCategoryAndParents(category.parentId);
-  }
-
-  for (const card of nextCards) {
-    markCategoryAndParents(card.categoryId);
-  }
-
-  const nextCategories = categories.filter((category) => {
-    const sectionId = category.sectionId || "section-default";
-    if (sectionId !== "section-default") return true;
-    if (reachableCategoryIds.has(category.id)) return true;
-    return category.name.trim() === "\u6536\u96c6\u7bb1" && !category.parentId;
-  });
-  const nextCategoryIds = new Set(nextCategories.map((category) => category.id));
-
-  return {
-    categories: nextCategories,
-    cards: nextCards,
-    removedCards: cards.length - nextCards.length,
-    removedCategories: categories.length - nextCategories.length,
-    removedCardIds: [...duplicateHomeCardIds],
-    removedCategoryIds: categories
-      .filter((category) => !nextCategoryIds.has(category.id))
-      .map((category) => category.id),
-  };
-}
-
-function categorySemanticKey(category: Category, categoryById: Map<string, Category>, seen = new Set<string>()): string {
-  const name = normalizeText(category.name);
-  const sectionId = category.sectionId || "section-default";
-  if (category.parentId && !seen.has(category.id)) {
-    const parent = categoryById.get(category.parentId);
-    if (parent) {
-      seen.add(category.id);
-      return `section:${sectionId}|group:${categorySemanticKey(parent, categoryById, seen)}>${name}`;
-    }
-  }
-  return category.isParent ? `section:${sectionId}|parent:${name}` : `section:${sectionId}|root:${name}`;
-}
-
-function preferItem<T extends { id: string; createdAt?: number; updatedAt?: number }>(
-  current: T,
-  candidate: T,
-  preferredIds: Set<string>
-): T {
-  const currentPreferred = preferredIds.has(current.id);
-  const candidatePreferred = preferredIds.has(candidate.id);
-  if (currentPreferred !== candidatePreferred) {
-    return candidatePreferred ? candidate : current;
-  }
-  const currentTs = current.updatedAt || current.createdAt || 0;
-  const candidateTs = candidate.updatedAt || candidate.createdAt || 0;
-  return candidateTs > currentTs ? candidate : current;
-}
-
-function fillMissingCardFields(primary: WebCard, duplicate: WebCard): WebCard {
-  return {
-    ...primary,
-    title: primary.title || duplicate.title,
-    shortDesc: primary.shortDesc || duplicate.shortDesc,
-    fullDesc: primary.fullDesc || duplicate.fullDesc,
-    note: primary.note || duplicate.note,
-    abbreviation: primary.abbreviation || duplicate.abbreviation,
-    imageUrl: primary.imageUrl || duplicate.imageUrl,
-  };
-}
-
-function dedupeSyncedData(
-  categories: Category[],
-  cards: WebCard[],
-  preferredCategoryIds: Set<string>,
-  preferredCardIds: Set<string>
-): { categories: Category[]; cards: WebCard[]; categoryIdMap: Map<string, string>; cardIdMap: Map<string, string> } {
-  const categoryById = new Map(categories.map((category) => [category.id, category]));
-  const categoryGroups = new Map<string, Category[]>();
-  for (const category of categories) {
-    const key = categorySemanticKey(category, categoryById);
-    const group = categoryGroups.get(key) || [];
-    group.push(category);
-    categoryGroups.set(key, group);
-  }
-
-  const categoryIdMap = new Map<string, string>();
-  const dedupedCategories: Category[] = [];
-  for (const group of categoryGroups.values()) {
-    let keeper = group[0];
-    for (const category of group.slice(1)) {
-      keeper = preferItem(keeper, category, preferredCategoryIds);
-    }
-    for (const category of group) {
-      categoryIdMap.set(category.id, keeper.id);
-    }
-    dedupedCategories.push(keeper);
-  }
-
-  const normalizedCategories = dedupedCategories.map((category) => {
-    const parentId = category.parentId ? categoryIdMap.get(category.parentId) || category.parentId : undefined;
-    if (!parentId || parentId === category.id) {
-      const rest = { ...category };
-      delete rest.parentId;
-      return rest;
-    }
-    return { ...category, parentId };
-  });
-
-  const normalizedCategoryById = new Map(normalizedCategories.map((category) => [category.id, category]));
-  const cardGroups = new Map<string, WebCard[]>();
-  const normalizedCards = cards.map((card) => ({
-    ...card,
-    categoryId: categoryIdMap.get(card.categoryId) || card.categoryId,
-  }));
-
-  for (const card of normalizedCards) {
-    const category = normalizedCategoryById.get(card.categoryId);
-    const categoryKey = category ? categorySemanticKey(category, normalizedCategoryById) : card.categoryId;
-    const key = `${categoryKey}|${normalizeUrl(card.url)}`;
-    const group = cardGroups.get(key) || [];
-    group.push(card);
-    cardGroups.set(key, group);
-  }
-
-  const cardIdMap = new Map<string, string>();
-  const dedupedCards: WebCard[] = [];
-  for (const group of cardGroups.values()) {
-    let keeper = group[0];
-    for (const card of group.slice(1)) {
-      const preferred = preferItem(keeper, card, preferredCardIds);
-      keeper = preferred.id === keeper.id
-        ? fillMissingCardFields(keeper, card)
-        : fillMissingCardFields(preferred, keeper);
-    }
-    for (const card of group) {
-      cardIdMap.set(card.id, keeper.id);
-    }
-    dedupedCards.push(keeper);
-  }
-
-  return {
-    categories: sortCategoriesByParentDepth(normalizedCategories),
-    cards: dedupedCards.sort((a, b) => (a.categoryId === b.categoryId ? a.order - b.order : a.categoryId.localeCompare(b.categoryId))),
-    categoryIdMap,
-    cardIdMap,
-  };
 }
 
 function isNonEmptyArray(value: unknown): value is unknown[] {
@@ -845,7 +728,12 @@ function mergePinnedBookmarkPreferences(
 function preferencesToMap(cloudPrefs: CloudPreference[]): CloudPreferenceMap {
   const cloudPrefsMap: CloudPreferenceMap = {};
   for (const pref of cloudPrefs) {
-    cloudPrefsMap[pref.key] = { value: pref.value, updatedAt: pref.updated_at };
+    cloudPrefsMap[pref.key] = {
+      value: pref.value,
+      updatedAt: pref.updated_at,
+      syncRevision: pref.sync_revision || 0,
+      syncDeviceId: pref.sync_device_id || "legacy",
+    };
   }
   return cloudPrefsMap;
 }
@@ -862,7 +750,7 @@ function shouldIgnoreCloudPreference(cloudPrefsMap: CloudPreferenceMap, key: str
 }
 
 function getResetAwareCategorySections(
-  cloudPrefsMap: Record<string, { value: unknown; updatedAt: string }>,
+  cloudPrefsMap: CloudPreferenceMap,
   workspaceResetAt: number
 ): Record<string, string> {
   return shouldIgnoreCloudPreference(cloudPrefsMap, "categorySectionIds", workspaceResetAt)
@@ -871,7 +759,7 @@ function getResetAwareCategorySections(
 }
 
 function getResetAwareSections(
-  cloudPrefsMap: Record<string, { value: unknown; updatedAt: string }>,
+  cloudPrefsMap: CloudPreferenceMap,
   workspaceResetAt: number
 ): CollectionSection[] {
   if (shouldIgnoreCloudPreference(cloudPrefsMap, "collectionSections", workspaceResetAt)) {
@@ -923,7 +811,7 @@ function localSnapshotContentScore(input: {
 function cloudSnapshotContentScore(
   cloudCategories: CloudCategory[],
   cloudCards: CloudCard[],
-  cloudPrefsMap: Record<string, { value: unknown; updatedAt: string }>,
+  cloudPrefsMap: CloudPreferenceMap,
   workspaceResetAt = 0
 ): number {
   const warehouseCards = !shouldIgnoreCloudPreference(cloudPrefsMap, "warehouseCards", workspaceResetAt)
@@ -1064,41 +952,8 @@ async function writeSyncBackup(
   }
 }
 
-async function deleteRecoveredCloudRows(
-  client: SupabaseClient,
-  userId: string,
-  cloudCategories: CloudCategory[],
-  cloudCards: CloudCard[],
-  cloudPrefs: CloudPreference[]
-): Promise<void> {
-  const recoveredIds = cloudCategories
-    .filter((category) => /^Recovered\s+[0-9a-f-]+$/i.test(category.name.trim()))
-    .map((category) => category.id);
-  if (recoveredIds.length === 0) return;
-
-  await writeSyncBackup(client, userId, "before-recovered-cloud-cleanup", cloudCategories, cloudCards, cloudPrefs);
-
-  const cardDelete = await client
-    .from("cards")
-    .delete()
-    .eq("user_id", userId)
-    .in("category_id", recoveredIds);
-  if (cardDelete.error) {
-    throw new Error(`Failed to remove recovered cloud cards: ${cardDelete.error.message}`);
-  }
-
-  const categoryDelete = await client
-    .from("categories")
-    .delete()
-    .eq("user_id", userId)
-    .in("id", recoveredIds);
-  if (categoryDelete.error) {
-    throw new Error(`Failed to remove recovered cloud categories: ${categoryDelete.error.message}`);
-  }
-}
-
 function getCategorySectionsFromPrefs(
-  cloudPrefsMap: Record<string, { value: unknown; updatedAt: string }>
+  cloudPrefsMap: CloudPreferenceMap
 ): Record<string, string> {
   const value = cloudPrefsMap.categorySectionIds?.value;
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -1153,7 +1008,7 @@ function hasLocalWarehouseData(
 }
 
 function getNumberPreference(
-  cloudPrefsMap: Record<string, { value: unknown; updatedAt: string }>,
+  cloudPrefsMap: CloudPreferenceMap,
   key: string
 ): number {
   const value = cloudPrefsMap[key]?.value;
@@ -1216,44 +1071,6 @@ function mergeRecycleBin(localItems: RecycleBinItem[], cloudItems: RecycleBinIte
   return [...byId.values()].sort((a, b) => b.deletedAt - a.deletedAt);
 }
 
-function removeRecoveredMainData(
-  categories: Category[],
-  cards: WebCard[]
-): { categories: Category[]; cards: WebCard[] } {
-  const recoveredIds = new Set(
-    categories
-      .filter((category) => /^Recovered\s+[0-9a-f-]+$/i.test(category.name.trim()))
-      .map((category) => category.id)
-  );
-
-  let nextCategories = recoveredIds.size > 0
-    ? categories.filter((category) => !recoveredIds.has(category.id))
-    : categories;
-  const validIds = new Set(nextCategories.map((category) => category.id));
-  const cardsNeedingFallback = cards.filter(
-    (card) => recoveredIds.has(card.categoryId) || !validIds.has(card.categoryId)
-  );
-  if (cardsNeedingFallback.length === 0) {
-    return { categories: nextCategories, cards };
-  }
-
-  const categoriesById = new Map(nextCategories.map((category) => [category.id, category]));
-  const fallbackCategory = ensureFallbackInboxCategory(nextCategories, categoriesById);
-  nextCategories = categoriesById.has(fallbackCategory.id) ? nextCategories : [...nextCategories, fallbackCategory];
-  let nextOrder = cards
-    .filter((card) => card.categoryId === fallbackCategory.id)
-    .reduce((max, card) => Math.max(max, card.order), -1);
-
-  return {
-    categories: nextCategories,
-    cards: cards.map((card) => {
-      if (!recoveredIds.has(card.categoryId) && validIds.has(card.categoryId)) return card;
-      nextOrder += 1;
-      return { ...card, categoryId: fallbackCategory.id, order: nextOrder, updatedAt: Date.now() };
-    }),
-  };
-}
-
 // Main sync function
 
 function isMissingTableError(message: string): boolean {
@@ -1302,6 +1119,9 @@ async function syncDataUnsafe(userId: string, depth: number): Promise<void> {
     localWallpaperPrefs,
     localWorkspaceResetAt,
     localSnapshotUpdatedAt,
+    localTombstones,
+    localPreferenceRevisions,
+    localSearchEngine,
   ] = await Promise.all([
     getCards(),
     getCategories(),
@@ -1323,6 +1143,9 @@ async function syncDataUnsafe(userId: string, depth: number): Promise<void> {
     getWallpaperPrefs(),
     getWorkspaceResetAt(),
     getLocalSnapshotUpdatedAt(),
+    getSyncTombstones(),
+    getSyncPreferenceRevisions(),
+    getSearchEngine(),
   ]);
 
   await createLocalDataSnapshot("before-cloud-sync", "\u4e91\u7aef\u540c\u6b65\u524d\u672c\u5730\u7248\u672c");
@@ -1335,26 +1158,63 @@ async function syncDataUnsafe(userId: string, depth: number): Promise<void> {
   // 2. Load cloud data
   const client = getBrowserSupabaseClient();
 
-  const [cloudCatResult, cloudCardResult, cloudPrefResult] = await Promise.all([
+  const [cloudCatResult, cloudCardResult, cloudPrefResult, cloudTombstoneResult] = await Promise.all([
     client.from("categories").select("*").eq("user_id", userId),
     client.from("cards").select("*").eq("user_id", userId),
     client.from("user_preferences").select("*").eq("user_id", userId),
+    client.from("workspace_tombstones").select("*").eq("user_id", userId),
   ]);
 
   if (cloudCatResult.error) throw formatCloudLoadError("\u5206\u7c7b", cloudCatResult.error.message);
   if (cloudCardResult.error) throw formatCloudLoadError("\u5361\u7247", cloudCardResult.error.message);
   if (cloudPrefResult.error) throw formatCloudLoadError("\u504f\u597d", cloudPrefResult.error.message);
+  if (cloudTombstoneResult.error) throw formatCloudLoadError("删除记录", cloudTombstoneResult.error.message);
 
   const cloudPrefs = (cloudPrefResult.data || []) as CloudPreference[];
+  const cloudTombstones = ((cloudTombstoneResult.data || []) as CloudTombstone[]).map(cloudToLocalTombstone);
+  const mergedTombstones = mergeSyncTombstones(localTombstones, cloudTombstones);
+  const categoryTombstones = tombstoneMapForType(mergedTombstones, "category");
+  const cardTombstones = tombstoneMapForType(mergedTombstones, "card");
+  localCategories = filterEntitiesSupersededByTombstones(localCategories, categoryTombstones);
+  localCards = filterEntitiesSupersededByTombstones(localCards, cardTombstones);
   const cloudPrefsMap = preferencesToMap(cloudPrefs);
   const cloudWorkspaceResetAt = getNumberPreference(cloudPrefsMap, WORKSPACE_RESET_PREF_KEY);
-  const workspaceResetAt = Math.max(localWorkspaceResetAt, cloudWorkspaceResetAt);
-  if (cloudWorkspaceResetAt > localWorkspaceResetAt) {
+  const cloudWorkspaceResetRow = cloudPrefsMap[WORKSPACE_RESET_PREF_KEY];
+  const workspaceResetResolution = resolvePreferenceByRevision({
+    localValue: localWorkspaceResetAt,
+    localVersion: localPreferenceRevisions[WORKSPACE_RESET_PREF_KEY],
+    cloud: cloudWorkspaceResetRow ? {
+      value: cloudWorkspaceResetAt,
+      syncRevision: cloudWorkspaceResetRow.syncRevision,
+      syncDeviceId: cloudWorkspaceResetRow.syncDeviceId,
+      updatedAt: getPreferenceUpdatedAt(cloudPrefsMap, WORKSPACE_RESET_PREF_KEY),
+    } : null,
+    legacyValue: Math.max(localWorkspaceResetAt, cloudWorkspaceResetAt),
+  });
+  const workspaceResetAt = workspaceResetResolution.value;
+  if (workspaceResetResolution.source === "cloud" && workspaceResetAt > localWorkspaceResetAt) {
     localCategories = [];
     localCards = [];
   }
-  const cloudCategories = filterCloudRowsAfterReset((cloudCatResult.data || []) as CloudCategory[], workspaceResetAt);
-  const cloudCards = filterCloudRowsAfterReset((cloudCardResult.data || []) as CloudCard[], workspaceResetAt);
+  const cloudCategories = filterCloudRowsAfterReset(
+    (cloudCatResult.data || []) as CloudCategory[],
+    workspaceResetAt
+  ).filter((row) => {
+    const tombstone = categoryTombstones.get(row.id);
+    return !tombstone || compareSyncVersions(cloudToLocalCategory(row), tombstone) > 0;
+  });
+  const activeCategoryIds = new Set([
+    ...cloudCategories.map((category) => category.id),
+    ...localCategories.map((category) => category.id),
+  ]);
+  const cloudCards = filterCloudRowsAfterReset(
+    (cloudCardResult.data || []) as CloudCard[],
+    workspaceResetAt
+  ).filter((row) => {
+    const tombstone = cardTombstones.get(row.id);
+    return (!tombstone || compareSyncVersions(cloudToLocalCard(row), tombstone) > 0)
+      && activeCategoryIds.has(row.category_id);
+  });
   const prefCategorySections = getResetAwareCategorySections(cloudPrefsMap, workspaceResetAt);
   const prefSections = getResetAwareSections(cloudPrefsMap, workspaceResetAt);
   const localCategorySections = Object.fromEntries(
@@ -1418,10 +1278,7 @@ async function syncDataUnsafe(userId: string, depth: number): Promise<void> {
     : localSections[0]?.id || "section-default";
 
   // 3. Merge categories
-  const localCatsForMerge = localCategories.map((c) => ({
-    ...c,
-    _ts: c.updatedAt || c.createdAt || 0,
-  }));
+  const localCatsForMerge = localCategories;
 
   const localCategoryIdSet = new Set(localCategories.map((category) => category.id));
   const localCardIdSet = new Set(localCards.map((card) => card.id));
@@ -1437,62 +1294,27 @@ async function syncDataUnsafe(userId: string, depth: number): Promise<void> {
     return {
       ...cloudCategory,
       sectionId: categorySections[c.id] || prefCategorySections[c.id],
-      _ts: cloudCategory.updatedAt || cloudCategory.createdAt || 0,
     };
   });
 
-  const catMerge = mergeByTimestamp(
-    localCatsForMerge,
-    cloudCatsForMerge,
-    (item) => item._ts
-  );
+  const catMerge = mergeBySyncVersion(localCatsForMerge, cloudCatsForMerge);
 
   // 4. Merge cards
-  const localCardsForMerge = localCards.map((c) => ({
-    ...c,
-    _ts: c.updatedAt || c.createdAt || 0,
-  }));
+  const localCardsForMerge = localCards;
 
-  const cloudCardsForMerge = cloudCardsForMergeSource.map((c) => ({
-    ...cloudToLocalCard(c),
-    _ts: new Date(c.updated_at).getTime(),
-  }));
+  const cloudCardsForMerge = cloudCardsForMergeSource.map(cloudToLocalCard);
 
-  const cardMerge = mergeByTimestamp(
-    localCardsForMerge,
-    cloudCardsForMerge,
-    (item) => item._ts
-  );
+  const cardMerge = mergeBySyncVersion(localCardsForMerge, cloudCardsForMerge);
 
   console.log(`[Sync] Categories: ${catMerge.cloudToPull.length} pull, ${catMerge.localToPush.length + catMerge.localOnly.length} push, ${catMerge.cloudOnly.length} new from cloud`);
   console.log(`[Sync] Cards: ${cardMerge.cloudToPull.length} pull, ${cardMerge.localToPush.length + cardMerge.localOnly.length} push, ${cardMerge.cloudOnly.length} new from cloud`);
 
   // 5. Update local DB with merged data
-  const mergedCategoriesBeforeDedupe = catMerge.merged.map((item) => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { _ts: _, ...rest } = item;
-    return rest as Category;
-  });
-  const mergedCardsBeforeDedupe = cardMerge.merged.map((item) => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { _ts: _, ...rest } = item;
-    return rest as WebCard;
-  });
+  const mergedCategoriesBeforeDedupe = catMerge.merged;
+  const mergedCardsBeforeDedupe = cardMerge.merged;
 
-  const deduped = dedupeSyncedData(
-    mergedCategoriesBeforeDedupe,
-    mergedCardsBeforeDedupe,
-    new Set(localCategories.map((category) => category.id)),
-    new Set(localCards.map((card) => card.id))
-  );
-  const dedupedCategorySections = { ...categorySections };
-  for (const [fromId, toId] of deduped.categoryIdMap.entries()) {
-    if (categorySections[fromId] && !dedupedCategorySections[toId]) {
-      dedupedCategorySections[toId] = categorySections[fromId];
-    }
-  }
-  const sectionedCategories = deduped.categories.map((category) => {
-    const preferredSectionId = dedupedCategorySections[category.id];
+  const mergedCategories = mergedCategoriesBeforeDedupe.map((category) => {
+    const preferredSectionId = categorySections[category.id];
     return {
       ...category,
       sectionId: shouldPreferCloudLayout && preferredSectionId
@@ -1500,18 +1322,7 @@ async function syncDataUnsafe(userId: string, depth: number): Promise<void> {
         : category.sectionId || preferredSectionId || defaultSectionId,
     };
   });
-  const cleanedMainData = removeRecoveredMainData(sectionedCategories, deduped.cards);
-  const defaultDuplicateCleanup = hasMultiSectionLayout(prefSections, prefCategorySections)
-    ? cleanDefaultSectionDuplicateCards(cleanedMainData.categories, cleanedMainData.cards)
-    : { ...cleanedMainData, removedCards: 0, removedCategories: 0, removedCardIds: [], removedCategoryIds: [] };
-  if (defaultDuplicateCleanup.removedCards > 0) {
-    console.warn(
-      `[Sync] Removed ${defaultDuplicateCleanup.removedCards} duplicated homepage card copies ` +
-      `and ${defaultDuplicateCleanup.removedCategories} empty homepage categories from the local merge candidate.`
-    );
-  }
-  const mergedCategories = defaultDuplicateCleanup.categories;
-  const mergedCards = defaultDuplicateCleanup.cards;
+  const mergedCards = mergedCardsBeforeDedupe;
   const mergedSectionsForGuard = shouldPreferCloudLayout
     ? mergeSections(localSections, prefSections)
     : mergeSections(prefSections, localSections);
@@ -1528,29 +1339,17 @@ async function syncDataUnsafe(userId: string, depth: number): Promise<void> {
     await saveCategories(mergedCategories);
     await saveCards(mergedCards);
   });
-  if (defaultDuplicateCleanup.removedCards > 0) {
-    await createLocalDataSnapshot(
-      "cloud-layout-dedupe-candidate",
-      "\u4e91\u7aef\u7ed3\u6784\u53bb\u91cd\u5019\u9009\u7248\u672c",
-      { force: true }
-    );
-  }
+  await saveSyncTombstones(mergedTombstones);
 
   // 6. Push only rows that are dirty, local-only, or newer locally. Clean rows
   // that already match cloud content are intentionally skipped.
   const cloudCategoryById = new Map(cloudCategories.map((category) => [category.id, category]));
   const cloudCardById = new Map(cloudCards.map((card) => [card.id, card]));
   const categoryCandidateIds = includeParentCategoryIds(
-    resolveDedupedIds(
-      [...mergePushCandidateIds(catMerge), ...dirtySets.categories],
-      deduped.categoryIdMap
-    ),
+    new Set([...mergePushCandidateIds(catMerge), ...dirtySets.categories]),
     mergedCategories
   );
-  const cardCandidateIds = resolveDedupedIds(
-    [...mergePushCandidateIds(cardMerge), ...dirtySets.cards],
-    deduped.cardIdMap
-  );
+  const cardCandidateIds = new Set([...mergePushCandidateIds(cardMerge), ...dirtySets.cards]);
   const categorySyncSelection = selectChangedRowsForCloud(
     mergedCategories,
     categoryCandidateIds,
@@ -1564,24 +1363,25 @@ async function syncDataUnsafe(userId: string, depth: number): Promise<void> {
     (card, cloudCard) => cloudCardMatchesLocal(card, cloudCard, userId)
   );
 
+  await upsertSyncTombstones(client, userId, mergedTombstones, cloudTombstones);
+  const rawCloudCards = (cloudCardResult.data || []) as CloudCard[];
+  const rawCloudCategories = (cloudCatResult.data || []) as CloudCategory[];
+  const tombstonedCloudCardIds = rawCloudCards
+    .filter((row) => {
+      const tombstone = cardTombstones.get(row.id);
+      return tombstone && compareSyncVersions(tombstone, cloudToLocalCard(row)) >= 0;
+    })
+    .map((row) => row.id);
+  const tombstonedCloudCategoryIds = rawCloudCategories
+    .filter((row) => {
+      const tombstone = categoryTombstones.get(row.id);
+      return tombstone && compareSyncVersions(tombstone, cloudToLocalCategory(row)) >= 0;
+    })
+    .map((row) => row.id);
+  await deleteRowsByIdsInChunks(client, "cards", tombstonedCloudCardIds, userId);
+  await deleteRowsByIdsInChunks(client, "categories", tombstonedCloudCategoryIds, userId);
   await upsertCategoriesWithParents(client, categorySyncSelection.rowsToUpsert, userId);
-
   await upsertCardsInChunks(client, cardSyncSelection.rowsToUpsert, userId);
-
-  if (defaultDuplicateCleanup.removedCards > 0) {
-    await writeSyncBackup(
-      client,
-      userId,
-      "before-default-homepage-duplicate-cleanup",
-      cloudCategories,
-      cloudCards,
-      cloudPrefs
-    );
-    await deleteRowsByIdsInChunks(client, "cards", defaultDuplicateCleanup.removedCardIds, userId);
-    await deleteRowsByIdsInChunks(client, "categories", defaultDuplicateCleanup.removedCategoryIds, userId);
-  }
-
-  await deleteRecoveredCloudRows(client, userId, cloudCategories, cloudCards, cloudPrefs);
 
   // 7. Sync preferences. Login/restore sync intentionally does not delete
   // cloud-only rows; destructive cloud replacement is guarded in
@@ -1608,11 +1408,13 @@ async function syncDataUnsafe(userId: string, depth: number): Promise<void> {
     localWallpaperPrefs,
     localWorkspaceResetAt,
     localLooksEmptyAgainstCloud || localLooksMuchSmallerAgainstCloud || shouldProtectCloudLayout ? 0 : localSnapshotUpdatedAt,
-    cloudPrefs
+    cloudPrefs,
+    localPreferenceRevisions,
+    localSearchEngine
   );
   await clearSyncDirtyIds({
-    categories: categorySyncSelection.resolvedIds,
-    cards: cardSyncSelection.resolvedIds,
+    categories: [...categorySyncSelection.resolvedIds, ...mergedTombstones.filter((item) => item.entityType === "category").map((item) => item.entityId)],
+    cards: [...cardSyncSelection.resolvedIds, ...mergedTombstones.filter((item) => item.entityType === "card").map((item) => item.entityId)],
   });
   await saveLocalSnapshotSyncedAt(syncStartLocalUpdatedAt);
   await saveLastSeenCloudSnapshotUpdatedAt(syncedCloudSnapshotUpdatedAt);
@@ -1658,6 +1460,9 @@ async function pushLocalSnapshotToCloudUnsafe(
     localWallpaperPrefs,
     localWorkspaceResetAt,
     localSnapshotUpdatedAt,
+    localTombstones,
+    localPreferenceRevisions,
+    localSearchEngine,
   ] = await Promise.all([
     getCards(),
     getCategories(),
@@ -1679,6 +1484,9 @@ async function pushLocalSnapshotToCloudUnsafe(
     getWallpaperPrefs(),
     getWorkspaceResetAt(),
     getLocalSnapshotUpdatedAt(),
+    getSyncTombstones(),
+    getSyncPreferenceRevisions(),
+    getSearchEngine(),
   ]);
 
   await createLocalDataSnapshot("before-cloud-push", "\u63a8\u9001\u4e91\u7aef\u524d\u672c\u5730\u7248\u672c");
@@ -1687,39 +1495,66 @@ async function pushLocalSnapshotToCloudUnsafe(
   const syncStartLocalUpdatedAt = localSnapshotUpdatedAt;
   const dirtySets = await getSyncDirtySets();
 
-  const localDedupe = dedupeSyncedData(
-    normalizedLocalCategories,
-    normalizedLocalCards,
-    new Set(normalizedLocalCategories.map((category) => category.id)),
-    new Set(normalizedLocalCards.map((card) => card.id))
-  );
-  const cleanedLocalMainData = removeRecoveredMainData(localDedupe.categories, localDedupe.cards);
-  const localCategories = cleanedLocalMainData.categories;
-  const localCards = cleanedLocalMainData.cards;
+  let localCategories = normalizedLocalCategories;
+  let localCards = normalizedLocalCards;
   const snapshotUpdatedAt = Math.max(localSnapshotUpdatedAt, Date.now());
   const workspaceResetAt = localWorkspaceResetAt || (options.allowDestructiveClear ? snapshotUpdatedAt : 0);
-  await withoutLocalChangeEvents(async () => {
-    await saveCategories(localCategories);
-    await saveCards(localCards);
-  });
 
   const client = getBrowserSupabaseClient();
-  const [cloudCatResult, cloudCardResult, cloudPrefResult] = await Promise.all([
+  const [cloudCatResult, cloudCardResult, cloudPrefResult, cloudTombstoneResult] = await Promise.all([
     client.from("categories").select("*").eq("user_id", userId),
     client.from("cards").select("*").eq("user_id", userId),
     client.from("user_preferences").select("*").eq("user_id", userId),
+    client.from("workspace_tombstones").select("*").eq("user_id", userId),
   ]);
 
   if (cloudCatResult.error) throw formatCloudLoadError("\u5206\u7c7b", cloudCatResult.error.message);
   if (cloudCardResult.error) throw formatCloudLoadError("\u5361\u7247", cloudCardResult.error.message);
 
-  const cloudCategories = (cloudCatResult.data || []) as CloudCategory[];
-  const cloudCards = (cloudCardResult.data || []) as CloudCard[];
   if (cloudPrefResult.error) throw formatCloudLoadError("\u504f\u597d", cloudPrefResult.error.message);
+  if (cloudTombstoneResult.error) throw formatCloudLoadError("删除记录", cloudTombstoneResult.error.message);
+  const cloudTombstones = ((cloudTombstoneResult.data || []) as CloudTombstone[]).map(cloudToLocalTombstone);
+  const mergedTombstones = mergeSyncTombstones(localTombstones, cloudTombstones);
+  const categoryTombstones = tombstoneMapForType(mergedTombstones, "category");
+  const cardTombstones = tombstoneMapForType(mergedTombstones, "card");
+  localCategories = filterEntitiesSupersededByTombstones(localCategories, categoryTombstones);
+  localCards = filterEntitiesSupersededByTombstones(localCards, cardTombstones);
+  const cloudCategories = ((cloudCatResult.data || []) as CloudCategory[]).filter((row) => {
+    const tombstone = categoryTombstones.get(row.id);
+    return !tombstone || compareSyncVersions(cloudToLocalCategory(row), tombstone) > 0;
+  });
+  const activeCategoryIds = new Set([
+    ...cloudCategories.map((category) => category.id),
+    ...localCategories.map((category) => category.id),
+  ]);
+  const cloudCards = ((cloudCardResult.data || []) as CloudCard[]).filter((row) => {
+    const tombstone = cardTombstones.get(row.id);
+    return (!tombstone || compareSyncVersions(cloudToLocalCard(row), tombstone) > 0)
+      && activeCategoryIds.has(row.category_id);
+  });
+  await withoutLocalChangeEvents(async () => {
+    await saveCategories(localCategories);
+    await saveCards(localCards);
+  });
+  await saveSyncTombstones(mergedTombstones);
   const cloudPrefs = (cloudPrefResult.data || []) as CloudPreference[];
   const cloudPrefsMap = preferencesToMap(cloudPrefs);
   const cloudWorkspaceResetAt = getNumberPreference(cloudPrefsMap, WORKSPACE_RESET_PREF_KEY);
-  if (!options.allowDestructiveClear && cloudWorkspaceResetAt > localWorkspaceResetAt) {
+  const cloudWorkspaceResetRow = cloudPrefsMap[WORKSPACE_RESET_PREF_KEY];
+  const resetResolution = resolvePreferenceByRevision({
+    localValue: localWorkspaceResetAt,
+    localVersion: localPreferenceRevisions[WORKSPACE_RESET_PREF_KEY],
+    cloud: cloudWorkspaceResetRow ? {
+      value: cloudWorkspaceResetAt,
+      syncRevision: cloudWorkspaceResetRow.syncRevision,
+      syncDeviceId: cloudWorkspaceResetRow.syncDeviceId,
+      updatedAt: getPreferenceUpdatedAt(cloudPrefsMap, WORKSPACE_RESET_PREF_KEY),
+    } : null,
+    legacyValue: Math.max(localWorkspaceResetAt, cloudWorkspaceResetAt),
+  });
+  const cloudResetWins = resetResolution.source === "cloud"
+    || (resetResolution.source === "legacy" && cloudWorkspaceResetAt > localWorkspaceResetAt);
+  if (!options.allowDestructiveClear && cloudResetWins) {
     console.warn("[Sync] Cloud workspace reset is newer than this tab; pulling before push.");
     await syncData(userId, depth + 1);
     return;
@@ -1743,8 +1578,9 @@ async function pushLocalSnapshotToCloudUnsafe(
       warehouseImportBatches: localImportBatches,
       warehouseUpdatedAt: localWarehouseUpdatedAt,
       wallpaperPrefs: toWallpaperSyncedSettings(localWallpaperPrefs),
+      searchEngine: localSearchEngine,
       localSnapshotUpdatedAt: snapshotUpdatedAt,
-    });
+    }, { revisions: localPreferenceRevisions, cloudPrefsMap });
   }
   if (
     !options.allowDestructiveClear &&
@@ -1797,15 +1633,25 @@ async function pushLocalSnapshotToCloudUnsafe(
     return;
   }
 
-  const willDeleteCloudRows =
-    cloudCards.some((card) => !localCards.some((localCard) => localCard.id === card.id))
-    || cloudCategories.some((category) => !localCategories.some((localCategory) => localCategory.id === category.id));
+  const rawCloudCards = (cloudCardResult.data || []) as CloudCard[];
+  const rawCloudCategories = (cloudCatResult.data || []) as CloudCategory[];
+  const tombstonedCloudCardIds = rawCloudCards
+    .filter((row) => {
+      const tombstone = cardTombstones.get(row.id);
+      return tombstone && compareSyncVersions(tombstone, cloudToLocalCard(row)) >= 0;
+    })
+    .map((row) => row.id);
+  const tombstonedCloudCategoryIds = rawCloudCategories
+    .filter((row) => {
+      const tombstone = categoryTombstones.get(row.id);
+      return tombstone && compareSyncVersions(tombstone, cloudToLocalCategory(row)) >= 0;
+    })
+    .map((row) => row.id);
+  const willDeleteCloudRows = tombstonedCloudCardIds.length > 0 || tombstonedCloudCategoryIds.length > 0;
   if (willDeleteCloudRows) {
     await createLocalDataSnapshot("before-cloud-row-delete", "\u5220\u9664\u4e91\u7aef\u884c\u524d\u672c\u5730\u7248\u672c", { force: true });
     await writeSyncBackup(client, userId, "before-local-snapshot-replace", cloudCategories, cloudCards, cloudPrefs);
   }
-  const localCategoryIds = new Set(localCategories.map((category) => category.id));
-  const localCardIds = new Set(localCards.map((card) => card.id));
   const cloudCategoryById = new Map(cloudCategories.map((category) => [category.id, category]));
   const cloudCardById = new Map(cloudCards.map((card) => [card.id, card]));
   const categoryCandidateIds = includeParentCategoryIds(
@@ -1826,42 +1672,11 @@ async function pushLocalSnapshotToCloudUnsafe(
     (card, cloudCard) => cloudCardMatchesLocal(card, cloudCard, userId)
   );
 
-  const staleCardIds = cloudCards
-    .filter((card) => !localCardIds.has(card.id))
-    .map((card) => card.id);
-  if (staleCardIds.length > 0) {
-    const { error } = await client
-      .from("cards")
-      .delete()
-      .eq("user_id", userId)
-      .in("id", staleCardIds);
-    if (error) {
-      throw new Error(`Failed to remove stale cloud cards: ${error.message}`);
-    }
-  }
-
+  await upsertSyncTombstones(client, userId, mergedTombstones, cloudTombstones);
+  await deleteRowsByIdsInChunks(client, "cards", tombstonedCloudCardIds, userId);
+  await deleteRowsByIdsInChunks(client, "categories", tombstonedCloudCategoryIds, userId);
   await upsertCategoriesWithParents(client, categorySyncSelection.rowsToUpsert, userId);
-
   await upsertCardsInChunks(client, cardSyncSelection.rowsToUpsert, userId);
-
-  const staleCategoryIds = sortCategoriesByParentDepth(
-    cloudCategories
-      .filter((category) => !localCategoryIds.has(category.id))
-      .map(cloudToLocalCategory)
-  )
-    .reverse()
-    .map((category) => category.id);
-
-  for (const categoryId of staleCategoryIds) {
-    const { error } = await client
-      .from("categories")
-      .delete()
-      .eq("user_id", userId)
-      .eq("id", categoryId);
-    if (error) {
-      throw new Error(`Failed to remove stale cloud category "${categoryId}": ${error.message}`);
-    }
-  }
 
   await writePreferences(client, userId, {
     currentWorkspaceResetAt: workspaceResetAt,
@@ -1882,11 +1697,12 @@ async function pushLocalSnapshotToCloudUnsafe(
     warehouseImportBatches: localImportBatches,
     warehouseUpdatedAt: localWarehouseUpdatedAt,
     wallpaperPrefs: toWallpaperSyncedSettings(localWallpaperPrefs),
+    searchEngine: localSearchEngine,
     localSnapshotUpdatedAt: snapshotUpdatedAt,
-  });
+  }, { revisions: localPreferenceRevisions, cloudPrefsMap });
   await clearSyncDirtyIds({
-    categories: categorySyncSelection.resolvedIds,
-    cards: cardSyncSelection.resolvedIds,
+    categories: [...categorySyncSelection.resolvedIds, ...mergedTombstones.filter((item) => item.entityType === "category").map((item) => item.entityId)],
+    cards: [...cardSyncSelection.resolvedIds, ...mergedTombstones.filter((item) => item.entityType === "card").map((item) => item.entityId)],
   });
   await saveLocalSnapshotSyncedAt(syncStartLocalUpdatedAt);
   await saveLastSeenCloudSnapshotUpdatedAt(snapshotUpdatedAt);
@@ -2011,12 +1827,42 @@ async function syncPreferences(
   localWallpaperPrefs: WallpaperPrefs,
   localWorkspaceResetAt: number,
   localSnapshotUpdatedAt: number,
-  cloudPrefs: CloudPreference[]
+  cloudPrefs: CloudPreference[],
+  localPreferenceRevisions: SyncPreferenceRevisions,
+  localSearchEngine: SearchEngineId
 ): Promise<number> {
   const cloudPrefsMap = preferencesToMap(cloudPrefs);
+  const resolvedPreferenceRevisions: SyncPreferenceRevisions = { ...localPreferenceRevisions };
+
+  function resolvePreference<T>(key: string, localValue: T, legacyValue: T) {
+    const cloudRow = cloudPrefsMap[key];
+    const result = resolvePreferenceByRevision({
+      localValue,
+      localVersion: localPreferenceRevisions[key],
+      cloud: cloudRow ? {
+        value: cloudRow.value as T,
+        syncRevision: cloudRow.syncRevision,
+        syncDeviceId: cloudRow.syncDeviceId,
+        updatedAt: getPreferenceUpdatedAt(cloudPrefsMap, key),
+      } : null,
+      legacyValue,
+    });
+    if (result.version) resolvedPreferenceRevisions[key] = result.version;
+    return result;
+  }
+
   const cloudWorkspaceResetAt = getNumberPreference(cloudPrefsMap, WORKSPACE_RESET_PREF_KEY);
-  const workspaceResetAt = Math.max(localWorkspaceResetAt, cloudWorkspaceResetAt);
-  const cloudResetIsNewerThanLocal = cloudWorkspaceResetAt > localWorkspaceResetAt && cloudWorkspaceResetAt > localSnapshotUpdatedAt;
+  const workspaceResetResolution = resolvePreference(
+    WORKSPACE_RESET_PREF_KEY,
+    localWorkspaceResetAt,
+    Math.max(localWorkspaceResetAt, cloudWorkspaceResetAt)
+  );
+  const workspaceResetAt = typeof workspaceResetResolution.value === "number"
+    ? workspaceResetResolution.value
+    : 0;
+  const cloudResetIsNewerThanLocal = workspaceResetResolution.source === "cloud"
+    ? workspaceResetAt > localSnapshotUpdatedAt
+    : cloudWorkspaceResetAt > localWorkspaceResetAt && cloudWorkspaceResetAt > localSnapshotUpdatedAt;
   if (workspaceResetAt !== localWorkspaceResetAt) {
     await withoutLocalChangeEvents(async () => {
       await saveWorkspaceResetAt(workspaceResetAt);
@@ -2026,11 +1872,12 @@ async function syncPreferences(
   const cloudHiddenSites = shouldIgnoreCloudPreference(cloudPrefsMap, "hiddenSites", workspaceResetAt)
     ? []
     : Array.isArray(cloudPrefsMap.hiddenSites?.value) ? cloudPrefsMap.hiddenSites.value as HiddenSite[] : [];
-  const mergedHiddenSites = mergeHiddenSites(
+  const legacyMergedHiddenSites = mergeHiddenSites(
     cloudResetIsNewerThanLocal ? [] : localHiddenSites,
     cloudHiddenSites
   );
-  if (mergedHiddenSites.length !== localHiddenSites.length) {
+  const mergedHiddenSites = resolvePreference("hiddenSites", localHiddenSites, legacyMergedHiddenSites).value;
+  if (JSON.stringify(mergedHiddenSites) !== JSON.stringify(localHiddenSites)) {
     await withoutLocalChangeEvents(async () => {
       await saveHiddenSites(mergedHiddenSites);
     });
@@ -2039,8 +1886,9 @@ async function syncPreferences(
   const cloudPinnedIds = !shouldIgnoreCloudPreference(cloudPrefsMap, "pinnedCategoryIds", workspaceResetAt) && Array.isArray(cloudPrefsMap.pinnedCategoryIds?.value)
     ? cloudPrefsMap.pinnedCategoryIds.value as string[]
     : [];
-  const mergedPinnedIds = [...new Set([...cloudPinnedIds, ...(cloudResetIsNewerThanLocal ? [] : localPinnedIds)])];
-  if (mergedPinnedIds.length !== localPinnedIds.length) {
+  const legacyMergedPinnedIds = [...new Set([...cloudPinnedIds, ...(cloudResetIsNewerThanLocal ? [] : localPinnedIds)])];
+  const mergedPinnedIds = resolvePreference("pinnedCategoryIds", localPinnedIds, legacyMergedPinnedIds).value;
+  if (JSON.stringify(mergedPinnedIds) !== JSON.stringify(localPinnedIds)) {
     await withoutLocalChangeEvents(async () => {
       await savePinnedCategoryIds(mergedPinnedIds);
     });
@@ -2058,15 +1906,25 @@ async function syncPreferences(
       );
   const localPinnedBookmarkItemsForMerge = cloudResetIsNewerThanLocal ? [] : localPinnedBookmarkItems;
   const localPinnedBookmarkItemsUpdatedAtForMerge = cloudResetIsNewerThanLocal ? 0 : localPinnedBookmarkItemsUpdatedAt;
-  const mergedPinnedBookmarkUpdatedAt = Math.max(
+  const legacyMergedPinnedBookmarkUpdatedAt = Math.max(
     localPinnedBookmarkItemsUpdatedAtForMerge,
     cloudPinnedBookmarkItemsUpdatedAt
   );
-  const mergedPinnedBookmarkItems = cloudResetIsNewerThanLocal || cloudPinnedBookmarkItemsUpdatedAt > localPinnedBookmarkItemsUpdatedAtForMerge
+  const legacyMergedPinnedBookmarkItems = cloudResetIsNewerThanLocal || cloudPinnedBookmarkItemsUpdatedAt > localPinnedBookmarkItemsUpdatedAtForMerge
     ? normalizePinnedBookmarkItems(cloudPinnedBookmarkItems)
     : localPinnedBookmarkItemsUpdatedAtForMerge > cloudPinnedBookmarkItemsUpdatedAt
       ? normalizePinnedBookmarkItems(localPinnedBookmarkItemsForMerge)
       : mergePinnedBookmarkPreferences(cloudPinnedBookmarkItems, localPinnedBookmarkItemsForMerge);
+  const mergedPinnedBookmarkItems = resolvePreference(
+    "pinnedBookmarkItems",
+    localPinnedBookmarkItems,
+    legacyMergedPinnedBookmarkItems
+  ).value;
+  const mergedPinnedBookmarkUpdatedAt = resolvePreference(
+    "pinnedBookmarkItemsUpdatedAt",
+    localPinnedBookmarkItemsUpdatedAt,
+    legacyMergedPinnedBookmarkUpdatedAt
+  ).value;
   if (JSON.stringify(mergedPinnedBookmarkItems) !== JSON.stringify(localPinnedBookmarkItems)) {
     await withoutLocalChangeEvents(async () => {
       await savePinnedBookmarkItems(mergedPinnedBookmarkItems, mergedPinnedBookmarkUpdatedAt || Date.now());
@@ -2077,10 +1935,11 @@ async function syncPreferences(
     ? null
     : cloudPrefsMap.categoryWidths?.value;
   const localWidthsForMerge = cloudResetIsNewerThanLocal ? {} : localWidths;
-  const mergedWidths = Object.keys(localWidthsForMerge).length > 0 || !cloudWidths || Array.isArray(cloudWidths)
+  const legacyMergedWidths = Object.keys(localWidthsForMerge).length > 0 || !cloudWidths || Array.isArray(cloudWidths)
     ? localWidthsForMerge
     : cloudWidths as Record<string, number>;
-  if (mergedWidths !== localWidths) {
+  const mergedWidths = resolvePreference("categoryWidths", localWidths, legacyMergedWidths).value;
+  if (JSON.stringify(mergedWidths) !== JSON.stringify(localWidths)) {
     await withoutLocalChangeEvents(async () => {
       await saveCategoryWidths(mergedWidths);
     });
@@ -2090,7 +1949,8 @@ async function syncPreferences(
     ? {}
     : normalizeCategoryLayouts(cloudPrefsMap.categoryLayouts?.value);
   const localLayoutsForMerge = cloudResetIsNewerThanLocal ? {} : localLayouts;
-  const mergedLayouts = mergeCategoryLayouts(localLayoutsForMerge, cloudLayouts);
+  const legacyMergedLayouts = mergeCategoryLayouts(localLayoutsForMerge, cloudLayouts);
+  const mergedLayouts = resolvePreference("categoryLayouts", localLayouts, legacyMergedLayouts).value;
   if (JSON.stringify(mergedLayouts) !== JSON.stringify(localLayouts)) {
     await withoutLocalChangeEvents(async () => {
       await saveCategoryLayouts(mergedLayouts);
@@ -2105,9 +1965,10 @@ async function syncPreferences(
     cloudVisualScale === 90 && localVisualScaleForMerge === DEFAULT_VISUAL_SCALE
       ? DEFAULT_VISUAL_SCALE
       : cloudVisualScale;
-  const mergedVisualScale = typeof cloudVisualScaleForMerge === "number" && localVisualScaleForMerge === DEFAULT_VISUAL_SCALE
+  const legacyMergedVisualScale = typeof cloudVisualScaleForMerge === "number" && localVisualScaleForMerge === DEFAULT_VISUAL_SCALE
     ? cloudVisualScaleForMerge
     : localVisualScaleForMerge;
+  const mergedVisualScale = resolvePreference("visualScale", localVisualScale, legacyMergedVisualScale).value;
   if (mergedVisualScale !== localVisualScale) {
     await withoutLocalChangeEvents(async () => {
       await saveVisualScale(mergedVisualScale);
@@ -2118,9 +1979,10 @@ async function syncPreferences(
     ? null
     : cloudPrefsMap.linkOpenMode?.value;
   const localLinkOpenModeForMerge = cloudResetIsNewerThanLocal ? "new-background-tab" : localLinkOpenMode;
-  const mergedLinkOpenMode = isLinkOpenMode(cloudLinkOpenMode) && localLinkOpenModeForMerge === "new-background-tab"
+  const legacyMergedLinkOpenMode = isLinkOpenMode(cloudLinkOpenMode) && localLinkOpenModeForMerge === "new-background-tab"
     ? cloudLinkOpenMode
     : localLinkOpenModeForMerge;
+  const mergedLinkOpenMode = resolvePreference("linkOpenMode", localLinkOpenMode, legacyMergedLinkOpenMode).value;
   if (mergedLinkOpenMode !== localLinkOpenMode) {
     await withoutLocalChangeEvents(async () => {
       await saveLinkOpenMode(mergedLinkOpenMode);
@@ -2141,11 +2003,13 @@ async function syncPreferences(
     cloudHasRealLayout && (cloudSnapshotUpdatedAt > localSnapshotUpdatedAt || shouldProtectCloudLayout || localLayoutWasMarkedUnsafe);
   const shouldPreferLocalLayout = localSnapshotUpdatedAt > 0 && localSnapshotUpdatedAt > cloudSnapshotUpdatedAt && !shouldPreferCloudLayout;
 
-  const mergedSections = shouldPreferCloudLayout
+  const legacyMergedSections = shouldPreferCloudLayout
     ? mergeSections([], cloudSections)
     : shouldPreferLocalLayout
       ? mergeSections(localSectionsForMerge, [])
       : mergeSections(localSectionsForMerge, cloudSections);
+  const resolvedSections = resolvePreference("collectionSections", localSections, legacyMergedSections).value;
+  const mergedSections = mergeSections(resolvedSections, []);
   if (JSON.stringify(mergedSections) !== JSON.stringify(localSections)) {
     await withoutLocalChangeEvents(async () => {
       await saveSections(mergedSections);
@@ -2156,30 +2020,41 @@ async function syncPreferences(
     && typeof cloudPrefsMap.activeCollectionSectionId?.value === "string"
     ? cloudPrefsMap.activeCollectionSectionId.value
     : null;
-  const mergedActiveSectionId = shouldPreferCloudLayout
+  const legacyMergedActiveSectionId = shouldPreferCloudLayout
     ? cloudActiveSectionId || localActiveSectionId || mergedSections[0]?.id || "section-default"
     : localActiveSectionId || cloudActiveSectionId || mergedSections[0]?.id || "section-default";
+  const mergedActiveSectionId = resolvePreference(
+    "activeCollectionSectionId",
+    localActiveSectionId || "section-default",
+    legacyMergedActiveSectionId
+  ).value;
   if (mergedActiveSectionId !== localActiveSectionId) {
     await withoutLocalChangeEvents(async () => {
       await saveActiveSectionId(mergedActiveSectionId);
     });
   }
 
-  const mergedCategorySectionIds = {
+  const legacyMergedCategorySectionIds = {
     ...(shouldPreferCloudLayout ? localCategorySectionIdsForMerge : shouldPreferLocalLayout ? {} : cloudCategorySectionIds),
     ...(shouldPreferCloudLayout ? cloudCategorySectionIds : localCategorySectionIdsForMerge),
   };
+  const mergedCategorySectionIds = resolvePreference(
+    "categorySectionIds",
+    localCategorySectionIds,
+    legacyMergedCategorySectionIds
+  ).value;
 
   const cloudRecycleBin = !shouldIgnoreCloudPreference(cloudPrefsMap, "recycleBin", workspaceResetAt)
     && Array.isArray(cloudPrefsMap.recycleBin?.value)
     ? cloudPrefsMap.recycleBin.value as RecycleBinItem[]
     : [];
   const localRecycleBinForMerge = cloudResetIsNewerThanLocal ? [] : localRecycleBin;
-  const mergedRecycleBin = shouldPreferCloudLayout
+  const legacyMergedRecycleBin = shouldPreferCloudLayout
     ? cloudRecycleBin
     : shouldPreferLocalLayout
       ? localRecycleBinForMerge
       : mergeRecycleBin(localRecycleBinForMerge, cloudRecycleBin);
+  const mergedRecycleBin = resolvePreference("recycleBin", localRecycleBin, legacyMergedRecycleBin).value;
   if (JSON.stringify(mergedRecycleBin) !== JSON.stringify(localRecycleBin)) {
     await withoutLocalChangeEvents(async () => {
       await saveRecycleBin(mergedRecycleBin);
@@ -2208,12 +2083,20 @@ async function syncPreferences(
   const localImportBatchesForMerge = cloudResetIsNewerThanLocal ? [] : localImportBatches;
   const localWarehouseUpdatedAtForMerge = cloudResetIsNewerThanLocal ? 0 : localWarehouseUpdatedAt;
 
-  const warehouseCards = shouldPullCloudWarehouse ? cloudWarehouseCards : localWarehouseCardsForMerge;
-  const warehouseCategories = shouldPullCloudWarehouse ? cloudWarehouseCategories : localWarehouseCategoriesForMerge;
-  const warehouseImportBatches = shouldPullCloudWarehouse ? cloudImportBatches : localImportBatchesForMerge;
-  const warehouseUpdatedAt = shouldPullCloudWarehouse ? cloudWarehouseUpdatedAt : localWarehouseUpdatedAtForMerge;
+  const legacyWarehouseCards = shouldPullCloudWarehouse ? cloudWarehouseCards : localWarehouseCardsForMerge;
+  const legacyWarehouseCategories = shouldPullCloudWarehouse ? cloudWarehouseCategories : localWarehouseCategoriesForMerge;
+  const legacyWarehouseImportBatches = shouldPullCloudWarehouse ? cloudImportBatches : localImportBatchesForMerge;
+  const legacyWarehouseUpdatedAt = shouldPullCloudWarehouse ? cloudWarehouseUpdatedAt : localWarehouseUpdatedAtForMerge;
+  const warehouseCards = resolvePreference("warehouseCards", localWarehouseCards, legacyWarehouseCards).value;
+  const warehouseCategories = resolvePreference("warehouseCategories", localWarehouseCategories, legacyWarehouseCategories).value;
+  const warehouseImportBatches = resolvePreference("warehouseImportBatches", localImportBatches, legacyWarehouseImportBatches).value;
+  const warehouseUpdatedAt = resolvePreference("warehouseUpdatedAt", localWarehouseUpdatedAt, legacyWarehouseUpdatedAt).value;
 
-  if (shouldPullCloudWarehouse || cloudResetIsNewerThanLocal) {
+  if (
+    JSON.stringify(warehouseCards) !== JSON.stringify(localWarehouseCards)
+    || JSON.stringify(warehouseCategories) !== JSON.stringify(localWarehouseCategories)
+    || JSON.stringify(warehouseImportBatches) !== JSON.stringify(localImportBatches)
+  ) {
     await withoutLocalChangeEvents(async () => {
       await Promise.all([
         saveWarehouseCards(warehouseCards),
@@ -2225,10 +2108,31 @@ async function syncPreferences(
 
   const cloudWallpaperSettings = getCloudWallpaperSettings(cloudPrefsMap);
   const wallpaperPrefsMerge = mergeWallpaperPrefsByUpdatedAt(localWallpaperPrefs, cloudWallpaperSettings);
-  await applySyncedWallpaperPrefsIfNeeded(wallpaperPrefsMerge.prefs, wallpaperPrefsMerge.shouldApplyCloud);
-  const mergedWallpaperPrefs = wallpaperPrefsMerge.shouldApplyCloud
-    ? await getWallpaperPrefs()
-    : wallpaperPrefsMerge.prefs;
+  const localWallpaperSettings = toWallpaperSyncedSettings(localWallpaperPrefs);
+  const legacyWallpaperSettings = toWallpaperSyncedSettings(wallpaperPrefsMerge.prefs);
+  const mergedWallpaperSettings = resolvePreference(
+    "wallpaperPrefs",
+    localWallpaperSettings,
+    legacyWallpaperSettings
+  ).value;
+  const mergedWallpaperPrefs = applyWallpaperSyncedSettings(localWallpaperPrefs, mergedWallpaperSettings);
+  await applySyncedWallpaperPrefsIfNeeded(
+    mergedWallpaperPrefs,
+    JSON.stringify(mergedWallpaperSettings) !== JSON.stringify(localWallpaperSettings)
+  );
+
+  const cloudSearchEngine = isSearchEngineId(cloudPrefsMap.searchEngine?.value)
+    ? cloudPrefsMap.searchEngine.value
+    : DEFAULT_SEARCH_ENGINE_ID;
+  const legacySearchEngine = localSearchEngine === DEFAULT_SEARCH_ENGINE_ID
+    ? cloudSearchEngine
+    : localSearchEngine;
+  const mergedSearchEngine = resolvePreference("searchEngine", localSearchEngine, legacySearchEngine).value;
+  if (mergedSearchEngine !== localSearchEngine) {
+    await withoutLocalChangeEvents(async () => {
+      await saveSearchEngine(mergedSearchEngine);
+    });
+  }
 
   const syncedCloudSnapshotUpdatedAt = Math.max(localSnapshotUpdatedAt, cloudSnapshotUpdatedAt);
   await writePreferences(client, userId, {
@@ -2250,21 +2154,46 @@ async function syncPreferences(
     warehouseImportBatches,
     warehouseUpdatedAt,
     wallpaperPrefs: toWallpaperSyncedSettings(mergedWallpaperPrefs),
+    searchEngine: mergedSearchEngine,
     localSnapshotUpdatedAt: syncedCloudSnapshotUpdatedAt,
-  });
+  }, { revisions: resolvedPreferenceRevisions, cloudPrefsMap });
+  await saveSyncPreferenceRevisions(resolvedPreferenceRevisions);
   return syncedCloudSnapshotUpdatedAt;
 }
 
 async function writePreferences(
   client: SupabaseClient,
   userId: string,
-  preferences: Record<string, unknown>
+  preferences: Record<string, unknown>,
+  options: {
+    revisions?: SyncPreferenceRevisions;
+    cloudPrefsMap?: CloudPreferenceMap;
+  } = {}
 ): Promise<void> {
-  const rows = Object.entries(preferences).map(([key, value]) => ({
-    user_id: userId,
-    key,
-    value,
-  }));
+  const revisions = options.revisions || await getSyncPreferenceRevisions();
+  const rows = Object.entries(preferences).flatMap(([key, value]) => {
+    const version: SyncVersionStamp = revisions[key] || {
+      syncRevision: 0,
+      syncDeviceId: "legacy",
+    };
+    const cloud = options.cloudPrefsMap?.[key];
+    if (cloud) {
+      const comparison = compareSyncVersions(version, {
+        syncRevision: cloud.syncRevision,
+        syncDeviceId: cloud.syncDeviceId,
+        updatedAt: new Date(cloud.updatedAt).getTime(),
+      });
+      const sameValue = JSON.stringify(value) === JSON.stringify(cloud.value);
+      if (comparison < 0 || (comparison === 0 && sameValue)) return [];
+    }
+    return [{
+      user_id: userId,
+      key,
+      value,
+      sync_revision: version.syncRevision,
+      sync_device_id: version.syncDeviceId,
+    }];
+  });
   if (rows.length === 0) return;
 
   const { error } = await client

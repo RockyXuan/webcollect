@@ -1,6 +1,5 @@
 import type { Category, CollectionSection, WebCard } from "./types";
-import { saveCards, saveCategories, saveSections } from "./db";
-import { localizeDescriptionText } from "./description-translation";
+import { saveCardsRebased, saveCategoriesRebased, saveSectionsRebased } from "./db";
 import { createLocalDataSnapshot } from "./local-snapshots";
 import { isChromeExtension } from "./platform";
 import { useAppStore } from "./store";
@@ -817,10 +816,7 @@ export function drainCaptureQueueItemsForWorkspace(
     }
 
     const categoryCards = cards.filter((card) => card.categoryId === categoryId);
-    const description = localizeDescriptionText(item.draft.description?.trim() || "", {
-      title,
-      url: normalizedUrl,
-    });
+    const description = item.draft.description?.trim() || "";
     const createdAt = nextCaptureTimestamp(options);
     const nextCard: WebCard = {
       id: `card-${createdAt}-${nextCaptureRandomId(options)}`,
@@ -966,15 +962,15 @@ export async function drainFloatingCaptureQueue(): Promise<{ imported: number; s
   }
 
   if (drained.changed || repaired.changed) {
-    await Promise.all([
-      saveSections(repaired.sections),
-      saveCategories(repaired.categories),
-      saveCards(repaired.cards),
+    const [sections, categories, cards] = await Promise.all([
+      saveSectionsRebased(app.sections, repaired.sections),
+      saveCategoriesRebased(app.categories, repaired.categories),
+      saveCardsRebased(app.cards, repaired.cards),
     ]);
     useAppStore.setState({
-      sections: repaired.sections,
-      categories: repaired.categories,
-      cards: repaired.cards,
+      sections,
+      categories,
+      cards,
     });
     await replaceCaptureQueueThroughBackground(queue, repaired.queue);
   }

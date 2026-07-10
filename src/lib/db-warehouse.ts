@@ -9,7 +9,8 @@
 
 import localforage from "localforage";
 import type { WebCard, Category } from "./types";
-import { markLocalSnapshotChanged } from "./db";
+import { markLocalSnapshotChanged, markSyncPreferenceChanged } from "./db";
+import { withStorageLock } from "./storage-lock";
 
 localforage.config({
   name: "WebCollect",
@@ -24,7 +25,19 @@ const WH_UPDATED_AT_KEY = "wh_updated_at";
 
 async function touchWarehouse(): Promise<void> {
   await localforage.setItem(WH_UPDATED_AT_KEY, Date.now());
+  await markSyncPreferenceChanged("warehouseUpdatedAt");
   await markLocalSnapshotChanged();
+}
+
+async function saveWarehousePreference<T>(storageKey: string, syncKey: string, value: T): Promise<void> {
+  const changed = await withStorageLock(`warehouse:${storageKey}`, async () => {
+    const previous = await localforage.getItem<unknown>(storageKey);
+    if (JSON.stringify(previous) === JSON.stringify(value)) return false;
+    await localforage.setItem(storageKey, value);
+    await markSyncPreferenceChanged(syncKey);
+    return true;
+  });
+  if (changed) await touchWarehouse();
 }
 
 export async function getWarehouseUpdatedAt(): Promise<number> {
@@ -56,12 +69,11 @@ export interface WarehouseCategory extends Category {
 
 export async function getWarehouseCards(): Promise<WarehouseCard[]> {
   const cards = (await localforage.getItem<WarehouseCard[]>(WH_CARDS_KEY)) || [];
-  return cards.sort((a, b) => a.order - b.order);
+  return [...cards].sort((a, b) => a.order - b.order);
 }
 
 export async function saveWarehouseCards(cards: WarehouseCard[]): Promise<void> {
-  await localforage.setItem(WH_CARDS_KEY, cards);
-  await touchWarehouse();
+  await saveWarehousePreference(WH_CARDS_KEY, "warehouseCards", cards);
 }
 
 export async function addWarehouseCard(card: WarehouseCard): Promise<void> {
@@ -90,12 +102,11 @@ export async function deleteWarehouseCardsByBatch(batchId: string): Promise<void
 
 export async function getWarehouseCategories(): Promise<WarehouseCategory[]> {
   const cats = (await localforage.getItem<WarehouseCategory[]>(WH_CATEGORIES_KEY)) || [];
-  return cats.sort((a, b) => a.order - b.order);
+  return [...cats].sort((a, b) => a.order - b.order);
 }
 
 export async function saveWarehouseCategories(categories: WarehouseCategory[]): Promise<void> {
-  await localforage.setItem(WH_CATEGORIES_KEY, categories);
-  await touchWarehouse();
+  await saveWarehousePreference(WH_CATEGORIES_KEY, "warehouseCategories", categories);
 }
 
 export async function addWarehouseCategory(cat: WarehouseCategory): Promise<void> {
@@ -131,12 +142,11 @@ export async function deleteWarehouseCategoriesByBatch(batchId: string): Promise
 
 export async function getImportBatches(): Promise<ImportBatch[]> {
   const batches = (await localforage.getItem<ImportBatch[]>(WH_BATCHES_KEY)) || [];
-  return batches.sort((a, b) => b.importedAt - a.importedAt); // newest first
+  return [...batches].sort((a, b) => b.importedAt - a.importedAt); // newest first
 }
 
 export async function saveImportBatches(batches: ImportBatch[]): Promise<void> {
-  await localforage.setItem(WH_BATCHES_KEY, batches);
-  await touchWarehouse();
+  await saveWarehousePreference(WH_BATCHES_KEY, "warehouseImportBatches", batches);
 }
 
 export async function addImportBatch(batch: ImportBatch): Promise<void> {
