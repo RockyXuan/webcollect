@@ -30,6 +30,7 @@ Target release: `V1.1.0`
 | DATA-02 | P0 | Sync | Preference unions prevent unpin, unhide, and recycle-bin empty from propagating. | Open |
 | DATA-03 | P0 | Concurrency | Whole-array IndexedDB and `chrome.storage` read-modify-write operations can lose concurrent updates. | Open |
 | DATA-04 | P0 | Migration | Name-based heuristics deleted legitimate categories, rewrote descriptions, and ran without a pre-migration snapshot. | Fixed with behavioral tests |
+| DATA-05 | P1 | Recovery | Snapshot health used personal crypto keywords and fixed minimum workspace sizes. | Fixed with relative structural tests |
 | SEC-01 | P0 | Server fetch | Metadata and safety routes can request localhost/private-network URLs. | Open |
 | SEC-02 | P1 | Dependencies | Production dependency audit contains critical/high advisories and unused large dependency trees. | Open |
 | UI-01 | P1 | Responsive | Fixed 2048px canvas with a minimum zoom clipped 1024px and 390px viewports. Vitest plus Playwright now cover five target sizes. | Fixed and browser-verified |
@@ -58,3 +59,10 @@ Every finding must have a failing behavioral test, the smallest root-cause fix, 
 - Fix: local schema v2 snapshots first and only performs additive or visibility-preserving repairs. Automatic name-based deletion, description translation, recovered-category deletion, reset-time filtering, and direct-card reparenting were removed.
 - Focused verification: migration safety tests, startup idempotency test, TypeScript, and ESLint pass.
 - Data impact: the migration no longer deletes or semantically rewrites user-owned content.
+
+### DATA-05 snapshot and recovery health
+
+- Before: a valid one-card workspace was rejected because it was small, while orphaned card references were not identified; category names such as `zkSync` reduced the score.
+- Fix: snapshot health now validates IDs and references only. Emergency recovery compares the current workspace with same-size-or-larger candidates and prompts only when the candidate has a demonstrably richer section distribution.
+- Focused verification: valid small workspace, orphaned-card, small collapsed workspace, and already-healthy workspace tests pass.
+- Data impact: recovery remains confirmation-only and never applies a snapshot automatically.

@@ -4,6 +4,7 @@ import {
   getSections,
 } from "@/lib/db";
 import {
+  assessLocalDataSnapshot,
   getLocalDataSnapshots,
   restoreLocalDataSnapshot,
   type LocalSnapshotData,
@@ -75,31 +76,11 @@ function distributionStats(data: Pick<LocalSnapshotData, "cards" | "categories" 
   return { counts, sectionsWithCards, defaultShare, nonDefaultCards };
 }
 
-function isHealthySnapshot(snapshot: LocalSnapshotEntry): boolean {
-  const data = snapshot.data;
-  if (data.cards.length < 40 || data.categories.length < 20 || data.sections.length < 3) return false;
-  const stats = distributionStats(data);
-  if (stats.sectionsWithCards < 2) return false;
-  if (stats.nonDefaultCards < 12) return false;
-  if (stats.defaultShare > 0.82) return false;
-  return parentLinkCount(data.categories) >= 4;
-}
-
-function currentLooksCollapsed(
+type WorkspaceShape = {
   cards: WebCard[],
   categories: Category[],
   sections: CollectionSection[]
-): boolean {
-  if (cards.length < 20 || categories.length < 8) return false;
-  const data = {
-    cards,
-    categories,
-    sections,
-  };
-  const stats = distributionStats(data);
-  if (sections.length > 1 && stats.nonDefaultCards === 0) return true;
-  return stats.defaultShare > 0.68 && stats.sectionsWithCards <= 2;
-}
+};
 
 function snapshotRank(snapshot: LocalSnapshotEntry): number {
   const stats = distributionStats(snapshot.data);
@@ -112,9 +93,24 @@ function snapshotRank(snapshot: LocalSnapshotEntry): number {
   );
 }
 
-function pickLatestHealthySnapshot(snapshots: LocalSnapshotEntry[]): LocalSnapshotEntry | null {
+export function selectEmergencyRestoreCandidate(
+  current: WorkspaceShape,
+  snapshots: LocalSnapshotEntry[]
+): LocalSnapshotEntry | null {
+  if (current.sections.length <= 1) return null;
+  const currentStats = distributionStats(current);
+  const currentLooksCollapsed = currentStats.nonDefaultCards === 0 || currentStats.sectionsWithCards <= 1;
+  if (!currentLooksCollapsed) return null;
+
   const healthy = snapshots
-    .filter(isHealthySnapshot)
+    .filter((snapshot) => assessLocalDataSnapshot(snapshot).recoverable)
+    .filter((snapshot) => snapshot.data.cards.length >= current.cards.length)
+    .filter((snapshot) => snapshot.data.categories.length >= current.categories.length)
+    .filter((snapshot) => {
+      const candidateStats = distributionStats(snapshot.data);
+      return candidateStats.sectionsWithCards > currentStats.sectionsWithCards
+        && candidateStats.nonDefaultCards > currentStats.nonDefaultCards;
+    })
     .sort((a, b) => b.createdAt - a.createdAt || snapshotRank(b) - snapshotRank(a));
   return healthy[0] || null;
 }
@@ -126,12 +122,8 @@ export async function restoreLatestHealthyWorkspaceIfNeeded(): Promise<Emergency
     getSections(),
   ]);
 
-  if (!currentLooksCollapsed(cards, categories, sections)) {
-    return { restored: false, shouldPrompt: false, reason: "current-layout-not-collapsed" };
-  }
-
   const snapshots = await getLocalDataSnapshots();
-  const latestHealthy = pickLatestHealthySnapshot(snapshots);
+  const latestHealthy = selectEmergencyRestoreCandidate({ cards, categories, sections }, snapshots);
   if (latestHealthy) {
     return {
       restored: false,

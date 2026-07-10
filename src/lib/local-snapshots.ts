@@ -270,62 +270,43 @@ function distributionStats(data: Pick<LocalSnapshotData, "cards" | "categories" 
   return { counts, sectionsWithCards, defaultShare, nonDefaultCards };
 }
 
-function parentLinkCount(categories: Category[]): number {
-  const categoryIds = new Set(categories.map((category) => category.id));
-  return categories.filter((category) => category.parentId && categoryIds.has(category.parentId)).length;
-}
-
-function hasKnownMisplacedCryptoInHome(categories: Category[]): boolean {
-  const suspiciousTerms = [
-    "bstocks",
-    "rwa",
-    "macro",
-    "stock",
-    "zksync",
-    "zk era",
-    "zk official",
-    "coin",
-    "defi",
-    "airdrop",
-    "layerzero",
-    "stark",
-  ];
-  return categories.some((category) => {
-    if ((category.sectionId || DEFAULT_SECTION_ID) !== DEFAULT_SECTION_ID) return false;
-    const name = normalizeSnapshotText(category.name);
-    return suspiciousTerms.some((term) => name.includes(term));
-  });
-}
-
 export function assessLocalDataSnapshot(snapshot: LocalSnapshotEntry): LocalSnapshotAssessment {
   const data = snapshot.data;
   const stats = distributionStats(data);
-  const links = parentLinkCount(data.categories);
+  const sectionIds = new Set(data.sections.map((section) => section.id));
+  const categoryIds = new Set(data.categories.map((category) => category.id));
+  const duplicateSectionIds = data.sections.length - sectionIds.size;
+  const duplicateCategoryIds = data.categories.length - categoryIds.size;
+  const duplicateCardIds = data.cards.length - new Set(data.cards.map((card) => card.id)).size;
+  const orphanedCategories = data.categories.filter((category) =>
+    (category.parentId && !categoryIds.has(category.parentId))
+    || !sectionIds.has(category.sectionId || DEFAULT_SECTION_ID)
+  );
+  const orphanedCards = data.cards.filter((card) => !categoryIds.has(card.categoryId));
   const score =
     structureScore(data)
-    + stats.sectionsWithCards * 160
-    + stats.nonDefaultCards * 3
-    - Math.round(stats.defaultShare * 260)
-    - (hasKnownMisplacedCryptoInHome(data.categories) ? 500 : 0);
+    + data.cards.length
+    + data.categories.length * 2
+    + stats.sectionsWithCards * 8
+    - orphanedCategories.length * 100
+    - orphanedCards.length * 100;
   const issues: string[] = [];
 
-  if (data.cards.length < 20) issues.push("网页数量偏少");
-  if (data.categories.length < 10) issues.push("分类数量偏少");
-  if (data.sections.length < 2) issues.push("分项不足");
-  if (stats.sectionsWithCards < 2) issues.push("只有一个分项有内容");
-  if (stats.nonDefaultCards < Math.min(12, Math.max(4, Math.floor(data.cards.length * 0.08)))) {
-    issues.push("非主页内容偏少");
-  }
-  if (stats.defaultShare > 0.82) issues.push("大部分内容在主页");
-  if (links < 3) issues.push("分组关系偏少");
-  if (hasKnownMisplacedCryptoInHome(data.categories)) issues.push("疑似 HODL/crypto 内容落在主页");
+  if (data.sections.length === 0) issues.push("缺少分项");
+  if (data.cards.length === 0 && data.categories.length === 0) issues.push("快照为空");
+  if (duplicateSectionIds > 0) issues.push("分项 ID 重复");
+  if (duplicateCategoryIds > 0) issues.push("分类 ID 重复");
+  if (duplicateCardIds > 0) issues.push("网页 ID 重复");
+  if (orphanedCategories.length > 0) issues.push("分类引用了不存在的分项或父分类");
+  if (orphanedCards.length > 0) issues.push("网页引用了不存在的分类");
+  if (data.activeSectionId && !sectionIds.has(data.activeSectionId)) issues.push("当前分项不存在");
 
   const recoverable = issues.length === 0;
   return {
     recoverable,
     score,
     label: recoverable ? "结构正常候选" : "谨慎检查",
-    details: recoverable ? "多分项、多分组、内容分布正常" : issues.join(" / "),
+    details: recoverable ? "引用关系完整，可安全恢复" : issues.join(" / "),
     sectionCardCounts: stats.counts,
   };
 }
