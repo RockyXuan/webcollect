@@ -28,7 +28,7 @@ Target release: `V1.1.0`
 | --- | --- | --- | --- | --- |
 | DATA-01 | P0 | Sync | Cloud-only rows can resurrect locally deleted cards/categories. | Open |
 | DATA-02 | P0 | Sync | Preference unions prevent unpin, unhide, and recycle-bin empty from propagating. | Open |
-| DATA-03 | P0 | Concurrency | Whole-array IndexedDB and `chrome.storage` read-modify-write operations can lose concurrent updates. | Open |
+| DATA-03 | P0 | Concurrency | IndexedDB and `chrome.storage` read-modify-write operations lost concurrent updates. Atomic mutation paths are fixed; revision conflict handling remains in DATA-01/02. | Partial: local and queue writes fixed |
 | DATA-04 | P0 | Migration | Name-based heuristics deleted legitimate categories, rewrote descriptions, and ran without a pre-migration snapshot. | Fixed with behavioral tests |
 | DATA-05 | P1 | Recovery | Snapshot health used personal crypto keywords and fixed minimum workspace sizes. | Fixed with relative structural tests |
 | SEC-01 | P0 | Server fetch | Metadata and safety routes can request localhost/private-network URLs. | Open |
@@ -66,3 +66,10 @@ Every finding must have a failing behavioral test, the smallest root-cause fix, 
 - Fix: snapshot health now validates IDs and references only. Emergency recovery compares the current workspace with same-size-or-larger candidates and prompts only when the candidate has a demonstrably richer section distribution.
 - Focused verification: valid small workspace, orphaned-card, small collapsed workspace, and already-healthy workspace tests pass.
 - Data impact: recovery remains confirmation-only and never applies a snapshot automatically.
+
+### DATA-03 concurrent local writes
+
+- Before: two simultaneous card captures or category additions retained only the second item. Recycle-bin and dirty-set updates had the same read-modify-write race.
+- Fix: added a cross-tab Web Locks wrapper with an in-process fallback around atomic IndexedDB mutations. Floating-capture queue writes now run through one background mutation queue and preserve captures created after a new-tab drain started.
+- Focused verification: concurrent card, category, recycle-bin, dirty-set, and queue-replacement tests pass; extension build and floating-capture target/health scripts pass.
+- Remaining: full-array conflicts between independently edited tabs are handled by the revision/tombstone protocol in the next receipt.

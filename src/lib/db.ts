@@ -7,6 +7,7 @@ import {
   clampVisualScale,
   shouldMigrateLegacyNinetyScale,
 } from "./visual-scale";
+import { withStorageLock } from "./storage-lock";
 
 localforage.config({
   name: "WebCollect",
@@ -80,27 +81,31 @@ export async function markDirtyIds(kind: SyncDirtyKind, ids: string[]): Promise<
   if (localChangeSilenceDepth > 0) return;
   const cleanIds = [...new Set(ids.filter((id) => typeof id === "string" && id.length > 0))];
   if (cleanIds.length === 0) return;
-  const dirtySets = await getSyncDirtySets();
-  const key = dirtyKeyForKind(kind);
-  dirtySets[key] = [...new Set([...dirtySets[key], ...cleanIds])];
-  await saveSyncDirtySets(dirtySets);
+  await withStorageLock("sync-dirty-sets", async () => {
+    const dirtySets = await getSyncDirtySets();
+    const key = dirtyKeyForKind(kind);
+    dirtySets[key] = [...new Set([...dirtySets[key], ...cleanIds])];
+    await saveSyncDirtySets(dirtySets);
+  });
 }
 
 export async function clearSyncDirtyIds(input: Partial<SyncDirtySets>): Promise<void> {
-  const dirtySets = await getSyncDirtySets();
-  const cardIds = new Set(input.cards || []);
-  const categoryIds = new Set(input.categories || []);
-  if (cardIds.size > 0) {
-    dirtySets.cards = dirtySets.cards.filter((id) => !cardIds.has(id));
-  }
-  if (categoryIds.size > 0) {
-    dirtySets.categories = dirtySets.categories.filter((id) => !categoryIds.has(id));
-  }
-  await saveSyncDirtySets(dirtySets);
+  await withStorageLock("sync-dirty-sets", async () => {
+    const dirtySets = await getSyncDirtySets();
+    const cardIds = new Set(input.cards || []);
+    const categoryIds = new Set(input.categories || []);
+    if (cardIds.size > 0) {
+      dirtySets.cards = dirtySets.cards.filter((id) => !cardIds.has(id));
+    }
+    if (categoryIds.size > 0) {
+      dirtySets.categories = dirtySets.categories.filter((id) => !categoryIds.has(id));
+    }
+    await saveSyncDirtySets(dirtySets);
+  });
 }
 
 export async function clearSyncDirtySets(): Promise<void> {
-  await saveSyncDirtySets(emptySyncDirtySets());
+  await withStorageLock("sync-dirty-sets", () => saveSyncDirtySets(emptySyncDirtySets()));
 }
 
 export async function getDataSchemaVersion(): Promise<number> {
@@ -186,23 +191,29 @@ export async function saveCards(cards: WebCard[]): Promise<void> {
 }
 
 export async function addCard(card: WebCard): Promise<void> {
-  const cards = await getCards();
-  cards.push(card);
-  await saveCards(cards);
+  await withStorageLock("cards-rmw", async () => {
+    const cards = await getCards();
+    cards.push(card);
+    await saveCards(cards);
+  });
 }
 
 export async function updateCard(updated: WebCard): Promise<void> {
-  const cards = await getCards();
-  const idx = cards.findIndex((c) => c.id === updated.id);
-  if (idx >= 0) {
-    cards[idx] = updated;
-    await saveCards(cards);
-  }
+  await withStorageLock("cards-rmw", async () => {
+    const cards = await getCards();
+    const idx = cards.findIndex((c) => c.id === updated.id);
+    if (idx >= 0) {
+      cards[idx] = updated;
+      await saveCards(cards);
+    }
+  });
 }
 
 export async function deleteCard(id: string): Promise<void> {
-  const cards = await getCards();
-  await saveCards(cards.filter((c) => c.id !== id));
+  await withStorageLock("cards-rmw", async () => {
+    const cards = await getCards();
+    await saveCards(cards.filter((c) => c.id !== id));
+  });
 }
 
 export async function getCategories(): Promise<Category[]> {
@@ -218,28 +229,34 @@ export async function saveCategories(categories: Category[]): Promise<void> {
 }
 
 export async function addCategory(category: Category): Promise<void> {
-  const cats = await getCategories();
-  const now = Date.now();
-  cats.push({
-    ...category,
-    createdAt: category.createdAt || now,
-    updatedAt: category.updatedAt || now,
+  await withStorageLock("categories-rmw", async () => {
+    const cats = await getCategories();
+    const now = Date.now();
+    cats.push({
+      ...category,
+      createdAt: category.createdAt || now,
+      updatedAt: category.updatedAt || now,
+    });
+    await saveCategories(cats);
   });
-  await saveCategories(cats);
 }
 
 export async function updateCategory(updated: Category): Promise<void> {
-  const cats = await getCategories();
-  const idx = cats.findIndex((c) => c.id === updated.id);
-  if (idx >= 0) {
-    cats[idx] = { ...updated, updatedAt: updated.updatedAt || Date.now() };
-    await saveCategories(cats);
-  }
+  await withStorageLock("categories-rmw", async () => {
+    const cats = await getCategories();
+    const idx = cats.findIndex((c) => c.id === updated.id);
+    if (idx >= 0) {
+      cats[idx] = { ...updated, updatedAt: updated.updatedAt || Date.now() };
+      await saveCategories(cats);
+    }
+  });
 }
 
 export async function deleteCategory(id: string): Promise<void> {
-  const cats = await getCategories();
-  await saveCategories(cats.filter((c) => c.id !== id));
+  await withStorageLock("categories-rmw", async () => {
+    const cats = await getCategories();
+    await saveCategories(cats.filter((c) => c.id !== id));
+  });
 }
 
 export async function isInitialized(): Promise<boolean> {
@@ -432,15 +449,19 @@ export async function getRecycleBinItem(id: string): Promise<RecycleBinItem | nu
 }
 
 export async function addToRecycleBin(items: RecycleBinItem[]): Promise<void> {
-  const existing = await getRecycleBin();
-  await saveRecycleBin([...existing, ...items]);
+  await withStorageLock("recycle-bin-rmw", async () => {
+    const existing = await getRecycleBin();
+    await saveRecycleBin([...existing, ...items]);
+  });
 }
 
 export async function removeFromRecycleBin(ids: string[]): Promise<void> {
-  const existing = await getRecycleBin();
-  await saveRecycleBin(existing.filter((item) => !ids.includes(item.id)));
+  await withStorageLock("recycle-bin-rmw", async () => {
+    const existing = await getRecycleBin();
+    await saveRecycleBin(existing.filter((item) => !ids.includes(item.id)));
+  });
 }
 
 export async function clearRecycleBin(): Promise<void> {
-  await saveRecycleBin([]);
+  await withStorageLock("recycle-bin-rmw", () => saveRecycleBin([]));
 }

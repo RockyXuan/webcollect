@@ -14,6 +14,7 @@ const CAPTURE_QUEUE_KEY = 'webcollect.capture.queue';
 const CAPTURE_PREFS_KEY = 'webcollect.capture.prefs';
 const CAPTURE_DESTINATIONS_KEY = 'webcollect.capture.destinations';
 const CAPTURE_CONTEXT_MENU_ID = 'webcollect-capture-link';
+let captureQueueMutationTail = Promise.resolve();
 
 const DEFAULT_CAPTURE_PREFS = {
   enabled: true,
@@ -104,8 +105,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === 'CAPTURE_QUEUE_REPLACE') {
+    replaceCaptureQueueItems(message.previouslyReadIds, message.queue)
+      .then(queue => sendResponse({ success: true, queue }))
+      .catch(err => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
   if (message.type === 'CAPTURE_QUEUE_LIST') {
-    getStorageValue(CAPTURE_QUEUE_KEY, [])
+    listCaptureQueueItems()
       .then(queue => sendResponse({ success: true, queue }))
       .catch(err => sendResponse({ success: false, error: err.message }));
     return true;
@@ -395,6 +403,39 @@ function setStorageValue(key, value) {
   });
 }
 
+function runCaptureQueueMutation(operation) {
+  const run = captureQueueMutationTail
+    .catch(() => undefined)
+    .then(operation);
+  captureQueueMutationTail = run.then(() => undefined, () => undefined);
+  return run;
+}
+
+function mergeCaptureQueueReplacement(currentQueue, previouslyReadIds, replacementQueue) {
+  const previousIds = new Set(Array.isArray(previouslyReadIds) ? previouslyReadIds : []);
+  const replacement = Array.isArray(replacementQueue) ? replacementQueue : [];
+  const replacementIds = new Set(replacement.map(item => item?.id).filter(Boolean));
+  return [
+    ...replacement,
+    ...(Array.isArray(currentQueue) ? currentQueue : []).filter(item =>
+      item?.id && !previousIds.has(item.id) && !replacementIds.has(item.id)
+    ),
+  ];
+}
+
+function listCaptureQueueItems() {
+  return runCaptureQueueMutation(() => getStorageValue(CAPTURE_QUEUE_KEY, []));
+}
+
+function replaceCaptureQueueItems(previouslyReadIds, replacementQueue) {
+  return runCaptureQueueMutation(async () => {
+    const currentQueue = await getStorageValue(CAPTURE_QUEUE_KEY, []);
+    const mergedQueue = mergeCaptureQueueReplacement(currentQueue, previouslyReadIds, replacementQueue);
+    await setStorageValue(CAPTURE_QUEUE_KEY, mergedQueue);
+    return mergedQueue;
+  });
+}
+
 async function getCapturePrefs() {
   const stored = await getStorageValue(CAPTURE_PREFS_KEY, {});
   return normalizeCapturePrefs(stored);
@@ -430,7 +471,11 @@ function hostFromUrl(url) {
   }
 }
 
-async function addCaptureQueueItem(draft) {
+function addCaptureQueueItem(draft) {
+  return runCaptureQueueMutation(() => addCaptureQueueItemUnlocked(draft));
+}
+
+async function addCaptureQueueItemUnlocked(draft) {
   if (!draft) throw new Error('Missing capture draft');
   const normalizedUrl = normalizeCaptureUrl(draft.url);
   if (!normalizedUrl) throw new Error('Invalid URL');

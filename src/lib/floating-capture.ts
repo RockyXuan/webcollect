@@ -153,6 +153,45 @@ function setChromeStorage(items: Record<string, unknown>): Promise<void> {
   });
 }
 
+export function mergeCaptureQueueReplacement(
+  currentQueue: CaptureQueueItem[],
+  previouslyReadIds: string[],
+  replacementQueue: CaptureQueueItem[]
+): CaptureQueueItem[] {
+  const previousIds = new Set(previouslyReadIds);
+  const replacementIds = new Set(replacementQueue.map((item) => item.id));
+  return [
+    ...replacementQueue,
+    ...currentQueue.filter((item) => !previousIds.has(item.id) && !replacementIds.has(item.id)),
+  ];
+}
+
+function replaceCaptureQueueThroughBackground(
+  previouslyReadQueue: CaptureQueueItem[],
+  replacementQueue: CaptureQueueItem[]
+): Promise<void> {
+  if (!hasExtensionStorage() || !chrome.runtime?.sendMessage) {
+    return setChromeStorage({ [CAPTURE_QUEUE_KEY]: replacementQueue });
+  }
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({
+      type: "CAPTURE_QUEUE_REPLACE",
+      previouslyReadIds: previouslyReadQueue.map((item) => item.id),
+      queue: replacementQueue,
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      if (!response?.success) {
+        reject(new Error(response?.error || "Failed to replace capture queue"));
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
 export function normalizeCaptureUrl(input: string): string | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
@@ -937,7 +976,7 @@ export async function drainFloatingCaptureQueue(): Promise<{ imported: number; s
       categories: repaired.categories,
       cards: repaired.cards,
     });
-    await setChromeStorage({ [CAPTURE_QUEUE_KEY]: repaired.queue });
+    await replaceCaptureQueueThroughBackground(queue, repaired.queue);
   }
 
   if (drained.imported > 0 || repaired.repaired > 0 || repaired.changed) {
