@@ -32,6 +32,7 @@ Target release: `V1.1.0`
 | DATA-03 | P0 | Concurrency | IndexedDB and `chrome.storage` read-modify-write operations lost concurrent updates. | Fixed with lock, queue, and stale-snapshot rebase tests |
 | DATA-04 | P0 | Migration | Name-based heuristics deleted legitimate categories, rewrote descriptions, and ran without a pre-migration snapshot. | Fixed with behavioral tests |
 | DATA-05 | P1 | Recovery | Snapshot health used personal crypto keywords and fixed minimum workspace sizes. | Fixed with relative structural tests |
+| DATA-06 | P0 | Supabase schema | Tombstones require UUID entity IDs and new tables lack explicit authenticated Data API grants, so legacy pre-sync deletions can fail remotely. | Fixed in migration/bootstrap contracts; live migration remains export/confirmation gated |
 | SEC-01 | P0 | Server fetch | Metadata and safety routes can request localhost/private-network URLs. | Fixed and isolated Chromium runtime verified; final installed Chrome shell check remains a release gate |
 | SEC-02 | P1 | Dependencies | Production dependency audit contains critical/high advisories and unused large dependency trees. | Fixed; official production audit reports no known vulnerabilities |
 | UI-01 | P1 | Responsive | Fixed 2048px canvas with a minimum zoom clipped 1024px and 390px viewports. Vitest plus Playwright now cover five target sizes. | Fixed and browser-verified |
@@ -110,6 +111,15 @@ Every finding must have a failing behavioral test, the smallest root-cause fix, 
 - Before: two simultaneous card captures or category additions retained only the second item. Recycle-bin and dirty-set updates had the same read-modify-write race.
 - Fix: added a cross-tab Web Locks wrapper with an in-process fallback around atomic IndexedDB mutations. Floating-capture queue writes run through one background mutation queue and preserve captures created after a new-tab drain started. Whole-array drag/restore operations now replay only their delta against the latest locked snapshot.
 - Focused verification: concurrent card, category, section, recycle-bin, dirty-set, stale whole-array, and queue-replacement tests pass; floating-capture target/health scripts pass.
+
+### DATA-06 Supabase tombstone and Data API contract
+
+- Before: `workspace_tombstones.entity_id` was declared as UUID even though locally owned IDs can remain `card-...` / `cat-...` strings when an item is deleted before its first cloud normalization. The new tombstone/version tables also had RLS policies but no explicit `authenticated` grants, so PostgREST access could fail depending on the project's Data API/default privilege settings.
+- Test-first evidence: the migration contract failed on the UUID column, missing grants, and policies without an explicit authenticated role. The same failure was then reproduced in the fresh-project bootstrap script.
+- Fix: both SQL paths use `text` for entity IDs and safely convert an earlier test table with `using entity_id::text`. They grant only the required operations to `authenticated`, revoke table access from `anon`, and use ownership policies scoped to `to authenticated` with `(select auth.uid())`.
+- Schema model: the Drizzle `workspaceTombstones.entityId` field now matches the SQL `text` type.
+- Behavior evidence: an isolated client can delete `card-local-before-first-sync` before the first cloud sync and preserve that exact string in the uploaded tombstone. The broader two-profile test also proves new-device pull, offline conflict convergence, explicit unpin/unhide, wallpaper-mode propagation, deletion, and deliberate restore.
+- External gate: the SQL still has not run against the live project. Official Supabase RLS guidance was rechecked on 2026-07-12; live execution still requires CSV exports and explicit confirmation.
 
 ### Snapshot completeness and restore semantics
 
