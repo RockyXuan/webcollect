@@ -31,6 +31,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --registry=https://registry.npmjs.org
 
+      - name: Audit production dependencies
+        run: pnpm audit --prod --registry=https://registry.npmjs.org
+
       - name: Type check
         run: pnpm ts-check
 
@@ -41,13 +44,10 @@ jobs:
         run: pnpm test
 
       - name: Run script tests
-        shell: bash
-        run: |
-          set -euo pipefail
-          for script in scripts/test-*.ts; do
-            echo "Running ${script}"
-            node --import tsx "${script}"
-          done
+        run: pnpm test:legacy
+
+      - name: Build Web app
+        run: pnpm build
 
       - name: Build Chrome extension
         run: pnpm build:ext
