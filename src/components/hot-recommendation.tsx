@@ -44,6 +44,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const featuredTitles = ["ChatGPT", "Notion", "Figma", "Midjourney", "GitHub", "DeepSeek"];
+const RECOMMENDATION_GROUP_PAGE_SIZE = 6;
 
 const categoryAccents = [
   "linear-gradient(135deg, #2563eb, #4f46e5)",
@@ -215,7 +216,7 @@ function CategoryGroup({
   /* If all sites are added, default collapsed */
   if (allAdded) {
     return (
-      <div className="rounded-2xl border border-white/60 bg-white/45 p-3 opacity-75 shadow-sm">
+      <div data-recommendation-group className="rounded-2xl border border-white/60 bg-white/45 p-3 opacity-75 shadow-sm">
         <button
           onClick={() => setShowAdded(!showAdded)}
           className="flex items-center gap-1.5 w-full text-left"
@@ -242,7 +243,7 @@ function CategoryGroup({
   }
 
   return (
-    <div className="rounded-2xl border border-white/70 bg-white/60 p-3 shadow-sm shadow-blue-100/40">
+    <div data-recommendation-group className="rounded-2xl border border-white/70 bg-white/60 p-3 shadow-sm shadow-blue-100/40">
       {/* header */}
       <div className="flex items-center gap-1.5 mb-2 flex-wrap">
         <span className="text-xs font-semibold text-slate-800">{catName}</span>
@@ -608,7 +609,9 @@ export function HotRecommendation() {
   const [addedUrls, setAddedUrls] = useState<Set<string>>(new Set());
   const [showExtra, setShowExtra] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [visibleGroupCount, setVisibleGroupCount] = useState(RECOMMENDATION_GROUP_PAGE_SIZE);
   const discoverRef = useRef<HTMLDivElement | null>(null);
+  const loadMoreRef = useRef<HTMLButtonElement | null>(null);
 
   const visibleCategories = useMemo(
     () => categories.filter((cat) => (cat.sectionId || "section-default") === activeSectionId),
@@ -885,6 +888,31 @@ export function HotRecommendation() {
     [categorizedGroups],
   );
 
+  const visibleCategorizedGroups = useMemo(
+    () => categorizedGroups.slice(0, visibleGroupCount),
+    [categorizedGroups, visibleGroupCount],
+  );
+
+  useEffect(() => {
+    setVisibleGroupCount(RECOMMENDATION_GROUP_PAGE_SIZE);
+  }, [showExtra, activeSectionId]);
+
+  useEffect(() => {
+    if (searchQuery || visibleGroupCount >= categorizedGroups.length) return;
+    const node = loadMoreRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      setVisibleGroupCount((count) => Math.min(
+        count + RECOMMENDATION_GROUP_PAGE_SIZE,
+        categorizedGroups.length,
+      ));
+    }, { rootMargin: "0px 0px 96px" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [categorizedGroups.length, searchQuery, visibleGroupCount]);
+
   const searchResults = useMemo(
     () =>
       allSites
@@ -1064,7 +1092,7 @@ export function HotRecommendation() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {categorizedGroups.map((group) => (
+            {visibleCategorizedGroups.map((group) => (
               <CategoryGroup
                 key={group.catName}
                 catName={group.catName}
@@ -1082,6 +1110,21 @@ export function HotRecommendation() {
               />
             ))}
           </div>
+        )}
+        {!searchQuery && visibleGroupCount < categorizedGroups.length && (
+          <button
+            ref={loadMoreRef}
+            type="button"
+            data-recommendation-more
+            onClick={() => setVisibleGroupCount((count) => Math.min(
+              count + RECOMMENDATION_GROUP_PAGE_SIZE,
+              categorizedGroups.length,
+            ))}
+            className="mx-auto mt-4 flex h-10 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/75 px-4 text-xs font-bold text-blue-700 shadow-sm transition-colors hover:bg-white"
+          >
+            <ChevronDown className="h-3.5 w-3.5" />
+            继续加载分类
+          </button>
         )}
       </section>
 

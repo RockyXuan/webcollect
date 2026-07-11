@@ -20,10 +20,5 @@ export default defineConfig({
       formats: ["iife"],
       fileName: () => "assets/floating-capture.js",
     },
-    rollupOptions: {
-      output: {
-        inlineDynamicImports: true,
-      },
-    },
   },
 });

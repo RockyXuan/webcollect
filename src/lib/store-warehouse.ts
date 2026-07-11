@@ -27,6 +27,7 @@ import {
   deleteWarehouseCard,
   shipCardToMain as dbShipCardToMain,
   shipSubGroupToMain as dbShipSubGroupToMain,
+  shipCategoryToMain as dbShipCategoryToMain,
   updateWarehouseCategory,
   updateWarehouseCard as dbUpdateWarehouseCard,
   promoteWarehouseCategory as dbPromoteWarehouseCategory,
@@ -147,7 +148,6 @@ export const useWarehouseStore = create<WarehouseState>((set) => ({
       await addWarehouseCards(newCards);
       const batches = await getImportBatches();
       batches.push(batch);
-      const { saveImportBatches } = await import("./db-warehouse");
       await saveImportBatches(batches);
     }
     // Reload
@@ -227,8 +227,7 @@ export const useWarehouseStore = create<WarehouseState>((set) => ({
   },
 
   shipToMain: async (warehouseCategoryId, mainTargetCategoryId) => {
-    const { shipCategoryToMain } = await import("./db-warehouse");
-    const result = await shipCategoryToMain(warehouseCategoryId, mainTargetCategoryId);
+    const result = await dbShipCategoryToMain(warehouseCategoryId, mainTargetCategoryId);
     // Reload warehouse data
     const [cards, categories, batches] = await Promise.all([
       getWarehouseCards(),

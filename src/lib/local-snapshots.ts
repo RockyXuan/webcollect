@@ -50,6 +50,12 @@ import {
 import type { Category, CategoryLayoutPreference, CollectionSection, HiddenSite, LinkOpenMode, PinnedBookmarkItem, RecycleBinItem, SyncPreferenceRevisions, SyncTombstone, WebCard } from "@/lib/types";
 import { DEFAULT_SEARCH_ENGINE_ID, isSearchEngineId, type SearchEngineId } from "@/lib/search-engines";
 import type { WallpaperItem, WallpaperPrefs } from "@/lib/wallpaper-types";
+import {
+  getWallpaperLibrary,
+  getWallpaperPrefs,
+  saveWallpaperLibrary,
+  saveWallpaperPrefs,
+} from "@/lib/wallpaper-db";
 
 localforage.config({
   name: "WebCollect",
@@ -190,7 +196,6 @@ async function readWallpaperSnapshot(): Promise<{
 }> {
   if (typeof indexedDB === "undefined") return {};
   try {
-    const { getWallpaperLibrary, getWallpaperPrefs } = await import("@/lib/wallpaper-db");
     const [wallpaperPrefs, wallpaperLibrary] = await Promise.all([
       getWallpaperPrefs(),
       getWallpaperLibrary(),
@@ -204,7 +209,6 @@ async function readWallpaperSnapshot(): Promise<{
 
 async function restoreWallpaperSnapshot(data: LocalSnapshotData): Promise<void> {
   if (!data.wallpaperPrefs && !data.wallpaperLibrary) return;
-  const { saveWallpaperLibrary, saveWallpaperPrefs } = await import("@/lib/wallpaper-db");
   if (data.wallpaperPrefs) await saveWallpaperPrefs(data.wallpaperPrefs);
   if (data.wallpaperLibrary) await saveWallpaperLibrary(data.wallpaperLibrary);
 }

@@ -55,6 +55,7 @@ import {
   togglePinnedBookmarkItem,
   updatePinnedBookmarkItem,
 } from "./pinned-bookmarks";
+import { publishCaptureDestinationCacheForWorkspace } from "./floating-capture-destinations";
 
 const DEFAULT_SECTION_ID = "section-default";
 
@@ -100,10 +101,15 @@ function looksLikeRefreshCollapse(
   return previousActiveCards >= 5 && nextActiveCards <= Math.max(1, Math.floor(previousActiveCards * 0.2));
 }
 
-function publishCaptureDestinationsSoon(): void {
+function publishCaptureDestinationsSoon(
+  workspace: Pick<AppState, "sections" | "categories" | "activeSectionId">
+): void {
   if (typeof window === "undefined") return;
-  void import("./floating-capture")
-    .then(({ publishCaptureDestinationCache }) => publishCaptureDestinationCache())
+  void publishCaptureDestinationCacheForWorkspace(
+    workspace.sections,
+    workspace.categories,
+    workspace.activeSectionId
+  )
     .catch((error) => {
       console.warn("[WebCollect] Failed to publish floating capture destinations:", error);
     });
@@ -322,7 +328,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     set(nextState);
-    publishCaptureDestinationsSoon();
+    publishCaptureDestinationsSoon(nextState);
 
     // Load recycle bin in background (non-blocking)
     void get().loadRecycleBin();

@@ -3,10 +3,19 @@ import { saveCardsRebased, saveCategoriesRebased, saveSectionsRebased } from "./
 import { createLocalDataSnapshot } from "./local-snapshots";
 import { isChromeExtension } from "./platform";
 import { useAppStore } from "./store";
+import {
+  publishCaptureDestinationCacheForWorkspace,
+} from "./floating-capture-destinations";
+import type { CaptureDestinationCache } from "./floating-capture-destinations";
+
+export {
+  CAPTURE_DESTINATIONS_KEY,
+  buildCaptureDestinationCache,
+} from "./floating-capture-destinations";
+export type { CaptureDestinationCache } from "./floating-capture-destinations";
 
 export const CAPTURE_QUEUE_KEY = "webcollect.capture.queue";
 export const CAPTURE_PREFS_KEY = "webcollect.capture.prefs";
-export const CAPTURE_DESTINATIONS_KEY = "webcollect.capture.destinations";
 
 export type CaptureSourceType = "floating-button" | "hover-link" | "selection" | "current-page" | "context-menu";
 export type CaptureQueueStatus = "pending" | "imported" | "failed";
@@ -59,13 +68,6 @@ export interface FloatingCapturePrefs {
   disabledHosts: string[];
   hiddenByUserAt?: number | null;
   recoveredAt?: number | null;
-}
-
-export interface CaptureDestinationCache {
-  updatedAt: number;
-  activeSectionId?: string;
-  sections: Array<Pick<CollectionSection, "id" | "name" | "order">>;
-  categories: Array<Pick<Category, "id" | "name" | "icon" | "color" | "order" | "parentId" | "sectionId" | "isParent">>;
 }
 
 type DestinationCategory = CaptureDestinationCache["categories"][number];
@@ -363,48 +365,9 @@ function findGroupByName(
   return [...candidates].sort(categorySort)[0];
 }
 
-export function buildCaptureDestinationCache(
-  sections: CollectionSection[],
-  categories: Category[],
-  activeSectionId: string,
-  now = Date.now()
-): CaptureDestinationCache {
-  const sectionItems = sections
-    .map((section) => ({ id: section.id, name: section.name, order: section.order }))
-    .sort(sectionSort);
-  const resolvedActiveSectionId = sectionItems.some((section) => section.id === activeSectionId)
-    ? activeSectionId
-    : sectionItems[0]?.id || activeSectionId || "section-default";
-
-  return {
-    updatedAt: now,
-    activeSectionId: resolvedActiveSectionId,
-    sections: [...sectionItems].sort((a, b) => {
-      if (a.id === resolvedActiveSectionId) return -1;
-      if (b.id === resolvedActiveSectionId) return 1;
-      return sectionSort(a, b);
-    }),
-    categories: categories
-      .map((category) => ({
-        id: category.id,
-        name: category.name,
-        icon: category.icon,
-        color: category.color,
-        order: category.order,
-        parentId: category.parentId,
-        sectionId: category.sectionId,
-        isParent: category.isParent,
-      }))
-      .sort(categorySort),
-  };
-}
-
 export async function publishCaptureDestinationCache(): Promise<void> {
-  if (!hasExtensionStorage()) return;
   const { sections, categories, activeSectionId } = useAppStore.getState();
-  await setChromeStorage({
-    [CAPTURE_DESTINATIONS_KEY]: buildCaptureDestinationCache(sections, categories, activeSectionId),
-  });
+  await publishCaptureDestinationCacheForWorkspace(sections, categories, activeSectionId);
 }
 
 export function resolveCaptureTargetCategoryId(
