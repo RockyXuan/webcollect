@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import * as cheerio from "cheerio";
+import { RemoteUrlPolicyError } from "../../../../shared/remote-url-policy.js";
+import { fetchRemoteText } from "@/lib/safe-remote-fetch";
 
 export async function POST(request: Request) {
   try {
@@ -8,11 +10,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "URL is required" }, { status: 400 });
     }
 
-    const res = await fetch(url, {
+    const { response: res, text: html, url: resolvedUrl } = await fetchRemoteText(url, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.0",
+        Accept: "text/html,application/xhtml+xml;q=0.9",
       },
-      signal: AbortSignal.timeout(8000),
+      timeoutMs: 8_000,
+      maxRedirects: 4,
+      maxBytes: 1_500_000,
+      allowedContentTypes: ["text/html", "application/xhtml+xml"],
     });
 
     if (!res.ok) {
@@ -22,7 +28,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const html = await res.text();
     const $ = cheerio.load(html);
 
     const getMeta = (name: string) =>
@@ -32,19 +37,19 @@ export async function POST(request: Request) {
 
     const rawTitle =
       getMeta("og:title") || getMeta("twitter:title") || $("title").text();
-    const title = compactTitleForCapture(rawTitle, url);
+    const title = compactTitleForCapture(rawTitle, resolvedUrl);
     const description =
       getMeta("description") ||
       getMeta("og:description") ||
       getMeta("twitter:description") ||
-      extractDescriptionFromTitle(rawTitle, url) ||
-      extractReadableDescription($, rawTitle, url);
+      extractDescriptionFromTitle(rawTitle, resolvedUrl) ||
+      extractReadableDescription($, rawTitle, resolvedUrl);
     let image = getMeta("og:image") || getMeta("twitter:image");
 
     // Resolve relative image URLs
     if (image && !image.startsWith("http")) {
       try {
-        const base = new URL(url);
+        const base = new URL(resolvedUrl);
         image = new URL(image, base).toString();
       } catch {
         image = "";
@@ -54,7 +59,7 @@ export async function POST(request: Request) {
     // Extract domain for favicon APIs
     let domain = "";
     try {
-      domain = new URL(url).hostname;
+      domain = new URL(resolvedUrl).hostname;
     } catch {
       domain = "";
     }
@@ -65,7 +70,7 @@ export async function POST(request: Request) {
       $('link[rel="icon"]').attr("href") || $('link[rel="shortcut icon"]').attr("href");
     if (faviconRel) {
       try {
-        const base = new URL(url);
+        const base = new URL(resolvedUrl);
         favicon = new URL(faviconRel, base).toString();
       } catch {
         favicon = "";
@@ -89,8 +94,11 @@ export async function POST(request: Request) {
       faviconApis,
     });
   } catch (err) {
+    if (err instanceof RemoteUrlPolicyError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
     const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 502 });
   }
 }
 

@@ -114,7 +114,7 @@ function mapExtensionSafetyResult(r: ExtensionSafetyResult): SafetyCheckResult {
   const details: string[] = [];
   if (!r.isHttps) details.push('不使用 HTTPS');
   if (r.hasSuspiciousTld) details.push('可疑顶级域名');
-  if (r.isWhitelisted) details.push('已知安全网站');
+  if (r.isWhitelisted) details.push('常见网站名单匹配，不代表绝对安全');
 
   return {
     url: r.url,

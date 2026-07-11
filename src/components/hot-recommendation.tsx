@@ -81,9 +81,9 @@ function renderCategoryIcon(name: string) {
 function SafetyBadge({ status }: { status: SafetyCheckResult | undefined }) {
   if (!status) return null;
   const map: Record<string, { icon: typeof ShieldCheck; cls: string; label: string }> = {
-    safe: { icon: ShieldCheck, cls: "text-emerald-500", label: "安全" },
-    warning: { icon: ShieldAlert, cls: "text-amber-500", label: "警告" },
-    danger: { icon: ShieldX, cls: "text-red-500", label: "危险" },
+    safe: { icon: ShieldCheck, cls: "text-emerald-500", label: "基础通过" },
+    warning: { icon: ShieldAlert, cls: "text-amber-500", label: "需留意" },
+    danger: { icon: ShieldX, cls: "text-red-500", label: "有风险" },
   };
   const info = map[status.status] || map.safe;
   const Icon = info.icon;
@@ -158,7 +158,7 @@ function SettingsPanel({
         </div>
       </div>
 
-      {/* Safety scan */}
+      {/* Basic URL check */}
       <div className="mt-2">
         <button
           onClick={onSafetyCheck}
@@ -166,7 +166,7 @@ function SettingsPanel({
           className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-white/70 bg-white/75 px-2 py-2 text-[11px] font-semibold text-blue-700 transition-colors hover:bg-white disabled:opacity-50"
         >
           <Shield className="h-3 w-3" />
-          {checking ? "扫描中..." : "安全扫描"}
+          {checking ? "检查中..." : "运行基础检查"}
         </button>
       </div>
 
@@ -913,7 +913,7 @@ export function HotRecommendation() {
               为你的网页墙补充高质量入口
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
-              精选常用工具、创作平台和效率网站；添加、屏蔽、查重和安全扫描仍沿用原有推荐逻辑。
+              精选常用工具、创作平台和效率网站；支持添加、屏蔽、查重和基础网址检查。
             </p>
           </div>
 
@@ -970,7 +970,7 @@ export function HotRecommendation() {
           </div>
           <div className="wc-orbit-node bottom-[18%] left-[24%]">
             <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-            安全扫描
+            基础检查
           </div>
           <div className="absolute left-1/2 top-1/2 flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[28px] bg-[var(--wc-primary-gradient)] text-white shadow-[0_22px_52px_rgba(37,99,235,0.30)]">
             <Star className="h-8 w-8" />
@@ -1088,7 +1088,7 @@ export function HotRecommendation() {
       <div className="wc-value-strip grid gap-3 p-4 text-xs text-slate-600 sm:grid-cols-2 lg:grid-cols-4">
         {[
           ["精心筛选", "只保留常用、可信、高频入口"],
-          ["安全可靠", checking ? "安全扫描进行中" : "支持一键安全扫描"],
+          ["基础检查", checking ? "网址检查进行中" : "支持一键基础检查"],
           ["持续更新", showExtra ? "已展开更多推荐" : "可继续加载更多工具"],
           ["一键收藏", "直接进入现有添加与查重流程"],
         ].map(([title, desc]) => (

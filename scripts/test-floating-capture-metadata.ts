@@ -1,14 +1,19 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
+import { assertSafeRemoteUrl } from "../shared/remote-url-policy.js";
 
-const backgroundSource = readFileSync("extension/background.js", "utf8");
+const backgroundSource = readFileSync("extension/background.js", "utf8")
+  .replace(/^import \{ assertSafeRemoteUrl \} from '\.\/remote-url-policy\.js';\s*/m, "");
 
 const listeners: Record<string, unknown[]> = {};
 const context = {
   console,
   URL,
   AbortSignal,
+  TextDecoder,
+  Uint8Array,
+  assertSafeRemoteUrl,
   chrome: {
     runtime: {
       lastError: null,
@@ -83,6 +88,36 @@ assert.equal(
 );
 
 async function main() {
+  let requestCount = 0;
+  (context as typeof context & { fetch: typeof fetch }).fetch = async () => {
+    requestCount += 1;
+    return new Response("should not be reached", {
+      status: 200,
+      headers: { "content-type": "text/html" },
+    });
+  };
+
+  const blocked = await bg.handleFetchMeta("http://127.0.0.1/private");
+  assert.equal(requestCount, 0, "private targets must be rejected before extension fetch");
+  assert.equal(blocked.title, "");
+  assert.equal(blocked.description, "");
+  assert.equal(blocked.image, "");
+  assert.equal(blocked.favicon, "");
+
+  (context as typeof context & { fetch: typeof fetch }).fetch = async () => {
+    requestCount += 1;
+    return new Response(null, {
+      status: 302,
+      headers: { location: "http://192.168.1.1/private" },
+    });
+  };
+  const redirected = await bg.handleFetchMeta("https://example.com/start");
+  assert.equal(requestCount, 1, "unsafe redirect must be rejected before its second request");
+  assert.equal(redirected.title, "");
+  assert.equal(redirected.description, "");
+  assert.equal(redirected.image, "");
+  assert.equal(redirected.favicon, "");
+
   (context as typeof context & { fetch: typeof fetch }).fetch = async () => new Response(
     `
       <html>

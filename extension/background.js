@@ -10,6 +10,8 @@
  * Chrome Service Workers do not support TS type annotations.
  */
 
+import { assertSafeRemoteUrl } from './remote-url-policy.js';
+
 const CAPTURE_QUEUE_KEY = 'webcollect.capture.queue';
 const CAPTURE_PREFS_KEY = 'webcollect.capture.prefs';
 const CAPTURE_DESTINATIONS_KEY = 'webcollect.capture.destinations';
@@ -125,20 +127,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  */
 async function handleFetchMeta(url) {
   try {
-    const response = await fetch(url, {
+    const { response, text: html, url: resolvedUrl } = await fetchExtensionRemoteText(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept': 'text/html,application/xhtml+xml;q=0.9',
       },
-      signal: AbortSignal.timeout(8000),
-      redirect: 'follow',
+      timeoutMs: 8000,
+      maxRedirects: 4,
+      maxBytes: 1500000,
     });
 
     if (!response.ok) {
       return { title: '', description: '', image: '', favicon: '' };
     }
-
-    const html = await response.text();
 
     const rawTitle = extractMeta(html, 'og:title')
       || extractTitle(html)
@@ -146,19 +147,81 @@ async function handleFetchMeta(url) {
 
     const description = extractMeta(html, 'og:description')
       || extractMeta(html, 'description')
-      || extractDescriptionFromTitle(rawTitle, url)
-      || extractReadableDescription(html, rawTitle, url)
+      || extractDescriptionFromTitle(rawTitle, resolvedUrl)
+      || extractReadableDescription(html, rawTitle, resolvedUrl)
       || '';
 
     const image = extractMeta(html, 'og:image') || '';
 
-    const favicon = extractFavicon(html, url) || '';
-    const title = compactTitleForCapture(rawTitle, url);
+    const favicon = extractFavicon(html, resolvedUrl) || '';
+    const title = compactTitleForCapture(rawTitle, resolvedUrl);
 
     return { title, description, image, favicon };
   } catch (e) {
     return { title: '', description: '', image: '', favicon: '' };
   }
+}
+
+async function readExtensionResponseText(response, maxBytes) {
+  const declaredSize = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declaredSize) && declaredSize > maxBytes) {
+    throw new Error('Remote page is too large');
+  }
+  if (!response.body) return '';
+  const reader = response.body.getReader();
+  const chunks = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new Error('Remote page exceeds size limit');
+    }
+    chunks.push(value);
+  }
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(body);
+}
+
+async function fetchExtensionRemoteText(input, options = {}) {
+  let currentUrl = assertSafeRemoteUrl(input);
+  const maxRedirects = options.maxRedirects ?? 4;
+  const timeoutMs = options.timeoutMs ?? 8000;
+  for (let redirectCount = 0; redirectCount <= maxRedirects; redirectCount += 1) {
+    const response = await fetch(currentUrl.toString(), {
+      headers: options.headers,
+      signal: AbortSignal.timeout(timeoutMs),
+      redirect: 'manual',
+    });
+    if (![301, 302, 303, 307, 308].includes(response.status)) {
+      if (response.status === 0 || response.type === 'opaqueredirect') {
+        throw new Error('Redirect target cannot be verified safely');
+      }
+      const contentType = (response.headers.get('content-type') || '').toLowerCase();
+      if (!contentType.startsWith('text/html') && !contentType.startsWith('application/xhtml+xml')) {
+        await response.body?.cancel();
+        throw new Error('Unsupported remote content type');
+      }
+      const text = await readExtensionResponseText(response, options.maxBytes ?? 1500000);
+      return { response, text, url: currentUrl.toString() };
+    }
+
+    const location = response.headers.get('location');
+    await response.body?.cancel();
+    if (!location || response.type === 'opaqueredirect') {
+      throw new Error('Redirect target cannot be verified safely');
+    }
+    if (redirectCount === maxRedirects) throw new Error('Too many redirects');
+    currentUrl = assertSafeRemoteUrl(new URL(location, currentUrl).toString());
+  }
+  throw new Error('Too many redirects');
 }
 
 /**
@@ -192,7 +255,7 @@ async function handleCheckSafety(urls) {
 
   const results = urls.map(url => {
     try {
-      const parsed = new URL(url);
+      const parsed = assertSafeRemoteUrl(url);
       const hostname = parsed.hostname;
       const domain = hostname.replace(/^www\./, '');
 

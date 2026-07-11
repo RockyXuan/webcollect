@@ -1,6 +1,6 @@
 # WebCollect 用户截图索引
 
-更新时间：2026-07-07
+更新时间：2026-07-12
 
 说明：以下截图来自用户在对话中贴出的 UI 标注。2026-07-07 检查时，原始 `/var/folders/.../T/codex-clipboard-*.png` 临时文件已经过期，不再能复制进仓库。因此本文件保存截图名称、用户标注、对应需求和当前状态。后续新截图必须落到 `docs/audit/screenshots/`，不要只依赖对话临时文件。
 
@@ -24,6 +24,8 @@
 | `codex-clipboard-77459e7f-5a42-4652-907f-4cc60078122a.png` | 新增内容都落到主页“节流/收集箱”，分类错乱 | P0：扩展保存目标必须准确 | 已加测试和 fail-safe，仍需真实扩展验证 |
 | `codex-clipboard-8ff07294-c0e0-4a3b-b2b8-32f4497c2108.png` | X/Twitter 博主发 `docu.md`，页面文案是“AI 负责写作，Docu.md 完成其余工作” | 元数据应提取目标网页，不应取 Twitter 简介 | 已修 `docu.md` 规则和错配保护 |
 | `codex-clipboard-ce29b5f2-b06c-4a0e-ae0b-800135e90a0d.png` | 浮窗表单名称/简介识别错误，简介变成 X/Twitter 社交平台 | 名称为 `Docu.md`，简介为目标页 slogan | 已修，测试 `scripts/test-floating-capture-metadata.ts` 覆盖 |
+| `webcollect-v1.1-extension-runtime-2026-07-12.png` | 隔离 Chromium 加载 `extension/dist` 后进入网页墙 | Manifest V3 服务工作线程、扩展新标签页、基础检查与元数据消息运行时验收 | 运行通过；控制台零错误，1440px 无横向溢出 |
+| `webcollect-v1.1-wallpaper-before-ui-fix-2026-07-12.png` | 扩展默认壁纸页的引言、译文、来源和操作提示集中在底部 | UI-02 壁纸文字层级和间距修复前证据 | 已复现，待 Phase 4 修复并补 after 截图 |
 
 ## 后续截图管理规则
 

@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server";
+import {
+  RemoteUrlPolicyError,
+  assertSafeRemoteUrl,
+} from "../../../../shared/remote-url-policy.js";
+import { safeRemoteFetch } from "@/lib/safe-remote-fetch";
 
 /**
- * 网站安全检查 API
+ * 网站基础检查 API
  *
  * 检查策略（纯脚本，不依赖大模型）：
  * 1. HTTPS 检查 — 非 HTTPS 标记为 warning
  * 2. 域名特征检查 — 已知钓鱼域名模式（如超长域名、过多连字符）
- * 3. 已知恶意域名黑名单 — 来自 URLhaus 等开源威胁情报
- * 4. 可疑 TLD 检查 — 高风险顶级域名
- * 5. URL 结构检查 — 可疑参数、IP 地址直连
- * 6. HTTP 可达性验证 — HEAD 请求检查网站是否存活
+ * 3. 可疑 TLD 检查 — 高风险顶级域名
+ * 4. URL 结构检查 — 可疑参数、IP 地址直连
+ * 5. HTTP 可达性验证 — HEAD 请求检查网站是否存活
  */
 
 interface CheckResult {
@@ -35,7 +39,7 @@ const PHISHING_KEYWORDS = [
   "apple-id-verify", "microsoft-alert",
 ];
 
-/** 已知安全域名白名单（热门网站推荐中的域名） */
+/** 常见网站名单（只用于基础提示，不构成安全认证） */
 const SAFE_DOMAINS = new Set([
   "google.com", "bing.com", "baidu.com",
   "twitter.com", "reddit.com", "weibo.com", "zhihu.com",
@@ -54,9 +58,13 @@ const SAFE_DOMAINS = new Set([
   "chatgpt.com", "deepseek.com",
 ]);
 
+function normalizeCheckUrl(url: string): string {
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+}
+
 function extractDomain(url: string): string {
   try {
-    const u = new URL(url.startsWith("http") ? url : `https://${url}`);
+    const u = new URL(normalizeCheckUrl(url));
     return u.hostname.replace(/^www\./, "");
   } catch {
     return "";
@@ -65,7 +73,7 @@ function extractDomain(url: string): string {
 
 function checkHttps(url: string): string | null {
   try {
-    const u = new URL(url.startsWith("http") ? url : `https://${url}`);
+    const u = new URL(normalizeCheckUrl(url));
     if (u.protocol !== "https:") {
       return "未使用 HTTPS 加密连接，数据传输可能不安全";
     }
@@ -121,7 +129,7 @@ function checkSafeDomain(domain: string): "safe" | null {
   if (SAFE_DOMAINS.has(domain)) {
     return "safe";
   }
-  // 检查是否是已知安全域名的子域名
+  // 检查是否是常见网站的子域名
   for (const safe of SAFE_DOMAINS) {
     if (domain.endsWith(`.${safe}`)) {
       return "safe";
@@ -130,30 +138,38 @@ function checkSafeDomain(domain: string): "safe" | null {
   return null;
 }
 
-async function checkHttpReachable(url: string): Promise<string | null> {
-  try {
-    const normalizedUrl = url.startsWith("http") ? url : `https://${url}`;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+interface ReachabilityIssue {
+  message: string;
+  blocked: boolean;
+}
 
-    const response = await fetch(normalizedUrl, {
+async function checkHttpReachable(url: string): Promise<ReachabilityIssue | null> {
+  try {
+    const { response } = await safeRemoteFetch(normalizeCheckUrl(url), {
       method: "HEAD",
-      signal: controller.signal,
-      redirect: "follow",
+      timeoutMs: 5_000,
+      maxRedirects: 3,
       headers: {
         "User-Agent":
           "Mozilla/5.0 (compatible; WebCollectSafetyCheck/1.0)",
       },
     });
 
-    clearTimeout(timeout);
-
     if (!response.ok && response.status >= 400) {
-      return `网站返回 HTTP ${response.status}，可能无法正常访问`;
+      return {
+        message: `网站返回 HTTP ${response.status}，可能无法正常访问`,
+        blocked: false,
+      };
     }
     return null;
-  } catch {
-    return "网站无法访问或响应超时，请确认网址是否正确";
+  } catch (error) {
+    if (error instanceof RemoteUrlPolicyError) {
+      return { message: error.message, blocked: true };
+    }
+    return {
+      message: "网站无法访问或响应超时，请确认网址是否正确",
+      blocked: false,
+    };
   }
 }
 
@@ -162,6 +178,13 @@ async function checkSingleUrl(url: string): Promise<CheckResult> {
     let status: CheckResult["status"] = "safe";
 
     // 1. 提取域名
+    try {
+      assertSafeRemoteUrl(normalizeCheckUrl(url));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "URL 不允许进行远程检查";
+      return { url, status: "danger", details: [message], checkedAt: Date.now() };
+    }
+
     const domain = extractDomain(url);
     if (!domain) {
       return { url, status: "danger", details: ["URL 格式无效，无法解析域名"], checkedAt: Date.now() };
@@ -170,7 +193,7 @@ async function checkSingleUrl(url: string): Promise<CheckResult> {
     // 2. 白名单快速通过
     const safeResult = checkSafeDomain(domain);
     if (safeResult === "safe") {
-      details.push("该域名在已知安全域名白名单中");
+      details.push("该域名在常见网站名单中，但不代表绝对安全");
       const httpsIssue = checkHttps(url);
       if (httpsIssue) {
         details.push(httpsIssue);
@@ -214,12 +237,16 @@ async function checkSingleUrl(url: string): Promise<CheckResult> {
     // 7. HTTP 可达性检查
     const reachabilityIssue = await checkHttpReachable(url);
     if (reachabilityIssue) {
-      details.push(reachabilityIssue);
-      if (status === "safe") status = "warning";
+      details.push(reachabilityIssue.message);
+      if (reachabilityIssue.blocked) {
+        status = "danger";
+      } else if (status === "safe") {
+        status = "warning";
+      }
     }
 
     if (details.length === 0 || (details.length === 1 && details[0].includes("✓"))) {
-      details.push("基础安全检查通过，但仍建议保持警惕");
+      details.push("基础检查未发现明显异常，但仍建议保持警惕");
     }
 
     return { url, status, details, checkedAt: Date.now() };
@@ -233,7 +260,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     // Batch mode: { urls: string[] }
     if (urls && Array.isArray(urls)) {
       // Limit batch size to avoid timeout
-      const batchUrls = urls.slice(0, 20);
+      const batchUrls = urls.filter((item): item is string => typeof item === "string").slice(0, 20);
       const results = await Promise.all(batchUrls.map(checkSingleUrl));
       return NextResponse.json({ results });
     }
@@ -251,7 +278,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   } catch (error) {
     console.error("[check-safety] Error:", error);
     return NextResponse.json(
-      { error: "安全检查失败，请稍后重试" },
+      { error: "基础检查失败，请稍后重试" },
       { status: 500 }
     );
   }

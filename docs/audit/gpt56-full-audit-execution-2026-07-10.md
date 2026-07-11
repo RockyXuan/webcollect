@@ -31,7 +31,7 @@ Target release: `V1.1.0`
 | DATA-03 | P0 | Concurrency | IndexedDB and `chrome.storage` read-modify-write operations lost concurrent updates. | Fixed with lock, queue, and stale-snapshot rebase tests |
 | DATA-04 | P0 | Migration | Name-based heuristics deleted legitimate categories, rewrote descriptions, and ran without a pre-migration snapshot. | Fixed with behavioral tests |
 | DATA-05 | P1 | Recovery | Snapshot health used personal crypto keywords and fixed minimum workspace sizes. | Fixed with relative structural tests |
-| SEC-01 | P0 | Server fetch | Metadata and safety routes can request localhost/private-network URLs. | Open |
+| SEC-01 | P0 | Server fetch | Metadata and safety routes can request localhost/private-network URLs. | Fixed and isolated Chromium runtime verified; final installed Chrome shell check remains a release gate |
 | SEC-02 | P1 | Dependencies | Production dependency audit contains critical/high advisories and unused large dependency trees. | Open |
 | UI-01 | P1 | Responsive | Fixed 2048px canvas with a minimum zoom clipped 1024px and 390px viewports. Vitest plus Playwright now cover five target sizes. | Fixed and browser-verified |
 | UI-02 | P1 | Wallpaper | Quote, citation, and idle hint overlap at 1280x720. | Reproduced |
@@ -92,3 +92,15 @@ Every finding must have a failing behavioral test, the smallest root-cause fix, 
 - Local snapshots now include wallpaper settings/library, sync tombstones, per-preference revisions, extension floating-capture settings, and the full capture queue including failed items.
 - User-initiated clear, full restore, and structure restore are no longer wrapped in sync-suppression. They create higher revisions/tombstones so the restored or cleared state can propagate instead of being immediately overwritten by old cloud data.
 - Old snapshot revision metadata is retained for forensic export but is not blindly restored over newer local counters.
+
+### SEC-01 remote URL and SSRF boundary
+
+- Before: `/api/fetch-meta` and `/api/check-safety` passed user-controlled URLs to unrestricted fetch calls that followed redirects. The extension background did the same for metadata.
+- Web fix: one shared URL policy rejects credentials, non-HTTP(S) schemes, localhost/internal names, private/link-local/reserved IPv4 and IPv6, obfuscated IPv4 forms, and common IPv4-over-IPv6 encodings. The server resolves every hop, rejects mixed public/private answers, and pins the socket to the validated public address to close DNS rebinding between validation and connection.
+- Fetch limits: redirects are manual and bounded; every target is revalidated; metadata accepts HTML/XHTML only; response bytes, URL length, timeout, and redirect count are bounded.
+- Extension fix: the same URL policy runs in the Manifest V3 service worker. Chrome does not expose a server-style DNS pinning API, so unverifiable opaque redirects are rejected instead of followed. Saving a bookmark still works when metadata enrichment is refused.
+- Product wording: the recommendation UI now says `基础检查`, `基础通过`, `需留意`, and `有风险`; it no longer claims that a whitelist/HTTPS result proves a site is safe.
+- Focused verification: 32 policy/fetch cases, two route-level boundary cases, extension private-target and redirect-to-private cases, all 61 Vitest tests, 31 legacy scripts, TypeScript, ESLint, and extension production build pass.
+- Real Web verification: a local Next.js server returned normal metadata for `https://example.com/` and HTTP 400 before any internal fetch for `http://127.0.0.1:5011/`.
+- Real extension verification: an isolated Playwright Chromium profile loaded `extension/dist`, started the Manifest V3 service worker, returned `danger` for a private URL, returned empty metadata for the metadata-service IP, fetched public Example Domain metadata, rendered the wallpaper page, entered the collection page with Enter, logged no console errors, and had no horizontal overflow at 1440x900.
+- Browser constraint: [Google Chrome removed command-line side-loading in branded builds](https://developer.chrome.com/blog/extension-news-june-2025), so automated unpacked-extension validation follows [Playwright's official Chromium extension path](https://playwright.dev/docs/chrome-extensions). A final manually installed/loaded Chrome shell check remains in the release gate for toolbar and context-menu chrome.
