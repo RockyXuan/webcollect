@@ -9,6 +9,7 @@ describe("continuous integration contract", () => {
     expect(workflow).toContain("run: pnpm build\n");
     expect(workflow).toContain("run: pnpm build:ext");
     expect(workflow).toContain("run: pnpm test:extension-artifact");
+    expect(workflow).toContain("run: pnpm test:extension-size");
     expect(workflow).toContain("run: pnpm test:e2e");
   });
 });

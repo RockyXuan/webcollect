@@ -91,6 +91,7 @@ git_with_network fetch origin main --tags
 
 corepack pnpm@9.0.0 build:ext
 corepack pnpm@9.0.0 test:extension-artifact
+corepack pnpm@9.0.0 test:extension-size
 "${NODE_BIN}" "scripts/release-preflight.mjs" "${TAG}" --built
 
 rm -f "${ZIP_PATH}"

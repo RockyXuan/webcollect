@@ -53,5 +53,6 @@ describe("extension release preflight", () => {
     expect(builtPreflight).toBeGreaterThan(build);
     expect(script).toContain("fetch origin main --tags");
     expect(script).toContain("test:extension-artifact");
+    expect(script).toContain("test:extension-size");
   });
 });

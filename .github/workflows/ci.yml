@@ -55,6 +55,9 @@ jobs:
       - name: Verify Chrome extension artifact
         run: pnpm test:extension-artifact
 
+      - name: Verify Chrome extension package size
+        run: pnpm test:extension-size
+
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
 

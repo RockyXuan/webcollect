@@ -16,6 +16,45 @@ const extensionId = createHash("sha256")
   .replace(/[0-9a-f]/g, (digit) => String.fromCharCode(97 + Number.parseInt(digit, 16)));
 await mkdir(outputDir, { recursive: true });
 
+async function readWallpaperGeometry(page) {
+  return page.evaluate(() => {
+    const rect = (selector) => {
+      const value = document.querySelector(selector)?.getBoundingClientRect();
+      return value ? { left: value.left, top: value.top, right: value.right, bottom: value.bottom } : null;
+    };
+    return {
+      quote: rect(".wc-zoom-quote"),
+      hint: rect(".wc-zoom-idle-hint-visible"),
+      controls: rect(".wc-wallpaper-controls"),
+      scrollWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth,
+    };
+  });
+}
+
+function rectanglesIntersect(left, right) {
+  return left.left < right.right
+    && left.right > right.left
+    && left.top < right.bottom
+    && left.bottom > right.top;
+}
+
+function assertWallpaperGeometry(label, geometry) {
+  if (!geometry.quote || !geometry.hint || !geometry.controls) {
+    throw new Error(`${label} wallpaper geometry is incomplete: ${JSON.stringify(geometry)}`);
+  }
+  if (
+    rectanglesIntersect(geometry.quote, geometry.hint)
+    || rectanglesIntersect(geometry.quote, geometry.controls)
+    || rectanglesIntersect(geometry.hint, geometry.controls)
+  ) {
+    throw new Error(`${label} wallpaper layers overlap: ${JSON.stringify(geometry)}`);
+  }
+  if (geometry.scrollWidth > geometry.viewportWidth + 1) {
+    throw new Error(`${label} wallpaper overflows horizontally: ${JSON.stringify(geometry)}`);
+  }
+}
+
 const context = await chromium.launchPersistentContext(profileDir, {
   channel: "chromium",
   headless: false,
@@ -69,11 +108,23 @@ try {
     scrollWidth: document.documentElement.scrollWidth,
     viewportWidth: window.innerWidth,
   }));
+  await page.waitForTimeout(2_300);
+  const desktopWallpaperGeometry = await readWallpaperGeometry(page);
+  assertWallpaperGeometry("desktop", desktopWallpaperGeometry);
 
   await page.screenshot({
     path: resolve(outputDir, "extension-runtime-wallpaper-1440x900.png"),
     fullPage: false,
   });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileWallpaperGeometry = await readWallpaperGeometry(page);
+  assertWallpaperGeometry("mobile", mobileWallpaperGeometry);
+  await page.screenshot({
+    path: resolve(outputDir, "extension-runtime-wallpaper-390x844.png"),
+    fullPage: false,
+  });
+  await page.setViewportSize({ width: 1440, height: 900 });
 
   if (!wallpaperState.text.includes("WebCollect")) {
     await page.keyboard.press("Enter");
@@ -116,10 +167,13 @@ try {
     privateMetadata: privateMetadata.data,
     publicMetadata: publicMetadata.data,
     wallpaperState,
+    desktopWallpaperGeometry,
+    mobileWallpaperGeometry,
     collectionState,
     consoleErrors,
     screenshots: [
       resolve(outputDir, "extension-runtime-wallpaper-1440x900.png"),
+      resolve(outputDir, "extension-runtime-wallpaper-390x844.png"),
       resolve(outputDir, "extension-runtime-collection-1440x900.png"),
     ],
     profileDir,

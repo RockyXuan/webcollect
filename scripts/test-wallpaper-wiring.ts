@@ -9,6 +9,9 @@ const settingsSource = readFileSync("src/components/wallpaper/wallpaper-settings
 const storeSource = readFileSync("src/lib/wallpaper-store.ts", "utf8");
 const wallpaperSourcesSource = readFileSync("src/lib/wallpaper-sources.ts", "utf8");
 const extensionHtmlSource = readFileSync("extension/src/newtab.html", "utf8");
+const webCssSource = readFileSync("src/app/globals.css", "utf8");
+const extensionCssSource = readFileSync("extension/src/extension.css", "utf8");
+const sharedWallpaperCssSource = readFileSync("src/styles/zoom-wallpaper.css", "utf8");
 
 for (const [label, source] of [
   ["web page", pageSource],
@@ -79,5 +82,11 @@ assert.equal(shellSource.includes("长按进入 Zoom 模式"), false, "Collectio
 assert.equal(shellSource.includes("wc-zoom-idle-hint-collection"), false, "Collection mode must not show Zoom-entry idle hints");
 assert.equal(shellSource.includes("wc-wallpaper-floating-return"), false, "Collection mode must not render an extra floating wallpaper button");
 assert.ok(shellSource.includes("Space") && shellSource.includes("Enter"), "WallpaperShell should support keyboard entry");
+assert.ok(webCssSource.includes("@import '../styles/zoom-wallpaper.css';"), "Web should load the shared wallpaper styles");
+assert.ok(extensionCssSource.includes("@import '../../src/styles/zoom-wallpaper.css';"), "Extension should load the shared wallpaper styles");
+assert.equal(webCssSource.includes(".wc-wallpaper-stage {"), false, "Web globals must not duplicate the shared wallpaper styles");
+assert.ok(sharedWallpaperCssSource.includes("top: max(1rem, env(safe-area-inset-top));"), "Idle hint should stay in the safe top area");
+assert.ok(sharedWallpaperCssSource.includes("grid-template-columns: minmax(0, 1fr) auto;"), "Idle hint text and action should use stable grid columns");
+assert.ok(sharedWallpaperCssSource.includes("@media (max-width: 640px)"), "Shared wallpaper styles should include mobile-safe positioning");
 
 console.log("wallpaper wiring tests passed");

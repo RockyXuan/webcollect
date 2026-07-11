@@ -33,6 +33,18 @@ import { ZOOM_CURATED_WALLPAPERS } from "../src/lib/zoom-curated-wallpapers";
 import { WALLPAPER_QUOTES, getWallpaperQuoteCounts } from "../src/lib/wallpaper-quotes";
 import type { WallpaperItem } from "../src/lib/wallpaper-types";
 
+function readLossyWebpSize(path: string): { width: number; height: number } {
+  const bytes = readFileSync(path);
+  assert.equal(bytes.subarray(0, 4).toString("ascii"), "RIFF", `${path} should be a RIFF file`);
+  assert.equal(bytes.subarray(8, 12).toString("ascii"), "WEBP", `${path} should be a WebP file`);
+  assert.equal(bytes.subarray(12, 16).toString("ascii"), "VP8 ", `${path} should use the supported lossy WebP profile`);
+  assert.equal(bytes.subarray(23, 26).toString("hex"), "9d012a", `${path} should contain a valid VP8 frame header`);
+  return {
+    width: bytes.readUInt16LE(26) & 0x3fff,
+    height: bytes.readUInt16LE(28) & 0x3fff,
+  };
+}
+
 assert.equal(DEFAULT_WALLPAPER_PREFS.defaultMode, "wallpaper");
 assert.equal(DEFAULT_WALLPAPER_PREFS.themeMode, "auto");
 assert.equal(DEFAULT_WALLPAPER_PREFS.autoUpdate, true);
@@ -76,6 +88,14 @@ assert.equal(
   packagedWallpaperHashes.length,
   "packaged wallpaper fallback files should not be duplicated under different metadata"
 );
+for (const item of FALLBACK_WALLPAPERS.filter((wallpaper) => wallpaper.imageUrl.startsWith("/assets/wallpapers/"))) {
+  assert.match(item.imageUrl, /\.webp$/, `${item.id} should use the optimized WebP package asset`);
+  assert.deepEqual(
+    readLossyWebpSize(`public${item.imageUrl}`),
+    { width: item.width, height: item.height },
+    `${item.id} registry dimensions should match the packaged file`
+  );
+}
 assert.ok(
   FALLBACK_WALLPAPERS.every((item) => {
     const aspectRatio = item.width / item.height;
