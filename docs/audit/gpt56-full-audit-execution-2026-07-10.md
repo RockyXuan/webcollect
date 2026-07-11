@@ -38,7 +38,7 @@ Target release: `V1.1.0`
 | UI-02 | P1 | Wallpaper | Quote, citation, and idle hint overlap at 1280x720. | Reproduced |
 | AUTH-01 | P1 | Auth | Cached identity is trusted without validating the Supabase session; extension logout leaves the remote session intact. | Code fixed and isolated extension startup verified; real OAuth account gate pending |
 | META-01 | P1 | Capture | Web and extension metadata extractors diverge and can select unrelated boilerplate. | Fixed with one shared structural extractor, 24 fixtures, Web API, and isolated extension runtime evidence |
-| REL-01 | P1 | Release | Release script can tag a feature commit while pushing a different `main`; static extension output can be stale. | Open |
+| REL-01 | P1 | Release | Release script can tag a feature commit while pushing a different `main`; static extension output can be stale. | Fixed with deterministic preflight and one build source; final main/tag/Release execution pending all gates |
 | BUILD-01 | P1 | Build | Scripts require global `pnpm`; production Babel config disables the default compiler. | Fixed; default Turbopack and custom server builds pass without dependency installation |
 
 ## Execution rule
@@ -113,7 +113,7 @@ Every finding must have a failing behavioral test, the smallest root-cause fix, 
 - Upgraded: Next `16.2.10`, React/React DOM `19.2.7`, ESLint Next config `16.2.10`, and Supabase `2.109.0`. Supabase `2.109.0` is the newest inspected release that declares Node 20 support; `2.110.2` requires Node 22 and was rejected for this workspace.
 - Overrides: Undici `7.28.0`, PostCSS `8.5.10`, and Babel Core `7.29.6` are pinned to patched versions within compatible major lines.
 - Result: production top-level dependencies fell from 62 to 48. `pnpm audit --prod --registry=https://registry.npmjs.org` reports `No known vulnerabilities found`.
-- Verification: dependency-surface contract tests, all unit/legacy tests, TypeScript, ESLint, extension build, and Next 16.2.10 Webpack production build pass. The default Turbopack build still hangs because of the existing `.babelrc`; that remains BUILD-01 and is not hidden by this finding.
+- Verification: dependency-surface contract tests, all unit/legacy tests, TypeScript, ESLint, extension build, and Next 16.2.10 Webpack production build pass. BUILD-01 subsequently removed the obsolete Babel configuration and the default Turbopack production build now passes too.
 
 ### AUTH-01 verified session and logout
 
@@ -141,3 +141,11 @@ Every finding must have a failing behavioral test, the smallest root-cause fix, 
 - Fix: removed the Inspector and `.babelrc`, removed its unused packages, replaced `npx only-allow` with a local package-manager guard, pinned shell entry points to `corepack pnpm@9.0.0`, removed install-on-build, and made the dev server report port conflicts instead of terminating unrelated processes.
 - Focused verification: all four build contract tests, TypeScript, and ESLint pass. The exact default `corepack pnpm@9.0.0 build` command compiles with Next 16.2.10 Turbopack, generates all ten pages/routes, and bundles `src/server.ts` with tsup.
 - Environment note: the restricted command sandbox initially blocked Turbopack's temporary PostCSS helper from binding a local port. Running the same command in the approved local execution boundary passed; this was an OS sandbox restriction, not an application fallback or a Webpack substitution.
+
+### REL-01 release identity and artifact guard
+
+- Before: `release-extension.sh` could build and tag the current feature commit, push an unrelated `main`, then publish the feature tag. It did not reject a dirty tree, an unpushed commit, mismatched product versions, a reused tag, or stale output. A tracked `public/extension-dist` copy was no longer referenced by the app and had drifted behind the real manifest, permissions, content script, and service worker.
+- Fix: one pure release-state validator now requires a clean `main`, `HEAD === refs/remotes/origin/main` after fetch, matching package/manifest/app versions, an exact `webcollect-YYYY-MM-DD-vX.Y.Z` tag, no reused tag at another commit, and a built manifest matching the product version. The release shell runs it before and after `build:ext`, then runs the extension artifact contract before zipping.
+- Artifact policy: `extension/manifest.json` plus a fresh `extension/dist` build are the only release source. The unused tracked `public/extension-dist` snapshot was removed instead of committing another large generated copy; CI compares the built manifest byte-for-structure with its source and verifies every service-worker relative import resolves.
+- Focused verification: eleven release-state/shell-order tests pass. The real preflight rejects the current feature branch and dirty worktree as designed. A fresh extension build and final artifact test pass; the existing branding test now checks source icons, favicon entries, version display, and brand wiring without trusting a stale compiled bundle.
+- Remaining execution: after all V1.1.0 gates pass, update version/date, merge the audited commit to `main`, push it, rerun preflight on that exact remote commit, then create the tag and Release. The script cannot publish from this feature branch.

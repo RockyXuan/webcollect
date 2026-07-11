@@ -46,11 +46,9 @@ function readIcoPngEntries(path: string): Array<{ width: number; height: number 
 
 const packageJson = readJson<{ version: string }>("package.json");
 const manifest = readJson<{ version: string; icons: Record<string, string> }>("extension/manifest.json");
-const staticManifest = readJson<{ version: string; icons: Record<string, string> }>("public/extension-dist/manifest.json");
 
 assert.equal(packageJson.version, EXPECTED_VERSION, "package version should track the current product version");
 assert.equal(manifest.version, EXPECTED_VERSION, "Chrome extension manifest version should match the product version");
-assert.equal(staticManifest.version, EXPECTED_VERSION, "static extension copy should not lag behind the current product version");
 
 assert.deepEqual(
   manifest.icons,
@@ -69,20 +67,6 @@ for (const [size, path] of Object.entries(manifest.icons)) {
   assert.equal(width, expectedSize, `${iconPath} should be ${expectedSize}px wide`);
   assert.equal(height, expectedSize, `${iconPath} should be ${expectedSize}px tall`);
 }
-
-for (const [size, path] of Object.entries(staticManifest.icons)) {
-  const expectedSize = Number(size);
-  const iconPath = `public/extension-dist/${path}`;
-  const { width, height } = readPngSize(iconPath);
-  assert.equal(width, expectedSize, `${iconPath} should be ${expectedSize}px wide`);
-  assert.equal(height, expectedSize, `${iconPath} should be ${expectedSize}px tall`);
-}
-
-assert.deepEqual(
-  readPngSize("public/extension-dist/assets/icon16-BNAU1x4U.png"),
-  { width: 16, height: 16 },
-  "static extension bundled asset icon should use a crisp chipmunk favicon"
-);
 
 assert.deepEqual(
   readIcoPngEntries("src/app/favicon.ico"),

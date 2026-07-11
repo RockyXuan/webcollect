@@ -70,11 +70,7 @@ NODE_BIN="${NODE_BIN:-$(find_node)}"
 export PATH="$(dirname "${NODE_BIN}"):${PATH}"
 
 if [[ -z "${TAG}" ]]; then
-  TAG="$(git tag --points-at HEAD | grep '^webcollect-' | sort | tail -n 1 || true)"
-fi
-
-if [[ -z "${TAG}" ]]; then
-  TAG="webcollect-$(date +%F)-$(git rev-parse --short HEAD)"
+  TAG="$("${NODE_BIN}" "scripts/release-preflight.mjs" --print-tag)"
 fi
 
 ZIP_NAME="$(extension_zip_filename "${TAG}")"
@@ -90,7 +86,12 @@ else
   echo "GitHub proxy ${GITHUB_PROXY} is not listening; falling back to direct GitHub access."
 fi
 
-"${NODE_BIN}" ./extension/build.mjs
+git_with_network fetch origin main --tags
+"${NODE_BIN}" "scripts/release-preflight.mjs" "${TAG}"
+
+corepack pnpm@9.0.0 build:ext
+corepack pnpm@9.0.0 test:extension-artifact
+"${NODE_BIN}" "scripts/release-preflight.mjs" "${TAG}" --built
 
 rm -f "${ZIP_PATH}"
 (cd extension/dist && zip -qr "${ZIP_PATH}" .)

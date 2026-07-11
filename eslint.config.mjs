@@ -47,7 +47,6 @@ const eslintConfig = defineConfig([
     'extension/dist/**',
     'extension/src/**',
     'extension/background.js',
-    'public/extension-dist/**',
     'tmp/**',
     // Script files (CommonJS):
     'scripts/**/*.js',
