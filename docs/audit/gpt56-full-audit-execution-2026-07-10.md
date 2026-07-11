@@ -32,7 +32,7 @@ Target release: `V1.1.0`
 | DATA-04 | P0 | Migration | Name-based heuristics deleted legitimate categories, rewrote descriptions, and ran without a pre-migration snapshot. | Fixed with behavioral tests |
 | DATA-05 | P1 | Recovery | Snapshot health used personal crypto keywords and fixed minimum workspace sizes. | Fixed with relative structural tests |
 | SEC-01 | P0 | Server fetch | Metadata and safety routes can request localhost/private-network URLs. | Fixed and isolated Chromium runtime verified; final installed Chrome shell check remains a release gate |
-| SEC-02 | P1 | Dependencies | Production dependency audit contains critical/high advisories and unused large dependency trees. | Open |
+| SEC-02 | P1 | Dependencies | Production dependency audit contains critical/high advisories and unused large dependency trees. | Fixed; official production audit reports no known vulnerabilities |
 | UI-01 | P1 | Responsive | Fixed 2048px canvas with a minimum zoom clipped 1024px and 390px viewports. Vitest plus Playwright now cover five target sizes. | Fixed and browser-verified |
 | UI-02 | P1 | Wallpaper | Quote, citation, and idle hint overlap at 1280x720. | Reproduced |
 | AUTH-01 | P1 | Auth | Cached identity is trusted without validating the Supabase session; extension logout leaves the remote session intact. | Open |
@@ -104,3 +104,12 @@ Every finding must have a failing behavioral test, the smallest root-cause fix, 
 - Real Web verification: a local Next.js server returned normal metadata for `https://example.com/` and HTTP 400 before any internal fetch for `http://127.0.0.1:5011/`.
 - Real extension verification: an isolated Playwright Chromium profile loaded `extension/dist`, started the Manifest V3 service worker, returned `danger` for a private URL, returned empty metadata for the metadata-service IP, fetched public Example Domain metadata, rendered the wallpaper page, entered the collection page with Enter, logged no console errors, and had no horizontal overflow at 1440x900.
 - Browser constraint: [Google Chrome removed command-line side-loading in branded builds](https://developer.chrome.com/blog/extension-news-june-2025), so automated unpacked-extension validation follows [Playwright's official Chromium extension path](https://playwright.dev/docs/chrome-extensions). A final manually installed/loaded Chrome shell check remains in the release gate for toolbar and context-menu chrome.
+
+### SEC-02 production dependency surface
+
+- Before: the official npm production audit reported 55 advisories: 1 critical, 26 high, 20 moderate, and 8 low. The critical XML parser path came from unused AWS SDK packages; Recharts was referenced only by an unused template component; the optional Coze reporting wrapper pulled axios, langchain, OpenAI, and ws into the runtime tree.
+- Removed: `@aws-sdk/client-s3`, `@aws-sdk/lib-storage`, `coze-coding-dev-sdk`, `recharts`, `drizzle-zod`, `pg`, and unused chart UI code. Supabase now uses its ordinary fetch path. `drizzle-orm` remains development-only because only generated schema files import it.
+- Upgraded: Next `16.2.10`, React/React DOM `19.2.7`, ESLint Next config `16.2.10`, and Supabase `2.109.0`. Supabase `2.109.0` is the newest inspected release that declares Node 20 support; `2.110.2` requires Node 22 and was rejected for this workspace.
+- Overrides: Undici `7.28.0`, PostCSS `8.5.10`, and Babel Core `7.29.6` are pinned to patched versions within compatible major lines.
+- Result: production top-level dependencies fell from 62 to 48. `pnpm audit --prod --registry=https://registry.npmjs.org` reports `No known vulnerabilities found`.
+- Verification: dependency-surface contract tests, all unit/legacy tests, TypeScript, ESLint, extension build, and Next 16.2.10 Webpack production build pass. The default Turbopack build still hangs because of the existing `.babelrc`; that remains BUILD-01 and is not hidden by this finding.
