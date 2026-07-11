@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import localforage from "localforage";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Category, WebCard } from "../src/lib/types";
+import { compareSyncVersions } from "../src/lib/sync-revisions";
 
 type Row = Record<string, unknown>;
 type TableName = "categories" | "cards" | "user_preferences" | "workspace_tombstones";
@@ -320,7 +321,9 @@ async function importSyncModules() {
   const supabase = await import("../src/lib/supabase-browser");
   const sync = await import("../src/lib/sync");
   const db = await import("../src/lib/db");
-  return { supabase, sync, db };
+  const wallpaper = await import("../src/lib/wallpaper-db");
+  const wallpaperSources = await import("../src/lib/wallpaper-sources");
+  return { supabase, sync, db, wallpaper, wallpaperSources };
 }
 
 async function resetLocal(db: Awaited<ReturnType<typeof importSyncModules>>["db"]): Promise<void> {
@@ -338,7 +341,7 @@ async function resetLocal(db: Awaited<ReturnType<typeof importSyncModules>>["db"
 }
 
 async function main(): Promise<void> {
-  const { supabase, sync, db } = await importSyncModules();
+  const { supabase, sync, db, wallpaper, wallpaperSources } = await importSyncModules();
 
   {
     const fake = new FakeSupabaseClient();
@@ -653,6 +656,89 @@ async function main(): Promise<void> {
     assert.equal((await db.getCards())[0]?.title, "Device A Edit", "device A edit should not be rolled back after device B sync");
     assert.equal(fake.tables.cards[0]?.title, "Device A Edit", "device A edit should be pushed to cloud");
     assert.equal(fake.tables.cards[0]?.updated_at, new Date(editedAt).toISOString(), "cloud row should preserve client edit timestamp");
+  }
+
+  {
+    const fake = new FakeSupabaseClient();
+    const sharedCategory = category({ name: "Dual device inbox" });
+    const sharedCard = card({ title: "Initial shared card" });
+    const hiddenSite = {
+      siteId: "dual-device-hidden",
+      siteUrl: "https://hidden.example.com",
+      hiddenAt: baseTime,
+      duration: "permanent" as const,
+    };
+    supabase.__setBrowserSupabaseClientForTest(fake as unknown as SupabaseClient);
+
+    await resetLocal(db);
+    await db.addCategory(sharedCategory);
+    await db.addCard(sharedCard);
+    await db.savePinnedCategoryIds([sharedCategory.id]);
+    await db.saveHiddenSites([hiddenSite]);
+    await wallpaper.saveWallpaperPrefs({
+      ...wallpaperSources.DEFAULT_WALLPAPER_PREFS,
+      defaultMode: "collection",
+    });
+    await sync.syncData(userId);
+    const deviceABaseline = captureLocalStore();
+    const deviceAId = String(memoryStore.get("syncDeviceId") || "");
+
+    memoryStore.clear();
+    await resetLocal(db);
+    await sync.syncData(userId);
+    const deviceBId = String(memoryStore.get("syncDeviceId") || "");
+    assert.ok(deviceAId && deviceBId && deviceAId !== deviceBId, "isolated profiles should use different stable device IDs");
+    assert.equal((await db.getCategories()).some((item) => item.id === sharedCategory.id), true, "a new device should pull the shared category");
+    assert.equal((await db.getCards())[0]?.title, "Initial shared card", "a new device should pull the shared card");
+    assert.deepEqual(await db.getPinnedCategoryIds(), [sharedCategory.id], "a new device should pull pinned categories");
+    assert.deepEqual(await db.getHiddenSites(), [hiddenSite], "a new device should pull hidden sites");
+    assert.equal((await wallpaper.getWallpaperPrefs()).defaultMode, "collection", "a new device should pull the wallpaper mode switch");
+    const deviceBBaseline = captureLocalStore();
+
+    restoreLocalStore(deviceABaseline);
+    const deviceACard = (await db.getCards())[0];
+    await db.updateCard({ ...deviceACard, title: "Device A offline edit", updatedAt: baseTime + 10_000 });
+    const deviceAEditedCard = (await db.getCards())[0];
+    const deviceAOffline = captureLocalStore();
+
+    restoreLocalStore(deviceBBaseline);
+    const deviceBCard = (await db.getCards())[0];
+    await db.updateCard({ ...deviceBCard, title: "Device B offline edit", updatedAt: baseTime + 20_000 });
+    await db.savePinnedCategoryIds([]);
+    await db.saveHiddenSites([]);
+    await wallpaper.saveWallpaperPrefs({
+      ...(await wallpaper.getWallpaperPrefs()),
+      defaultMode: "wallpaper",
+    });
+    const deviceBEditedCard = (await db.getCards())[0];
+    const deviceBOffline = captureLocalStore();
+
+    const expectedWinner = compareSyncVersions(deviceAEditedCard, deviceBEditedCard) >= 0
+      ? deviceAEditedCard
+      : deviceBEditedCard;
+
+    restoreLocalStore(deviceAOffline);
+    await sync.syncData(userId);
+    const deviceAAfterFirstSync = captureLocalStore();
+
+    restoreLocalStore(deviceBOffline);
+    await sync.syncData(userId);
+    assert.equal((await db.getCards())[0]?.title, expectedWinner.title, "the second online device should resolve the offline conflict deterministically");
+    assert.deepEqual(await db.getPinnedCategoryIds(), [], "an explicit unpin should reach the cloud");
+    assert.deepEqual(await db.getHiddenSites(), [], "an explicit unhide should reach the cloud");
+    assert.equal((await wallpaper.getWallpaperPrefs()).defaultMode, "wallpaper", "the wallpaper switch should reach the cloud");
+    const deviceBAfterSync = captureLocalStore();
+
+    restoreLocalStore(deviceAAfterFirstSync);
+    await sync.syncData(userId);
+    assert.equal((await db.getCards())[0]?.title, expectedWinner.title, "device A should converge after the other device resolves the conflict");
+    assert.deepEqual(await db.getPinnedCategoryIds(), [], "device A should receive the explicit unpin");
+    assert.deepEqual(await db.getHiddenSites(), [], "device A should receive the explicit unhide");
+    assert.equal((await wallpaper.getWallpaperPrefs()).defaultMode, "wallpaper", "device A should receive the wallpaper switch");
+
+    restoreLocalStore(deviceBAfterSync);
+    assert.equal((await db.getCards())[0]?.title, expectedWinner.title, "both isolated profiles should finish with the same card");
+    assert.equal(fake.tables.cards[0]?.title, expectedWinner.title, "cloud state should match both isolated profiles");
   }
 
   supabase.__resetBrowserSupabaseForTest();
