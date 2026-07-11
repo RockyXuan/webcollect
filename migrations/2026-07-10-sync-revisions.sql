@@ -93,13 +93,74 @@ create trigger workspace_tombstones_bump_workspace_version
 after insert or update or delete on public.workspace_tombstones
 for each row execute function public.bump_workspace_version();
 
+alter table public.users enable row level security;
+alter table public.categories enable row level security;
+alter table public.cards enable row level security;
+alter table public.user_preferences enable row level security;
+alter table public.workspace_snapshots enable row level security;
 alter table public.workspace_tombstones enable row level security;
 alter table public.workspace_versions enable row level security;
 
+grant select, insert, update, delete on public.users to authenticated;
+grant select, insert, update, delete on public.categories to authenticated;
+grant select, insert, update, delete on public.cards to authenticated;
+grant select, insert, update, delete on public.user_preferences to authenticated;
+grant select, insert, update, delete on public.workspace_snapshots to authenticated;
 grant select, insert, update, delete on public.workspace_tombstones to authenticated;
 grant select on public.workspace_versions to authenticated;
+
+revoke all on public.users from anon;
+revoke all on public.categories from anon;
+revoke all on public.cards from anon;
+revoke all on public.user_preferences from anon;
+revoke all on public.workspace_snapshots from anon;
 revoke all on public.workspace_tombstones from anon;
 revoke all on public.workspace_versions from anon;
+
+drop policy if exists users_select_own on public.users;
+create policy users_select_own on public.users
+for select to authenticated
+using ((select auth.uid()) = id);
+
+drop policy if exists users_insert_own on public.users;
+create policy users_insert_own on public.users
+for insert to authenticated
+with check ((select auth.uid()) = id);
+
+drop policy if exists users_update_own on public.users;
+create policy users_update_own on public.users
+for update to authenticated
+using ((select auth.uid()) = id)
+with check ((select auth.uid()) = id);
+
+drop policy if exists users_delete_own on public.users;
+create policy users_delete_own on public.users
+for delete to authenticated
+using ((select auth.uid()) = id);
+
+drop policy if exists categories_owner_all on public.categories;
+create policy categories_owner_all on public.categories
+for all to authenticated
+using ((select auth.uid()) = user_id)
+with check ((select auth.uid()) = user_id);
+
+drop policy if exists cards_owner_all on public.cards;
+create policy cards_owner_all on public.cards
+for all to authenticated
+using ((select auth.uid()) = user_id)
+with check ((select auth.uid()) = user_id);
+
+drop policy if exists user_preferences_owner_all on public.user_preferences;
+create policy user_preferences_owner_all on public.user_preferences
+for all to authenticated
+using ((select auth.uid()) = user_id)
+with check ((select auth.uid()) = user_id);
+
+drop policy if exists workspace_snapshots_owner_all on public.workspace_snapshots;
+create policy workspace_snapshots_owner_all on public.workspace_snapshots
+for all to authenticated
+using ((select auth.uid()) = user_id)
+with check ((select auth.uid()) = user_id);
 
 drop policy if exists workspace_tombstones_owner_all on public.workspace_tombstones;
 create policy workspace_tombstones_owner_all on public.workspace_tombstones

@@ -30,4 +30,19 @@ describe("revisioned sync SQL migration", () => {
       expect(source).toMatch(/workspace_versions_owner_select[\s\S]*for select\s+to authenticated[\s\S]*auth\.uid\(\)/i);
     }
   });
+
+  it("replaces legacy WebCollect policies with initplan-safe authenticated ownership checks", () => {
+    for (const policy of [
+      "users_select_own",
+      "users_insert_own",
+      "users_update_own",
+      "users_delete_own",
+      "categories_owner_all",
+      "cards_owner_all",
+      "user_preferences_owner_all",
+      "workspace_snapshots_owner_all",
+    ]) {
+      expect(sql).toMatch(new RegExp(`${policy}[\\s\\S]*?to authenticated[\\s\\S]*?\\(select auth\\.uid\\(\\)\\)`, "i"));
+    }
+  });
 });
