@@ -39,7 +39,7 @@ Target release: `V1.1.0`
 | AUTH-01 | P1 | Auth | Cached identity is trusted without validating the Supabase session; extension logout leaves the remote session intact. | Code fixed and isolated extension startup verified; real OAuth account gate pending |
 | META-01 | P1 | Capture | Web and extension metadata extractors diverge and can select unrelated boilerplate. | Fixed with one shared structural extractor, 24 fixtures, Web API, and isolated extension runtime evidence |
 | REL-01 | P1 | Release | Release script can tag a feature commit while pushing a different `main`; static extension output can be stale. | Open |
-| BUILD-01 | P1 | Build | Scripts require global `pnpm`; production Babel config disables the default compiler. | Open |
+| BUILD-01 | P1 | Build | Scripts require global `pnpm`; production Babel config disables the default compiler. | Fixed; default Turbopack and custom server builds pass without dependency installation |
 
 ## Execution rule
 
@@ -133,3 +133,11 @@ Every finding must have a failing behavioral test, the smallest root-cause fix, 
 - Build fix: the Manifest V3 service worker is now a Vite entry instead of an unprocessed file copy. CI and the release workflow reject any built service worker with unresolved relative imports.
 - Verification: 25 focused metadata tests, 94 total Vitest tests, all 31 legacy scripts, TypeScript, ESLint, extension production build, and the artifact contract pass. An isolated Chromium extension runtime starts the bundled service worker, returns clean Example Domain metadata, blocks private metadata fetches, logs zero console errors, and reaches the collection page.
 - Real Web verification: `/api/fetch-meta` returns `Docu.md` plus the live target site's own product description, returns a properly spaced Example Domain description, and rejects `http://127.0.0.1:5011/`. No user bookmarks, IndexedDB rows, or seed data were changed.
+
+### BUILD-01 deterministic default build
+
+- Before: `.babelrc` applied the React Dev Inspector Babel plugin to every Next build, disabling the default compiler. `scripts/build.sh` installed dependencies during the build and called an unspecified global `pnpm`; `scripts/dev.sh` also attempted to `SIGKILL` whatever owned port 5000.
+- Root cause: the inspector was a Coze-only development aid, not a WebCollect product feature. Keeping its component, Babel plugin, middleware, and transitive packages in the production path imposed a compiler-wide cost for functionality that ordinary development and release flows did not use.
+- Fix: removed the Inspector and `.babelrc`, removed its unused packages, replaced `npx only-allow` with a local package-manager guard, pinned shell entry points to `corepack pnpm@9.0.0`, removed install-on-build, and made the dev server report port conflicts instead of terminating unrelated processes.
+- Focused verification: all four build contract tests, TypeScript, and ESLint pass. The exact default `corepack pnpm@9.0.0 build` command compiles with Next 16.2.10 Turbopack, generates all ten pages/routes, and bundles `src/server.ts` with tsup.
+- Environment note: the restricted command sandbox initially blocked Turbopack's temporary PostCSS helper from binding a local port. Running the same command in the approved local execution boundary passed; this was an OS sandbox restriction, not an application fallback or a Webpack substitution.
