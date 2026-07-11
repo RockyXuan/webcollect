@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
+import { extractMetadataFromHtml } from "../shared/metadata-extractor.js";
 import { assertSafeRemoteUrl } from "../shared/remote-url-policy.js";
 
 const backgroundSource = readFileSync("extension/background.js", "utf8")
-  .replace(/^import \{ assertSafeRemoteUrl \} from '\.\/remote-url-policy\.js';\s*/m, "");
+  .replace(/^import \{ extractMetadataFromHtml \} from '\.\.\/shared\/metadata-extractor\.js';\s*/m, "")
+  .replace(/^import \{ assertSafeRemoteUrl \} from '\.\.\/shared\/remote-url-policy\.js';\s*/m, "");
 
 const listeners: Record<string, unknown[]> = {};
 const context = {
@@ -13,6 +15,7 @@ const context = {
   AbortSignal,
   TextDecoder,
   Uint8Array,
+  extractMetadataFromHtml,
   assertSafeRemoteUrl,
   chrome: {
     runtime: {
@@ -44,48 +47,10 @@ vm.createContext(context);
 vm.runInContext(backgroundSource, context, { filename: "extension/background.js" });
 
 type BackgroundContext = typeof context & {
-  extractDescriptionFromTitle: (title: string, url: string) => string;
-  extractReadableDescription: (html: string, title: string, url: string) => string;
   handleFetchMeta: (url: string) => Promise<{ title: string; description: string; image: string; favicon: string }>;
-  compactTitleForCapture: (title: string, url: string) => string;
 };
 
 const bg = context as BackgroundContext;
-
-assert.equal(
-  bg.compactTitleForCapture("docu.md — AI writes it. docu.md does the rest.", "https://docu.md/"),
-  "Docu.md",
-  "docu.md capture title should prefer the concise product name"
-);
-
-assert.equal(
-  bg.extractDescriptionFromTitle("docu.md — AI writes it. docu.md does the rest.", "https://docu.md/"),
-  "AI writes it. docu.md does the rest.",
-  "docu.md title slogan should be usable as the target-page description"
-);
-
-assert.equal(
-  bg.extractReadableDescription(
-    `
-      <html>
-        <head><title>docu.md — AI writes it. docu.md does the rest.</title></head>
-        <body>
-          <nav>Features Docs</nav>
-          <main>
-            <p>The aftercare for AI-written markdown</p>
-            <h1>AI writes it.</h1>
-            <p>docu.md does the rest.</p>
-            <p>Turn AI-generated markdown into work you can hand in.</p>
-          </main>
-        </body>
-      </html>
-    `,
-    "docu.md — AI writes it. docu.md does the rest.",
-    "https://docu.md/"
-  ),
-  "AI writes it. docu.md does the rest.",
-  "readable fallback should prefer the hero promise over unrelated source-page text"
-);
 
 async function main() {
   let requestCount = 0;

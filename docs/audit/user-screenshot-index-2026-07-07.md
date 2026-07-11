@@ -22,8 +22,8 @@
 | `codex-clipboard-0edbb090-f3a3-476e-9299-761088b19a8b.png` | 编辑模式随便点 AI/HODL 却弹删除 HODL 确认 | 误删防护，删除必须明确触发 | 已移除普通点击删除入口，仍列 P0 复验 |
 | `codex-clipboard-60aa9ec0-81a2-4344-a03b-49076b94c326.png` | 搜索 `taste` 后显示结果路径为 `主页 / 节流 / 收集箱` | 扩展收集目标落点错误 | 已修队列 target drain，历史无证据不自动搬 |
 | `codex-clipboard-77459e7f-5a42-4652-907f-4cc60078122a.png` | 新增内容都落到主页“节流/收集箱”，分类错乱 | P0：扩展保存目标必须准确 | 已加测试和 fail-safe，仍需真实扩展验证 |
-| `codex-clipboard-8ff07294-c0e0-4a3b-b2b8-32f4497c2108.png` | X/Twitter 博主发 `docu.md`，页面文案是“AI 负责写作，Docu.md 完成其余工作” | 元数据应提取目标网页，不应取 Twitter 简介 | 已修 `docu.md` 规则和错配保护 |
-| `codex-clipboard-ce29b5f2-b06c-4a0e-ae0b-800135e90a0d.png` | 浮窗表单名称/简介识别错误，简介变成 X/Twitter 社交平台 | 名称为 `Docu.md`，简介为目标页 slogan | 已修，测试 `scripts/test-floating-capture-metadata.ts` 覆盖 |
+| `codex-clipboard-8ff07294-c0e0-4a3b-b2b8-32f4497c2108.png` | X/Twitter 博主发 `docu.md`，页面文案是“AI 负责写作，Docu.md 完成其余工作” | 元数据应提取目标网页，不应取 Twitter 简介 | 已由共享结构化提取器修复；24 组样本覆盖 X 外链、GitHub、文档站、文章、产品和异常页 |
+| `codex-clipboard-ce29b5f2-b06c-4a0e-ae0b-800135e90a0d.png` | 浮窗表单名称/简介识别错误，简介变成 X/Twitter 社交平台 | 名称为 `Docu.md`，简介为目标页 slogan | 已修；Web API、扩展源码与最终 service worker 使用同一提取器 |
 | `webcollect-v1.1-extension-runtime-2026-07-12.png` | 隔离 Chromium 加载 `extension/dist` 后进入网页墙 | Manifest V3 服务工作线程、扩展新标签页、基础检查与元数据消息运行时验收 | 运行通过；控制台零错误，1440px 无横向溢出 |
 | `webcollect-v1.1-wallpaper-before-ui-fix-2026-07-12.png` | 扩展默认壁纸页的引言、译文、来源和操作提示集中在底部 | UI-02 壁纸文字层级和间距修复前证据 | 已复现，待 Phase 4 修复并补 after 截图 |
 

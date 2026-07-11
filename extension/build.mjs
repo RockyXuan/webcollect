@@ -13,7 +13,6 @@ const mascotSourceDir = join(extensionRoot, "src", "assets", "mascots");
 const mascotDistDir = join(distDir, "assets", "mascots");
 const wallpaperSourceDir = join(projectRoot, "public", "assets", "wallpapers");
 const wallpaperDistDir = join(distDir, "assets", "wallpapers");
-const remoteUrlPolicySource = join(projectRoot, "shared", "remote-url-policy.js");
 
 console.log("Building WebCollect Chrome Extension...");
 
@@ -57,8 +56,6 @@ if (contentScriptResult.status !== 0) {
 }
 
 cpSync(join(extensionRoot, "manifest.json"), join(distDir, "manifest.json"));
-cpSync(join(extensionRoot, "background.js"), join(distDir, "background.js"));
-cpSync(remoteUrlPolicySource, join(distDir, "remote-url-policy.js"));
 
 mkdirSync(iconDistDir, { recursive: true });
 if (existsSync(iconSourceDir)) {

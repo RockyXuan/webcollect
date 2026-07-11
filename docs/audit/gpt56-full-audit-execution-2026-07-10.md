@@ -12,6 +12,7 @@ Target release: `V1.1.0`
 - `src/lib/seed.ts` was reviewed before edits; default categories and cards must remain unchanged.
 - Chrome automation cannot enter `chrome://newtab` under its security policy. A real-profile local export remains a hard gate before any data migration or release.
 - No Supabase credentials are stored in the checkout. A cloud export remains a hard gate before applying SQL.
+- These external gates do not block code remediation. Automated engineering acceptance uses an isolated extension Profile, deterministic IndexedDB/Supabase doubles, migration contract tests, and real local Web routes. Only account data export, live SQL, branded-Chrome shell chrome, and dual-device account behavior remain confirmation gates.
 
 ## Verified starting state
 
@@ -36,7 +37,7 @@ Target release: `V1.1.0`
 | UI-01 | P1 | Responsive | Fixed 2048px canvas with a minimum zoom clipped 1024px and 390px viewports. Vitest plus Playwright now cover five target sizes. | Fixed and browser-verified |
 | UI-02 | P1 | Wallpaper | Quote, citation, and idle hint overlap at 1280x720. | Reproduced |
 | AUTH-01 | P1 | Auth | Cached identity is trusted without validating the Supabase session; extension logout leaves the remote session intact. | Code fixed and isolated extension startup verified; real OAuth account gate pending |
-| META-01 | P1 | Capture | Web and extension metadata extractors diverge and can select unrelated boilerplate. | Open |
+| META-01 | P1 | Capture | Web and extension metadata extractors diverge and can select unrelated boilerplate. | Fixed with one shared structural extractor, 24 fixtures, Web API, and isolated extension runtime evidence |
 | REL-01 | P1 | Release | Release script can tag a feature commit while pushing a different `main`; static extension output can be stale. | Open |
 | BUILD-01 | P1 | Build | Scripts require global `pnpm`; production Babel config disables the default compiler. | Open |
 
@@ -108,7 +109,7 @@ Every finding must have a failing behavioral test, the smallest root-cause fix, 
 ### SEC-02 production dependency surface
 
 - Before: the official npm production audit reported 55 advisories: 1 critical, 26 high, 20 moderate, and 8 low. The critical XML parser path came from unused AWS SDK packages; Recharts was referenced only by an unused template component; the optional Coze reporting wrapper pulled axios, langchain, OpenAI, and ws into the runtime tree.
-- Removed: `@aws-sdk/client-s3`, `@aws-sdk/lib-storage`, `coze-coding-dev-sdk`, `recharts`, `drizzle-zod`, `pg`, and unused chart UI code. Supabase now uses its ordinary fetch path. `drizzle-orm` remains development-only because only generated schema files import it.
+- Removed: `@aws-sdk/client-s3`, `@aws-sdk/lib-storage`, `coze-coding-dev-sdk`, `recharts`, `drizzle-zod`, `pg`, `cheerio`, and unused chart UI code. Supabase now uses its ordinary fetch path. `drizzle-orm` remains development-only because only generated schema files import it; metadata parsing uses the smaller shared `htmlparser2` implementation.
 - Upgraded: Next `16.2.10`, React/React DOM `19.2.7`, ESLint Next config `16.2.10`, and Supabase `2.109.0`. Supabase `2.109.0` is the newest inspected release that declares Node 20 support; `2.110.2` requires Node 22 and was rejected for this workspace.
 - Overrides: Undici `7.28.0`, PostCSS `8.5.10`, and Babel Core `7.29.6` are pinned to patched versions within compatible major lines.
 - Result: production top-level dependencies fell from 62 to 48. `pnpm audit --prod --registry=https://registry.npmjs.org` reports `No known vulnerabilities found`.
@@ -123,3 +124,12 @@ Every finding must have a failing behavioral test, the smallest root-cause fix, 
 - Text cleanup: user-visible OAuth mojibake was replaced with readable Chinese, and remaining broken encoding markers in auth/sync/store comments were removed.
 - Verification: four auth-state behavior tests, one project-scoped storage cleanup test, auth contract script, all 69 Vitest tests, all 31 fail-fast legacy scripts, TypeScript, ESLint, extension build, and isolated Chromium no-session startup pass with zero console errors.
 - Remaining gate: a real Google OAuth sign-in/sign-out requires an authorized test/user account and would change live session state, so it remains a release-time confirmation step rather than being performed silently.
+
+### META-01 shared relevant metadata extraction
+
+- Before: the Web API used Cheerio while the extension background used a separate regex parser. Their priorities differed, generic X/Twitter or GitHub boilerplate could beat the target page lead, and the original extension build copied source imports that did not exist inside `extension/dist`.
+- Test-first evidence: 24 representative HTML fixtures cover Docu.md reached from X, GitHub repositories, JSON-LD graphs/arrays, Open Graph, Twitter Cards, docs, articles, products, YouTube, Chinese copy, malformed metadata, redirected URLs, reversed attributes, relative media, long/empty pages, and navigation/copyright noise. The built-artifact test first failed on two unresolved `../shared/*` imports.
+- Fix: Web and extension now call one DOM-based pure extractor. It scores JSON-LD, OG, Twitter Card, title, H1, and visible body leads; filters source-site/navigation/legal noise; resolves relative assets; and keeps the original description language. Translation still occurs only after the user presses the translation control.
+- Build fix: the Manifest V3 service worker is now a Vite entry instead of an unprocessed file copy. CI and the release workflow reject any built service worker with unresolved relative imports.
+- Verification: 25 focused metadata tests, 94 total Vitest tests, all 31 legacy scripts, TypeScript, ESLint, extension production build, and the artifact contract pass. An isolated Chromium extension runtime starts the bundled service worker, returns clean Example Domain metadata, blocks private metadata fetches, logs zero console errors, and reaches the collection page.
+- Real Web verification: `/api/fetch-meta` returns `Docu.md` plus the live target site's own product description, returns a properly spaced Example Domain description, and rejects `http://127.0.0.1:5011/`. No user bookmarks, IndexedDB rows, or seed data were changed.
