@@ -11,6 +11,7 @@
     "release:extension": "bash ./scripts/release-extension.sh",
     "start": "bash ./scripts/start.sh",
     "test": "vitest run",
+    "test:legacy": "node scripts/run-legacy-tests.mjs",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium",
     "ts-check": "tsc -p tsconfig.json",
