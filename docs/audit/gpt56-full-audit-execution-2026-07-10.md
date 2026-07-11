@@ -39,6 +39,7 @@ Target release: `V1.1.0`
 | UI-02 | P1 | Wallpaper | Quote, citation, and idle hint overlap at 1280x720. | Fixed in one shared Web/extension stylesheet; desktop/mobile browser verified |
 | PERF-01 | P2 | Render/build | Recommendation groups mount eagerly and three dynamic imports cannot create chunks because the same modules are statically bundled. | Fixed; progressive render and clean ineffective-import build log verified |
 | ASSET-01 | P1 | Extension package | Seventeen full-size local wallpapers occupy 60.0 MiB; two source files are structurally corrupt and can fail decode. | Fixed; repaired and converted to true-dimension WebP, package now 17.1 MiB |
+| ENV-01 | P0 | Shared Supabase project | The same Supabase project contains 40 portfolio-management tables with RLS disabled; its public key can expose unrelated project data. | Confirmed by Supabase table advisor; deliberately not auto-fixed from WebCollect |
 | AUTH-01 | P1 | Auth | Cached identity is trusted without validating the Supabase session; extension logout leaves the remote session intact. | Code fixed and isolated extension startup verified; real OAuth account gate pending |
 | META-01 | P1 | Capture | Web and extension metadata extractors diverge and can select unrelated boilerplate. | Fixed with one shared structural extractor, 24 fixtures, Web API, and isolated extension runtime evidence |
 | REL-01 | P1 | Release | Release script can tag a feature commit while pushing a different `main`; static extension output can be stale. | Fixed with deterministic preflight and one build source; final main/tag/Release execution pending all gates |
@@ -119,7 +120,23 @@ Every finding must have a failing behavioral test, the smallest root-cause fix, 
 - Fix: both SQL paths use `text` for entity IDs and safely convert an earlier test table with `using entity_id::text`. They grant only the required operations to `authenticated`, revoke table access from `anon`, and use ownership policies scoped to `to authenticated` with `(select auth.uid())`.
 - Schema model: the Drizzle `workspaceTombstones.entityId` field now matches the SQL `text` type.
 - Behavior evidence: an isolated client can delete `card-local-before-first-sync` before the first cloud sync and preserve that exact string in the uploaded tombstone. The broader two-profile test also proves new-device pull, offline conflict convergence, explicit unpin/unhide, wallpaper-mode propagation, deletion, and deliberate restore.
-- External gate: the SQL still has not run against the live project. Official Supabase RLS guidance was rechecked on 2026-07-12; live execution still requires CSV exports and explicit confirmation.
+- External gate: the SQL still has not run against the live project. Official Supabase RLS guidance was rechecked on 2026-07-12 and the private JSON export is complete; live execution now requires explicit confirmation.
+
+### Live Supabase preflight and private backup (2026-07-12)
+
+- Connection: the Codex Supabase MCP resolved the project referenced by WebCollect and reports PostgreSQL 17.6 in `ACTIVE_HEALTHY` state. No main-Chrome session or copied database password was used.
+- Pre-migration schema: the live project has no sync revision columns and no `workspace_tombstones` / `workspace_versions` tables, confirming that `migrations/2026-07-10-sync-revisions.sql` has not yet run.
+- Private export: `/private/tmp/webcollect-supabase-backup-2026-07-12/` contains raw JSON for 125 categories, 361 cards, 22 preferences, and all 57 workspace snapshots plus the pre-migration columns/policies/grants/triggers contract. The data is outside Git under a mode-700 directory.
+- Archive: `/private/tmp/webcollect-supabase-backup-2026-07-12.tgz` is 2.5 MiB, mode 600, SHA-256 `6e6c683f14832df5a44b3c0e23faa791493c361b9bcde116d32e4b76461efa1d`.
+- Server checks: categories `eaaf581c395dc873dd5545b751e5d6ad`; cards `6ca41dfb249524f47948f6eff7e2e5a2`; preferences `ac153da1467232f9b3cad337859b3902`; snapshots `7827bef71685108a6f537653d8136406` (MD5 over stable ID-ordered row JSON).
+- Advisor baseline: the project-wide security advisor warns that leaked-password protection is disabled. WebCollect uses Google OAuth, so this is not a current password-flow regression, but it remains an account hardening item. Performance advisor findings for WebCollect's legacy per-row `auth.uid()` policies are addressed in the pending migration with equivalent `(select auth.uid())` authenticated policies.
+- Confirmation gate: no migration or other cloud write was executed. The next cloud action must be an explicit user-approved application of the reviewed migration, followed by row/checksum/schema/advisor verification.
+
+### ENV-01 shared-project security boundary
+
+- Supabase's table advisor reports 40 non-WebCollect tables (portfolio-management/Prisma tables) with RLS disabled and classifies the condition as Critical because Data API roles may access every row.
+- This is not repaired in the WebCollect migration. Blindly enabling RLS without the portfolio app's policies could break that application, and changing those tables would violate the repository boundary.
+- Required follow-up: review the portfolio-management access path, then either revoke `anon`/`authenticated` Data API grants for server-only tables or enable RLS with its actual workspace ownership policies. Supabase's remediation reference is https://supabase.com/docs/guides/database/postgres/row-level-security.
 
 ### Snapshot completeness and restore semantics
 
