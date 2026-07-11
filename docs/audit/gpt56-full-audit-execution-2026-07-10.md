@@ -1,6 +1,6 @@
 # WebCollect V1.1.0 full audit execution log
 
-Date: 2026-07-10
+Date: 2026-07-10 (updated 2026-07-12)
 Branch: `fix/sync-architecture`
 Target release: `V1.1.0`
 
@@ -35,7 +35,9 @@ Target release: `V1.1.0`
 | SEC-01 | P0 | Server fetch | Metadata and safety routes can request localhost/private-network URLs. | Fixed and isolated Chromium runtime verified; final installed Chrome shell check remains a release gate |
 | SEC-02 | P1 | Dependencies | Production dependency audit contains critical/high advisories and unused large dependency trees. | Fixed; official production audit reports no known vulnerabilities |
 | UI-01 | P1 | Responsive | Fixed 2048px canvas with a minimum zoom clipped 1024px and 390px viewports. Vitest plus Playwright now cover five target sizes. | Fixed and browser-verified |
-| UI-02 | P1 | Wallpaper | Quote, citation, and idle hint overlap at 1280x720. | Reproduced |
+| UI-02 | P1 | Wallpaper | Quote, citation, and idle hint overlap at 1280x720. | Fixed in one shared Web/extension stylesheet; desktop/mobile browser verified |
+| PERF-01 | P2 | Render/build | Recommendation groups mount eagerly and three dynamic imports cannot create chunks because the same modules are statically bundled. | Fixed; progressive render and clean ineffective-import build log verified |
+| ASSET-01 | P1 | Extension package | Seventeen full-size local wallpapers occupy 60.0 MiB; two source files are structurally corrupt and can fail decode. | Fixed; repaired and converted to true-dimension WebP, package now 17.1 MiB |
 | AUTH-01 | P1 | Auth | Cached identity is trusted without validating the Supabase session; extension logout leaves the remote session intact. | Code fixed and isolated extension startup verified; real OAuth account gate pending |
 | META-01 | P1 | Capture | Web and extension metadata extractors diverge and can select unrelated boilerplate. | Fixed with one shared structural extractor, 24 fixtures, Web API, and isolated extension runtime evidence |
 | REL-01 | P1 | Release | Release script can tag a feature commit while pushing a different `main`; static extension output can be stale. | Fixed with deterministic preflight and one build source; final main/tag/Release execution pending all gates |
@@ -53,6 +55,27 @@ Every finding must have a failing behavioral test, the smallest root-cause fix, 
 - Fix: removed global CSS `zoom`, made the collection canvas fluid, and limited wide-screen enhancements to viewports at least 1440px wide.
 - Focused verification: five Vitest cases and five Playwright Chromium cases pass at 2048x1152, 1440x900, 1280x720, 1024x768, and 390x844.
 - Data impact: none. Seed data and persisted workspace data were not read or changed by the tests.
+
+### UI-02 shared wallpaper layout
+
+- Before: the quote/source block, idle instruction, and bottom-right controls could overlap at 1280x720. The Web fix initially lived only in `globals.css`; the extension still loaded an older minified copy, so a Web-only screenshot could falsely pass.
+- Test-first evidence: Playwright geometry assertions failed before the position change. A wiring contract then failed until both Web and extension imported `src/styles/zoom-wallpaper.css` and Web stopped duplicating the wallpaper stage selectors.
+- Fix: the idle hint now occupies the safe top area with stable grid columns and wrap-safe mobile text. Quote, source, controls, loading state, and responsive positioning live in one shared stylesheet.
+- Browser verification: all five collection viewports pass; wallpaper geometry passes at 1280x720 and 390x844. An isolated extension Profile independently passed at 1440x900 and 390x844 with zero console errors and no horizontal overflow.
+- Evidence: `docs/audit/screenshots/webcollect-v1.1-wallpaper-after-ui-fix-1440x900-2026-07-12.png` and `docs/audit/screenshots/webcollect-v1.1-wallpaper-after-ui-fix-390x844-2026-07-12.png`.
+
+### PERF-01 progressive recommendations and honest imports
+
+- Before: every recommendation category mounted immediately. `store.ts`, `store-warehouse.ts`, and `local-snapshots.ts` used dynamic imports for modules already entering the same main bundle, producing Vite ineffective-import warnings without reducing first-load code.
+- Fix: the recommendation grid mounts six groups at first and appends six when its sentinel enters view, with an explicit button fallback; search results remain complete. Capture destination publishing moved into a store-independent lightweight module, while warehouse and wallpaper storage use explicit static dependencies.
+- Verification: the focused source guard passes, Playwright sees exactly six initial groups and more after scrolling, and extension builds no longer report ineffective dynamic imports. The remaining main chunk is 294.6 KiB gzip and is tracked honestly rather than hidden by raising the warning threshold.
+
+### ASSET-01 extension wallpaper package
+
+- Before: the 17 tracked local wallpaper sources occupied 60.0 MiB. `zoom-cc0-sea-sunset-clouds.jpg` failed JPEG decoding and `zoom-nasa-blue-marble.png` failed CRC validation. A built extension was about 63.9 MiB.
+- Fix: both broken images were decoded/repaired without changing their depicted content, then all 17 local assets were encoded as quality-86 WebP with a maximum 3200px long edge. The wallpaper registry records each packaged file's real dimensions and the extension preload points to WebP.
+- Guard: `test-wallpaper-data.ts` parses RIFF/WEBP dimensions and compares them with the registry. CI, release workflow, and release shell reject an extension package above 25 MiB.
+- Result: local wallpaper assets are 13.1 MiB and the complete unpacked extension is 17.1 MiB. Artifact resolution, package size, wallpaper data, and isolated runtime checks pass.
 
 ### DATA-04 migration safety
 

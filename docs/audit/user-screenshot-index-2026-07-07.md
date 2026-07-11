@@ -25,7 +25,10 @@
 | `codex-clipboard-8ff07294-c0e0-4a3b-b2b8-32f4497c2108.png` | X/Twitter 博主发 `docu.md`，页面文案是“AI 负责写作，Docu.md 完成其余工作” | 元数据应提取目标网页，不应取 Twitter 简介 | 已由共享结构化提取器修复；24 组样本覆盖 X 外链、GitHub、文档站、文章、产品和异常页 |
 | `codex-clipboard-ce29b5f2-b06c-4a0e-ae0b-800135e90a0d.png` | 浮窗表单名称/简介识别错误，简介变成 X/Twitter 社交平台 | 名称为 `Docu.md`，简介为目标页 slogan | 已修；Web API、扩展源码与最终 service worker 使用同一提取器 |
 | `webcollect-v1.1-extension-runtime-2026-07-12.png` | 隔离 Chromium 加载 `extension/dist` 后进入网页墙 | Manifest V3 服务工作线程、扩展新标签页、基础检查与元数据消息运行时验收 | 运行通过；控制台零错误，1440px 无横向溢出 |
-| `webcollect-v1.1-wallpaper-before-ui-fix-2026-07-12.png` | 扩展默认壁纸页的引言、译文、来源和操作提示集中在底部 | UI-02 壁纸文字层级和间距修复前证据 | 已复现，待 Phase 4 修复并补 after 截图 |
+| `webcollect-v1.1-wallpaper-before-ui-fix-2026-07-12.png` | 扩展默认壁纸页的引言、译文、来源和操作提示集中在底部 | UI-02 壁纸文字层级和间距修复前证据 | 已复现并修复 |
+| `webcollect-v1.1-wallpaper-after-ui-fix-1440x900-2026-07-12.png` | 隔离 Chromium 扩展壁纸页，操作提示位于顶部安全区，引用与控制条分离 | UI-02 桌面修复后证据 | 通过几何断言和肉眼复核 |
+| `webcollect-v1.1-wallpaper-after-ui-fix-390x844-2026-07-12.png` | 隔离 Chromium 扩展壁纸页手机视口，提示换行且无横向溢出 | UI-02 移动端修复后证据 | 通过几何断言和肉眼复核 |
+| `webcollect-v1.1-extension-runtime-after-phase4-2026-07-12.png` | 压缩壁纸与渐进推荐接入后的扩展网页墙 | Phase 4 扩展运行时回归 | 服务工作线程正常，控制台零错误，1440px 无溢出 |
 
 ## 后续截图管理规则
 
