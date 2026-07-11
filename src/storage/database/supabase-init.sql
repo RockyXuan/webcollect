@@ -80,7 +80,7 @@ create table if not exists public.workspace_tombstones (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.users(id) on delete cascade,
   entity_type text not null check (entity_type in ('card', 'category')),
-  entity_id uuid not null,
+  entity_id text not null,
   deleted_at timestamptz not null,
   sync_revision bigint not null,
   sync_device_id text not null,
@@ -88,6 +88,9 @@ create table if not exists public.workspace_tombstones (
   created_at timestamptz not null default now(),
   constraint workspace_tombstones_user_entity_unique unique (user_id, entity_type, entity_id)
 );
+
+alter table public.workspace_tombstones
+  alter column entity_id type text using entity_id::text;
 
 create table if not exists public.workspace_versions (
   user_id uuid primary key references public.users(id) on delete cascade,
@@ -196,42 +199,74 @@ alter table public.workspace_snapshots enable row level security;
 alter table public.workspace_tombstones enable row level security;
 alter table public.workspace_versions enable row level security;
 
+grant select, insert, update, delete on public.users to authenticated;
+grant select, insert, update, delete on public.categories to authenticated;
+grant select, insert, update, delete on public.cards to authenticated;
+grant select, insert, update, delete on public.user_preferences to authenticated;
+grant select, insert, update, delete on public.workspace_snapshots to authenticated;
+grant select, insert, update, delete on public.workspace_tombstones to authenticated;
+grant select on public.workspace_versions to authenticated;
+
+revoke all on public.users from anon;
+revoke all on public.categories from anon;
+revoke all on public.cards from anon;
+revoke all on public.user_preferences from anon;
+revoke all on public.workspace_snapshots from anon;
+revoke all on public.workspace_tombstones from anon;
+revoke all on public.workspace_versions from anon;
+
 drop policy if exists users_select_own on public.users;
 create policy users_select_own on public.users
-for select using (auth.uid() = id);
+for select to authenticated
+using ((select auth.uid()) = id);
 
 drop policy if exists users_insert_own on public.users;
 create policy users_insert_own on public.users
-for insert with check (auth.uid() = id);
+for insert to authenticated
+with check ((select auth.uid()) = id);
 
 drop policy if exists users_update_own on public.users;
 create policy users_update_own on public.users
-for update using (auth.uid() = id) with check (auth.uid() = id);
+for update to authenticated
+using ((select auth.uid()) = id)
+with check ((select auth.uid()) = id);
 
 drop policy if exists users_delete_own on public.users;
 create policy users_delete_own on public.users
-for delete using (auth.uid() = id);
+for delete to authenticated
+using ((select auth.uid()) = id);
 
 drop policy if exists categories_owner_all on public.categories;
 create policy categories_owner_all on public.categories
-for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+for all to authenticated
+using ((select auth.uid()) = user_id)
+with check ((select auth.uid()) = user_id);
 
 drop policy if exists cards_owner_all on public.cards;
 create policy cards_owner_all on public.cards
-for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+for all to authenticated
+using ((select auth.uid()) = user_id)
+with check ((select auth.uid()) = user_id);
 
 drop policy if exists user_preferences_owner_all on public.user_preferences;
 create policy user_preferences_owner_all on public.user_preferences
-for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+for all to authenticated
+using ((select auth.uid()) = user_id)
+with check ((select auth.uid()) = user_id);
 
 drop policy if exists workspace_snapshots_owner_all on public.workspace_snapshots;
 create policy workspace_snapshots_owner_all on public.workspace_snapshots
-for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+for all to authenticated
+using ((select auth.uid()) = user_id)
+with check ((select auth.uid()) = user_id);
 
 drop policy if exists workspace_tombstones_owner_all on public.workspace_tombstones;
 create policy workspace_tombstones_owner_all on public.workspace_tombstones
-for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+for all to authenticated
+using ((select auth.uid()) = user_id)
+with check ((select auth.uid()) = user_id);
 
 drop policy if exists workspace_versions_owner_select on public.workspace_versions;
 create policy workspace_versions_owner_select on public.workspace_versions
-for select using ((select auth.uid()) = user_id);
+for select to authenticated
+using ((select auth.uid()) = user_id);

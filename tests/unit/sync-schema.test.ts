@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 describe("revisioned sync SQL migration", () => {
   const sql = readFileSync("migrations/2026-07-10-sync-revisions.sql", "utf8");
+  const bootstrapSql = readFileSync("src/storage/database/supabase-init.sql", "utf8");
 
   it("is additive and contains no user-data deletion statement", () => {
     expect(sql).toMatch(/add column if not exists sync_revision/i);
@@ -17,5 +18,16 @@ describe("revisioned sync SQL migration", () => {
     expect(sql).toMatch(/create or replace function public\.bump_workspace_version/i);
     expect(sql).toMatch(/after insert or update or delete on public\.cards/i);
     expect(sql).toMatch(/after insert or update or delete on public\.user_preferences/i);
+  });
+
+  it("accepts legacy entity IDs and exposes only the required authenticated Data API operations", () => {
+    for (const source of [sql, bootstrapSql]) {
+      expect(source).toMatch(/entity_id\s+text\s+not null/i);
+      expect(source).not.toMatch(/entity_id\s+uuid\s+not null/i);
+      expect(source).toMatch(/grant\s+select\s*,\s*insert\s*,\s*update\s*,\s*delete\s+on\s+public\.workspace_tombstones\s+to\s+authenticated/i);
+      expect(source).toMatch(/grant\s+select\s+on\s+public\.workspace_versions\s+to\s+authenticated/i);
+      expect(source).toMatch(/workspace_tombstones_owner_all[\s\S]*for all\s+to authenticated[\s\S]*auth\.uid\(\)/i);
+      expect(source).toMatch(/workspace_versions_owner_select[\s\S]*for select\s+to authenticated[\s\S]*auth\.uid\(\)/i);
+    }
   });
 });

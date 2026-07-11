@@ -76,7 +76,7 @@ export const workspaceTombstones = pgTable("workspace_tombstones", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	userId: uuid("user_id").notNull(),
 	entityType: text("entity_type").notNull(),
-	entityId: uuid("entity_id").notNull(),
+	entityId: text("entity_id").notNull(),
 	deletedAt: timestamp("deleted_at", { withTimezone: true, mode: 'string' }).notNull(),
 	syncRevision: bigint("sync_revision", { mode: "number" }).notNull(),
 	syncDeviceId: text("sync_device_id").notNull(),

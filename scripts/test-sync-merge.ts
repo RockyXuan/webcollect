@@ -442,6 +442,29 @@ async function main(): Promise<void> {
 
   {
     const fake = new FakeSupabaseClient();
+    const legacyCategory = category({ id: "cat-local-before-first-sync" });
+    const legacyCard = card({
+      id: "card-local-before-first-sync",
+      categoryId: legacyCategory.id,
+      title: "Deleted before first sync",
+    });
+    supabase.__setBrowserSupabaseClientForTest(fake as unknown as SupabaseClient);
+    await resetLocal(db);
+    await db.addCategory(legacyCategory);
+    await db.addCard(legacyCard);
+    await db.deleteCard(legacyCard.id);
+
+    await sync.syncData(userId);
+
+    assert.equal(
+      fake.tables.workspace_tombstones[0]?.entity_id,
+      legacyCard.id,
+      "a pre-sync deletion must preserve its legacy string entity ID in the cloud tombstone"
+    );
+  }
+
+  {
+    const fake = new FakeSupabaseClient();
     const hiddenSite = {
       siteId: "site-a",
       siteUrl: "https://example.com",
