@@ -22,6 +22,10 @@ assert.ok(authStoreSource.includes('chrome.identity.getRedirectURL("auth")'), "e
 assert.ok(authStoreSource.includes("launchWebAuthFlow"), "extension login must use launchWebAuthFlow");
 assert.ok(authStoreSource.includes("skipBrowserRedirect: true"), "extension login must request Supabase OAuth URL");
 assert.ok(authStoreSource.includes("exchangeCodeForSession(code)"), "extension login must exchange returned code");
+assert.ok(authStoreSource.includes("client.auth.getUser()"), "startup must validate the user with Supabase");
+assert.equal(authStoreSource.includes("if (cached)"), false, "cached display identity must not establish login state");
+assert.ok(authStoreSource.includes('client.auth.signOut({ scope: "local" })'), "web and extension logout must revoke the current remote session");
+assert.ok(authStoreSource.includes("clearBrowserSupabaseSessionCache()"), "logout must clear the Supabase local token cache");
 assert.ok(callbackSource.includes('target.searchParams.set("code", code)'), "web callback must forward code to browser client");
 assert.equal(callbackSource.includes("exchangeCodeForSession"), false, "web callback must not exchange code server-side");
 assert.ok(callbackSource.includes("safeNext"), "web callback must sanitize next path");

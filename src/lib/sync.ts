@@ -467,10 +467,10 @@ async function deleteRowsByIdsInChunks(
 
 interface MergeResult<T extends { id: string }> {
   merged: T[];
-  cloudToPull: T[];   // items that are newer on cloud 鈫?update local
-  localToPush: T[];   // items that are newer locally 鈫?push to cloud
-  localOnly: T[];     // items only in local 鈫?push to cloud
-  cloudOnly: T[];     // items only in cloud 鈫?add to local
+  cloudToPull: T[];   // items that are newer on cloud, update local
+  localToPush: T[];   // items that are newer locally, push to cloud
+  localOnly: T[];     // items only in local, push to cloud
+  cloudOnly: T[];     // items only in cloud, add to local
 }
 
 function mergeBySyncVersion<T extends { id: string; syncRevision?: number; syncDeviceId?: string; updatedAt?: number; createdAt?: number }>(

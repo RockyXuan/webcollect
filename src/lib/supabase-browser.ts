@@ -174,6 +174,37 @@ export function getBrowserSupabaseClient(token?: string): SupabaseClient {
   return client;
 }
 
+function getSupabaseAuthStorageKey(): string | null {
+  try {
+    const projectRef = new URL(_config?.url || "").hostname.split(".")[0];
+    return projectRef ? `sb-${projectRef}-auth-token` : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearBrowserSupabaseSessionCache(): void {
+  const storageKey = getSupabaseAuthStorageKey();
+  if (storageKey && typeof localStorage !== "undefined") {
+    try {
+      const keys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
+        .filter((key): key is string => Boolean(key));
+      for (const key of keys) {
+        if (
+          key === storageKey
+          || key === `${storageKey}-code-verifier`
+          || key.startsWith(`${storageKey}.`)
+        ) {
+          localStorage.removeItem(key);
+        }
+      }
+    } catch {
+      // Local cleanup is best-effort in restricted browser contexts.
+    }
+  }
+  _client = null;
+}
+
 export function __setBrowserSupabaseClientForTest(client: SupabaseClient): void {
   _testClient = client;
   _config = { url: "https://webcollect.test", anonKey: "test-anon-key" };

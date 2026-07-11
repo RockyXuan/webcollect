@@ -35,7 +35,7 @@ Target release: `V1.1.0`
 | SEC-02 | P1 | Dependencies | Production dependency audit contains critical/high advisories and unused large dependency trees. | Fixed; official production audit reports no known vulnerabilities |
 | UI-01 | P1 | Responsive | Fixed 2048px canvas with a minimum zoom clipped 1024px and 390px viewports. Vitest plus Playwright now cover five target sizes. | Fixed and browser-verified |
 | UI-02 | P1 | Wallpaper | Quote, citation, and idle hint overlap at 1280x720. | Reproduced |
-| AUTH-01 | P1 | Auth | Cached identity is trusted without validating the Supabase session; extension logout leaves the remote session intact. | Open |
+| AUTH-01 | P1 | Auth | Cached identity is trusted without validating the Supabase session; extension logout leaves the remote session intact. | Code fixed and isolated extension startup verified; real OAuth account gate pending |
 | META-01 | P1 | Capture | Web and extension metadata extractors diverge and can select unrelated boilerplate. | Open |
 | REL-01 | P1 | Release | Release script can tag a feature commit while pushing a different `main`; static extension output can be stale. | Open |
 | BUILD-01 | P1 | Build | Scripts require global `pnpm`; production Babel config disables the default compiler. | Open |
@@ -113,3 +113,13 @@ Every finding must have a failing behavioral test, the smallest root-cause fix, 
 - Overrides: Undici `7.28.0`, PostCSS `8.5.10`, and Babel Core `7.29.6` are pinned to patched versions within compatible major lines.
 - Result: production top-level dependencies fell from 62 to 48. `pnpm audit --prod --registry=https://registry.npmjs.org` reports `No known vulnerabilities found`.
 - Verification: dependency-surface contract tests, all unit/legacy tests, TypeScript, ESLint, extension build, and Next 16.2.10 Webpack production build pass. The default Turbopack build still hangs because of the existing `.babelrc`; that remains BUILD-01 and is not hidden by this finding.
+
+### AUTH-01 verified session and logout
+
+- Before: `initialize()` trusted the plain `webcollect_auth_session` display object and immediately marked the user logged in, including in the extension. A stale or forged cache could trigger cloud synchronization without a verified Supabase user. Extension logout skipped Supabase `signOut()` entirely.
+- Startup fix: both Web and extension call `auth.getUser()` and use only the server-verified user as login authority. Missing/invalid sessions clear local auth caches and do not sync. Temporary verification failures leave collection data usable but do not claim login success.
+- Logout fix: both platforms call `signOut({ scope: "local" })` to revoke the current remote session, stop the old client's token auto-refresh, then always clear the WebCollect display cache and the configured Supabase project's token, verifier, and chunk keys. A remote/network failure still logs out locally and surfaces an honest warning.
+- Scope protection: local cleanup targets only the configured Supabase project and preserves unrelated localStorage/Supabase keys.
+- Text cleanup: user-visible OAuth mojibake was replaced with readable Chinese, and remaining broken encoding markers in auth/sync/store comments were removed.
+- Verification: four auth-state behavior tests, one project-scoped storage cleanup test, auth contract script, all 69 Vitest tests, all 31 fail-fast legacy scripts, TypeScript, ESLint, extension build, and isolated Chromium no-session startup pass with zero console errors.
+- Remaining gate: a real Google OAuth sign-in/sign-out requires an authorized test/user account and would change live session state, so it remains a release-time confirmation step rather than being performed silently.

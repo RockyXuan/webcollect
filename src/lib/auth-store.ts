@@ -1,5 +1,5 @@
 /**
- * Auth Store 鈥?Google OAuth login & session management
+ * Auth Store - Google OAuth login and session management
  * 
  * Supports two platforms:
  * 1. Web (Next.js): Uses Supabase Auth SDK with browser redirect
@@ -7,11 +7,15 @@
  * 
  * After login:
  * - Creates/updates user record in Supabase `users` table
- * - Triggers data sync (local 鈫?cloud)
+ * - Triggers data sync between local and cloud storage
  */
 
 import { create } from "zustand";
-import { getBrowserSupabaseClient, initBrowserSupabase } from "@/lib/supabase-browser";
+import {
+  clearBrowserSupabaseSessionCache,
+  getBrowserSupabaseClient,
+  initBrowserSupabase,
+} from "@/lib/supabase-browser";
 import { isChromeExtension } from "@/lib/platform";
 import { saveCloudWorkspaceSnapshot } from "@/lib/cloud-snapshots";
 import { pushLocalSnapshotToCloud, syncData } from "@/lib/sync";
@@ -242,16 +246,6 @@ function saveSession(user: AuthUser): void {
   }
 }
 
-function loadSession(): AuthUser | null {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as AuthUser;
-  } catch {
-    return null;
-  }
-}
-
 function clearSession(): void {
   try {
     localStorage.removeItem(SESSION_KEY);
@@ -270,6 +264,10 @@ function mapSupabaseUser(supabaseUser: Record<string, unknown>): AuthUser {
     displayName: (meta.full_name as string) || (meta.name as string) || "",
     avatarUrl: (meta.avatar_url as string) || (meta.picture as string) || "",
   };
+}
+
+function isMissingAuthSessionError(message: string): boolean {
+  return /auth session missing|session.*missing|invalid.*jwt|jwt.*expired/i.test(message);
 }
 
 // Helper: trigger background sync
@@ -516,7 +514,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   error: null,
 
   initialize: async () => {
-    set({ isLoading: true });
+    set({ isLoading: true, user: null, isLoggedIn: false, error: null });
+    stopAutoSyncInterval();
     ensureAutoSyncListener();
     const syncMode = loadSyncMode();
     set({ syncMode });
@@ -524,42 +523,44 @@ export const useAuthStore = create<AuthState>((set) => ({
     // Initialize Supabase browser client (fetches config from API)
     const configured = await initBrowserSupabase();
     if (!configured) {
-      // Supabase not configured 鈥?auth features disabled
+      // Supabase is not configured, so auth features remain disabled.
       set({ isLoading: false });
       return;
     }
 
-    // Try to restore session from localStorage first
-    const cached = loadSession();
-    if (cached) {
-      set({ user: cached, isLoggedIn: true, isLoading: false });
+    try {
+      const client = getBrowserSupabaseClient();
+      const { data, error } = await client.auth.getUser();
+      if (error || !data.user) {
+        clearSession();
+        const message = error?.message || "Auth session missing";
+        if (isMissingAuthSessionError(message)) {
+          clearBrowserSupabaseSessionCache();
+          set({ isLoading: false, error: null });
+        } else {
+          set({
+            isLoading: false,
+            error: `暂时无法验证登录状态，本地数据仍可正常使用：${summarizeAuthError(message)}`,
+          });
+        }
+        return;
+      }
+
+      const user = mapSupabaseUser(data.user as unknown as Record<string, unknown>);
+      saveSession(user);
+      await upsertUser(user);
+      set({ user, isLoggedIn: true, isLoading: false, error: null });
       if (isAutoSyncEnabled()) {
-        scheduleStartupSync(cached.id);
+        scheduleStartupSync(user.id);
       }
       return;
+    } catch (error) {
+      clearSession();
+      set({
+        isLoading: false,
+        error: `暂时无法验证登录状态，本地数据仍可正常使用：${getErrorMessage(error, "登录状态验证失败")}`,
+      });
     }
-
-    // For Web version, try to get session from Supabase
-    if (!isChromeExtension()) {
-      try {
-        const client = getBrowserSupabaseClient();
-        const { data } = await client.auth.getSession();
-        if (data.session?.user) {
-          const user = mapSupabaseUser(data.session.user as unknown as Record<string, unknown>);
-          saveSession(user);
-          await upsertUser(user);
-          set({ user, isLoggedIn: true, isLoading: false });
-          if (isAutoSyncEnabled()) {
-            scheduleStartupSync(user.id);
-          }
-          return;
-        }
-      } catch {
-        // Session restore failed, user is not logged in
-      }
-    }
-
-    set({ isLoading: false });
   },
 
   loginWithGoogle: async () => {
@@ -577,28 +578,41 @@ export const useAuthStore = create<AuthState>((set) => ({
         await loginWithGoogleWeb();
       }
     } catch (err) {
-      const message = getErrorMessage(err, "鐧诲綍澶辫触");
+      const message = getErrorMessage(err, "登录失败");
       set({ error: message, isLoading: false });
     }
   },
 
   logout: async () => {
-    set({ isLoading: true });
+    set({ isLoading: true, error: null });
+    stopAutoSyncInterval();
+    let logoutError: string | null = null;
+    let stopRemoteRefresh: (() => void) | null = null;
 
     try {
-      // Sign out from Supabase (Web only, extension doesn't maintain Supabase session)
-      if (!isChromeExtension()) {
-        try {
-          const client = getBrowserSupabaseClient();
-          await client.auth.signOut();
-        } catch {
-          // ignore
-        }
+      const client = getBrowserSupabaseClient();
+      stopRemoteRefresh = () => client.auth.stopAutoRefresh();
+      const { error } = await client.auth.signOut({ scope: "local" });
+      if (error) {
+        logoutError = summarizeAuthError(error.message);
       }
+    } catch (error) {
+      logoutError = getErrorMessage(error, "远端退出失败");
     } finally {
+      stopRemoteRefresh?.();
+      clearBrowserSupabaseSessionCache();
       clearSession();
-      stopAutoSyncInterval();
-      set({ user: null, isLoggedIn: false, isLoading: false, syncStatus: "idle", localSavedAt: null, lastSyncAt: null });
+      set({
+        user: null,
+        isLoggedIn: false,
+        isLoading: false,
+        syncStatus: "idle",
+        localSavedAt: null,
+        lastSyncAt: null,
+        error: logoutError
+          ? `远端退出未确认，但本地会话已清除：${logoutError}`
+          : null,
+      });
     }
   },
 
@@ -664,7 +678,7 @@ async function loginWithGoogleWeb(): Promise<void> {
   });
 
   if (error) {
-    throw new Error(`Google 鐧诲綍澶辫触: ${error.message}`);
+    throw new Error(`Google 登录失败: ${error.message}`);
   }
 
   // After redirect back, Supabase will have the session.

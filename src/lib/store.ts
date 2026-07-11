@@ -561,7 +561,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ categories: persistedCategories });
   },
 
-  // Move a standalone category into a parent (demotion: 鍒嗙被 鈫?鍒嗙粍)
+  // Move a standalone category into a parent (category to group).
   moveCategoryToParent: async (categoryId: string, parentId: string, insertIndex?: number) => {
     const categories = await getCategories();
     const categoryBaseline = cloneEntitySnapshot(categories);
@@ -594,7 +594,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ categories: persistedCategories });
   },
 
-  // Remove a sub-group from its parent (promotion: 鍒嗙粍 鈫?椤剁骇鍒嗙被)
+  // Remove a sub-group from its parent (group to top-level category).
   detachCategoryFromParent: async (categoryId: string) => {
     const categories = await getCategories();
     const cards = await getCards();

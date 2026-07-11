@@ -139,7 +139,11 @@ async function main(): Promise<void> {
   const initializeStart = authSource.indexOf("initialize: async () => {");
   const loginStart = authSource.indexOf("loginWithGoogle: async () => {");
   const initializeBody = authSource.slice(initializeStart, loginStart);
-  assert.ok(initializeBody.includes("scheduleStartupSync(cached.id)"));
+  assert.equal(
+    initializeBody.includes("scheduleStartupSync(cached.id)"),
+    false,
+    "an unverified cached display identity must not trigger startup sync"
+  );
   assert.ok(initializeBody.includes("scheduleStartupSync(user.id)"));
   assert.equal(initializeBody.includes("void triggerSync(cached.id)"), false);
   assert.equal(initializeBody.includes("void triggerSync(user.id)"), false);
