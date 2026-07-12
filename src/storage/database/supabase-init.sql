@@ -123,6 +123,8 @@ begin
 end;
 $$;
 
+revoke execute on function public.set_updated_at() from public, anon, authenticated;
+
 drop trigger if exists categories_set_updated_at on public.categories;
 create trigger categories_set_updated_at
 before update on public.categories
@@ -170,6 +172,8 @@ begin
   return new;
 end;
 $$;
+
+revoke execute on function public.bump_workspace_version() from public, anon, authenticated;
 
 drop trigger if exists categories_bump_workspace_version on public.categories;
 create trigger categories_bump_workspace_version

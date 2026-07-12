@@ -45,6 +45,8 @@ on conflict (user_id) do nothing;
 create index if not exists workspace_tombstones_user_id_idx
   on public.workspace_tombstones(user_id);
 
+revoke execute on function public.set_updated_at() from public, anon, authenticated;
+
 create or replace function public.bump_workspace_version()
 returns trigger
 language plpgsql
@@ -72,6 +74,8 @@ begin
   return new;
 end;
 $$;
+
+revoke execute on function public.bump_workspace_version() from public, anon, authenticated;
 
 drop trigger if exists categories_bump_workspace_version on public.categories;
 create trigger categories_bump_workspace_version

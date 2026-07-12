@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 describe("revisioned sync SQL migration", () => {
@@ -18,6 +18,26 @@ describe("revisioned sync SQL migration", () => {
     expect(sql).toMatch(/create or replace function public\.bump_workspace_version/i);
     expect(sql).toMatch(/after insert or update or delete on public\.cards/i);
     expect(sql).toMatch(/after insert or update or delete on public\.user_preferences/i);
+
+    for (const source of [sql, bootstrapSql]) {
+      expect(source).toMatch(
+        /revoke\s+execute\s+on\s+function\s+public\.set_updated_at\(\)\s+from\s+public\s*,\s*anon\s*,\s*authenticated/i,
+      );
+      expect(source).toMatch(
+        /revoke\s+execute\s+on\s+function\s+public\.bump_workspace_version\(\)\s+from\s+public\s*,\s*anon\s*,\s*authenticated/i,
+      );
+    }
+  });
+
+  it("contains a live follow-up for trigger functions created before V1.1.0", () => {
+    const followUpPath = "migrations/2026-07-12-restrict-trigger-functions.sql";
+
+    expect(existsSync(followUpPath)).toBe(true);
+
+    const followUpSql = readFileSync(followUpPath, "utf8");
+    expect(followUpSql).toMatch(/revoke\s+execute\s+on\s+function\s+public\.set_updated_at\(\)/i);
+    expect(followUpSql).toMatch(/revoke\s+execute\s+on\s+function\s+public\.bump_workspace_version\(\)/i);
+    expect(followUpSql).not.toMatch(/\b(delete\s+from|truncate\s+table|drop\s+(table|function))\b/i);
   });
 
   it("accepts legacy entity IDs and exposes only the required authenticated Data API operations", () => {
@@ -44,5 +64,18 @@ describe("revisioned sync SQL migration", () => {
     ]) {
       expect(sql).toMatch(new RegExp(`${policy}[\\s\\S]*?to authenticated[\\s\\S]*?\\(select auth\\.uid\\(\\)\\)`, "i"));
     }
+  });
+
+  it("retires the former PM login without deleting any WebCollect data", () => {
+    const hardeningPath = "migrations/2026-07-12-retire-shared-pm-role.sql";
+
+    expect(existsSync(hardeningPath)).toBe(true);
+
+    const hardeningSql = readFileSync(hardeningPath, "utf8");
+    expect(hardeningSql).toMatch(/if\s+exists[\s\S]*pg_roles[\s\S]*alphalens_app/i);
+    expect(hardeningSql).toMatch(/alter\s+role\s+alphalens_app\s+nologin/i);
+    expect(hardeningSql).toMatch(/revoke\s+all\s+privileges\s+on\s+all\s+tables\s+in\s+schema\s+public\s+from\s+alphalens_app/i);
+    expect(hardeningSql).toMatch(/revoke\s+all\s+privileges\s+on\s+schema\s+public\s+from\s+alphalens_app/i);
+    expect(hardeningSql).not.toMatch(/\b(delete\s+from|truncate\s+table|drop\s+(table|role))\b/i);
   });
 });
