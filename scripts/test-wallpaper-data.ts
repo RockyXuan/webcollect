@@ -259,6 +259,31 @@ const merged = mergeWallpaperLibrary([valid], [
 assert.equal(merged.length, 2);
 assert.equal(merged.find((item) => item.id === "valid")?.title, "Updated");
 
+const packagedFallback = FALLBACK_WALLPAPERS.find((item) => item.imageUrl.startsWith("/assets/wallpapers/"));
+assert.ok(packagedFallback, "curated registry should include a packaged wallpaper");
+const stalePackagedFallback = {
+  ...packagedFallback,
+  imageUrl: `/assets/wallpapers/${packagedFallback.id}.jpg`,
+  thumbnailUrl: `/assets/wallpapers/${packagedFallback.id}.jpg`,
+  fetchedAt: 99,
+};
+const repairedLibrary = pruneWallpaperLibrary(
+  mergeWallpaperLibrary(FALLBACK_WALLPAPERS, [stalePackagedFallback])
+);
+const repairedPackagedFallback = repairedLibrary.find((item) => item.id === packagedFallback.id);
+assert.equal(
+  repairedPackagedFallback?.imageUrl,
+  packagedFallback.imageUrl,
+  "stale persisted paths for packaged wallpaper IDs must be repaired from the current registry"
+);
+assert.equal(repairedPackagedFallback?.thumbnailUrl, packagedFallback.thumbnailUrl);
+assert.ok(
+  repairedLibrary
+    .filter((item) => item.imageUrl.startsWith("/assets/wallpapers/"))
+    .every((item) => item.imageUrl.endsWith(".webp") && item.thumbnailUrl.endsWith(".webp")),
+  "packaged wallpaper records must not retain obsolete local jpg paths"
+);
+
 const pruned = pruneWallpaperLibrary(
   Array.from({ length: 15 }, (_, index) => ({ ...valid, id: `item-${index}`, fetchedAt: index }))
 );

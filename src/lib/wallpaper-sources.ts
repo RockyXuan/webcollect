@@ -326,18 +326,15 @@ export function mergeWallpaperLibrary(existing: WallpaperItem[], incoming: Wallp
 
 export function pruneWallpaperLibrary(items: WallpaperItem[], limit = WALLPAPER_LIBRARY_LIMIT): WallpaperItem[] {
   const fallbackIds = new Set(FALLBACK_WALLPAPERS.map((item) => item.id));
-  const sorted = filterZoomWallpapers(items).sort((a, b) => {
-    const fetchedDelta = b.fetchedAt - a.fetchedAt;
-    return fetchedDelta || scoreZoomWallpaper(b) - scoreZoomWallpaper(a);
-  });
-  const storedFallbacks = sorted.filter((item) => fallbackIds.has(item.id));
-  const fallbacks = FALLBACK_WALLPAPERS.map((fallback) =>
-    storedFallbacks.find((item) => item.id === fallback.id) || fallback
-  );
-  const remote = sorted.filter((item) => !fallbackIds.has(item.id));
+  const remote = filterZoomWallpapers(items)
+    .filter((item) => !fallbackIds.has(item.id))
+    .sort((a, b) => {
+      const fetchedDelta = b.fetchedAt - a.fetchedAt;
+      return fetchedDelta || scoreZoomWallpaper(b) - scoreZoomWallpaper(a);
+    });
   const preferredFallbacks = [
-    ...fallbacks.filter(isPackagedWallpaper),
-    ...fallbacks.filter((item) => !isPackagedWallpaper(item)),
+    ...FALLBACK_WALLPAPERS.filter(isPackagedWallpaper),
+    ...FALLBACK_WALLPAPERS.filter((item) => !isPackagedWallpaper(item)),
   ];
   const curatedCount = Math.min(WALLPAPER_CURATED_MIN, preferredFallbacks.length, limit);
   const remoteCount = Math.min(WALLPAPER_REMOTE_LIMIT, Math.max(0, limit - curatedCount));
