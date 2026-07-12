@@ -36,4 +36,23 @@ describe("production dependency surface", () => {
     expect(source).not.toContain("createWrappedFetch");
     expect(source).not.toContain("getReportBuffer");
   });
+
+  it("reads Supabase configuration without spawning legacy Coze helpers", () => {
+    for (const file of [
+      "src/app/api/supabase-config/route.ts",
+      "src/storage/database/supabase-client.ts",
+    ]) {
+      const source = readFileSync(file, "utf8");
+      expect(source).not.toContain("child_process");
+      expect(source).not.toContain("execSync");
+      expect(source).not.toContain("coze_workload_identity");
+      expect(source).not.toContain("python3");
+    }
+  });
+
+  it("never falls back to a service-role key for ordinary app clients", () => {
+    const source = readFileSync("src/storage/database/supabase-client.ts", "utf8");
+    expect(source).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
+    expect(source).not.toContain("getSupabaseServiceRoleKey");
+  });
 });
