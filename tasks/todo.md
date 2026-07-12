@@ -1,5 +1,19 @@
 # WebCollect Task Plan
 
+## Current Task: 2026-07-12 V1.1.0 Independent Audit Closeout
+
+- [x] Independently verify the PM Supabase split, PM GitHub/Vercel deployment, and old-project residue.
+- [x] Create a fresh private WebCollect cloud backup and record counts/checksums before SQL.
+- [x] Apply revision/tombstone/workspace-version migrations and verify unchanged legacy counts.
+- [x] Disable the leftover PM login role and revoke its WebCollect privileges.
+- [x] Remove legacy child-process configuration and service-role fallback.
+- [x] Fix short-screen wallpaper settings reachability and section tab accessibility.
+- [x] Repair stale persisted packaged wallpaper paths and prove zero obsolete `.jpg` requests in a real browser.
+- [x] Pass 116 Vitest cases, 31 legacy scripts, 12 Playwright cases, TypeScript, ESLint, production dependency audit, Web/extension builds, and isolated extension runtime.
+- [x] Finalize `main`, GitHub tag/Release, and zip URL on the exact verified commit.
+
+Current evidence: `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`.
+
 ## Current Task: 2026-07-07 Full Project Audit Handoff Docs
 
 - [x] Re-read current project handoff and summary docs -> Verification: inspected `HANDOFF.md`, `PROJECT_SUMMARY.md`, `NEXT_THREAD_PROMPT.md`, `tasks/lessons.md`, `tasks/todo.md`, `CODEX_GO_MODE_STATUS.md`, current git log, and version files.

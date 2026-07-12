@@ -1,22 +1,24 @@
 # WebCollect Project Summary
 
-## 2026-07-07 最新接手入口
+## 2026-07-12 最新接手入口
 
-先读 `AGD.md`。它是当前给 Claude / Codex 做全项目体检的总入口，覆盖 7 月 1 日、7 月 2 日两轮最新修复，以及用户一路提出的需求、截图、踩坑和待办。
+先读 `AGD.md` 和 `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`。前者保留完整需求历史，后者记录 PM 分库后的独立核验、WebCollect 云端迁移、最终修复和验收事实。
 
 当前最新状态：
 
-- 最新提交：`c31b507 fix: improve capture metadata relevance`
-- 最新版本：`V1.0.3 / 2026年7月2日`
-- 最新 Release：`webcollect-2026-07-02-v1.0.3`
-- 最新 zip：`WebCollect-Chrome-Extension-v1.0.3-2026-07-02.zip`
+- 最新提交：以 Release tag `webcollect-2026-07-12-v1.1.0` 指向为准
+- 最新版本：`V1.1.0 / 2026年7月12日`
+- 最新 Release：`webcollect-2026-07-12-v1.1.0`
+- 最新 zip：`WebCollect-Chrome-Extension-v1.1.0-2026-07-12.zip`
 - 最新新增文档：
   - `AGD.md`
+  - `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`
+  - `docs/audit/gpt56-full-audit-execution-2026-07-10.md`
   - `docs/audit/claude-code-review-handoff-2026-07-07.md`
   - `docs/audit/webcollect-full-audit-brief-2026-07-07.md`
   - `docs/audit/user-screenshot-index-2026-07-07.md`
 
-如果旧文档和这些新文档冲突，以 `AGD.md` 和 `docs/audit/webcollect-full-audit-brief-2026-07-07.md` 为准。
+如果旧文档和这些新文档冲突，以 `AGD.md` 和 `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md` 为准。
 
 ## 一句话概览
 

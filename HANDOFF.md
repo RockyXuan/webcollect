@@ -1,5 +1,21 @@
 # Project Handoff
 
+## 2026-07-12 V1.1.0 Audit And Supabase Split Handoff
+
+This section supersedes every older status or release statement below.
+
+- Repository: `https://github.com/RockyXuan/webcollect`
+- Workspace: `/Users/rockyx/vibe coding/Web Collect 0628`
+- Source of truth: `main` at tag `webcollect-2026-07-12-v1.1.0`
+- Version/date: `V1.1.0 / 2026年7月12日`
+- Extension zip: `WebCollect-Chrome-Extension-v1.1.0-2026-07-12.zip`
+- Current closeout: `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`
+- Full execution log: `docs/audit/gpt56-full-audit-execution-2026-07-10.md`
+
+PM now uses independent Supabase project `erzblrpfqjjwmlkxkkkb`. The former shared project contains only WebCollect; the leftover PM role was disabled and stripped of grants. WebCollect's revision/tombstone migration is live after a fresh private backup, with original row counts unchanged.
+
+All automated gates pass at closeout: 116 Vitest cases, 31 legacy scripts, 12 Playwright cases, type check, lint, Web build, extension build/artifact/size, responsive/search/section/wallpaper flows, and isolated MV3 runtime target capture. The wallpaper browser suite also repairs a stale packaged `.jpg` record from IndexedDB and proves that no obsolete request survives. Remaining human-account observation is limited to real Google OAuth and two simultaneously signed-in physical Profiles.
+
 ## 2026-07-07 Claude / Codex Full-Audit Handoff
 
 This section supersedes older handoff notes below when there is a conflict.

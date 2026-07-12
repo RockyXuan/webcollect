@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 
-const EXPECTED_VERSION = "1.0.3";
-const EXPECTED_RELEASE_DATE = "2026-07-02";
-const EXPECTED_RELEASE_DATE_DISPLAY = "2026年7月2日";
+const EXPECTED_VERSION = "1.1.0";
+const EXPECTED_RELEASE_DATE = "2026-07-12";
+const EXPECTED_RELEASE_DATE_DISPLAY = "2026年7月12日";
 
 function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(path, "utf8")) as T;
@@ -44,9 +44,10 @@ function readIcoPngEntries(path: string): Array<{ width: number; height: number 
   return entries;
 }
 
-const packageJson = readJson<{ version: string }>("package.json");
+const packageJson = readJson<{ name: string; version: string }>("package.json");
 const manifest = readJson<{ version: string; icons: Record<string, string> }>("extension/manifest.json");
 
+assert.equal(packageJson.name, "webcollect", "package name should identify the WebCollect product");
 assert.equal(packageJson.version, EXPECTED_VERSION, "package version should track the current product version");
 assert.equal(manifest.version, EXPECTED_VERSION, "Chrome extension manifest version should match the product version");
 

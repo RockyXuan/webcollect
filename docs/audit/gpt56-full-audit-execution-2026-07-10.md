@@ -4,6 +4,12 @@ Date: 2026-07-10 (updated 2026-07-12)
 Branch: `fix/sync-architecture`
 Target release: `V1.1.0`
 
+## 2026-07-12 final status
+
+The PM split, fresh WebCollect backup, live sync migration, former-PM-role retirement, trigger-function hardening, and post-migration count/access checks are complete. The final independent pass also removed legacy privileged configuration fallback, fixed the short-screen wallpaper settings dialog, and expanded real browser/extension runtime tests.
+
+Read `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md` for the current counts, backup hashes, applied migration names, browser evidence, and honest remaining account-level gates. Older `pending` wording below is preserved as test-first execution history and no longer describes the live database state.
+
 ## Safety baseline
 
 - Git worktree was clean before the audit.
@@ -27,19 +33,23 @@ Target release: `V1.1.0`
 
 | ID | Priority | Area | Evidence | Status |
 | --- | --- | --- | --- | --- |
-| DATA-01 | P0 | Sync | Cloud-only rows can resurrect locally deleted cards/categories. | Code fixed and isolated tests passed; live Supabase migration/dual-device gate pending |
-| DATA-02 | P0 | Sync | Preference unions prevent unpin, unhide, and recycle-bin empty from propagating. | Code fixed and isolated tests passed; live Supabase migration/dual-device gate pending |
+| DATA-01 | P0 | Sync | Cloud-only rows can resurrect locally deleted cards/categories. | Fixed; live migration and isolated two-client conflict journey passed; physical signed-in dual-device observation remains |
+| DATA-02 | P0 | Sync | Preference unions prevent unpin, unhide, and recycle-bin empty from propagating. | Fixed; live migration and isolated preference convergence tests passed |
 | DATA-03 | P0 | Concurrency | IndexedDB and `chrome.storage` read-modify-write operations lost concurrent updates. | Fixed with lock, queue, and stale-snapshot rebase tests |
 | DATA-04 | P0 | Migration | Name-based heuristics deleted legitimate categories, rewrote descriptions, and ran without a pre-migration snapshot. | Fixed with behavioral tests |
 | DATA-05 | P1 | Recovery | Snapshot health used personal crypto keywords and fixed minimum workspace sizes. | Fixed with relative structural tests |
-| DATA-06 | P0 | Supabase schema | Tombstones require UUID entity IDs and new tables lack explicit authenticated Data API grants, so legacy pre-sync deletions can fail remotely. | Fixed in migration/bootstrap contracts; live migration remains export/confirmation gated |
+| DATA-06 | P0 | Supabase schema | Tombstones require UUID entity IDs and new tables lack explicit authenticated Data API grants, so legacy pre-sync deletions can fail remotely. | Fixed and live; text tombstones, grants, RLS, triggers, rollback, and unchanged row counts verified |
 | SEC-01 | P0 | Server fetch | Metadata and safety routes can request localhost/private-network URLs. | Fixed and isolated Chromium runtime verified; final installed Chrome shell check remains a release gate |
 | SEC-02 | P1 | Dependencies | Production dependency audit contains critical/high advisories and unused large dependency trees. | Fixed; official production audit reports no known vulnerabilities |
 | UI-01 | P1 | Responsive | Fixed 2048px canvas with a minimum zoom clipped 1024px and 390px viewports. Vitest plus Playwright now cover five target sizes. | Fixed and browser-verified |
 | UI-02 | P1 | Wallpaper | Quote, citation, and idle hint overlap at 1280x720. | Fixed in one shared Web/extension stylesheet; desktop/mobile browser verified |
 | PERF-01 | P2 | Render/build | Recommendation groups mount eagerly and three dynamic imports cannot create chunks because the same modules are statically bundled. | Fixed; progressive render and clean ineffective-import build log verified |
 | ASSET-01 | P1 | Extension package | Seventeen full-size local wallpapers occupy 60.0 MiB; two source files are structurally corrupt and can fail decode. | Fixed; repaired and converted to true-dimension WebP, package now 17.1 MiB |
-| ENV-01 | P0 | Shared Supabase project | The same Supabase project contains 40 portfolio-management tables with RLS disabled; its public key can expose unrelated project data. | Confirmed by Supabase table advisor; deliberately not auto-fixed from WebCollect |
+| ENV-01 | P0 | Shared Supabase project | The same Supabase project contains 40 portfolio-management tables with RLS disabled; its public key can expose unrelated project data. | Resolved by PM migration to `erzblrpfqjjwmlkxkkkb`; old project now contains only WebCollect tables |
+| ENV-02 | P1 | Shared-project residue | Former PM login role retained grants on WebCollect tables after the table split. | Fixed live: role is `NOLOGIN`, grants revoked, old connection rejected |
+| SEC-03 | P1 | Configuration | Legacy Coze helper spawned Python and ordinary client construction could silently use service-role credentials. | Fixed with failing source contracts; no child process or service-role fallback remains |
+| UI-03 | P1 | Wallpaper settings | Short desktop viewports clipped the modal title/footer and made `完成` unreachable. | Fixed with scrollable body and fixed footer; 1280x720 Browser and Playwright evidence passed |
+| ASSET-02 | P1 | Wallpaper persistence | Old IndexedDB entries could override current packaged IDs and request removed `.jpg` assets. | Fixed by making the curated registry authoritative for its IDs; pure regression and real-browser IndexedDB/network tests passed |
 | AUTH-01 | P1 | Auth | Cached identity is trusted without validating the Supabase session; extension logout leaves the remote session intact. | Code fixed and isolated extension startup verified; real OAuth account gate pending |
 | META-01 | P1 | Capture | Web and extension metadata extractors diverge and can select unrelated boilerplate. | Fixed with one shared structural extractor, 24 fixtures, Web API, and isolated extension runtime evidence |
 | REL-01 | P1 | Release | Release script can tag a feature commit while pushing a different `main`; static extension output can be stale. | Fixed with deterministic preflight and one build source; final main/tag/Release execution pending all gates |

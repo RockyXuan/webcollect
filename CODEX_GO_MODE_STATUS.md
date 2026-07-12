@@ -1,5 +1,15 @@
 # Codex Go Mode Status
 
+## 2026-07-12 V1.1.0 Goal Status
+
+- PM 独立 Supabase、旧项目清理和 PM Vercel exact-SHA 已独立复核。
+- WebCollect 云端新备份、同步迁移、旧 PM 角色禁用、函数权限收紧和数据计数复核已完成。
+- 修复旧 Coze 子进程取配置与 service-role 回退、短屏壁纸设置裁切、分项快速提交/可访问名称。
+- 新增搜索引擎、分项误删、壁纸直达主页和扩展目标队列真实浏览器验收。
+- 当前验证：116 Vitest、31 历史脚本、12 Playwright、TypeScript、ESLint、Web/扩展构建、依赖审计和隔离 MV3 runtime 通过。
+- 当前发布身份：`V1.1.0 / 2026年7月12日`；精确提交与 zip 由 `webcollect-2026-07-12-v1.1.0` 固定。
+- 最新证据：`docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`。
+
 ## 2026-07-07 Documentation Handoff Status
 
 最新目标：把 WebCollect 全项目需求、用户截图、实现方式、保留边界、踩坑教训和待办，整理成 Claude/Codex 可直接读取的体检入口。
