@@ -5,18 +5,19 @@
 当前主目录：`/Users/rockyx/vibe coding/Web Collect 0628`
 远端仓库：`https://github.com/RockyXuan/webcollect`
 主分支：`main`
-当前最新发布身份：`V1.1.0 / 2026年7月12日`
-当前主线：本轮审计从 `fix/sync-architecture` 完成后进入 `main`；精确提交以 Release tag `webcollect-2026-07-12-v1.1.0` 为准。
+当前最新发布身份：`V1.1.1 / 2026年7月12日`
+当前主线：本轮审计从 `fix/sync-architecture` 完成后进入 `main`；精确提交以 Release tag `webcollect-2026-07-12-v1.1.1` 为准。
 
-## 2026-07-12 V1.1.0 全项目审计结论
+## 2026-07-12 V1.1.1 全项目审计结论
 
-- 最新且优先读取：`docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`。
+- 最新且优先读取：`docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`；数据库与全项目细节继续见 `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`。
 - PM 已迁往独立 Supabase `erzblrpfqjjwmlkxkkkb`；原项目 `qxlkigwadvgkoeqdojxx` 只保留 WebCollect。
 - 找到并清理了旧 PM 角色 `alphalens_app` 对 WebCollect 的残留授权；角色已禁用登录。
 - WebCollect 同步 revision/tombstone/workspace-version SQL 已在备份后执行；原五表数据计数保持 `1 / 128 / 364 / 22 / 57`。
 - 本轮修复旧 Coze 子进程取配置、service-role 静默回退、短屏壁纸设置裁切，并扩大搜索、分项、壁纸、扩展目标队列的真实浏览器验收。
-- 当前自动验证：116 条 Vitest、31 条历史脚本、12 条 Playwright、TypeScript、ESLint、Web/扩展构建和隔离扩展运行时通过。
-- 历史文档中“Supabase 迁移待执行”“PM 仍与 WebCollect 共库”等说法已过期，以本节和 V1.1.0 closeout 为准。
+- V1.1.1 追加修复 GitHub 冷启动下 E2E 过早按键、缺失 tag 的误导性 fatal 日志，以及 tag 工作流重复上传第二个 zip。
+- 当前自动验证：117 条 Vitest、31 条历史脚本、12 条 Playwright、TypeScript、ESLint、Web/扩展构建和隔离扩展运行时通过。
+- 历史文档中“Supabase 迁移待执行”“PM 仍与 WebCollect 共库”等说法已过期，以本节和 V1.1.1 closeout 为准。
 
 ## 2026-07-07 Fable 整改执行状态
 
@@ -36,12 +37,13 @@
 
 这个文件是 WebCollect 的“全身体检交接入口”。后续 agent 不需要让用户重新复述需求，先读：
 
-0. `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`（**当前最新**：PM 分库核验、WebCollect 云端迁移、备份校验、修复和验收总收口）
-0.1 `docs/audit/gpt56-full-audit-execution-2026-07-10.md`（V1.1.0 测试先行执行日志与历史红绿证据）
-0.2 `docs/audit/claude-fable-followup-plan-2026-07-07.md`（Fable 第二轮审查结论 + R1-R4 历史方案）
-0.3 `docs/audit/claude-fable-code-review-2026-07-07.md`（Claude Fable 5 第一轮全量代码审查结论）
-0.4 `docs/audit/claude-fable-remediation-plan-2026-07-07.md`（第一轮整改执行方案）
-0.5 `docs/audit/remediation-execution-log-2026-07-07.md`（第一轮 Codex 执行日志）
+0. `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`（**当前最新**：CI 冷启动与单一 Release 发布链路收口）
+0.1 `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`（PM 分库核验、WebCollect 云端迁移、备份校验和全项目审计）
+0.2 `docs/audit/gpt56-full-audit-execution-2026-07-10.md`（V1.1 测试先行执行日志与历史红绿证据）
+0.3 `docs/audit/claude-fable-followup-plan-2026-07-07.md`（Fable 第二轮审查结论 + R1-R4 历史方案）
+0.4 `docs/audit/claude-fable-code-review-2026-07-07.md`（Claude Fable 5 第一轮全量代码审查结论）
+0.5 `docs/audit/claude-fable-remediation-plan-2026-07-07.md`（第一轮整改执行方案）
+0.6 `docs/audit/remediation-execution-log-2026-07-07.md`（第一轮 Codex 执行日志）
 1. `AGD.md`
 2. `docs/audit/claude-code-review-handoff-2026-07-07.md`
 3. `docs/audit/webcollect-full-audit-brief-2026-07-07.md`
@@ -52,7 +54,7 @@
 8. `tasks/todo.md`
 9. `AGENTS.md`
 
-如果这些文件和旧文档冲突，以 `AGD.md` 和 `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md` 为准。
+如果这些文件和旧文档冲突，以 `AGD.md` 和 `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md` 为准。
 
 ## 产品一句话
 
@@ -64,7 +66,7 @@ WebCollect 是个人网页收藏工作台：用户可以用 Web 页面和 Chrome
 - 不要用默认 `seed.ts` 覆盖用户真实数据；默认数据只能作为首次空数据示例。
 - 不要操作用户主 Chrome 窗口；本地验证优先用 in-app Browser，扩展验证用辅助 Chrome / Codex Workbench。
 - 每次涉及 Chrome 扩展可测试版本，都要构建、打包、发布 GitHub Release，并给出 zip 直链。
-- 每次推送功能版本都要更新版本号和日期；`V1.1.0` 之后的小修从 `V1.1.1` 起。
+- 每次推送功能版本都要更新版本号和日期；`V1.1.1` 之后的小修从 `V1.1.2` 起。
 - 小松鼠头是 WebCollect 统一品牌图标，Chrome 顶栏、右键菜单、默认图标、浮窗 UI 都应优先使用它。
 
 ## 已完成的重要需求
@@ -81,10 +83,11 @@ WebCollect 是个人网页收藏工作台：用户可以用 Web 页面和 Chrome
   - `webcollect-2026-07-01-v1.0.2`
   - `webcollect-2026-07-02-v1.0.3`
   - `webcollect-2026-07-12-v1.1.0`
+  - `webcollect-2026-07-12-v1.1.1`
 - 当前 UI 显示版本和日期：`src/lib/app-version.ts`。
 - 版本一致性测试：`scripts/test-extension-branding.ts`。
 - 扩展构建命令：`corepack pnpm@9.0.0 build:ext`。
-- V1.1.0 发布源只允许使用 `extension/manifest.json` 和当次新构建的 `extension/dist`；不得恢复旧的 `public/extension-dist` 副本。
+- V1.1.1 发布源只允许使用 `extension/manifest.json` 和当次新构建的 `extension/dist`；不得恢复旧的 `public/extension-dist` 副本。
 
 ### 3. 小松鼠品牌统一
 
@@ -216,5 +219,5 @@ git diff --check
 
 ## 最近发布信息
 
-- Release 页面：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-12-v1.1.0`
-- zip 直链：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-12-v1.1.0/WebCollect-Chrome-Extension-v1.1.0-2026-07-12.zip`
+- Release 页面：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-12-v1.1.1`
+- zip 直链：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-12-v1.1.1/WebCollect-Chrome-Extension-v1.1.1-2026-07-12.zip`

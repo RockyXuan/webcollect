@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openCollection } from "./helpers";
 
 const viewports = [
   { width: 2048, height: 1152 },
@@ -12,7 +13,7 @@ for (const viewport of viewports) {
   test(`collection stays inside ${viewport.width}x${viewport.height}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.goto("/");
-    await page.keyboard.press("Enter");
+    await openCollection(page);
 
     await expect(page.getByText("WebCollect", { exact: true })).toBeVisible();
 

@@ -55,4 +55,15 @@ describe("extension release preflight", () => {
     expect(script).toContain("test:extension-artifact");
     expect(script).toContain("test:extension-size");
   });
+
+  it("keeps one quiet, authoritative GitHub Release publisher", () => {
+    const preflight = readFileSync("scripts/release-preflight.mjs", "utf8");
+    const releaseScript = readFileSync("scripts/release-extension.sh", "utf8");
+    const tagWorkflow = readFileSync(".github/workflows/webcollect-release.yml", "utf8");
+
+    expect(preflight).toContain('stdio: ["ignore", "pipe", "ignore"]');
+    expect(releaseScript).toContain("release create");
+    expect(tagWorkflow).not.toContain("softprops/action-gh-release");
+    expect(tagWorkflow).not.toContain("Publish GitHub Release");
+  });
 });

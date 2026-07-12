@@ -1,4 +1,4 @@
-name: WebCollect Chrome Extension Release
+name: WebCollect Chrome Extension Tag Verification
 
 on:
   push:
@@ -6,10 +6,10 @@ on:
       - "webcollect-*"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build-release:
+  verify-tag:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -39,21 +39,3 @@ jobs:
 
       - name: Verify Chrome extension package size
         run: pnpm test:extension-size
-
-      - name: Package extension
-        run: |
-          cd extension/dist
-          zip -r ../../WebCollect-Chrome-Extension-${{ github.ref_name }}.zip .
-
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: WebCollect Latest ${{ github.ref_name }}
-          body: |
-            WebCollect 最新测试包。
-
-            Chrome 扩展请下载：WebCollect-Chrome-Extension-${{ github.ref_name }}.zip。
-            GitHub 自动附带的 Source code (zip/tar.gz) 是完整源码包，不是 Chrome 可直接加载的扩展目录。
-
-            使用方法：下载 Chrome 扩展 zip 后先解压，再在 Chrome 扩展程序页面选择“加载已解压的扩展程序”，加载解压后的文件夹。
-          files: WebCollect-Chrome-Extension-${{ github.ref_name }}.zip

@@ -1,5 +1,7 @@
 # WebCollect V1.1.0 audit closeout
 
+Current release note: V1.1.0 remains the full audit and database-migration record. The installable release was superseded the same day by V1.1.1 after GitHub cold-start E2E and duplicate-release-publisher fixes. Read `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md` first for current release identity.
+
 Date: 2026-07-12
 Release identity: `V1.1.0 / 2026年7月12日`
 Release tag: `webcollect-2026-07-12-v1.1.0`

@@ -3,7 +3,10 @@ import { existsSync, readFileSync } from "node:fs";
 
 function git(args, fallback = "") {
   try {
-    return execFileSync("git", args, { encoding: "utf8" }).trimEnd();
+    return execFileSync("git", args, {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trimEnd();
   } catch {
     return fallback;
   }

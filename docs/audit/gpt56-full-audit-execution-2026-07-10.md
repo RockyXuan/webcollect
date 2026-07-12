@@ -2,13 +2,15 @@
 
 Date: 2026-07-10 (updated 2026-07-12)
 Branch: `fix/sync-architecture`
-Target release: `V1.1.0`
+Target release: `V1.1.1` (V1.1.0 full-audit release plus same-day CI/release patch)
 
 ## 2026-07-12 final status
 
 The PM split, fresh WebCollect backup, live sync migration, former-PM-role retirement, trigger-function hardening, and post-migration count/access checks are complete. The final independent pass also removed legacy privileged configuration fallback, fixed the short-screen wallpaper settings dialog, and expanded real browser/extension runtime tests.
 
 Read `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md` for the current counts, backup hashes, applied migration names, browser evidence, and honest remaining account-level gates. Older `pending` wording below is preserved as test-first execution history and no longer describes the live database state.
+
+The first V1.1.0 GitHub main run then exposed a cold-hydration E2E race and duplicate Release publishers. V1.1.1 waits for the persisted wallpaper state before entering the collection, silences expected absent-tag stderr, and leaves Release publication to one guarded script. See `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`.
 
 ## Safety baseline
 

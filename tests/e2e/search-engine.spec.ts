@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
+import { openCollection } from "./helpers";
 
 test("a freshly selected search engine still handles a quick Enter", async ({ page }) => {
   await page.goto("/");
-  await page.keyboard.press("Enter");
+  await openCollection(page);
 
   const searchInput = page.getByRole("textbox", { name: "搜索网站" });
   const engineSelect = page.getByRole("combobox", { name: "选择搜索引擎" });

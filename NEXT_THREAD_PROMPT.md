@@ -2,10 +2,10 @@
 
 ## 2026-07-12 当前事实
 
-- 最新版本：`V1.1.0 / 2026年7月12日`
-- 最新 Release：`webcollect-2026-07-12-v1.1.0`
+- 最新版本：`V1.1.1 / 2026年7月12日`
+- 最新 Release：`webcollect-2026-07-12-v1.1.1`
 - PM 已迁出旧 Supabase；WebCollect 云端迁移已执行并验证数据计数不变。
-- 第一优先事实源：`docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`。
+- 第一优先事实源：`docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`。
 - 旧文档里“SQL 待执行”“PM 仍共库”“下一版 V1.0.4”等说法已过期。
 
 ## 第一件事
@@ -16,6 +16,7 @@
    `/Users/rockyx/Documents/webcollect`
 3. 先阅读这些文件：
    - `AGD.md`
+   - `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`
    - `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`
    - `docs/audit/gpt56-full-audit-execution-2026-07-10.md`
    - `docs/audit/claude-code-review-handoff-2026-07-07.md`
@@ -43,7 +44,7 @@ git ls-remote --heads origin main
 
 ## 2026-07-07 最新背景
 
-以下是 `V1.0.3 / 2026年7月2日` 的历史背景；当前版本与状态以文件顶部的 V1.1.0 事实和 closeout 为准。7 月 1 日和 7 月 2 日已经完成：
+以下是 `V1.0.3 / 2026年7月2日` 的历史背景；当前版本与状态以文件顶部的 V1.1.1 事实和 closeout 为准。7 月 1 日和 7 月 2 日已经完成：
 
 - 扩展浮窗保存目标不再静默错放到主页或默认收集箱。
 - 顶部分项支持编辑、行内改名、新增和排序，`主页` 固定。

@@ -11,7 +11,7 @@
 | `codex-clipboard-34f386d2-bf73-4147-8650-e2e411c3a395.png` | 交接说明，固定目录为 `/Users/rockyx/vibe coding/Web Collect 0628`，GitHub main clean | 固定主开发目录，避免旧目录污染 | 已记录到 `PROJECT_SUMMARY.md`、`HANDOFF.md`、`AGD.md` |
 | `codex-clipboard-e27a74a9-75a6-43e3-85a7-b13d7950424d.png` | 新线程直接打开固定目录，首次运行可能需重新安装依赖 | 交接路径和依赖提示 | 已纳入交接规则 |
 | `codex-clipboard-85334df7-ac96-4d83-92ad-bfdeac2991ac.png` | 浮窗收集表单的“简介”区域，希望加翻译按钮 | 简介翻译按钮，先用免费/底层翻译 | 已实现本地规则翻译和按钮，需继续评估翻译质量 |
-| `codex-clipboard-d47732e0-90dd-480d-a7b7-45566e7e1389.png` | 账号/设置页，希望浅灰显示日期和版本号 | 版本号和日期展示 | 当前为 `V1.1.0 / 2026年7月12日`，后续小修从 `V1.1.1` 起 |
+| `codex-clipboard-d47732e0-90dd-480d-a7b7-45566e7e1389.png` | 账号/设置页，希望浅灰显示日期和版本号 | 版本号和日期展示 | 当前为 `V1.1.1 / 2026年7月12日`，后续小修从 `V1.1.2` 起 |
 | `codex-clipboard-72ad0316-2aa0-4349-ae9b-437f14b5e3c2.png` | Chrome 右键菜单“收集到 WebCollect”显示默认拼图图标 | 右键菜单图标统一为小松鼠 | 已做资源统一，仍需真实 Chrome 菜单位置复验 |
 | `codex-clipboard-c515590a-d23b-4634-835a-9b6f984cf0cd.png` | Chrome 顶栏扩展图标显示默认拼图 | 工具栏图标统一为小松鼠 | 已更新 manifest/icons，仍需安装包实测 |
 | `codex-clipboard-4ffa005f-777e-4864-9a44-b64545c6cfb9.png` | 用户指定的小松鼠头像 | WebCollect 统一品牌图 | 作为品牌资产保留；不可改形象，只能提高清晰度 |

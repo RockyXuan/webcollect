@@ -54,6 +54,7 @@ export function WallpaperShell({
   const updatePrefs = useWallpaperStore((state) => state.updatePrefs);
   const refreshOnlineWallpapers = useWallpaperStore((state) => state.refreshOnlineWallpapers);
   const isRefreshing = useWallpaperStore((state) => state.isRefreshing);
+  const isReady = useWallpaperStore((state) => state.isReady);
   const wallpaperError = useWallpaperStore((state) => state.error);
   const [fullImageLoaded, setFullImageLoaded] = useState(false);
   const [imageLoadStage, setImageLoadStage] = useState<WallpaperImageLoadStage>("display");
@@ -254,6 +255,8 @@ export function WallpaperShell({
       <div
         className="wc-wallpaper-stage"
         tabIndex={0}
+        aria-busy={!isReady}
+        data-wallpaper-ready={isReady ? "true" : "false"}
         onClick={handleWallpaperClick}
         onWheel={handleWallpaperWheel}
       >

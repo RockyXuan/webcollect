@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
+import { openCollection } from "./helpers";
 
 test("quick Enter creates a section and selecting it never asks to delete", async ({ page }) => {
   await page.goto("/");
-  await page.keyboard.press("Enter");
+  await openCollection(page);
 
   await page.getByRole("button", { name: "分项", exact: true }).click();
   const sectionInput = page.getByRole("textbox", { name: "新分项名称" });

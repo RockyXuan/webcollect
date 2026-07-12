@@ -5,8 +5,8 @@
 如果你是后续接手 WebCollect 的 Claude / Codex / 其他 agent，请先读：
 
 1. `AGD.md`
-2. `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`
-3. `docs/audit/gpt56-full-audit-execution-2026-07-10.md`
+2. `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`
+3. `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`
 4. `docs/audit/claude-code-review-handoff-2026-07-07.md`
 5. `PROJECT_SUMMARY.md`
 6. `HANDOFF.md`
@@ -15,9 +15,9 @@
 9. `AGENTS.md`
 
 当前固定开发目录：`/Users/rockyx/vibe coding/Web Collect 0628`。
-当前最新功能版本：`V1.1.0 / 2026年7月12日`。
-最新 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-12-v1.1.0`。
-Chrome 扩展 zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-12-v1.1.0/WebCollect-Chrome-Extension-v1.1.0-2026-07-12.zip`。
+当前最新功能版本：`V1.1.1 / 2026年7月12日`。
+最新 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-12-v1.1.1`。
+Chrome 扩展 zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-12-v1.1.1/WebCollect-Chrome-Extension-v1.1.1-2026-07-12.zip`。
 如果旧说明和 `AGD.md` 冲突，以 `AGD.md` 为准。
 
 这是一个基于 [Next.js 16](https://nextjs.org) + [shadcn/ui](https://ui.shadcn.com) 的全栈应用项目，由扣子编程 CLI 创建。
