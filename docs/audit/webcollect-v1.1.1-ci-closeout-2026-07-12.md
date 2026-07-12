@@ -19,6 +19,7 @@ The release preflight also printed a misleading Git fatal message while safely p
 
 - `WallpaperShell` exposes `aria-busy` and `data-wallpaper-ready` from the real persisted-store readiness state.
 - Collection E2E uses one `openCollection()` helper that waits for readiness before pressing Enter and then waits for the brand shell.
+- Wallpaper geometry E2E waits for the real idle-hint state after any startup wallpaper refresh instead of sleeping for a fixed 2.3 seconds.
 - Progressive recommendation assertions use a bounded readiness timeout rather than a fixed sleep.
 - Release preflight suppresses expected stderr from an absent tag probe.
 - The local guarded release script is the only GitHub Release publisher. The tag workflow independently rebuilds and verifies the extension but has read-only contents permission and cannot attach a duplicate asset.

@@ -7,7 +7,8 @@ for (const viewport of [
   test(`wallpaper text layers do not overlap at ${viewport.width}x${viewport.height}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.goto("/");
-    await page.waitForTimeout(2_300);
+    await expect(page.locator('[data-wallpaper-ready="true"]')).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator(".wc-zoom-idle-hint-visible")).toBeVisible({ timeout: 15_000 });
 
     const geometry = await page.evaluate(() => {
       const rect = (selector: string) => {
