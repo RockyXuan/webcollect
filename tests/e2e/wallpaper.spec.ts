@@ -52,3 +52,76 @@ test("disabling wallpaper mode opens the next page directly in the collection", 
   await expect(page.getByText("WebCollect", { exact: true })).toBeVisible();
   await expect(page.locator(".wc-zoom-wallpaper")).toHaveCount(0);
 });
+
+test("repairs obsolete packaged wallpaper paths from IndexedDB", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForFunction(async () => {
+    const databases = await indexedDB.databases();
+    return databases.some((database) => database.name === "WebCollect");
+  });
+
+  await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("WebCollect");
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+    const transaction = database.transaction("webcollect_wallpaper", "readwrite");
+    const store = transaction.objectStore("webcollect_wallpaper");
+    const staleUrl = "/assets/wallpapers/zoom-wle-madygen-geopark.jpg";
+    store.put([{
+      id: "zoom-wle-madygen-geopark",
+      title: "Madygen Geopark colors",
+      author: "Marat Nadjibaev",
+      source: "wikimedia",
+      sourceUrl: "https://commons.wikimedia.org/wiki/File:Example.jpg",
+      imageUrl: staleUrl,
+      thumbnailUrl: staleUrl,
+      license: "Creative Commons Attribution-Share Alike 4.0",
+      width: 3200,
+      height: 1800,
+      category: "landscape",
+      quality: "award",
+      sourceCollection: "Wiki Loves Earth 2024 winners",
+      quoteId: "old-stone",
+      fetchedAt: 99,
+    }], "wallpaperLibrary");
+    store.put({
+      defaultMode: "wallpaper",
+      themeMode: "auto",
+      rotationInterval: "15m",
+      enabledCategories: ["landscape", "landmark", "animals", "ocean"],
+      autoUpdate: false,
+      paused: false,
+      showZoomHints: true,
+      currentWallpaperId: "zoom-wle-madygen-geopark",
+      currentQuoteId: null,
+      recentQuoteIds: [],
+      recentAssetIds: [],
+      recentMediaIds: [],
+      lastRemoteRefreshAt: Date.now(),
+      settingsUpdatedAt: 0,
+      updatedAt: 0,
+    }, "wallpaperPrefs");
+    await new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+    database.close();
+  });
+
+  const obsoleteRequests: string[] = [];
+  page.on("request", (request) => {
+    if (/\/assets\/wallpapers\/[^/?]+\.jpg(?:\?|$)/.test(request.url())) {
+      obsoleteRequests.push(request.url());
+    }
+  });
+  await page.reload();
+
+  await expect(page.locator(".wc-wallpaper-image")).toHaveCSS(
+    "background-image",
+    /zoom-wle-madygen-geopark\.webp/
+  );
+  expect(obsoleteRequests).toEqual([]);
+});
