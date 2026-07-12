@@ -37,3 +37,18 @@ for (const viewport of [
     expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.viewport.width + 1);
   });
 }
+
+test("disabling wallpaper mode opens the next page directly in the collection", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "壁纸设置" }).click();
+
+  const wallpaperMode = page.getByRole("checkbox", {
+    name: "启动壁纸模式 关闭后，下次打开新页面会直接进入主页。",
+  });
+  await wallpaperMode.uncheck();
+  await page.getByRole("button", { name: "完成", exact: true }).click();
+
+  await page.reload();
+  await expect(page.getByText("WebCollect", { exact: true })).toBeVisible();
+  await expect(page.locator(".wc-zoom-wallpaper")).toHaveCount(0);
+});

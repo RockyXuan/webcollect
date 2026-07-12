@@ -96,15 +96,15 @@ export function WallpaperSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[520px]">
-        <DialogHeader>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 sm:max-w-[520px]">
+        <DialogHeader className="px-6 pt-6 pr-12 pb-4">
           <DialogTitle className="font-serif">壁纸设置</DialogTitle>
           <DialogDescription>
             选择壁纸分类、轮播节奏和默认打开方式。壁纸数据与收藏数据分开保存。
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5 py-2">
+        <div className="min-h-0 space-y-5 overflow-y-auto px-6 py-2">
           <section className="space-y-2">
             <p className="text-sm font-bold text-slate-800">壁纸主题</p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -203,7 +203,7 @@ export function WallpaperSettingsDialog({
           </section>
         </div>
 
-        <DialogFooter className="gap-2 sm:justify-between">
+        <DialogFooter className="gap-2 border-t border-slate-200 bg-background px-6 py-4 sm:justify-between">
           <Button
             type="button"
             variant="outline"

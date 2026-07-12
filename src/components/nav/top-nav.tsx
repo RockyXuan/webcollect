@@ -143,6 +143,7 @@ function SortableSectionTab({
       <div
         role="button"
         tabIndex={0}
+        aria-label={section.name}
         className={`wc-section-tab ${active ? "wc-section-tab-active" : ""} ${editMode ? "wc-section-tab-editable" : ""}`}
         onClick={() => onSelect(section.id)}
         onKeyDown={(event) => {
@@ -406,8 +407,8 @@ export function TopNav({
     setDeleteSectionCandidate(null);
   };
 
-  const commitSectionDraft = () => {
-    const trimmed = sectionDraftName.trim();
+  const commitSectionDraft = (draftName = sectionDraftInputRef.current?.value ?? sectionDraftName) => {
+    const trimmed = draftName.trim();
     setIsAddingSection(false);
     setSectionDraftName("");
     if (trimmed) {
@@ -726,12 +727,12 @@ export function TopNav({
               className="wc-section-draft-input"
               value={sectionDraftName}
               onChange={(event) => setSectionDraftName(event.target.value)}
-              onBlur={commitSectionDraft}
+              onBlur={(event) => commitSectionDraft(event.currentTarget.value)}
               onKeyDown={(event) => {
                 event.stopPropagation();
                 if (event.key === "Enter") {
                   event.preventDefault();
-                  commitSectionDraft();
+                  commitSectionDraft(event.currentTarget.value);
                 } else if (event.key === "Escape") {
                   event.preventDefault();
                   cancelSectionDraft();

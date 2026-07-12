@@ -1,12 +1,11 @@
 /**
  * Supabase Browser Client — lightweight client for browser/extension usage
  * 
- * Unlike the full supabase-client.ts (which uses Node.js modules like
- * child_process, require('dotenv')), this client is safe to import from
- * client components in Next.js and Chrome extensions.
+ * This client is safe to import from client components in Next.js and Chrome
+ * extensions. It uses only the public anon key plus the signed-in user's token.
  * 
  * Configuration is fetched from /api/supabase-config at runtime (Web)
- * or from environment variables (Extension).
+ * or from the extension's public configuration.
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';

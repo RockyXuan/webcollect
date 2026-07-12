@@ -55,6 +55,12 @@ function assertWallpaperGeometry(label, geometry) {
   }
 }
 
+async function sendRuntimeMessage(page, message) {
+  return page.evaluate((payload) => new Promise((resolveMessage) => {
+    chrome.runtime.sendMessage(payload, resolveMessage);
+  }), message);
+}
+
 const context = await chromium.launchPersistentContext(profileDir, {
   channel: "chromium",
   headless: false,
@@ -138,6 +144,51 @@ try {
     scrollWidth: document.documentElement.scrollWidth,
     viewportWidth: window.innerWidth,
   }));
+
+  const captureProbeTitle = "WebCollect Runtime Target Probe";
+  const captureProbe = await sendRuntimeMessage(page, {
+    type: "CAPTURE_QUEUE_ADD",
+    draft: {
+      url: "https://example.com/webcollect-runtime-target-probe",
+      title: captureProbeTitle,
+      description: "Isolated extension runtime destination check",
+      sourceType: "context-menu",
+      destination: {
+        createSectionName: "Runtime Audit",
+        createGroupName: "Runtime Inbox",
+      },
+    },
+  });
+  if (!captureProbe?.success || !captureProbe.item?.id) {
+    throw new Error(`Capture runtime probe was not queued: ${JSON.stringify(captureProbe)}`);
+  }
+
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  let captureQueue;
+  const captureDeadline = Date.now() + 10_000;
+  do {
+    captureQueue = await sendRuntimeMessage(page, { type: "CAPTURE_QUEUE_LIST" });
+    const status = captureQueue?.queue?.find((entry) => entry.id === captureProbe.item.id)?.status;
+    if (status === "imported" || status === "failed") break;
+    await page.waitForTimeout(200);
+  } while (Date.now() < captureDeadline);
+
+  const captureDestinations = await sendRuntimeMessage(page, { type: "CAPTURE_GET_DESTINATIONS" });
+  const importedCapture = captureQueue?.queue?.find((entry) => entry.id === captureProbe.item.id);
+  const runtimeSection = captureDestinations?.cache?.sections?.find((section) => section.name === "Runtime Audit");
+  const runtimeGroup = captureDestinations?.cache?.categories?.find((category) => category.name === "Runtime Inbox");
+
+  if (
+    importedCapture?.status !== "imported"
+    || importedCapture?.destinationError
+    || importedCapture?.resolvedDestinationPath !== "Runtime Audit / Runtime Inbox"
+  ) {
+    throw new Error(`Capture runtime probe landed incorrectly: ${JSON.stringify(importedCapture)}`);
+  }
+  if (!runtimeSection || !runtimeGroup || runtimeGroup.sectionId !== runtimeSection.id) {
+    throw new Error(`Capture runtime destination cache is inconsistent: ${JSON.stringify(captureDestinations)}`);
+  }
+
   await page.screenshot({
     path: resolve(outputDir, "extension-runtime-collection-1440x900.png"),
     fullPage: false,
@@ -170,6 +221,13 @@ try {
     desktopWallpaperGeometry,
     mobileWallpaperGeometry,
     collectionState,
+    captureProbe: {
+      id: captureProbe.item.id,
+      status: importedCapture.status,
+      resolvedDestinationPath: importedCapture.resolvedDestinationPath,
+      sectionId: runtimeSection.id,
+      groupId: runtimeGroup.id,
+    },
     consoleErrors,
     screenshots: [
       resolve(outputDir, "extension-runtime-wallpaper-1440x900.png"),
