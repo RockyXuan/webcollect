@@ -3,11 +3,11 @@
 ## 2026-07-14 V1.1.2 候选事实
 
 - 第一优先事实源：`docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`。
-- 已发布稳定版仍是 `V1.1.1`；先发布 `V1.1.2 / 2026年7月14日` RC 供主 Chrome 安装，只有授权 Chrome + 独立 Profile B、双会话核验、生产构建、final main/tag/zip 一致后才转正式版。
+- 已发布稳定版仍是 `V1.1.1`；`V1.1.2 RC3` 已发布为 Prerelease，tag `webcollect-2026-07-14-v1.1.2-rc.3`，本地安装目录为 `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.3/unpacked`。只有授权 Chrome + 独立 Profile B、双会话核验、生产构建、final main/tag/zip 一致后才转正式版。
 - 已修根因：干净 Web OAuth 配置、新 Profile 重复收集箱、旧客户端已有同分项空重复时的 canonical 选择、回调 code、HMR upgrade、浮窗并发目标、重复 GoTrue 客户端和错误的手动浏览器 refresh 生命周期。
-- 当前自动门禁：128 Vitest、31 组历史脚本、12 Playwright、TypeScript、ESLint、依赖审计、扩展构建/运行时均通过。
+- 当前自动门禁：129 Vitest、31 组历史脚本、13 Playwright、TypeScript、ESLint、Web/扩展构建、依赖审计、扩展产物/体积/运行时均通过。RC3 另有顶部 `壁纸 | 开/关` 启动开关和多视口浏览器证据。
 - 真实数据计数：`364 / 130 / 24 / 58 / 0 / 1`；不要删除 closeout 中记录的两条空收集箱，除非用户明确批准精确处理。
-- 用户已明确授权操作其主 Chrome、卸载旧扩展和加载新扩展。复用 `Codex Workbench`，不要碰无关个人标签；账号、密码、验证码或 CAPTCHA 仍由用户本人处理。
+- 用户已明确授权操作其主 Chrome 和加载新扩展。复用 `Codex Workbench`，不要碰无关个人标签；不要卸载现有 WebCollect，以免清除扩展 IndexedDB，应在相同固定扩展 ID 下更新/重新加载 RC3；账号、密码、验证码或 CAPTCHA 仍由用户本人处理。
 
 ## 2026-07-12 当前事实
 
@@ -25,6 +25,7 @@
    `/Users/rockyx/Documents/webcollect`
 3. 先阅读这些文件：
    - `AGD.md`
+   - `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`
    - `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`
    - `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`
    - `docs/audit/gpt56-full-audit-execution-2026-07-10.md`

@@ -6,7 +6,7 @@
 远端仓库：`https://github.com/RockyXuan/webcollect`
 主分支：`main`
 当前最新发布身份：`V1.1.1 / 2026年7月12日`
-当前 RC：`V1.1.2 / 2026年7月14日` RC2 已发布，tag `webcollect-2026-07-14-v1.1.2-rc.2` 固定到代码提交 `aec5b2035dc11ee793693014934494fa2681a450`；账号级收口见 `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`。
+当前 RC：`V1.1.2 / 2026年7月14日` RC3 已发布，tag `webcollect-2026-07-14-v1.1.2-rc.3` 固定到代码提交 `312a807bb20a1d99b2506a458c30edb6a8962081`；账号级收口见 `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`。
 当前主线：V1.1.2 RC 已进入 `main`；V1.1.1 仍是最新稳定版，必须等主 Chrome 和独立 Profile B 账号验收通过后才能发布 V1.1.2 正式版。
 
 ## 2026-07-14 V1.1.2 账号同步收口候选
@@ -17,11 +17,12 @@
 - 修复 OAuth 回调残留 `?code=`、自定义 Next 服务器漏接 HMR WebSocket，以及浮窗队列并发 drain 重复创建目标的问题。
 - 修复同一页面重复创建 Supabase `GoTrueClient` 的认证竞态；正常登出/登录保留 Supabase 官方的浏览器前后台刷新管理。
 - 修复本机 `gh` 自有 token 过期时 Release 发布被阻断的问题；发布脚本会复用已经通过 `git push` 验证的 GitHub 凭据，凭据只在子进程内使用且不会打印。
-- RC2 已发布并复核：Release `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-14-v1.1.2-rc.2`；zip 直链 `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-14-v1.1.2-rc.2/WebCollect-Chrome-Extension-v1.1.2-rc.2-2026-07-14.zip`；SHA-256 `7741a66561e8d1f8ab32dba908bd235eab9a6698e6c3b071cb3f6bdb3fc2f5c3`。
-- RC2 已下载并解压到 `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.2/unpacked`；清单为 WebCollect `1.1.2` / Manifest V3，且与 `extension/dist` 逐文件一致。由于 `chrome://extensions` 不暴露可可靠操作的自动化元素，主 Chrome 加载仍需用户手动选择该目录，不能盲点卸载旧扩展。
+- RC3 已发布为 GitHub Prerelease 并复核：Release `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-14-v1.1.2-rc.3`；zip 直链 `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-14-v1.1.2-rc.3/WebCollect-Chrome-Extension-v1.1.2-rc.3-2026-07-14.zip`；SHA-256 `7c32755cabcd165b236173123580f6f011f64b2a3483d42c4f3c7bd941ba7a1b`。
+- RC3 已从 GitHub 下载并解压到 `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.3/unpacked`；清单为 WebCollect `1.1.2` / Manifest V3，且与 `extension/dist` 逐文件一致。用户已加载 RC2，但 RC3 新增顶部壁纸启动开关，因此账号最终验收必须以 RC3 为准；不能通过卸载扩展来替换，以免丢失扩展 IndexedDB。
+- 收藏墙顶部“壁纸”入口现拆成一个融合式快捷控件：左侧进入当前壁纸页，右侧 `开/关` switch 只控制下次新标签页先显示壁纸还是直接进入主页；与壁纸设置弹窗共用同一 `defaultMode` 偏好。
 - 小松鼠浮窗收起时现在只露约半张脸并朝网页轻微侧头，鼠标悬停、键盘聚焦、拖动或打开面板时完整展开；隔离 Chromium 实测右侧可见 `50.07%`、左侧 `50.00%`，悬停后完整显示且点击可打开面板，控制台零错误。
 - 2026-07-14 主 Chrome 中的旧扩展再次上传了一个同分项空收集箱，使云端分类从 129 增至 130；V1.1.2 现按“同分项卡片数优先、创建时间与 ID 稳定排序”选择 canonical 收集箱，阻止数据库返回顺序把新收藏落到空重复项。现有两条空记录均保留，不自动删除。
-- 当前验证：129 条 Vitest、31 组历史脚本、12 条 Playwright、TypeScript、ESLint、依赖审计、扩展构建/产物/大小和隔离 MV3 runtime 已通过。
+- 当前验证：129 条 Vitest、31 组历史脚本、13 条 Playwright、TypeScript、ESLint、Web/扩展生产构建、依赖审计、扩展产物/大小和隔离 MV3 runtime 已通过。
 - Profile A 的真实 Google 登录、退出、重登和云同步已通过；Profile B 已用最新代码停在 Google 官方登录页，仍需用户本人完成账号/二次验证后才能宣布发布完成。
 - 当前云端为 `364 cards / 130 categories / 24 preferences / 58 snapshots / 0 tombstones / 1 workspace version`；130 个分类中包含两条本轮修复前由旧客户端产生的空收集箱，其中一条仍有分项偏好引用。未经用户明确批准不删除，也不把它们计作数据丢失。
 
@@ -237,8 +238,8 @@ git diff --check
 
 ## 最近发布信息
 
-- 当前 RC Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-14-v1.1.2-rc.2`
-- 当前 RC zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-14-v1.1.2-rc.2/WebCollect-Chrome-Extension-v1.1.2-rc.2-2026-07-14.zip`
-- 当前 RC SHA-256：`7741a66561e8d1f8ab32dba908bd235eab9a6698e6c3b071cb3f6bdb3fc2f5c3`
+- 当前 RC Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-14-v1.1.2-rc.3`
+- 当前 RC zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-14-v1.1.2-rc.3/WebCollect-Chrome-Extension-v1.1.2-rc.3-2026-07-14.zip`
+- 当前 RC SHA-256：`7c32755cabcd165b236173123580f6f011f64b2a3483d42c4f3c7bd941ba7a1b`
 - 最新稳定 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-12-v1.1.1`
 - 最新稳定 zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-12-v1.1.1/WebCollect-Chrome-Extension-v1.1.1-2026-07-12.zip`

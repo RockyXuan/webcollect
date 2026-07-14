@@ -8,9 +8,10 @@
 - [x] Handle old-client same-section empty inbox duplicates deterministically without deleting them or routing new captures by database row order.
 - [x] Remove consumed OAuth codes, restore custom-server HMR upgrades, and serialize the complete floating-capture queue drain.
 - [x] Reuse one GoTrue client per browser context and preserve Supabase's browser-managed foreground/background auth refresh lifecycle.
-- [x] Pass 128 Vitest cases, all 31 legacy scripts, all 12 Playwright cases, type check, lint, dependency audit, extension build/artifact/size, and isolated MV3 runtime.
+- [x] Pass 129 Vitest cases, all 31 legacy scripts, all 13 Playwright cases, type check, lint, Web/extension builds, dependency audit, extension artifact/size, and isolated MV3 runtime.
 - [x] Complete real Google OAuth sign-in/sign-out/re-sign-in and cloud sync in Profile A.
-- [ ] Publish the installable RC and replace the old extension in the explicitly authorized signed-in Chrome; verify manifest version and real cloud wall.
+- [x] Publish and byte-verify the installable V1.1.2 RC3 Prerelease, including tag, unique zip, manifest, SHA-256, and local unpacked copy.
+- [ ] Update the explicitly authorized signed-in Chrome from RC2 to RC3 without uninstalling it; verify manifest version, top-bar wallpaper switch, and real cloud wall.
 - [ ] User completes Google account/security confirmation in the independent Profile B; verify two sessions and unchanged `364 / 130 / 24 / 58` cloud counts.
 - [x] Run the production Web build in an isolated APFS-cloned workspace without interrupting the OAuth server.
 - [ ] After both Profiles pass, finalize docs and publish the exact final V1.1.2 zip.

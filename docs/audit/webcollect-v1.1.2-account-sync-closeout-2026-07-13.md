@@ -2,10 +2,10 @@
 
 Updated: 2026-07-14
 Release candidate identity: `V1.1.2 / 2026年7月14日`
-RC tag: `webcollect-2026-07-14-v1.1.2-rc.2`
-Previous RC tag: `webcollect-2026-07-14-v1.1.2-rc.1`
+RC tag: `webcollect-2026-07-14-v1.1.2-rc.3`
+Previous RC tags: `webcollect-2026-07-14-v1.1.2-rc.2`, `webcollect-2026-07-14-v1.1.2-rc.1`
 Planned final tag: `webcollect-2026-07-14-v1.1.2`
-Current gate: the installable RC is published and verified; load it in the user's explicitly authorized signed-in Chrome, then verify a second independent Profile. Do not call the final release complete until the account-level section below is closed.
+Current gate: RC3 is published, downloaded, and byte-verified; load RC3 in the user's explicitly authorized signed-in Chrome without uninstalling the existing extension, then verify a second independent Profile. Do not call the final release complete until the account-level section below is closed.
 
 This patch follows the V1.1.1 full-project audit. It focuses on the last real-account observation and on defects found while reproducing a fresh Profile login. The PM split and the live WebCollect database migration remain documented in `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`.
 
@@ -21,17 +21,25 @@ This patch follows the V1.1.1 full-project audit. It focuses on the last real-ac
 - `src/lib/seed.ts` is byte-for-byte unchanged from the baseline commit.
 - Tests use isolated IndexedDB and temporary Chrome Profiles. They do not clear or rename the user's real categories or cards.
 
-## Current RC2 publication receipt
+## Current RC3 publication receipt
 
-- Code identity: `aec5b2035dc11ee793693014934494fa2681a450` at tag `webcollect-2026-07-14-v1.1.2-rc.2`.
-- Release: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-14-v1.1.2-rc.2`.
-- Asset: `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-14-v1.1.2-rc.2/WebCollect-Chrome-Extension-v1.1.2-rc.2-2026-07-14.zip` (`16,941,052` bytes).
-- SHA-256: `7741a66561e8d1f8ab32dba908bd235eab9a6698e6c3b071cb3f6bdb3fc2f5c3`.
-- Downloaded zip: `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.2/WebCollect-Chrome-Extension-v1.1.2-rc.2-2026-07-14.zip`.
-- Unpacked extension: `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.2/unpacked`.
+- Code identity: `312a807bb20a1d99b2506a458c30edb6a8962081` at tag `webcollect-2026-07-14-v1.1.2-rc.3`.
+- Release: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-14-v1.1.2-rc.3` (GitHub Prerelease).
+- Asset: `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-14-v1.1.2-rc.3/WebCollect-Chrome-Extension-v1.1.2-rc.3-2026-07-14.zip` (`16,941,701` bytes).
+- SHA-256: `7c32755cabcd165b236173123580f6f011f64b2a3483d42c4f3c7bd941ba7a1b`.
+- Downloaded zip: `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.3/WebCollect-Chrome-Extension-v1.1.2-rc.3-2026-07-14.zip`.
+- Unpacked extension: `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.3/unpacked`.
 - The downloaded archive declares WebCollect `1.1.2` / Manifest V3; its unpacked contents match `extension/dist` exactly.
-- The signed-in Chrome installation is not claimed complete. `chrome://extensions` exposed no reliable automation elements or screenshot to Computer Use, so blindly removing or loading an extension was rejected; the user must select the verified unpacked folder manually.
-- RC1 remains available as historical evidence at tag `webcollect-2026-07-14-v1.1.2-rc.1`; RC2 supersedes it for installation.
+- The user confirmed loading RC2 before RC3 was built. RC3 adds the top-bar wallpaper startup switch, so the signed-in Chrome installation is not yet claimed current. Do not uninstall the existing extension; reload/update its unpacked path to RC3 so the stable extension ID and IndexedDB are preserved.
+- RC1 and RC2 remain available as historical evidence; RC3 supersedes both for installation and account acceptance.
+
+## Top-bar wallpaper startup switch acceptance
+
+- The left half of the fused control enters the wallpaper page immediately; it does not change the saved startup preference.
+- The right half is an accessible `role="switch"` with visible `开/关` state and persists the existing `defaultMode` preference used by the wallpaper settings dialog.
+- Turning it off keeps the current collection visible and makes the next reload/new tab enter the collection directly; turning it back on makes the next reload/new tab show wallpaper first.
+- The switch does not open the wallpaper settings dialog and rapid clicks are serialized while IndexedDB persistence is in flight.
+- Isolated Chromium acceptance passed at `2048x1152`, `1440x900`, `1024x768`, and `390x844`; all had zero document-level horizontal overflow. The mobile toolbar retains its deliberate recoverable horizontal scroller.
 
 ## Edge-peeking mascot acceptance
 
@@ -147,7 +155,7 @@ Fix:
 - Dedicated physical Chrome process and separate user-data directory: `/private/tmp/webcollect-oauth-profile-b2-20260713`.
 - Remote debugging is isolated on `127.0.0.1:9227`.
 - The previous login window was closed before Google callback and is not counted as a passing session.
-- The user has now explicitly authorized the existing signed-in main Chrome as the account-bearing verification surface; first install the RC there and confirm its actual extension version, then use the separate Profile B for the second-session proof.
+- The user has explicitly authorized the existing signed-in main Chrome as the account-bearing verification surface; first update that installation to RC3 and confirm its actual extension version, then use the separate Profile B for the second-session proof.
 - Password, second factor, CAPTCHA, and Google safety approval must be completed by the user. They are not copied, scripted, or bypassed.
 - Pending acceptance after callback: real avatar and sync badge render, existing wall loads, cloud remains `364 / 130 / 24`, no additional inbox is uploaded, and two recent account sessions are visible concurrently.
 
@@ -173,20 +181,20 @@ Both rows are empty, but the project's highest-priority rule forbids deleting or
 
 - Vitest: 22 files, 129 tests passed.
 - Legacy compatibility: all 31 scripts passed.
-- Playwright Web E2E: all 12 tests passed.
+- Playwright Web E2E: all 13 tests passed, including the top-bar startup switch persistence path.
 - TypeScript and ESLint: passed.
 - Web production build: all 10 routes/pages and the custom server bundle passed.
 - Extension build, background artifact, and 25 MiB size gate passed; unpacked size is 17.1 MiB.
 - Production dependency audit through the npm registry: no known vulnerabilities.
 - Supabase security advisor reports only the optional leaked-password protection warning; WebCollect currently uses Google OAuth rather than password login. The performance advisor reports one informational unused index and no blocking issue.
 - Isolated MV3 runtime: service worker, private URL refusal, public metadata, desktop/mobile wallpaper geometry, exact target capture, concurrency uniqueness, and zero console errors passed.
-- Persisted non-account screenshots: `docs/audit/screenshots/webcollect-v1.1.2-extension-wallpaper-1440x900-2026-07-13.png`, `docs/audit/screenshots/webcollect-v1.1.2-extension-wallpaper-390x844-2026-07-13.png`, and `docs/audit/screenshots/webcollect-v1.1.2-extension-collection-1440x900-2026-07-13.png`.
+- Persisted non-account screenshots include the previous extension wallpaper/runtime evidence plus `docs/audit/screenshots/webcollect-v1.1.2-rc3-wallpaper-toggle-2048x1152-2026-07-14.png` and `docs/audit/screenshots/webcollect-v1.1.2-rc3-wallpaper-toggle-390x844-2026-07-14.png` for the new fused control.
 - Isolated tests did not change cloud data or seed content. The separate increase from 129 to 130 categories was caused by the older signed-in Chrome extension before the RC was installed and is recorded above.
 
 ## Finalization checklist
 
-- [x] Publish the V1.1.2 RC2 and verify its tag, code commit, asset size, SHA-256, manifest, and unpacked contents.
-- [ ] Install the V1.1.2 RC2 in the explicitly authorized signed-in Chrome; verify the loaded manifest version.
+- [x] Publish the V1.1.2 RC3 and verify its tag, code commit, prerelease flag, unique asset, size, SHA-256, manifest, and unpacked contents.
+- [ ] Update the explicitly authorized signed-in Chrome from RC2 to RC3 without uninstalling it; verify the loaded manifest version and the top-bar switch.
 - [ ] Complete Google OAuth in the independent Profile B.
 - [ ] Verify two recent sessions, both cloud walls, and unchanged `364 / 130 / 24 / 58` counts.
 - [ ] Record the user's decision for both proven-empty category artifacts; default is retain.
@@ -194,5 +202,5 @@ Both rows are empty, but the project's highest-priority rule forbids deleting or
 - [x] Re-run Web E2E against the stable OAuth server and production build in an isolated APFS-cloned workspace without interrupting Profile B.
 - [x] Update `AGD.md`, handoff/status files, and this document with the exact RC code commit.
 - [x] Push the verified RC code to `main`.
-- [x] Publish and verify RC2 asset `WebCollect-Chrome-Extension-v1.1.2-rc.2-2026-07-14.zip`.
+- [x] Publish and verify RC3 asset `WebCollect-Chrome-Extension-v1.1.2-rc.3-2026-07-14.zip`.
 - [ ] Publish final `WebCollect-Chrome-Extension-v1.1.2-2026-07-14.zip` after account acceptance.

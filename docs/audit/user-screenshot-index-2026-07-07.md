@@ -34,6 +34,10 @@
 | `webcollect-v1.1.2-extension-wallpaper-390x844-2026-07-13.png` | V1.1.2 最终候选扩展的 390x844 壁纸页 | 移动视口引用、提示与控制条回归 | 几何断言通过，无横向溢出 |
 | `webcollect-v1.1.2-extension-collection-1440x900-2026-07-13.png` | V1.1.2 隔离 MV3 收藏墙，浮窗队列落到 `Runtime Audit / Runtime Inbox` | 服务工作线程、目标分类、并发唯一性与收藏墙渲染 | 单分项、单分组、单卡片，零控制台错误 |
 | `webcollect-main-chrome-old-extension-signed-in-2026-07-14.png` | 用户主 Chrome 中旧版扩展已登录并显示完整收藏墙、云端同步中 | 证明主 Chrome 具备真实账号状态，但安装版本尚待 RC 替换后核对 | 用户已明确授权在 `Codex Workbench` 中替换扩展；截图同时对应旧客户端新增空收集箱的云端时间窗 |
+| `user-wallpaper-toolbar-toggle-request-2026-07-14.png` | 用户标出收藏墙顶部“壁纸”按钮，希望就近增加启动模式开关 | 顶部快速开启/关闭新标签页壁纸入口 | 已实现融合式 `壁纸 | 开/关` 控件；左侧进入壁纸，右侧只改下次启动模式 |
+| `user-wallpaper-settings-toggle-reference-2026-07-14.png` | 壁纸设置弹窗已有“启动壁纸模式”复选项 | 顶部快捷开关必须与现有设置共用同一状态 | 已共用 `WallpaperPrefs.defaultMode`，两处状态实时一致 |
+| `webcollect-v1.1.2-rc3-wallpaper-toggle-2048x1152-2026-07-14.png` | RC3 宽屏收藏墙顶部完整显示“壁纸”和开关 | 宽屏视觉、标签、工具栏溢出验收 | 控件宽 `134px`、整页无横向溢出，肉眼复核通过 |
+| `webcollect-v1.1.2-rc3-wallpaper-toggle-390x844-2026-07-14.png` | RC3 手机视口收起“壁纸”文字，保留图标和开关 | 移动端紧凑布局与可恢复横向滚动 | 整页无横向溢出；工具栏可横向滚动，开关尺寸稳定 |
 
 ## 后续截图管理规则
 

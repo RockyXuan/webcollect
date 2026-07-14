@@ -17,9 +17,9 @@
 
 当前固定开发目录：`/Users/rockyx/vibe coding/Web Collect 0628`。
 当前最新功能版本：`V1.1.1 / 2026年7月12日`。
-当前 RC：`V1.1.2 / 2026年7月14日` 已发布；仍需在用户授权的主 Chrome 加载，再用独立 Profile B 完成第二会话验收。
-RC Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-14-v1.1.2-rc.2`。
-RC zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-14-v1.1.2-rc.2/WebCollect-Chrome-Extension-v1.1.2-rc.2-2026-07-14.zip`。
+当前 RC：`V1.1.2 / 2026年7月14日` RC3 已发布为 Prerelease；仍需在用户授权的主 Chrome 更新，再用独立 Profile B 完成第二会话验收。
+RC Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-14-v1.1.2-rc.3`。
+RC zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-14-v1.1.2-rc.3/WebCollect-Chrome-Extension-v1.1.2-rc.3-2026-07-14.zip`。
 最新 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-12-v1.1.1`。
 Chrome 扩展 zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-12-v1.1.1/WebCollect-Chrome-Extension-v1.1.1-2026-07-12.zip`。
 如果旧说明和 `AGD.md` 冲突，以 `AGD.md` 为准。
