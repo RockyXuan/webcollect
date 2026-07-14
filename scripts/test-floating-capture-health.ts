@@ -44,6 +44,16 @@ assert.match(
 );
 assert.match(
   contentScript,
+  /\.wc-button\[data-side="right"\] \.wc-peek-head img \{[\s\S]*?translateX\(calc\(var\(--wc-peek-width\) - 50%\)\) rotate\(-6deg\)/,
+  "right-docked mascot should rest with only half of its tilted face visible"
+);
+assert.match(
+  contentScript,
+  /\.wc-button\[data-side="left"\] \.wc-peek-head img \{[\s\S]*?translateX\(calc\(50% - var\(--wc-peek-width\)\)\) rotate\(6deg\)/,
+  "left-docked mascot should mirror the half-face peek"
+);
+assert.match(
+  contentScript,
   /PANEL_POSITION_STORAGE_KEY/,
   "floating capture panel should persist draggable panel position"
 );

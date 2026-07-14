@@ -15,6 +15,7 @@
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium",
     "test:extension-artifact": "node scripts/test-extension-background-artifact.mjs",
+    "test:extension-peek": "node scripts/verify-floating-capture-peek.mjs",
     "test:extension-size": "node scripts/test-extension-package-size.mjs",
     "ts-check": "tsc -p tsconfig.json",
     "validate:quotes": "node --import tsx scripts/test-wallpaper-quotes.ts",

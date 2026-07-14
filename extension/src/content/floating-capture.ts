@@ -335,10 +335,12 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
         filter: drop-shadow(0 9px 18px rgba(64, 91, 180, 0.16));
       }
       .wc-button[data-side="right"] .wc-peek-head img {
-        transform: translateX(-8px);
+        transform: translateX(calc(var(--wc-peek-width) - 50%)) rotate(-6deg);
+        transform-origin: center center;
       }
       .wc-button[data-side="left"] .wc-peek-head img {
-        transform: translateX(8px);
+        transform: translateX(calc(50% - var(--wc-peek-width))) rotate(6deg);
+        transform-origin: center center;
       }
       .wc-button[data-mascot="chipmunk"] .wc-chipmunk-art,
       .wc-button[data-mascot="otter"] .wc-otter-art {
