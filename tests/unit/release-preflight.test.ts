@@ -29,6 +29,15 @@ describe("extension release preflight", () => {
     expect(validateReleaseState(validState)).toEqual([]);
   });
 
+  it("accepts a numbered RC only through the explicit prerelease gate", () => {
+    const rcState = { ...validState, tag: "webcollect-2026-07-12-v1.1.0-rc.4" };
+    expect(validateReleaseState(rcState, { allowPrerelease: true })).toEqual([]);
+    expect(validateReleaseState(rcState).join("\n")).toContain("release tag");
+    expect(
+      validateReleaseState({ ...rcState, tag: "webcollect-2026-07-12-v1.1.0-rc.x" }, { allowPrerelease: true }).join("\n")
+    ).toContain("release tag");
+  });
+
   it.each([
     ["feature branch", { branch: "fix/sync-architecture" }, "main branch"],
     ["dirty worktree", { dirtyPaths: ["src/lib/store.ts"] }, "worktree"],
@@ -55,6 +64,7 @@ describe("extension release preflight", () => {
     expect(script).toContain("-c http.https://github.com.proxy=");
     expect(script).toContain("test:extension-artifact");
     expect(script).toContain("test:extension-size");
+    expect(script).toContain("--prerelease");
   });
 
   it("keeps one quiet, authoritative GitHub Release publisher", () => {

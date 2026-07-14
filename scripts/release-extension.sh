@@ -77,6 +77,13 @@ if [[ -z "${TAG}" ]]; then
   TAG="$("${NODE_BIN}" "scripts/release-preflight.mjs" --print-tag)"
 fi
 
+PREFLIGHT_ARGS=()
+RELEASE_CREATE_ARGS=()
+if [[ "${TAG}" =~ -rc\.[1-9][0-9]*$ ]]; then
+  PREFLIGHT_ARGS+=(--prerelease)
+  RELEASE_CREATE_ARGS+=(--prerelease)
+fi
+
 ZIP_NAME="$(extension_zip_filename "${TAG}")"
 ZIP_PATH="${WEB_COLLECT_EXTENSION_ZIP:-/private/tmp/${ZIP_NAME}}"
 
@@ -91,12 +98,12 @@ else
 fi
 
 git_with_network fetch origin main --tags
-"${NODE_BIN}" "scripts/release-preflight.mjs" "${TAG}"
+"${NODE_BIN}" "scripts/release-preflight.mjs" "${TAG}" "${PREFLIGHT_ARGS[@]}"
 
 corepack pnpm@9.0.0 build:ext
 corepack pnpm@9.0.0 test:extension-artifact
 corepack pnpm@9.0.0 test:extension-size
-"${NODE_BIN}" "scripts/release-preflight.mjs" "${TAG}" --built
+"${NODE_BIN}" "scripts/release-preflight.mjs" "${TAG}" --built "${PREFLIGHT_ARGS[@]}"
 
 rm -f "${ZIP_PATH}"
 (cd extension/dist && zip -qr "${ZIP_PATH}" .)
@@ -114,7 +121,8 @@ else
   scripts/gh-proxy.sh release create "${TAG}" "${ZIP_PATH}" \
     --repo "${REPO}" \
     --title "${TAG}" \
-    --notes "WebCollect Chrome extension build for ${TAG}."
+    --notes "WebCollect Chrome extension build for ${TAG}." \
+    "${RELEASE_CREATE_ARGS[@]}"
 fi
 
 scripts/gh-proxy.sh release view "${TAG}" --repo "${REPO}" --json tagName,url,assets

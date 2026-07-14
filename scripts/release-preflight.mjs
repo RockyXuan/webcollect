@@ -31,7 +31,7 @@ export function parsePorcelainPaths(output) {
     .map((line) => line.slice(3));
 }
 
-export function validateReleaseState(state) {
+export function validateReleaseState(state, { allowPrerelease = false } = {}) {
   const errors = [];
   if (state.branch !== "main") errors.push("release must run from the main branch");
   if (state.dirtyPaths.length > 0) errors.push(`worktree must be clean: ${state.dirtyPaths.join(", ")}`);
@@ -48,7 +48,12 @@ export function validateReleaseState(state) {
   }
 
   const expectedTag = expectedReleaseTag(state);
-  if (state.tag !== expectedTag) errors.push(`release tag must be ${expectedTag}`);
+  const validTag = allowPrerelease
+    ? new RegExp(`^${expectedTag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}-rc\\.[1-9]\\d*$`).test(state.tag)
+    : state.tag === expectedTag;
+  if (!validTag) {
+    errors.push(`release tag must be ${allowPrerelease ? `${expectedTag}-rc.N` : expectedTag}`);
+  }
   if (state.existingTagCommit && state.existingTagCommit !== state.head) {
     errors.push(`existing release tag points to another commit: ${state.existingTagCommit}`);
   }
@@ -96,13 +101,14 @@ function runCli() {
   const args = process.argv.slice(2);
   const requireBuilt = args.includes("--built");
   const printTag = args.includes("--print-tag");
+  const allowPrerelease = args.includes("--prerelease");
   const tag = args.find((arg) => !arg.startsWith("--"));
   const state = collectReleaseState({ tag, requireBuilt });
   if (printTag) {
     console.log(state.tag);
     return;
   }
-  const errors = validateReleaseState(state);
+  const errors = validateReleaseState(state, { allowPrerelease });
   if (errors.length > 0) {
     console.error("Release preflight failed:");
     for (const error of errors) console.error(`- ${error}`);
