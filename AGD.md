@@ -6,8 +6,8 @@
 远端仓库：`https://github.com/RockyXuan/webcollect`
 主分支：`main`
 当前最新发布身份：`V1.1.1 / 2026年7月12日`
-当前待发布候选：`V1.1.2 / 2026年7月14日`；账号级收口见 `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`。
-当前主线：本轮审计从 `fix/sync-architecture` 完成后进入 `main`；精确提交以 Release tag `webcollect-2026-07-12-v1.1.1` 为准。
+当前 RC：`V1.1.2 / 2026年7月14日` 已发布，tag `webcollect-2026-07-14-v1.1.2-rc.1` 固定到代码提交 `a8ef9a6b352cf8ac751b9ad9e0ae6e7c98aea834`；账号级收口见 `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`。
+当前主线：V1.1.2 RC 已进入 `main`；V1.1.1 仍是最新稳定版，必须等主 Chrome 和独立 Profile B 账号验收通过后才能发布 V1.1.2 正式版。
 
 ## 2026-07-14 V1.1.2 账号同步收口候选
 
@@ -17,6 +17,8 @@
 - 修复 OAuth 回调残留 `?code=`、自定义 Next 服务器漏接 HMR WebSocket，以及浮窗队列并发 drain 重复创建目标的问题。
 - 修复同一页面重复创建 Supabase `GoTrueClient` 的认证竞态；正常登出/登录保留 Supabase 官方的浏览器前后台刷新管理。
 - 修复本机 `gh` 自有 token 过期时 Release 发布被阻断的问题；发布脚本会复用已经通过 `git push` 验证的 GitHub 凭据，凭据只在子进程内使用且不会打印。
+- RC 已发布并复核：Release `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-14-v1.1.2-rc.1`；zip 直链 `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-14-v1.1.2-rc.1/WebCollect-Chrome-Extension-v1.1.2-rc.1-2026-07-14.zip`；SHA-256 `a07c1eba1029e6abfdb1895b665b40181c3b717447ec32cf8a2bf782b985a3b7`。
+- RC 已下载并解压到 `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.1/unpacked`；清单为 WebCollect `1.1.2` / Manifest V3，且与 `extension/dist` 逐文件一致。由于 `chrome://extensions` 不暴露可可靠操作的自动化元素，主 Chrome 加载仍需用户手动选择该目录，不能盲点卸载旧扩展。
 - 2026-07-14 主 Chrome 中的旧扩展再次上传了一个同分项空收集箱，使云端分类从 129 增至 130；V1.1.2 现按“同分项卡片数优先、创建时间与 ID 稳定排序”选择 canonical 收集箱，阻止数据库返回顺序把新收藏落到空重复项。现有两条空记录均保留，不自动删除。
 - 当前验证：129 条 Vitest、31 组历史脚本、12 条 Playwright、TypeScript、ESLint、依赖审计、扩展构建/产物/大小和隔离 MV3 runtime 已通过。
 - Profile A 的真实 Google 登录、退出、重登和云同步已通过；Profile B 已用最新代码停在 Google 官方登录页，仍需用户本人完成账号/二次验证后才能宣布发布完成。
@@ -234,5 +236,8 @@ git diff --check
 
 ## 最近发布信息
 
-- Release 页面：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-12-v1.1.1`
-- zip 直链：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-12-v1.1.1/WebCollect-Chrome-Extension-v1.1.1-2026-07-12.zip`
+- 当前 RC Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-14-v1.1.2-rc.1`
+- 当前 RC zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-14-v1.1.2-rc.1/WebCollect-Chrome-Extension-v1.1.2-rc.1-2026-07-14.zip`
+- 当前 RC SHA-256：`a07c1eba1029e6abfdb1895b665b40181c3b717447ec32cf8a2bf782b985a3b7`
+- 最新稳定 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-12-v1.1.1`
+- 最新稳定 zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-12-v1.1.1/WebCollect-Chrome-Extension-v1.1.1-2026-07-12.zip`

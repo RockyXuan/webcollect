@@ -4,7 +4,7 @@ Updated: 2026-07-14
 Release candidate identity: `V1.1.2 / 2026年7月14日`
 RC tag: `webcollect-2026-07-14-v1.1.2-rc.1`
 Planned final tag: `webcollect-2026-07-14-v1.1.2`
-Current gate: publish the installable RC first, then verify the user's explicitly authorized signed-in Chrome plus a second independent Profile; do not call the final release complete until the account-level section below is closed.
+Current gate: the installable RC is published and verified; load it in the user's explicitly authorized signed-in Chrome, then verify a second independent Profile. Do not call the final release complete until the account-level section below is closed.
 
 This patch follows the V1.1.1 full-project audit. It focuses on the last real-account observation and on defects found while reproducing a fresh Profile login. The PM split and the live WebCollect database migration remain documented in `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`.
 
@@ -19,6 +19,17 @@ This patch follows the V1.1.1 full-project audit. It focuses on the last real-ac
 - The public schema contains only seven WebCollect tables (`users`, `categories`, `cards`, `user_preferences`, `workspace_snapshots`, `workspace_tombstones`, and `workspace_versions`), all with RLS enabled; no Portfolio Management table has returned.
 - `src/lib/seed.ts` is byte-for-byte unchanged from the baseline commit.
 - Tests use isolated IndexedDB and temporary Chrome Profiles. They do not clear or rename the user's real categories or cards.
+
+## RC publication receipt
+
+- Code identity: `a8ef9a6b352cf8ac751b9ad9e0ae6e7c98aea834` at tag `webcollect-2026-07-14-v1.1.2-rc.1`.
+- Release: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-14-v1.1.2-rc.1`.
+- Asset: `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-14-v1.1.2-rc.1/WebCollect-Chrome-Extension-v1.1.2-rc.1-2026-07-14.zip` (`16,941,012` bytes).
+- SHA-256: `a07c1eba1029e6abfdb1895b665b40181c3b717447ec32cf8a2bf782b985a3b7`.
+- Downloaded zip: `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.1/WebCollect-Chrome-Extension-v1.1.2-rc.1-2026-07-14.zip`.
+- Unpacked extension: `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.1/unpacked`.
+- The downloaded archive declares WebCollect `1.1.2` / Manifest V3; its unpacked contents match `extension/dist` exactly.
+- The signed-in Chrome installation is not claimed complete. `chrome://extensions` exposed no reliable automation elements or screenshot to Computer Use, so blindly removing or loading an extension was rejected; the user must select the verified unpacked folder manually.
 
 ## Root causes fixed
 
@@ -165,12 +176,14 @@ Both rows are empty, but the project's highest-priority rule forbids deleting or
 
 ## Finalization checklist
 
-- [ ] Publish and install the V1.1.2 RC in the explicitly authorized signed-in Chrome; verify the loaded manifest version.
+- [x] Publish the V1.1.2 RC and verify its tag, code commit, asset size, SHA-256, manifest, and unpacked contents.
+- [ ] Install the V1.1.2 RC in the explicitly authorized signed-in Chrome; verify the loaded manifest version.
 - [ ] Complete Google OAuth in the independent Profile B.
 - [ ] Verify two recent sessions, both cloud walls, and unchanged `364 / 130 / 24 / 58` counts.
 - [ ] Record the user's decision for both proven-empty category artifacts; default is retain.
 - [x] Re-run unit, legacy, TypeScript, ESLint, extension build/runtime, dependency audit, and Supabase advisors after the latest auth fix.
 - [x] Re-run Web E2E against the stable OAuth server and production build in an isolated APFS-cloned workspace without interrupting Profile B.
-- [ ] Update `AGD.md`, handoff/status files, and this document with the exact commit.
-- [ ] Push the verified commit to `main`.
-- [ ] Publish and verify RC asset `WebCollect-Chrome-Extension-v1.1.2-rc.1-2026-07-14.zip`, then publish final `WebCollect-Chrome-Extension-v1.1.2-2026-07-14.zip` after account acceptance.
+- [x] Update `AGD.md`, handoff/status files, and this document with the exact RC code commit.
+- [x] Push the verified RC code to `main`.
+- [x] Publish and verify RC asset `WebCollect-Chrome-Extension-v1.1.2-rc.1-2026-07-14.zip`.
+- [ ] Publish final `WebCollect-Chrome-Extension-v1.1.2-2026-07-14.zip` after account acceptance.

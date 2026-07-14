@@ -7,12 +7,15 @@ This section supersedes older development status. V1.1.1 remains the latest stab
 - Candidate version/date: `V1.1.2 / 2026年7月14日`.
 - Candidate closeout: `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`.
 - Baseline and remote backup: `main@ea45b53` and `codex/backup-pre-oauth-2026-07-13`.
+- Published RC identity: tag `webcollect-2026-07-14-v1.1.2-rc.1`, code commit `a8ef9a6b352cf8ac751b9ad9e0ae6e7c98aea834`, asset `WebCollect-Chrome-Extension-v1.1.2-rc.1-2026-07-14.zip`, SHA-256 `a07c1eba1029e6abfdb1895b665b40181c3b717447ec32cf8a2bf782b985a3b7`.
+- RC Release: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-14-v1.1.2-rc.1`; direct zip: `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-14-v1.1.2-rc.1/WebCollect-Chrome-Extension-v1.1.2-rc.1-2026-07-14.zip`.
+- Verified local install folder: `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.1/unpacked`; it matches `extension/dist` and declares WebCollect `1.1.2` / Manifest V3. Loading it in the signed-in Chrome remains a manual `chrome://extensions` step because Chrome's internal page exposed no safe automation target.
 - Fixed: clean-checkout Web OAuth configuration, fresh-Profile inbox duplication, deterministic canonical inbox selection when old clients already produced same-section duplicates, OAuth code cleanup, custom-server HMR upgrades, concurrent floating-capture destination creation, duplicate GoTrue clients, and browser auth refresh lifecycle misuse.
-- Verified so far: 128 Vitest cases, all 31 legacy scripts, all 12 Playwright cases, TypeScript, ESLint, dependency audit, extension build/artifact/size, and isolated MV3 runtime.
+- Verified so far: 129 Vitest cases, all 31 legacy scripts, all 12 Playwright cases, TypeScript, ESLint, dependency audit, extension build/artifact/size, and isolated MV3 runtime.
 - Real account: Profile A passed Google sign-in, local-scope sign-out, re-sign-in, validated session, and cloud sync. The user has explicitly authorized the signed-in main Chrome for RC installation; Profile B remains the independent second-session surface.
 - Data state is `364 cards / 130 categories / 24 preferences / 58 snapshots / 0 tombstones`; the old extension added one empty category while cards and other counts stayed unchanged.
 - Two exact empty inbox artifacts are documented in the closeout. One still has a section-preference reference; neither may be deleted without explicit user approval.
-- Publish an installable RC first, but do not describe V1.1.2 as final until the authorized Chrome and Profile B both pass, counts remain unchanged, and final main/tag/zip are pinned to one commit.
+- The installable RC is published. Do not describe V1.1.2 as final until the authorized Chrome and Profile B both pass, counts remain unchanged, and final main/tag/zip are pinned to one commit.
 
 ## 2026-07-12 V1.1.1 Audit And Supabase Split Handoff
 
