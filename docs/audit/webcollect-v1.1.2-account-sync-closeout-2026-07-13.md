@@ -2,7 +2,8 @@
 
 Updated: 2026-07-14
 Release candidate identity: `V1.1.2 / 2026年7月14日`
-RC tag: `webcollect-2026-07-14-v1.1.2-rc.1`
+RC tag: `webcollect-2026-07-14-v1.1.2-rc.2`
+Previous RC tag: `webcollect-2026-07-14-v1.1.2-rc.1`
 Planned final tag: `webcollect-2026-07-14-v1.1.2`
 Current gate: the installable RC is published and verified; load it in the user's explicitly authorized signed-in Chrome, then verify a second independent Profile. Do not call the final release complete until the account-level section below is closed.
 
@@ -20,16 +21,24 @@ This patch follows the V1.1.1 full-project audit. It focuses on the last real-ac
 - `src/lib/seed.ts` is byte-for-byte unchanged from the baseline commit.
 - Tests use isolated IndexedDB and temporary Chrome Profiles. They do not clear or rename the user's real categories or cards.
 
-## RC publication receipt
+## Current RC2 publication receipt
 
-- Code identity: `a8ef9a6b352cf8ac751b9ad9e0ae6e7c98aea834` at tag `webcollect-2026-07-14-v1.1.2-rc.1`.
-- Release: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-14-v1.1.2-rc.1`.
-- Asset: `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-14-v1.1.2-rc.1/WebCollect-Chrome-Extension-v1.1.2-rc.1-2026-07-14.zip` (`16,941,012` bytes).
-- SHA-256: `a07c1eba1029e6abfdb1895b665b40181c3b717447ec32cf8a2bf782b985a3b7`.
-- Downloaded zip: `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.1/WebCollect-Chrome-Extension-v1.1.2-rc.1-2026-07-14.zip`.
-- Unpacked extension: `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.1/unpacked`.
+- Code identity: `aec5b2035dc11ee793693014934494fa2681a450` at tag `webcollect-2026-07-14-v1.1.2-rc.2`.
+- Release: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-14-v1.1.2-rc.2`.
+- Asset: `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-14-v1.1.2-rc.2/WebCollect-Chrome-Extension-v1.1.2-rc.2-2026-07-14.zip` (`16,941,052` bytes).
+- SHA-256: `7741a66561e8d1f8ab32dba908bd235eab9a6698e6c3b071cb3f6bdb3fc2f5c3`.
+- Downloaded zip: `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.2/WebCollect-Chrome-Extension-v1.1.2-rc.2-2026-07-14.zip`.
+- Unpacked extension: `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.2/unpacked`.
 - The downloaded archive declares WebCollect `1.1.2` / Manifest V3; its unpacked contents match `extension/dist` exactly.
 - The signed-in Chrome installation is not claimed complete. `chrome://extensions` exposed no reliable automation elements or screenshot to Computer Use, so blindly removing or loading an extension was rejected; the user must select the verified unpacked folder manually.
+- RC1 remains available as historical evidence at tag `webcollect-2026-07-14-v1.1.2-rc.1`; RC2 supersedes it for installation.
+
+## Edge-peeking mascot acceptance
+
+- Resting right-dock geometry exposes `50.07%` of the slightly tilted chipmunk face; resting left-dock geometry exposes `50.00%` with mirrored tilt.
+- Hover exposes the full `159px` capture pill, hides the standalone peek face, and keeps the mascot fully visible.
+- Clicking the revealed pill still opens the floating capture panel.
+- The isolated Chromium run reports zero console errors; the repeatable command is `corepack pnpm@9.0.0 test:extension-peek`.
 
 ## Root causes fixed
 
@@ -176,8 +185,8 @@ Both rows are empty, but the project's highest-priority rule forbids deleting or
 
 ## Finalization checklist
 
-- [x] Publish the V1.1.2 RC and verify its tag, code commit, asset size, SHA-256, manifest, and unpacked contents.
-- [ ] Install the V1.1.2 RC in the explicitly authorized signed-in Chrome; verify the loaded manifest version.
+- [x] Publish the V1.1.2 RC2 and verify its tag, code commit, asset size, SHA-256, manifest, and unpacked contents.
+- [ ] Install the V1.1.2 RC2 in the explicitly authorized signed-in Chrome; verify the loaded manifest version.
 - [ ] Complete Google OAuth in the independent Profile B.
 - [ ] Verify two recent sessions, both cloud walls, and unchanged `364 / 130 / 24 / 58` counts.
 - [ ] Record the user's decision for both proven-empty category artifacts; default is retain.
@@ -185,5 +194,5 @@ Both rows are empty, but the project's highest-priority rule forbids deleting or
 - [x] Re-run Web E2E against the stable OAuth server and production build in an isolated APFS-cloned workspace without interrupting Profile B.
 - [x] Update `AGD.md`, handoff/status files, and this document with the exact RC code commit.
 - [x] Push the verified RC code to `main`.
-- [x] Publish and verify RC asset `WebCollect-Chrome-Extension-v1.1.2-rc.1-2026-07-14.zip`.
+- [x] Publish and verify RC2 asset `WebCollect-Chrome-Extension-v1.1.2-rc.2-2026-07-14.zip`.
 - [ ] Publish final `WebCollect-Chrome-Extension-v1.1.2-2026-07-14.zip` after account acceptance.

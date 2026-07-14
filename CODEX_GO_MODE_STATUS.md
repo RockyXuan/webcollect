@@ -7,8 +7,8 @@
 - [x] 修复同分项已有空重复收集箱时 canonical 选择受数据库行顺序影响的问题；正常同步和兜底推送均优先复用已有卡片的收集箱，不删除现有记录。
 - [x] 完成 Profile A 真实 Google 登录、退出、重登和同步验证。
 - [x] 通过 129 Vitest、31 历史脚本、12 Playwright、TypeScript、ESLint、依赖审计、扩展构建/产物/大小和隔离 MV3 runtime。
-- [x] 发布并校验 V1.1.2 RC；tag、代码提交、下载资产、SHA-256 与本地解压目录已有证据。
-- [ ] 在用户明确授权的主 Chrome 加载 RC，核对实际扩展版本和真实收藏墙；`chrome://extensions` 需用户手动选择 `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.1/unpacked`。
+- [x] 发布并校验 V1.1.2 RC2；tag、代码提交、下载资产、SHA-256 与本地解压目录已有证据；半脸悬停交互通过左右停靠真实浏览器验收。
+- [ ] 在用户明确授权的主 Chrome 加载 RC2，核对实际扩展版本和真实收藏墙；`chrome://extensions` 需用户手动选择 `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.2/unpacked`。
 - [ ] 用户在独立 Profile B 完成 Google 账号/安全确认；随后核验双会话、真实收藏墙和 `364 / 130 / 24 / 58` 云端计数。
 - [x] 在不打断 OAuth 窗口的隔离副本完成生产 Web build（10 个页面/路由 + `dist/server.js`）。
 - [ ] RC 验收后更新最终提交证据并发布正式 V1.1.2 zip。
