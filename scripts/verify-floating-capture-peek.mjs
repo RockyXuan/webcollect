@@ -53,6 +53,7 @@ async function readFloatingState(page) {
     const visibleWidth = (rect) => Math.max(0, Math.min(window.innerWidth, rect.right) - Math.max(0, rect.left));
     return {
       side: button.dataset.side,
+      buttonHovered: button.matches(":hover"),
       button: {
         left: buttonRect.left,
         right: buttonRect.right,
@@ -80,11 +81,15 @@ function assertRestingPeek(label, state) {
   assert(state, `${label}: floating capture state is missing`);
   assert(
     state.mascot.visibleRatio >= 0.38 && state.mascot.visibleRatio <= 0.62,
-    `${label}: expected about half of the mascot face, received ${JSON.stringify(state.mascot)}`
+    `${label}: expected about half of the mascot face, received ${JSON.stringify(state)}`
   );
   assert(
     state.button.visibleWidth >= 24 && state.button.visibleWidth <= 36,
     `${label}: collapsed hit target width is unexpected: ${JSON.stringify(state.button)}`
+  );
+  assert(
+    state.button.visibleWidth >= state.button.width - 1,
+    `${label}: collapsed hit target must remain fully inside the viewport: ${JSON.stringify(state.button)}`
   );
   assert(state.peekOpacity >= 0.95, `${label}: peek face should be visible at rest`);
   assert(state.pillOpacity <= 0.05, `${label}: full pill should be hidden at rest`);
@@ -126,7 +131,8 @@ try {
   await page.waitForTimeout(320);
   const hover = await readFloatingState(page);
   assert(hover, "Hover state is missing");
-  assert(hover.button.visibleWidth >= hover.button.width - 1, `Hover should reveal the full button: ${JSON.stringify(hover.button)}`);
+  assert(hover.buttonHovered, "Hover should activate the floating button hit target");
+  assert(hover.button.visibleWidth >= hover.button.width - 1, `Hover should reveal the full button: ${JSON.stringify(hover)}`);
   assert(hover.peekOpacity <= 0.05, "Hover should hide the standalone peek face");
   assert(hover.pillOpacity >= 0.95, "Hover should reveal the full WebCollect pill");
   await page.screenshot({ path: hoverScreenshot, fullPage: false });

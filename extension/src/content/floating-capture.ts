@@ -201,7 +201,7 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
         top: 50%;
         pointer-events: auto;
         display: block;
-        width: var(--wc-button-width);
+        width: var(--wc-peek-width);
         height: var(--wc-button-height);
         border: 0;
         border-radius: 999px;
@@ -213,17 +213,17 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
         touch-action: none;
         overflow: visible;
         transition:
-          transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+          width 220ms cubic-bezier(0.22, 1, 0.36, 1),
           filter 180ms ease;
-        will-change: transform;
+        will-change: width;
       }
       .wc-button[data-side="right"] {
         right: 0;
-        transform: translate(calc(100% - var(--wc-peek-width)), -50%);
+        transform: translateY(-50%);
       }
       .wc-button[data-side="left"] {
         left: 0;
-        transform: translate(calc(-100% + var(--wc-peek-width)), -50%);
+        transform: translateY(-50%);
       }
       .wc-button:hover,
       .wc-button:focus-visible {
@@ -233,13 +233,13 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
       .wc-button[data-side="right"]:focus-visible,
       .wc-button[data-side="right"][data-dragging="true"],
       .wc-button[data-side="right"][data-open="true"] {
-        transform: translate(0, -50%);
+        width: var(--wc-button-width);
       }
       .wc-button[data-side="left"]:hover,
       .wc-button[data-side="left"]:focus-visible,
       .wc-button[data-side="left"][data-dragging="true"],
       .wc-button[data-side="left"][data-open="true"] {
-        transform: translate(0, -50%);
+        width: var(--wc-button-width);
       }
       .wc-button[data-dragging="true"] {
         cursor: grabbing;
@@ -269,9 +269,11 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
         transform: translateX(0) scale(1);
       }
       .wc-button[data-side="right"] .wc-peek-head {
+        justify-content: start;
         justify-items: start;
       }
       .wc-button[data-side="left"] .wc-peek-head {
+        justify-content: end;
         justify-items: end;
       }
       .wc-button:hover .wc-pill-art,
