@@ -9,21 +9,19 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import {
+  DEFAULT_PUBLIC_SUPABASE_CONFIG,
+  type PublicSupabaseConfig,
+} from '@/lib/supabase-public-config';
 
-interface SupabaseConfig {
-  url: string;
-  anonKey: string;
-}
+type SupabaseConfig = PublicSupabaseConfig;
 
 export const EXTENSION_STORAGE_KEYS = {
   url: "webcollect_supabase_url",
   anonKey: "webcollect_supabase_anon_key",
 } as const;
 
-export const DEFAULT_EXTENSION_CONFIG: SupabaseConfig = {
-  url: "https://qxlkigwadvgkoeqdojxx.supabase.co",
-  anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4bGtpZ3dhZHZna29lcWRvanh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNTc3MTgsImV4cCI6MjA5MjkzMzcxOH0.wY1et2-efStTxRXnepWs7PWjTyii1_ZX0glUGrC_VpM",
-};
+export const DEFAULT_EXTENSION_CONFIG: SupabaseConfig = DEFAULT_PUBLIC_SUPABASE_CONFIG;
 
 let _config: SupabaseConfig | null = null;
 let _client: SupabaseClient | null = null;
@@ -121,9 +119,12 @@ async function loadConfig(): Promise<SupabaseConfig> {
  * Set config directly (used by extension or after initial fetch)
  */
 export function setSupabaseConfig(config: SupabaseConfig): void {
+  const changed = _config?.url !== config.url || _config?.anonKey !== config.anonKey;
   _config = config;
-  // Reset client so it's recreated with new config
-  _client = null;
+  if (changed && _client) {
+    _client.auth.stopAutoRefresh();
+    _client = null;
+  }
 }
 
 /**
@@ -201,16 +202,17 @@ export function clearBrowserSupabaseSessionCache(): void {
       // Local cleanup is best-effort in restricted browser contexts.
     }
   }
-  _client = null;
 }
 
 export function __setBrowserSupabaseClientForTest(client: SupabaseClient): void {
+  _client?.auth.stopAutoRefresh();
   _testClient = client;
   _config = { url: "https://webcollect.test", anonKey: "test-anon-key" };
   _client = null;
 }
 
 export function __resetBrowserSupabaseForTest(): void {
+  _client?.auth.stopAutoRefresh();
   _testClient = null;
   _config = null;
   _client = null;

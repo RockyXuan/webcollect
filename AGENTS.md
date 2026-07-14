@@ -1,5 +1,9 @@
 # WebCollect — 个人网页收藏墙
 
+## 2026-07-14 current account-sync entry
+
+Read `AGD.md` and `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md` first. V1.1.2 is still a release candidate until the explicitly authorized signed-in Chrome and independent Profile B complete real Google OAuth/sync verification and the final main/tag/zip identity is recorded; V1.1.1 remains the latest stable Release meanwhile. For this account-closeout task only, the user explicitly authorized replacing the old WebCollect extension in the main signed-in Chrome; reuse the existing `Codex Workbench` group and do not touch unrelated personal tabs.
+
 ## 2026-07-07 current audit entry
 
 For full-project handoff, Claude/Codex audit, latest user requirements, screenshot index, lessons, and open UX/functionality risks, read `AGD.md` first. If older handoff sections conflict with `AGD.md`, treat `AGD.md` and `docs/audit/webcollect-full-audit-brief-2026-07-07.md` as newer.

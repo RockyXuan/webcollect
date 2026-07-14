@@ -31,4 +31,17 @@ else
   unset HTTPS_PROXY HTTP_PROXY ALL_PROXY
 fi
 
+# Reuse the credential that already powers git push when gh's own keychain
+# entry is stale. Keep it process-local and never print it.
+if [[ -z "${GH_TOKEN:-}" && -z "${GITHUB_TOKEN:-}" ]]; then
+  credential="$({
+    printf 'protocol=https\n'
+    printf 'host=github.com\n\n'
+  } | GIT_TERMINAL_PROMPT=0 git credential fill 2>/dev/null || true)"
+  token="$(printf '%s\n' "${credential}" | sed -n 's/^password=//p' | head -n 1)"
+  if [[ -n "${token}" ]]; then
+    export GH_TOKEN="${token}"
+  fi
+fi
+
 exec "${GH_BIN}" "$@"

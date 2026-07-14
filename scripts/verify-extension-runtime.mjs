@@ -175,8 +175,10 @@ try {
 
   const captureDestinations = await sendRuntimeMessage(page, { type: "CAPTURE_GET_DESTINATIONS" });
   const importedCapture = captureQueue?.queue?.find((entry) => entry.id === captureProbe.item.id);
-  const runtimeSection = captureDestinations?.cache?.sections?.find((section) => section.name === "Runtime Audit");
-  const runtimeGroup = captureDestinations?.cache?.categories?.find((category) => category.name === "Runtime Inbox");
+  const runtimeSections = captureDestinations?.cache?.sections?.filter((section) => section.name === "Runtime Audit") || [];
+  const runtimeGroups = captureDestinations?.cache?.categories?.filter((category) => category.name === "Runtime Inbox") || [];
+  const runtimeSection = runtimeSections[0];
+  const runtimeGroup = runtimeGroups[0];
 
   if (
     importedCapture?.status !== "imported"
@@ -187,6 +189,9 @@ try {
   }
   if (!runtimeSection || !runtimeGroup || runtimeGroup.sectionId !== runtimeSection.id) {
     throw new Error(`Capture runtime destination cache is inconsistent: ${JSON.stringify(captureDestinations)}`);
+  }
+  if (runtimeSections.length !== 1 || runtimeGroups.length !== 1) {
+    throw new Error(`Concurrent capture drain created duplicate destinations: ${JSON.stringify({ runtimeSections, runtimeGroups })}`);
   }
 
   await page.screenshot({
@@ -227,6 +232,8 @@ try {
       resolvedDestinationPath: importedCapture.resolvedDestinationPath,
       sectionId: runtimeSection.id,
       groupId: runtimeGroup.id,
+      matchingSectionCount: runtimeSections.length,
+      matchingGroupCount: runtimeGroups.length,
     },
     consoleErrors,
     screenshots: [

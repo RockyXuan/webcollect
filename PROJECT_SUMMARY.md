@@ -1,5 +1,11 @@
 # WebCollect Project Summary
 
+## 2026-07-14 V1.1.2 候选接手入口
+
+优先读 `AGD.md` 与 `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`。当前稳定版仍是 V1.1.1；V1.1.2 先以 RC 安装到用户明确授权的主 Chrome，再用独立 Profile B 完成第二会话验收。
+
+本轮候选修复：Web 本地 OAuth 公共配置、新 Profile 重复收集箱、同分项已有空重复时的 canonical 选择、OAuth code 清理、HMR WebSocket、浮窗并发重复目标、重复 Supabase 客户端和浏览器刷新生命周期。旧扩展在 2026-07-14 又上传一条空收集箱，云端现为 `364 cards / 130 categories / 24 preferences / 58 snapshots`；代码不删除现有记录，只阻止继续生成并确保新收藏落入已有卡片的收集箱。
+
 ## 2026-07-12 最新接手入口
 
 先读 `AGD.md`、`docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md` 和 `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`。前者保留完整需求历史，后两者记录 CI/发布收口及 PM 分库、WebCollect 云端迁移和全项目验收事实。

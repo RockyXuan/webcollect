@@ -5,17 +5,13 @@
  */
 
 import { NextResponse } from "next/server";
+import { resolvePublicSupabaseConfig } from "@/lib/supabase-public-config";
 
 export async function GET() {
-  const url = process.env.COZE_SUPABASE_URL || "";
-  const anonKey = process.env.COZE_SUPABASE_ANON_KEY || "";
-
-  if (!url || !anonKey) {
-    return NextResponse.json(
-      { error: "Supabase not configured" },
-      { status: 503 }
-    );
-  }
+  const { url, anonKey } = resolvePublicSupabaseConfig(
+    process.env.COZE_SUPABASE_URL,
+    process.env.COZE_SUPABASE_ANON_KEY
+  );
 
   return NextResponse.json(
     { url, anonKey },

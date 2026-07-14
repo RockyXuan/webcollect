@@ -1,12 +1,26 @@
 # WebCollect 全项目体检入口
 
-更新时间：2026-07-12
+更新时间：2026-07-14
 面向对象：Claude / Codex / 后续任何接手 WebCollect 的开发 agent
 当前主目录：`/Users/rockyx/vibe coding/Web Collect 0628`
 远端仓库：`https://github.com/RockyXuan/webcollect`
 主分支：`main`
 当前最新发布身份：`V1.1.1 / 2026年7月12日`
+当前待发布候选：`V1.1.2 / 2026年7月14日`；账号级收口见 `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`。
 当前主线：本轮审计从 `fix/sync-architecture` 完成后进入 `main`；精确提交以 Release tag `webcollect-2026-07-12-v1.1.1` 为准。
+
+## 2026-07-14 V1.1.2 账号同步收口候选
+
+- 本轮不改用户 seed、收藏名称或分类内容；远程备份分支、私有 Supabase 归档和本地安全快照均已确认。
+- 修复干净 Web 环境缺少私有 env 时 Google 登录不可用的问题，Web 与扩展改用同一个 RLS 保护的公开 anon 配置。
+- 修复新 Profile 在读取云端前把 `cat-inbox` 随机 UUID 化、从而重复上传空收集箱的问题；只对明确 bootstrap ID 和同分项映射做无歧义复用。
+- 修复 OAuth 回调残留 `?code=`、自定义 Next 服务器漏接 HMR WebSocket，以及浮窗队列并发 drain 重复创建目标的问题。
+- 修复同一页面重复创建 Supabase `GoTrueClient` 的认证竞态；正常登出/登录保留 Supabase 官方的浏览器前后台刷新管理。
+- 修复本机 `gh` 自有 token 过期时 Release 发布被阻断的问题；发布脚本会复用已经通过 `git push` 验证的 GitHub 凭据，凭据只在子进程内使用且不会打印。
+- 2026-07-14 主 Chrome 中的旧扩展再次上传了一个同分项空收集箱，使云端分类从 129 增至 130；V1.1.2 现按“同分项卡片数优先、创建时间与 ID 稳定排序”选择 canonical 收集箱，阻止数据库返回顺序把新收藏落到空重复项。现有两条空记录均保留，不自动删除。
+- 当前验证：129 条 Vitest、31 组历史脚本、12 条 Playwright、TypeScript、ESLint、依赖审计、扩展构建/产物/大小和隔离 MV3 runtime 已通过。
+- Profile A 的真实 Google 登录、退出、重登和云同步已通过；Profile B 已用最新代码停在 Google 官方登录页，仍需用户本人完成账号/二次验证后才能宣布发布完成。
+- 当前云端为 `364 cards / 130 categories / 24 preferences / 58 snapshots / 0 tombstones / 1 workspace version`；130 个分类中包含两条本轮修复前由旧客户端产生的空收集箱，其中一条仍有分项偏好引用。未经用户明确批准不删除，也不把它们计作数据丢失。
 
 ## 2026-07-12 V1.1.1 全项目审计结论
 
@@ -37,13 +51,14 @@
 
 这个文件是 WebCollect 的“全身体检交接入口”。后续 agent 不需要让用户重新复述需求，先读：
 
-0. `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`（**当前最新**：CI 冷启动与单一 Release 发布链路收口）
-0.1 `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`（PM 分库核验、WebCollect 云端迁移、备份校验和全项目审计）
-0.2 `docs/audit/gpt56-full-audit-execution-2026-07-10.md`（V1.1 测试先行执行日志与历史红绿证据）
-0.3 `docs/audit/claude-fable-followup-plan-2026-07-07.md`（Fable 第二轮审查结论 + R1-R4 历史方案）
-0.4 `docs/audit/claude-fable-code-review-2026-07-07.md`（Claude Fable 5 第一轮全量代码审查结论）
-0.5 `docs/audit/claude-fable-remediation-plan-2026-07-07.md`（第一轮整改执行方案）
-0.6 `docs/audit/remediation-execution-log-2026-07-07.md`（第一轮 Codex 执行日志）
+0. `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`（**当前候选最新**：真实 OAuth、新 Profile 同步与并发收集收口；尚待 Profile B 本人登录）
+0.1 `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`（当前已发布版本：CI 冷启动与单一 Release 发布链路收口）
+0.2 `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`（PM 分库核验、WebCollect 云端迁移、备份校验和全项目审计）
+0.3 `docs/audit/gpt56-full-audit-execution-2026-07-10.md`（V1.1 测试先行执行日志与历史红绿证据）
+0.4 `docs/audit/claude-fable-followup-plan-2026-07-07.md`（Fable 第二轮审查结论 + R1-R4 历史方案）
+0.5 `docs/audit/claude-fable-code-review-2026-07-07.md`（Claude Fable 5 第一轮全量代码审查结论）
+0.6 `docs/audit/claude-fable-remediation-plan-2026-07-07.md`（第一轮整改执行方案）
+0.7 `docs/audit/remediation-execution-log-2026-07-07.md`（第一轮 Codex 执行日志）
 1. `AGD.md`
 2. `docs/audit/claude-code-review-handoff-2026-07-07.md`
 3. `docs/audit/webcollect-full-audit-brief-2026-07-07.md`
@@ -54,7 +69,7 @@
 8. `tasks/todo.md`
 9. `AGENTS.md`
 
-如果这些文件和旧文档冲突，以 `AGD.md` 和 `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md` 为准。
+如果这些文件和旧文档冲突，以 `AGD.md` 和 `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md` 为准；候选文档中明确标为待账号验收的事项不得提前视为已发布。
 
 ## 产品一句话
 

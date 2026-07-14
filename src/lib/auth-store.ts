@@ -254,6 +254,14 @@ function clearSession(): void {
   }
 }
 
+function clearConsumedOAuthCodeFromUrl(): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("code")) return;
+  url.searchParams.delete("code");
+  window.history.replaceState(window.history.state, "", url.toString());
+}
+
 // Helper: map Supabase user to AuthUser
 
 function mapSupabaseUser(supabaseUser: Record<string, unknown>): AuthUser {
@@ -549,6 +557,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const user = mapSupabaseUser(data.user as unknown as Record<string, unknown>);
       saveSession(user);
       await upsertUser(user);
+      clearConsumedOAuthCodeFromUrl();
       set({ user, isLoggedIn: true, isLoading: false, error: null });
       if (isAutoSyncEnabled()) {
         scheduleStartupSync(user.id);
@@ -587,11 +596,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true, error: null });
     stopAutoSyncInterval();
     let logoutError: string | null = null;
-    let stopRemoteRefresh: (() => void) | null = null;
 
     try {
       const client = getBrowserSupabaseClient();
-      stopRemoteRefresh = () => client.auth.stopAutoRefresh();
       const { error } = await client.auth.signOut({ scope: "local" });
       if (error) {
         logoutError = summarizeAuthError(error.message);
@@ -599,7 +606,6 @@ export const useAuthStore = create<AuthState>((set) => ({
     } catch (error) {
       logoutError = getErrorMessage(error, "远端退出失败");
     } finally {
-      stopRemoteRefresh?.();
       clearBrowserSupabaseSessionCache();
       clearSession();
       set({

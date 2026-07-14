@@ -2,6 +2,7 @@ import type { Category, CollectionSection, WebCard } from "./types";
 import { saveCardsRebased, saveCategoriesRebased, saveSectionsRebased } from "./db";
 import { createLocalDataSnapshot } from "./local-snapshots";
 import { isChromeExtension } from "./platform";
+import { withStorageLock } from "./storage-lock";
 import { useAppStore } from "./store";
 import {
   publishCaptureDestinationCacheForWorkspace,
@@ -893,7 +894,7 @@ export function repairVerifiedCaptureMisfiledCardsFromQueue(
   };
 }
 
-export async function drainFloatingCaptureQueue(): Promise<{ imported: number; skipped: number; failed: number; repaired: number }> {
+async function drainFloatingCaptureQueueUnsafe(): Promise<{ imported: number; skipped: number; failed: number; repaired: number }> {
   if (!hasExtensionStorage()) return { imported: 0, skipped: 0, failed: 0, repaired: 0 };
 
   const queue = await getChromeStorage<CaptureQueueItem[]>(CAPTURE_QUEUE_KEY, []);
@@ -947,4 +948,12 @@ export async function drainFloatingCaptureQueue(): Promise<{ imported: number; s
     failed: drained.failed,
     repaired: repaired.repaired,
   };
+}
+
+export function withFloatingCaptureDrainLock<T>(operation: () => Promise<T>): Promise<T> {
+  return withStorageLock("floating-capture-drain", operation);
+}
+
+export function drainFloatingCaptureQueue(): Promise<{ imported: number; skipped: number; failed: number; repaired: number }> {
+  return withFloatingCaptureDrainLock(drainFloatingCaptureQueueUnsafe);
 }

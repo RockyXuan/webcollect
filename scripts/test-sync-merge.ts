@@ -369,6 +369,201 @@ async function main(): Promise<void> {
 
   {
     const fake = new FakeSupabaseClient();
+    const cloudInbox = category();
+    const otherSectionInbox = category({
+      id: "33333333-3333-4333-8333-333333333333",
+      sectionId: "section-ai",
+    });
+    const cloudExistingCard = card();
+    const bootstrapInbox = category({
+      id: "cat-inbox",
+      createdAt: baseTime + 50_000,
+      updatedAt: baseTime + 50_000,
+      syncRevision: undefined,
+      syncDeviceId: undefined,
+    });
+    const preLoginCapture = card({
+      id: "card-before-login",
+      categoryId: bootstrapInbox.id,
+      url: "https://before-login.example.com",
+      title: "Captured before login",
+      createdAt: baseTime + 60_000,
+      updatedAt: baseTime + 60_000,
+      syncRevision: undefined,
+      syncDeviceId: undefined,
+    });
+    fake.tables.categories.push(cloudCategory(cloudInbox));
+    fake.tables.categories.push(cloudCategory(otherSectionInbox));
+    fake.tables.cards.push(cloudCard(cloudExistingCard));
+    fake.tables.user_preferences.push({
+      id: "pref-category-sections",
+      user_id: userId,
+      key: "categorySectionIds",
+      value: {
+        [cloudInbox.id]: "section-default",
+        [otherSectionInbox.id]: "section-ai",
+      },
+      created_at: new Date(baseTime).toISOString(),
+      updated_at: new Date(baseTime).toISOString(),
+    });
+    supabase.__setBrowserSupabaseClientForTest(fake as unknown as SupabaseClient);
+    await resetLocal(db);
+    await db.addCategory(bootstrapInbox);
+    await db.addCard(preLoginCapture);
+
+    await sync.syncData(userId);
+
+    assert.equal(
+      fake.tables.categories.length,
+      2,
+      "a fresh profile must reuse the matching cloud inbox without merging or duplicating another section's inbox"
+    );
+    assert.equal(fake.tables.cards.length, 2, "a card captured before login must still be uploaded");
+    assert.equal(
+      fake.tables.cards.find((row) => row.title === preLoginCapture.title)?.category_id,
+      cloudInbox.id,
+      "the pre-login card should be remapped to the existing cloud inbox"
+    );
+    assert.deepEqual(
+      (await db.getCategories()).map((item) => item.id).sort(),
+      [cloudInbox.id, otherSectionInbox.id].sort(),
+      "the new profile should converge on the matching inbox while preserving the other section"
+    );
+  }
+
+  {
+    const fake = new FakeSupabaseClient();
+    const staleEmptyInbox = category({
+      id: "44444444-4444-4444-8444-444444444444",
+      createdAt: baseTime + 10_000,
+      updatedAt: baseTime + 10_000,
+    });
+    const populatedInbox = category();
+    const cloudExistingCard = card({ categoryId: populatedInbox.id });
+    const bootstrapInbox = category({
+      id: "cat-inbox",
+      createdAt: baseTime + 50_000,
+      updatedAt: baseTime + 50_000,
+      syncRevision: undefined,
+      syncDeviceId: undefined,
+    });
+    const preLoginCapture = card({
+      id: "card-before-login-with-duplicate",
+      categoryId: bootstrapInbox.id,
+      url: "https://before-login-with-duplicate.example.com",
+      title: "Captured before login with duplicate inbox",
+      createdAt: baseTime + 60_000,
+      updatedAt: baseTime + 60_000,
+      syncRevision: undefined,
+      syncDeviceId: undefined,
+    });
+    // Put the empty duplicate first to prove reconciliation is not row-order dependent.
+    fake.tables.categories.push(cloudCategory(staleEmptyInbox));
+    fake.tables.categories.push(cloudCategory(populatedInbox));
+    fake.tables.cards.push(cloudCard(cloudExistingCard));
+    fake.tables.user_preferences.push({
+      id: "pref-category-sections-with-duplicate",
+      user_id: userId,
+      key: "categorySectionIds",
+      value: {
+        [staleEmptyInbox.id]: "section-default",
+        [populatedInbox.id]: "section-default",
+      },
+      created_at: new Date(baseTime).toISOString(),
+      updated_at: new Date(baseTime).toISOString(),
+    });
+    supabase.__setBrowserSupabaseClientForTest(fake as unknown as SupabaseClient);
+    await resetLocal(db);
+    await db.addCategory(bootstrapInbox);
+    await db.addCard(preLoginCapture);
+
+    await sync.syncData(userId);
+
+    assert.equal(
+      fake.tables.categories.length,
+      2,
+      "a fresh profile must not upload a third inbox when the cloud already contains an empty duplicate"
+    );
+    assert.equal(
+      fake.tables.cards.find((row) => row.title === preLoginCapture.title)?.category_id,
+      populatedInbox.id,
+      "bootstrap captures must use the populated canonical inbox instead of a row-order-dependent empty duplicate"
+    );
+    assert.deepEqual(
+      (await db.getCategories()).map((item) => item.id).sort(),
+      [populatedInbox.id, staleEmptyInbox.id].sort(),
+      "reconciliation must preserve both cloud rows while preventing another duplicate"
+    );
+  }
+
+  {
+    const fake = new FakeSupabaseClient();
+    const cloudInbox = category();
+    const staleEmptyInbox = category({
+      id: "55555555-5555-4555-8555-555555555555",
+      createdAt: baseTime + 10_000,
+      updatedAt: baseTime + 10_000,
+    });
+    const cloudExistingCard = card();
+    const bootstrapInbox = category({
+      id: "cat-inbox",
+      createdAt: baseTime + 70_000,
+      updatedAt: baseTime + 70_000,
+      syncRevision: undefined,
+      syncDeviceId: undefined,
+    });
+    const preLoginCapture = card({
+      id: "card-before-push",
+      categoryId: bootstrapInbox.id,
+      url: "https://before-push.example.com",
+      title: "Captured before fallback push",
+      createdAt: baseTime + 80_000,
+      updatedAt: baseTime + 80_000,
+      syncRevision: undefined,
+      syncDeviceId: undefined,
+    });
+    fake.tables.categories.push(cloudCategory(staleEmptyInbox));
+    fake.tables.categories.push(cloudCategory(cloudInbox));
+    fake.tables.cards.push(cloudCard(cloudExistingCard));
+    fake.tables.user_preferences.push({
+      id: "pref-category-sections-push",
+      user_id: userId,
+      key: "categorySectionIds",
+      value: {
+        [staleEmptyInbox.id]: "section-default",
+        [cloudInbox.id]: "section-default",
+      },
+      created_at: new Date(baseTime).toISOString(),
+      updated_at: new Date(baseTime).toISOString(),
+    });
+    supabase.__setBrowserSupabaseClientForTest(fake as unknown as SupabaseClient);
+    await resetLocal(db);
+    await db.addCategory(bootstrapInbox);
+    await db.addCard(preLoginCapture);
+
+    await sync.pushLocalSnapshotToCloud(userId);
+
+    assert.equal(fake.tables.categories.length, 2, "fallback snapshot push must reuse the populated cloud inbox without another duplicate");
+    assert.equal(fake.tables.cards.length, 2, "fallback snapshot push must preserve the pre-login card");
+    assert.equal(
+      fake.tables.cards.find((row) => row.title === preLoginCapture.title)?.category_id,
+      cloudInbox.id,
+      "fallback snapshot push should remap the pre-login card to the cloud inbox"
+    );
+    assert.deepEqual(
+      (await db.getCategories()).map((item) => item.id),
+      [cloudInbox.id],
+      "fallback snapshot push should keep only the populated canonical inbox in the fresh local profile"
+    );
+    assert.deepEqual(
+      fake.tables.user_preferences.find((row) => row.key === "categorySectionIds")?.value,
+      { [cloudInbox.id]: "section-default" },
+      "fallback snapshot push should converge the fresh profile section mapping on the populated inbox"
+    );
+  }
+
+  {
+    const fake = new FakeSupabaseClient();
     const existingCategory = category();
     const existingCard = card();
     fake.tables.categories.push(cloudCategory(existingCategory));

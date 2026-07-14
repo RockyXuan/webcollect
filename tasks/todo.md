@@ -1,5 +1,22 @@
 # WebCollect Task Plan
 
+## Current Task: 2026-07-14 V1.1.2 Account Sync Closeout
+
+- [x] Back up main, local workspace state, and the existing private Supabase archive before account testing.
+- [x] Fix clean-checkout Web OAuth configuration and verify only the public WebCollect anon role is exposed.
+- [x] Prevent fresh Profiles from uploading a duplicate bootstrap inbox while preserving legitimate same-name inboxes in other sections.
+- [x] Handle old-client same-section empty inbox duplicates deterministically without deleting them or routing new captures by database row order.
+- [x] Remove consumed OAuth codes, restore custom-server HMR upgrades, and serialize the complete floating-capture queue drain.
+- [x] Reuse one GoTrue client per browser context and preserve Supabase's browser-managed foreground/background auth refresh lifecycle.
+- [x] Pass 128 Vitest cases, all 31 legacy scripts, all 12 Playwright cases, type check, lint, dependency audit, extension build/artifact/size, and isolated MV3 runtime.
+- [x] Complete real Google OAuth sign-in/sign-out/re-sign-in and cloud sync in Profile A.
+- [ ] Publish the installable RC and replace the old extension in the explicitly authorized signed-in Chrome; verify manifest version and real cloud wall.
+- [ ] User completes Google account/security confirmation in the independent Profile B; verify two sessions and unchanged `364 / 130 / 24 / 58` cloud counts.
+- [x] Run the production Web build in an isolated APFS-cloned workspace without interrupting the OAuth server.
+- [ ] After both Profiles pass, finalize docs and publish the exact final V1.1.2 zip.
+
+Current evidence: `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`.
+
 ## Current Task: 2026-07-12 V1.1.1 Independent Audit Closeout
 
 - [x] Independently verify the PM Supabase split, PM GitHub/Vercel deployment, and old-project residue.

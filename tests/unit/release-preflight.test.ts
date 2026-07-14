@@ -66,4 +66,12 @@ describe("extension release preflight", () => {
     expect(tagWorkflow).not.toContain("softprops/action-gh-release");
     expect(tagWorkflow).not.toContain("Publish GitHub Release");
   });
+
+  it("reuses git credentials when gh's own login is stale without printing the token", () => {
+    const proxyScript = readFileSync("scripts/gh-proxy.sh", "utf8");
+
+    expect(proxyScript).toContain("GIT_TERMINAL_PROMPT=0 git credential fill");
+    expect(proxyScript).toContain('export GH_TOKEN="${token}"');
+    expect(proxyScript).not.toMatch(/echo[^\n]*\$\{?token\}?/);
+  });
 });

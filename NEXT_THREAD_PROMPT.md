@@ -1,5 +1,14 @@
 这是一个新的 Codex 线程，请继续开发 RockyXuan/webcollect。当前上下文很长，务必先按下面顺序接手，不要从旧假设继续。
 
+## 2026-07-14 V1.1.2 候选事实
+
+- 第一优先事实源：`docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`。
+- 已发布稳定版仍是 `V1.1.1`；先发布 `V1.1.2 / 2026年7月14日` RC 供主 Chrome 安装，只有授权 Chrome + 独立 Profile B、双会话核验、生产构建、final main/tag/zip 一致后才转正式版。
+- 已修根因：干净 Web OAuth 配置、新 Profile 重复收集箱、旧客户端已有同分项空重复时的 canonical 选择、回调 code、HMR upgrade、浮窗并发目标、重复 GoTrue 客户端和错误的手动浏览器 refresh 生命周期。
+- 当前自动门禁：128 Vitest、31 组历史脚本、12 Playwright、TypeScript、ESLint、依赖审计、扩展构建/运行时均通过。
+- 真实数据计数：`364 / 130 / 24 / 58 / 0 / 1`；不要删除 closeout 中记录的两条空收集箱，除非用户明确批准精确处理。
+- 用户已明确授权操作其主 Chrome、卸载旧扩展和加载新扩展。复用 `Codex Workbench`，不要碰无关个人标签；账号、密码、验证码或 CAPTCHA 仍由用户本人处理。
+
 ## 2026-07-12 当前事实
 
 - 最新版本：`V1.1.1 / 2026年7月12日`

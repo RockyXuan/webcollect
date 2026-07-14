@@ -1,6 +1,6 @@
 # WebCollect 用户截图索引
 
-更新时间：2026-07-12
+更新时间：2026-07-14
 
 说明：以下截图来自用户在对话中贴出的 UI 标注。2026-07-07 检查时，原始 `/var/folders/.../T/codex-clipboard-*.png` 临时文件已经过期，不再能复制进仓库。因此本文件保存截图名称、用户标注、对应需求和当前状态。后续新截图必须落到 `docs/audit/screenshots/`，不要只依赖对话临时文件。
 
@@ -30,6 +30,10 @@
 | `webcollect-v1.1-wallpaper-after-ui-fix-390x844-2026-07-12.png` | 隔离 Chromium 扩展壁纸页手机视口，提示换行且无横向溢出 | UI-02 移动端修复后证据 | 通过几何断言和肉眼复核 |
 | `webcollect-v1.1-extension-runtime-after-phase4-2026-07-12.png` | 压缩壁纸与渐进推荐接入后的扩展网页墙 | Phase 4 扩展运行时回归 | 服务工作线程正常，控制台零错误，1440px 无溢出 |
 | `webcollect-v1.1-wallpaper-settings-short-screen-1280x720-2026-07-12.png` | 1280x720 短屏壁纸设置，内容区滚动且底部操作栏固定 | UI-03 设置弹窗顶部/底部被裁切 | 已修；完成按钮位于视口内，关闭壁纸后刷新直达主页 |
+| `webcollect-v1.1.2-extension-wallpaper-1440x900-2026-07-13.png` | V1.1.2 最终候选扩展的 1440x900 壁纸页 | 桌面壁纸文字层、提示、控制条和横向溢出回归 | 几何断言通过，零控制台错误 |
+| `webcollect-v1.1.2-extension-wallpaper-390x844-2026-07-13.png` | V1.1.2 最终候选扩展的 390x844 壁纸页 | 移动视口引用、提示与控制条回归 | 几何断言通过，无横向溢出 |
+| `webcollect-v1.1.2-extension-collection-1440x900-2026-07-13.png` | V1.1.2 隔离 MV3 收藏墙，浮窗队列落到 `Runtime Audit / Runtime Inbox` | 服务工作线程、目标分类、并发唯一性与收藏墙渲染 | 单分项、单分组、单卡片，零控制台错误 |
+| `webcollect-main-chrome-old-extension-signed-in-2026-07-14.png` | 用户主 Chrome 中旧版扩展已登录并显示完整收藏墙、云端同步中 | 证明主 Chrome 具备真实账号状态，但安装版本尚待 RC 替换后核对 | 用户已明确授权在 `Codex Workbench` 中替换扩展；截图同时对应旧客户端新增空收集箱的云端时间窗 |
 
 ## 后续截图管理规则
 

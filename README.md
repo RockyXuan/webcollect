@@ -5,17 +5,19 @@
 如果你是后续接手 WebCollect 的 Claude / Codex / 其他 agent，请先读：
 
 1. `AGD.md`
-2. `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`
-3. `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`
-4. `docs/audit/claude-code-review-handoff-2026-07-07.md`
-5. `PROJECT_SUMMARY.md`
-6. `HANDOFF.md`
-7. `tasks/lessons.md`
-8. `tasks/todo.md`
-9. `AGENTS.md`
+2. `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`
+3. `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`
+4. `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`
+5. `docs/audit/claude-code-review-handoff-2026-07-07.md`
+6. `PROJECT_SUMMARY.md`
+7. `HANDOFF.md`
+8. `tasks/lessons.md`
+9. `tasks/todo.md`
+10. `AGENTS.md`
 
 当前固定开发目录：`/Users/rockyx/vibe coding/Web Collect 0628`。
 当前最新功能版本：`V1.1.1 / 2026年7月12日`。
+当前待发布候选：`V1.1.2 / 2026年7月14日`；先发布 RC 供用户授权的主 Chrome 安装，再用独立 Profile B 完成第二会话验收。
 最新 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-12-v1.1.1`。
 Chrome 扩展 zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-12-v1.1.1/WebCollect-Chrome-Extension-v1.1.1-2026-07-12.zip`。
 如果旧说明和 `AGD.md` 冲突，以 `AGD.md` 为准。

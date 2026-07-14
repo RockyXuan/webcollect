@@ -1,6 +1,7 @@
 import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
+import { attachNextUpgradeHandler } from './lib/server-upgrade';
 
 const dev = process.env.COZE_PROJECT_ENV !== 'PROD';
 const hostname = process.env.HOSTNAME || 'localhost';
@@ -11,6 +12,7 @@ const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
 app.prepare().then(() => {
+  const handleUpgrade = app.getUpgradeHandler();
   const server = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url!, true);
@@ -25,6 +27,7 @@ app.prepare().then(() => {
     console.error(err);
     process.exit(1);
   });
+  attachNextUpgradeHandler(server, handleUpgrade);
   server.listen(port, () => {
     console.log(
       `> Server listening at http://${hostname}:${port} as ${

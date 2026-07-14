@@ -200,7 +200,8 @@ function createUuid(): string {
 
 async function normalizeLocalIdsForCloud(
   categories: Category[],
-  cards: WebCard[]
+  cards: WebCard[],
+  knownCloudCategoryIds: ReadonlySet<string> = new Set()
 ): Promise<{ categories: Category[]; cards: WebCard[] }> {
   const idMap = new Map<string, string>();
   const categoriesById = new Map(categories.map((category) => [category.id, category]));
@@ -208,7 +209,7 @@ async function normalizeLocalIdsForCloud(
   const missingCategoryIds = new Set<string>();
 
   function ensureCategory(categoryId: string): void {
-    if (!categoryId || categoriesById.has(categoryId)) return;
+    if (!categoryId || categoriesById.has(categoryId) || knownCloudCategoryIds.has(categoryId)) return;
 
     const defaultCategory = defaultCategoriesById.get(categoryId);
     if (!defaultCategory) {
@@ -298,6 +299,91 @@ function ensureFallbackInboxCategory(
   categories.push(inboxCategory);
   categoriesById.set(inboxCategory.id, inboxCategory);
   return inboxCategory;
+}
+
+function reconcileBootstrapInboxesWithCloud(
+  localCategories: Category[],
+  localCards: WebCard[],
+  cloudCategories: CloudCategory[],
+  cloudCards: CloudCard[],
+  cloudCategorySections: Record<string, string>
+): { categories: Category[]; cards: WebCard[]; reusedCloudInbox: boolean } {
+  const cloudTopLevelInboxes = cloudCategories.filter((category) => (
+    category.name.trim() === "收集箱" && !category.parent_id
+  ));
+  if (cloudTopLevelInboxes.length === 0) {
+    return { categories: localCategories, cards: localCards, reusedCloudInbox: false };
+  }
+
+  const cloudCardCountsByCategory = new Map<string, number>();
+  for (const cloudCard of cloudCards) {
+    cloudCardCountsByCategory.set(
+      cloudCard.category_id,
+      (cloudCardCountsByCategory.get(cloudCard.category_id) || 0) + 1
+    );
+  }
+  const inboxIdMap = new Map<string, string>();
+  const replacementInboxes = new Map<string, Category>();
+  for (const category of localCategories) {
+    const isBootstrapInbox = !UUID_PATTERN.test(category.id)
+      && (category.id === "cat-inbox" || category.id.startsWith("cat-inbox-"))
+      && category.name.trim() === "收集箱"
+      && !category.parentId;
+    if (!isBootstrapInbox) continue;
+
+    const sectionId = category.sectionId || "section-default";
+    const exactSectionMatches = cloudTopLevelInboxes.filter(
+      (cloudCategory) => cloudCategorySections[cloudCategory.id] === sectionId
+    );
+    const candidateInboxes = exactSectionMatches.length > 0
+      ? exactSectionMatches
+      : (cloudTopLevelInboxes.length === 1 ? cloudTopLevelInboxes : []);
+    const cloudInbox = [...candidateInboxes].sort((left, right) => {
+      const cardCountDifference = (cloudCardCountsByCategory.get(right.id) || 0)
+        - (cloudCardCountsByCategory.get(left.id) || 0);
+      if (cardCountDifference !== 0) return cardCountDifference;
+
+      const createdAtDifference = new Date(left.created_at).getTime() - new Date(right.created_at).getTime();
+      if (createdAtDifference !== 0) return createdAtDifference;
+
+      return left.id.localeCompare(right.id);
+    })[0];
+    if (cloudInbox) {
+      inboxIdMap.set(category.id, cloudInbox.id);
+      if (!replacementInboxes.has(cloudInbox.id)) {
+        replacementInboxes.set(cloudInbox.id, {
+          ...cloudToLocalCategory(cloudInbox),
+          sectionId: cloudCategorySections[cloudInbox.id] || sectionId,
+        });
+      }
+    }
+  }
+
+  if (inboxIdMap.size === 0) {
+    return { categories: localCategories, cards: localCards, reusedCloudInbox: false };
+  }
+
+  const reconciledCategories = localCategories
+    .filter((category) => !inboxIdMap.has(category.id))
+    .map((category) => {
+      const parentId = category.parentId ? inboxIdMap.get(category.parentId) : undefined;
+      return parentId ? { ...category, parentId } : category;
+    });
+  const reconciledCategoryIds = new Set(reconciledCategories.map((category) => category.id));
+  for (const replacement of replacementInboxes.values()) {
+    if (!reconciledCategoryIds.has(replacement.id)) {
+      reconciledCategories.push(replacement);
+    }
+  }
+
+  return {
+    categories: reconciledCategories,
+    cards: localCards.map((card) => {
+      const categoryId = inboxIdMap.get(card.categoryId);
+      return categoryId ? { ...card, categoryId } : card;
+    }),
+    reusedCloudInbox: true,
+  };
 }
 
 function cloudToLocalCategory(c: CloudCategory): Category {
@@ -1149,9 +1235,8 @@ async function syncDataUnsafe(userId: string, depth: number): Promise<void> {
   ]);
 
   await createLocalDataSnapshot("before-cloud-sync", "\u4e91\u7aef\u540c\u6b65\u524d\u672c\u5730\u7248\u672c");
-  const normalizedLocal = await normalizeLocalIdsForCloud(rawLocalCategories, rawLocalCards);
-  let localCategories = normalizedLocal.categories;
-  let localCards = normalizedLocal.cards;
+  let localCategories = rawLocalCategories;
+  let localCards = rawLocalCards;
   const syncStartLocalUpdatedAt = localSnapshotUpdatedAt;
   const dirtySets = await getSyncDirtySets();
 
@@ -1203,19 +1288,33 @@ async function syncDataUnsafe(userId: string, depth: number): Promise<void> {
     const tombstone = categoryTombstones.get(row.id);
     return !tombstone || compareSyncVersions(cloudToLocalCategory(row), tombstone) > 0;
   });
-  const activeCategoryIds = new Set([
-    ...cloudCategories.map((category) => category.id),
-    ...localCategories.map((category) => category.id),
-  ]);
-  const cloudCards = filterCloudRowsAfterReset(
+  const cloudCardsForBootstrap = filterCloudRowsAfterReset(
     (cloudCardResult.data || []) as CloudCard[],
     workspaceResetAt
   ).filter((row) => {
     const tombstone = cardTombstones.get(row.id);
-    return (!tombstone || compareSyncVersions(cloudToLocalCard(row), tombstone) > 0)
-      && activeCategoryIds.has(row.category_id);
+    return !tombstone || compareSyncVersions(cloudToLocalCard(row), tombstone) > 0;
   });
   const prefCategorySections = getResetAwareCategorySections(cloudPrefsMap, workspaceResetAt);
+  const reconciledBootstrap = reconcileBootstrapInboxesWithCloud(
+    localCategories,
+    localCards,
+    cloudCategories,
+    cloudCardsForBootstrap,
+    prefCategorySections
+  );
+  const normalizedLocal = await normalizeLocalIdsForCloud(
+    reconciledBootstrap.categories,
+    reconciledBootstrap.cards,
+    new Set(cloudCategories.map((category) => category.id))
+  );
+  localCategories = normalizedLocal.categories;
+  localCards = normalizedLocal.cards;
+  const activeCategoryIds = new Set([
+    ...cloudCategories.map((category) => category.id),
+    ...localCategories.map((category) => category.id),
+  ]);
+  const cloudCards = cloudCardsForBootstrap.filter((row) => activeCategoryIds.has(row.category_id));
   const prefSections = getResetAwareSections(cloudPrefsMap, workspaceResetAt);
   const localCategorySections = Object.fromEntries(
     localCategories.filter((category) => category.sectionId).map((category) => [category.id, category.sectionId as string])
@@ -1263,13 +1362,15 @@ async function syncDataUnsafe(userId: string, depth: number): Promise<void> {
     cloudHasRealLayout
     && (cloudSnapshotUpdatedAt > localSnapshotUpdatedAt || localLooksEmptyAgainstCloud || localLooksMuchSmallerAgainstCloud || shouldProtectCloudLayout);
   const shouldPreferLocalSnapshot =
-    localResetWins
+    !reconciledBootstrap.reusedCloudInbox
+    && (
+      localResetWins
     || (
       localSnapshotUpdatedAt > cloudSnapshotUpdatedAt
       && !localLooksEmptyAgainstCloud
       && !localLooksMuchSmallerAgainstCloud
       && !shouldProtectCloudLayout
-    );
+    ));
   const categorySections = shouldPreferCloudLayout
     ? { ...localCategorySections, ...prefCategorySections }
     : { ...prefCategorySections, ...localCategorySections };
@@ -1490,13 +1591,11 @@ async function pushLocalSnapshotToCloudUnsafe(
   ]);
 
   await createLocalDataSnapshot("before-cloud-push", "\u63a8\u9001\u4e91\u7aef\u524d\u672c\u5730\u7248\u672c");
-  const { categories: normalizedLocalCategories, cards: normalizedLocalCards } =
-    await normalizeLocalIdsForCloud(rawLocalCategories, rawLocalCards);
   const syncStartLocalUpdatedAt = localSnapshotUpdatedAt;
   const dirtySets = await getSyncDirtySets();
 
-  let localCategories = normalizedLocalCategories;
-  let localCards = normalizedLocalCards;
+  let localCategories = rawLocalCategories;
+  let localCards = rawLocalCards;
   const snapshotUpdatedAt = Math.max(localSnapshotUpdatedAt, Date.now());
   const workspaceResetAt = localWorkspaceResetAt || (options.allowDestructiveClear ? snapshotUpdatedAt : 0);
 
@@ -1513,30 +1612,7 @@ async function pushLocalSnapshotToCloudUnsafe(
 
   if (cloudPrefResult.error) throw formatCloudLoadError("\u504f\u597d", cloudPrefResult.error.message);
   if (cloudTombstoneResult.error) throw formatCloudLoadError("删除记录", cloudTombstoneResult.error.message);
-  const cloudTombstones = ((cloudTombstoneResult.data || []) as CloudTombstone[]).map(cloudToLocalTombstone);
-  const mergedTombstones = mergeSyncTombstones(localTombstones, cloudTombstones);
-  const categoryTombstones = tombstoneMapForType(mergedTombstones, "category");
-  const cardTombstones = tombstoneMapForType(mergedTombstones, "card");
-  localCategories = filterEntitiesSupersededByTombstones(localCategories, categoryTombstones);
-  localCards = filterEntitiesSupersededByTombstones(localCards, cardTombstones);
-  const cloudCategories = ((cloudCatResult.data || []) as CloudCategory[]).filter((row) => {
-    const tombstone = categoryTombstones.get(row.id);
-    return !tombstone || compareSyncVersions(cloudToLocalCategory(row), tombstone) > 0;
-  });
-  const activeCategoryIds = new Set([
-    ...cloudCategories.map((category) => category.id),
-    ...localCategories.map((category) => category.id),
-  ]);
-  const cloudCards = ((cloudCardResult.data || []) as CloudCard[]).filter((row) => {
-    const tombstone = cardTombstones.get(row.id);
-    return (!tombstone || compareSyncVersions(cloudToLocalCard(row), tombstone) > 0)
-      && activeCategoryIds.has(row.category_id);
-  });
-  await withoutLocalChangeEvents(async () => {
-    await saveCategories(localCategories);
-    await saveCards(localCards);
-  });
-  await saveSyncTombstones(mergedTombstones);
+
   const cloudPrefs = (cloudPrefResult.data || []) as CloudPreference[];
   const cloudPrefsMap = preferencesToMap(cloudPrefs);
   const cloudWorkspaceResetAt = getNumberPreference(cloudPrefsMap, WORKSPACE_RESET_PREF_KEY);
@@ -1559,10 +1635,55 @@ async function pushLocalSnapshotToCloudUnsafe(
     await syncData(userId, depth + 1);
     return;
   }
+
+  const cloudTombstones = ((cloudTombstoneResult.data || []) as CloudTombstone[]).map(cloudToLocalTombstone);
+  const mergedTombstones = mergeSyncTombstones(localTombstones, cloudTombstones);
+  const categoryTombstones = tombstoneMapForType(mergedTombstones, "category");
+  const cardTombstones = tombstoneMapForType(mergedTombstones, "card");
+  localCategories = filterEntitiesSupersededByTombstones(localCategories, categoryTombstones);
+  localCards = filterEntitiesSupersededByTombstones(localCards, cardTombstones);
+  const cloudCategories = filterCloudRowsAfterReset(
+    (cloudCatResult.data || []) as CloudCategory[],
+    workspaceResetAt
+  ).filter((row) => {
+    const tombstone = categoryTombstones.get(row.id);
+    return !tombstone || compareSyncVersions(cloudToLocalCategory(row), tombstone) > 0;
+  });
+  const cloudCardsForBootstrap = filterCloudRowsAfterReset(
+    (cloudCardResult.data || []) as CloudCard[],
+    workspaceResetAt
+  ).filter((row) => {
+    const tombstone = cardTombstones.get(row.id);
+    return !tombstone || compareSyncVersions(cloudToLocalCard(row), tombstone) > 0;
+  });
+  const cloudCategorySectionIds = getResetAwareCategorySections(cloudPrefsMap, workspaceResetAt);
+  const reconciledBootstrap = reconcileBootstrapInboxesWithCloud(
+    localCategories,
+    localCards,
+    cloudCategories,
+    cloudCardsForBootstrap,
+    cloudCategorySectionIds
+  );
+  const normalizedLocal = await normalizeLocalIdsForCloud(
+    reconciledBootstrap.categories,
+    reconciledBootstrap.cards,
+    new Set(cloudCategories.map((category) => category.id))
+  );
+  localCategories = normalizedLocal.categories;
+  localCards = normalizedLocal.cards;
+  const activeCategoryIds = new Set([
+    ...cloudCategories.map((category) => category.id),
+    ...localCategories.map((category) => category.id),
+  ]);
+  const cloudCards = cloudCardsForBootstrap.filter((row) => activeCategoryIds.has(row.category_id));
+  await withoutLocalChangeEvents(async () => {
+    await saveCategories(localCategories);
+    await saveCards(localCards);
+  });
+  await saveSyncTombstones(mergedTombstones);
   const cloudSnapshotUpdatedAt = Math.max(getNumberPreference(cloudPrefsMap, "localSnapshotUpdatedAt"), cloudWorkspaceResetAt);
   const resetReplacement = workspaceResetAt > 0 && workspaceResetAt >= cloudSnapshotUpdatedAt;
   const cloudSections = getResetAwareSections(cloudPrefsMap, workspaceResetAt);
-  const cloudCategorySectionIds = getResetAwareCategorySections(cloudPrefsMap, workspaceResetAt);
   const localCategorySectionIds = Object.fromEntries(
     localCategories.map((category) => [category.id, category.sectionId || localActiveSectionId || "section-default"])
   );
