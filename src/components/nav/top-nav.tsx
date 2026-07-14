@@ -22,7 +22,6 @@ import {
   Globe2,
   GripVertical,
   Home,
-  ImageIcon,
   Layers,
   Pencil,
   Plus,
@@ -34,6 +33,7 @@ import {
 } from "lucide-react";
 import { SyncStatusBadge, UserMenu } from "@/components/auth/user-menu";
 import { BookmarkBar } from "@/components/bookmark/bookmark-bar";
+import { WallpaperQuickControl } from "@/components/wallpaper/wallpaper-quick-control";
 import { InlineEditableText } from "@/components/ui/inline-editable-text";
 import {
   AlertDialog,
@@ -628,16 +628,7 @@ export function TopNav({
               </button>
             )}
             {onShowWallpaper && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onShowWallpaper}
-                className="wc-header-tool wc-header-tool-quiet"
-                title="进入壁纸模式"
-              >
-                <ImageIcon className="h-4 w-4" />
-                <span>壁纸</span>
-              </Button>
+              <WallpaperQuickControl onShowWallpaper={onShowWallpaper} />
             )}
             <Button
               variant="default"

@@ -54,6 +54,34 @@ test("disabling wallpaper mode opens the next page directly in the collection", 
   await expect(page.locator(".wc-zoom-wallpaper")).toHaveCount(0);
 });
 
+test("top bar wallpaper switch changes the next-tab startup mode without opening settings", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator('[data-wallpaper-ready="true"]')).toBeVisible({ timeout: 30_000 });
+  await page.keyboard.press("Enter");
+
+  const startupSwitch = page.getByRole("switch", { name: "启动壁纸模式" });
+  await expect(startupSwitch).toBeVisible();
+  await expect(startupSwitch).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  await startupSwitch.click();
+  await expect(startupSwitch).toHaveAttribute("aria-checked", "false");
+  await expect(startupSwitch).toContainText("关");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  await page.reload();
+  await expect(page.getByText("WebCollect", { exact: true })).toBeVisible();
+  await expect(page.locator(".wc-zoom-wallpaper")).toHaveCount(0);
+
+  const restoredSwitch = page.getByRole("switch", { name: "启动壁纸模式" });
+  await restoredSwitch.click();
+  await expect(restoredSwitch).toHaveAttribute("aria-checked", "true");
+  await expect(restoredSwitch).toContainText("开");
+
+  await page.reload();
+  await expect(page.locator('[data-wallpaper-ready="true"]')).toBeVisible({ timeout: 30_000 });
+});
+
 test("repairs obsolete packaged wallpaper paths from IndexedDB", async ({ page }) => {
   await page.goto("/");
   await page.waitForFunction(async () => {

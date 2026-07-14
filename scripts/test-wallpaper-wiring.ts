@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 const pageSource = readFileSync("src/app/page.tsx", "utf8");
 const extensionSource = readFileSync("extension/src/newtab-app.tsx", "utf8");
 const topNavSource = readFileSync("src/components/nav/top-nav.tsx", "utf8");
 const shellSource = readFileSync("src/components/wallpaper/wallpaper-shell.tsx", "utf8");
 const settingsSource = readFileSync("src/components/wallpaper/wallpaper-settings-dialog.tsx", "utf8");
+const quickTogglePath = "src/components/wallpaper/wallpaper-quick-control.tsx";
+const quickToggleSource = existsSync(quickTogglePath) ? readFileSync(quickTogglePath, "utf8") : "";
 const storeSource = readFileSync("src/lib/wallpaper-store.ts", "utf8");
 const wallpaperSourcesSource = readFileSync("src/lib/wallpaper-sources.ts", "utf8");
 const extensionHtmlSource = readFileSync("extension/src/newtab.html", "utf8");
@@ -24,7 +26,15 @@ for (const [label, source] of [
 }
 
 assert.ok(topNavSource.includes("onShowWallpaper"), "TopNav should accept a wallpaper button callback");
-assert.ok(topNavSource.includes("壁纸"), "TopNav should show a visible wallpaper entry");
+assert.ok(topNavSource.includes("WallpaperQuickControl"), "TopNav should expose the wallpaper startup shortcut");
+assert.ok(quickToggleSource.includes("壁纸"), "Wallpaper shortcut should show a visible wallpaper entry");
+assert.ok(quickToggleSource.includes('role="switch"'), "Wallpaper shortcut should use an accessible switch");
+assert.ok(quickToggleSource.includes("aria-checked={wallpaperStartupEnabled}"), "Wallpaper shortcut should expose its current state");
+assert.ok(
+  quickToggleSource.includes('defaultMode: wallpaperStartupEnabled ? "collection" : "wallpaper"'),
+  "Wallpaper shortcut should persist both startup modes"
+);
+assert.ok(quickToggleSource.includes('wallpaperStartupEnabled ? "开" : "关"'), "Wallpaper shortcut should show a compact state label");
 
 assert.ok(shellSource.includes("onEnterCollection"), "WallpaperShell should enter the bookmark wall");
 assert.ok(shellSource.includes("handleWallpaperClick"), "WallpaperShell should enter the bookmark wall through an explicit click");
@@ -84,6 +94,8 @@ assert.equal(shellSource.includes("wc-wallpaper-floating-return"), false, "Colle
 assert.ok(shellSource.includes("Space") && shellSource.includes("Enter"), "WallpaperShell should support keyboard entry");
 assert.ok(webCssSource.includes("@import '../styles/zoom-wallpaper.css';"), "Web should load the shared wallpaper styles");
 assert.ok(extensionCssSource.includes("@import '../../src/styles/zoom-wallpaper.css';"), "Extension should load the shared wallpaper styles");
+assert.ok(webCssSource.includes(".wc-wallpaper-quick-control"), "Web should style the wallpaper startup shortcut");
+assert.ok(extensionCssSource.includes(".wc-wallpaper-quick-control"), "Extension should style the wallpaper startup shortcut");
 assert.equal(webCssSource.includes(".wc-wallpaper-stage {"), false, "Web globals must not duplicate the shared wallpaper styles");
 assert.ok(sharedWallpaperCssSource.includes("top: max(1rem, env(safe-area-inset-top));"), "Idle hint should stay in the safe top area");
 assert.ok(sharedWallpaperCssSource.includes("grid-template-columns: minmax(0, 1fr) auto;"), "Idle hint text and action should use stable grid columns");

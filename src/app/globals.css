@@ -429,6 +429,116 @@
   box-shadow: none;
 }
 
+.wc-wallpaper-quick-control {
+  display: inline-flex;
+  height: 44px;
+  flex: 0 0 auto;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.70);
+  color: #1e293b;
+  box-shadow: var(--wc-shadow-xs);
+  backdrop-filter: blur(14px);
+  transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.wc-wallpaper-quick-control:hover {
+  border-color: rgba(96, 165, 250, 0.34);
+  background: rgba(255, 255, 255, 0.90);
+  box-shadow: var(--wc-shadow-sm);
+  transform: translateY(-1px);
+}
+
+.wc-wallpaper-quick-open,
+.wc-wallpaper-quick-toggle {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 760;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.wc-wallpaper-quick-open {
+  gap: 7px;
+  padding: 0 10px 0 12px;
+}
+
+.wc-wallpaper-quick-open:hover {
+  color: #1d4ed8;
+}
+
+.wc-wallpaper-quick-toggle {
+  gap: 5px;
+  padding: 0 8px;
+  border-left: 1px solid rgba(148, 163, 184, 0.20);
+}
+
+.wc-wallpaper-quick-toggle:hover {
+  background: rgba(219, 234, 254, 0.54);
+}
+
+.wc-wallpaper-quick-open:focus-visible,
+.wc-wallpaper-quick-toggle:focus-visible {
+  z-index: 1;
+  outline: 2px solid #2563eb;
+  outline-offset: -3px;
+}
+
+.wc-wallpaper-quick-toggle:disabled {
+  cursor: wait;
+  opacity: 0.64;
+}
+
+.wc-wallpaper-quick-state {
+  min-width: 1em;
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.wc-wallpaper-quick-track {
+  position: relative;
+  display: inline-flex;
+  width: 28px;
+  height: 16px;
+  flex: 0 0 auto;
+  align-items: center;
+  border-radius: 999px;
+  background: #cbd5e1;
+  box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.12);
+  transition: background-color 0.18s ease;
+}
+
+.wc-wallpaper-quick-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.28);
+  transform: translateX(2px);
+  transition: transform 0.18s ease;
+}
+
+.wc-wallpaper-quick-control[data-enabled="true"] .wc-wallpaper-quick-state {
+  color: #1d4ed8;
+}
+
+.wc-wallpaper-quick-control[data-enabled="true"] .wc-wallpaper-quick-track {
+  background: #2563eb;
+}
+
+.wc-wallpaper-quick-control[data-enabled="true"] .wc-wallpaper-quick-thumb {
+  transform: translateX(14px);
+}
+
 .wc-header-primary {
   border: 0;
   background: var(--wc-primary-gradient);
@@ -1782,6 +1892,10 @@
   .wc-header-tool-quiet span {
     display: none;
   }
+
+  .wc-wallpaper-quick-title {
+    display: none;
+  }
 }
 
 @media (max-width: 1180px) {
@@ -1846,6 +1960,11 @@
     border-radius: 14px;
     padding-inline: 12px;
     font-size: 0.8rem;
+  }
+
+  .wc-wallpaper-quick-control {
+    height: 38px;
+    border-radius: 14px;
   }
 
   .wc-section-tabs {
@@ -1920,6 +2039,11 @@
     min-width: 36px;
     border-radius: 13px;
     padding-inline: 10px;
+  }
+
+  .wc-wallpaper-quick-control {
+    height: 36px;
+    border-radius: 13px;
   }
 
   .wc-section-tab {
