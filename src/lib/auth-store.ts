@@ -26,6 +26,8 @@ import {
   getLocalSnapshotUpdatedAt,
   getLastSeenCloudWorkspaceVersion,
   saveLastSeenCloudWorkspaceVersion,
+  CURRENT_SYNC_METADATA_VERSION,
+  getSyncMetadataVersion,
 } from "@/lib/db";
 import { createLocalDataSnapshot, type LocalSnapshotEntry } from "@/lib/local-snapshots";
 
@@ -134,8 +136,10 @@ export function decideStartupSyncAction(
   localSnapshotUpdatedAt: number,
   localSnapshotSyncedAt: number,
   cloudSnapshotUpdatedAt: number,
-  lastSeenCloudSnapshotUpdatedAt: number
+  lastSeenCloudSnapshotUpdatedAt: number,
+  syncMetadataVersion = CURRENT_SYNC_METADATA_VERSION
 ): StartupSyncAction {
+  if (syncMetadataVersion < CURRENT_SYNC_METADATA_VERSION) return "sync";
   if (cloudSnapshotUpdatedAt > lastSeenCloudSnapshotUpdatedAt) return "sync";
   if (localSnapshotUpdatedAt > localSnapshotSyncedAt) return "push";
   return "none";
@@ -294,12 +298,14 @@ export async function triggerSync(userId: string): Promise<void> {
       lastSeenCloudSnapshotUpdatedAt,
       lastSeenCloudWorkspaceVersion,
       cloudWorkspaceVersion,
+      syncMetadataVersion,
     ] = await Promise.all([
       getLocalSnapshotUpdatedAt(),
       getLocalSnapshotSyncedAt(),
       getLastSeenCloudSnapshotUpdatedAt(),
       getLastSeenCloudWorkspaceVersion(),
       readCloudWorkspaceVersion(userId),
+      getSyncMetadataVersion(userId),
     ]);
     const cloudFreshness = cloudWorkspaceVersion.version;
     const lastSeenCloudFreshness = cloudWorkspaceVersion.legacyFallback
@@ -309,7 +315,8 @@ export async function triggerSync(userId: string): Promise<void> {
       localSnapshotUpdatedAt,
       localSnapshotSyncedAt,
       cloudFreshness,
-      lastSeenCloudFreshness
+      lastSeenCloudFreshness,
+      syncMetadataVersion
     );
 
     if (action === "sync") {
@@ -342,10 +349,15 @@ export async function triggerSync(userId: string): Promise<void> {
   }
 }
 
-function scheduleStartupSync(userId: string): void {
+function scheduleStartupSync(userId: string, immediate = false): void {
   const run = () => {
     void triggerSync(userId);
   };
+
+  if (immediate) {
+    run();
+    return;
+  }
 
   if (typeof window === "undefined") {
     setTimeout(run, 0);
@@ -560,7 +572,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       clearConsumedOAuthCodeFromUrl();
       set({ user, isLoggedIn: true, isLoading: false, error: null });
       if (isAutoSyncEnabled()) {
-        scheduleStartupSync(user.id);
+        const syncMetadataVersion = await getSyncMetadataVersion(user.id);
+        scheduleStartupSync(user.id, syncMetadataVersion < CURRENT_SYNC_METADATA_VERSION);
       }
       return;
     } catch (error) {

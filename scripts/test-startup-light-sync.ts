@@ -85,11 +85,17 @@ class FakeSupabaseClient {
 async function main(): Promise<void> {
   const supabase = await import("../src/lib/supabase-browser");
   const auth = await import("../src/lib/auth-store");
+  const db = await import("../src/lib/db");
 
   assert.equal(
     auth.decideStartupSyncAction(baseTime, baseTime, baseTime + 100, baseTime + 100),
     "none",
     "this device should not sync again after it already saw its own pushed cloud marker"
+  );
+  assert.equal(
+    auth.decideStartupSyncAction(baseTime, baseTime, baseTime + 100, baseTime + 100, 0),
+    "sync",
+    "an upgraded profile without revision metadata must hydrate cloud revisions before lightweight startup can skip"
   );
   assert.equal(
     auth.decideStartupSyncAction(baseTime, baseTime, baseTime + 200, baseTime + 100),
@@ -109,6 +115,13 @@ async function main(): Promise<void> {
   });
   supabase.__setBrowserSupabaseClientForTest(fake as unknown as SupabaseClient);
   memoryStore.clear();
+  await db.saveSyncMetadataVersion(db.CURRENT_SYNC_METADATA_VERSION, "different-user");
+  assert.equal(
+    await db.getSyncMetadataVersion(userId),
+    0,
+    "sync revision metadata from another account must not skip this account's first full sync"
+  );
+  await db.saveSyncMetadataVersion(db.CURRENT_SYNC_METADATA_VERSION, userId);
   await localforage.setItem("localSnapshotUpdatedAt", baseTime);
   await localforage.setItem("localSnapshotSyncedAt", baseTime);
   await localforage.setItem("lastSeenCloudSnapshotUpdatedAt", baseTime);
@@ -144,7 +157,10 @@ async function main(): Promise<void> {
     false,
     "an unverified cached display identity must not trigger startup sync"
   );
-  assert.ok(initializeBody.includes("scheduleStartupSync(user.id)"));
+  assert.ok(
+    initializeBody.includes("scheduleStartupSync(user.id, syncMetadataVersion < CURRENT_SYNC_METADATA_VERSION)"),
+    "startup sync should run immediately for profiles that still need revision metadata hydration"
+  );
   assert.equal(initializeBody.includes("void triggerSync(cached.id)"), false);
   assert.equal(initializeBody.includes("void triggerSync(user.id)"), false);
   assert.ok(authSource.includes("requestIdleCallback"), "startup sync should be scheduled after first paint when supported");

@@ -33,6 +33,9 @@ const SYNC_DEVICE_ID_KEY = "syncDeviceId";
 const SYNC_LAMPORT_COUNTER_KEY = "syncLamportCounter";
 const SYNC_TOMBSTONES_KEY = "syncTombstones";
 const SYNC_PREFERENCE_REVISIONS_KEY = "syncPreferenceRevisions";
+const SYNC_METADATA_VERSION_KEY = "syncMetadataVersion";
+
+export const CURRENT_SYNC_METADATA_VERSION = 1;
 
 let localChangeSilenceDepth = 0;
 
@@ -307,6 +310,23 @@ export async function clearSyncDirtyIds(input: Partial<SyncDirtySets>): Promise<
 
 export async function clearSyncDirtySets(): Promise<void> {
   await withStorageLock("sync-dirty-sets", () => saveSyncDirtySets(emptySyncDirtySets()));
+}
+
+export async function getSyncMetadataVersion(userId: string): Promise<number> {
+  const value = await localforage.getItem<unknown>(SYNC_METADATA_VERSION_KEY);
+  if (!value || typeof value !== "object" || Array.isArray(value)) return 0;
+  const metadata = value as { userId?: unknown; version?: unknown };
+  if (metadata.userId !== userId || typeof metadata.version !== "number" || !Number.isFinite(metadata.version)) {
+    return 0;
+  }
+  return Math.max(0, Math.floor(metadata.version));
+}
+
+export async function saveSyncMetadataVersion(version: number, userId: string): Promise<void> {
+  await localforage.setItem(SYNC_METADATA_VERSION_KEY, {
+    userId,
+    version: Math.max(0, Math.floor(version)),
+  });
 }
 
 export async function getDataSchemaVersion(): Promise<number> {

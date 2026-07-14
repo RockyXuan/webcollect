@@ -878,6 +878,76 @@ async function main(): Promise<void> {
 
   {
     const fake = new FakeSupabaseClient();
+    const sharedCategory = category();
+    const sharedCard = card();
+    const cloudWallpaperSettings = {
+      ...wallpaperSources.DEFAULT_WALLPAPER_PREFS,
+      defaultMode: "wallpaper" as const,
+      settingsUpdatedAt: baseTime,
+      updatedAt: baseTime,
+    };
+    fake.tables.categories.push(cloudCategory(sharedCategory));
+    fake.tables.cards.push(cloudCard(sharedCard));
+    fake.tables.user_preferences.push({
+      id: "pref-wallpaper-stale-cloud-revision",
+      user_id: userId,
+      key: "wallpaperPrefs",
+      value: cloudWallpaperSettings,
+      sync_revision: 8,
+      sync_device_id: "cloud-device",
+      created_at: new Date(baseTime).toISOString(),
+      updated_at: new Date(baseTime).toISOString(),
+    });
+    supabase.__setBrowserSupabaseClientForTest(fake as unknown as SupabaseClient);
+
+    await resetLocal(db);
+    await db.withoutLocalChangeEvents(async () => {
+      await db.saveCategories([sharedCategory]);
+      await db.saveCards([sharedCard]);
+      await wallpaper.saveSyncedWallpaperPrefs(cloudWallpaperSettings);
+    });
+    await db.clearSyncDirtySets();
+
+    await sync.syncData(userId);
+    assert.equal(
+      (await db.getSyncPreferenceRevisions()).wallpaperPrefs?.syncRevision,
+      8,
+      "the first upgraded-profile sync should hydrate the cloud wallpaper revision"
+    );
+    assert.equal(
+      await db.getSyncMetadataVersion(userId),
+      db.CURRENT_SYNC_METADATA_VERSION,
+      "a successful full sync should record revision metadata hydration"
+    );
+
+    await wallpaper.saveWallpaperPrefs({
+      ...(await wallpaper.getWallpaperPrefs()),
+      defaultMode: "collection",
+    });
+    const localRevisionBeforeSync = (await db.getSyncPreferenceRevisions()).wallpaperPrefs?.syncRevision || 0;
+    assert.ok(localRevisionBeforeSync > 8, "the local edit should advance beyond the hydrated cloud preference revision");
+
+    await sync.syncData(userId);
+
+    const cloudWallpaper = fake.tables.user_preferences.find((row) => row.key === "wallpaperPrefs");
+    assert.equal(
+      (cloudWallpaper?.value as { defaultMode?: string } | undefined)?.defaultMode,
+      "collection",
+      "a newly disabled wallpaper mode must not be rolled back by a stale higher cloud revision"
+    );
+    assert.ok(
+      Number(cloudWallpaper?.sync_revision || 0) > 8,
+      "the local preference revision should advance beyond the observed cloud revision"
+    );
+    assert.equal(
+      (await wallpaper.getWallpaperPrefs()).defaultMode,
+      "collection",
+      "the local wallpaper mode should remain disabled after sync"
+    );
+  }
+
+  {
+    const fake = new FakeSupabaseClient();
     const sharedCategory = category({ name: "Dual device inbox" });
     const sharedCard = card({ title: "Initial shared card" });
     const hiddenSite = {

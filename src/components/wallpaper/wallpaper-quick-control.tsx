@@ -10,6 +10,7 @@ interface WallpaperQuickControlProps {
 
 export function WallpaperQuickControl({ onShowWallpaper }: WallpaperQuickControlProps) {
   const wallpaperStartupEnabled = useWallpaperStore((state) => state.prefs.defaultMode === "wallpaper");
+  const isWallpaperReady = useWallpaperStore((state) => state.isReady);
   const updatePrefs = useWallpaperStore((state) => state.updatePrefs);
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -52,7 +53,7 @@ export function WallpaperQuickControl({ onShowWallpaper }: WallpaperQuickControl
         aria-checked={wallpaperStartupEnabled}
         className="wc-wallpaper-quick-toggle"
         onClick={() => void handleStartupToggle()}
-        disabled={isUpdating}
+        disabled={isUpdating || !isWallpaperReady}
         title={toggleTitle}
       >
         <span className="wc-wallpaper-quick-state" aria-hidden="true">

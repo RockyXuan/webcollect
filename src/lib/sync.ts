@@ -49,6 +49,8 @@ import {
   saveSyncPreferenceRevisions,
   getSearchEngine,
   saveSearchEngine,
+  CURRENT_SYNC_METADATA_VERSION,
+  saveSyncMetadataVersion,
 } from "@/lib/db";
 import {
   getWarehouseCards,
@@ -1519,6 +1521,7 @@ async function syncDataUnsafe(userId: string, depth: number): Promise<void> {
   });
   await saveLocalSnapshotSyncedAt(syncStartLocalUpdatedAt);
   await saveLastSeenCloudSnapshotUpdatedAt(syncedCloudSnapshotUpdatedAt);
+  await saveSyncMetadataVersion(CURRENT_SYNC_METADATA_VERSION, userId);
 
   console.log("[Sync] Sync completed successfully");
 }
