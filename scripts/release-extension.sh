@@ -27,7 +27,11 @@ git_with_network() {
   if github_proxy_is_listening; then
     git -c "http.https://github.com.proxy=${GITHUB_PROXY}" "$@"
   else
-    git "$@"
+    git \
+      -c http.proxy= \
+      -c https.proxy= \
+      -c http.https://github.com.proxy= \
+      "$@"
   fi
 }
 

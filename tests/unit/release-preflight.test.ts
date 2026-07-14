@@ -52,6 +52,7 @@ describe("extension release preflight", () => {
     expect(build).toBeGreaterThan(firstPreflight);
     expect(builtPreflight).toBeGreaterThan(build);
     expect(script).toContain("fetch origin main --tags");
+    expect(script).toContain("-c http.https://github.com.proxy=");
     expect(script).toContain("test:extension-artifact");
     expect(script).toContain("test:extension-size");
   });
