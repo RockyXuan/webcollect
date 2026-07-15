@@ -2,23 +2,24 @@
 
 > **2026-07-15 current workflow rule:** this repository has retired Superpowers (including `superpowers:*` / `using-superpowers`), `goal-zzx` / `zzx-goal`, and `andrej-karpathy-coding`. Do not install, enable, invoke, or imitate them. Any older instruction below that requires `tasks/todo.md`, `tasks/lessons.md`, `CODEX_GO_MODE_STATUS.md`, fixed phase counts, strict TDD, worktrees, subagents, or duplicate reviews is historical and superseded by `AGENTS.md`.
 
-## 2026-07-14 V1.1.2 Account Sync Release Candidate
+## 2026-07-15 V1.1.2 Account Sync Release Candidate
 
 This section supersedes older development status. V1.1.1 remains the latest stable Release until the V1.1.2 RC is installed and the final account gate passes.
 
-- Candidate version/date: `V1.1.2 / 2026年7月14日`.
+- Candidate version/date: `V1.1.2 / 2026年7月15日`.
 - Candidate closeout: `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`.
 - Baseline and remote backup: `main@ea45b53` and `codex/backup-pre-oauth-2026-07-13`.
-- Published RC identity: tag `webcollect-2026-07-14-v1.1.2-rc.3`, code commit `312a807bb20a1d99b2506a458c30edb6a8962081`, asset `WebCollect-Chrome-Extension-v1.1.2-rc.3-2026-07-14.zip`, SHA-256 `7c32755cabcd165b236173123580f6f011f64b2a3483d42c4f3c7bd941ba7a1b`.
-- RC Prerelease: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-14-v1.1.2-rc.3`; direct zip: `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-14-v1.1.2-rc.3/WebCollect-Chrome-Extension-v1.1.2-rc.3-2026-07-14.zip`.
-- Verified local install folder: `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.3/unpacked`; the GitHub download matches `extension/dist` and declares WebCollect `1.1.2` / Manifest V3. The user loaded RC2 before RC3 existed, so final account acceptance must first update the same installed extension to this folder without uninstalling it.
-- RC3 preserves the RC2 edge-peeking mascot and adds a fused top-bar `壁纸 | 开/关` control. Its left action enters wallpaper now; its accessible switch changes only the next new-tab startup mode and stays synchronized with the full wallpaper settings dialog.
+- Published RC identity: tag `webcollect-2026-07-15-v1.1.2-rc.6`, code commit `b9b41fcc828ca00e96cd1e0c29e0f4994c483b2d`, asset `WebCollect-Chrome-Extension-v1.1.2-rc.6-2026-07-15.zip`, SHA-256 `2e9496d8554f160343c9237221f34f2b698b8b9f0b184975f50ab8a8eae0db8a`.
+- RC Prerelease: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-15-v1.1.2-rc.6`; direct zip: `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-15-v1.1.2-rc.6/WebCollect-Chrome-Extension-v1.1.2-rc.6-2026-07-15.zip`.
+- Verified local install folder: `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.6/unpacked`; the GitHub download matches `extension/dist` and declares WebCollect `1.1.2` / Manifest V3. The signed-in main Chrome loads this folder under the unchanged extension ID, so its IndexedDB and real wall were preserved.
+- RC6 includes the edge-peeking mascot, fused top-bar `壁纸 | 开/关` control, July 15 version date, and the stale-refresh guard that prevents the startup wallpaper preference from rolling back.
 - Fixed: clean-checkout Web OAuth configuration, fresh-Profile inbox duplication, deterministic canonical inbox selection when old clients already produced same-section duplicates, OAuth code cleanup, custom-server HMR upgrades, concurrent floating-capture destination creation, duplicate GoTrue clients, and browser auth refresh lifecycle misuse.
-- Verified so far: 129 Vitest cases, all 31 legacy scripts, all 13 Playwright cases, TypeScript, ESLint, Web/extension production builds, dependency audit, extension artifact/size, multi-viewport visual checks, and isolated MV3 runtime.
-- Real account: Profile A passed Google sign-in, local-scope sign-out, re-sign-in, validated session, and cloud sync. The user has explicitly authorized the signed-in main Chrome for RC installation; Profile B remains the independent second-session surface.
-- Data state is `364 cards / 130 categories / 24 preferences / 58 snapshots / 0 tombstones`; the old extension added one empty category while cards and other counts stayed unchanged.
+- Verified so far: 132 Vitest cases, all 31 legacy scripts, all 14 Playwright cases with one worker, TypeScript, ESLint, Web/extension production builds, dependency audit, extension artifact/size, multi-viewport visual checks, and isolated MV3 runtime.
+- Real account: Profile A passed Google sign-in, local-scope sign-out, re-sign-in, validated session, and cloud sync. The explicitly authorized signed-in main Chrome also passed RC6 version/date, account, cloud wall, sync badge, startup-wallpaper switch, and Docu.md metadata checks without data edits.
+- Profile B loads RC6 but remains logged out because Google reached its passkey/Touch ID challenge. It created no cloud data and remains the only independent second-session gate.
+- Data state is `364 cards / 130 categories / 24 preferences / 60 snapshots / 0 tombstones`; the old extension added one empty category while primary data counts otherwise stayed unchanged.
 - Two exact empty inbox artifacts are documented in the closeout. One still has a section-preference reference; neither may be deleted without explicit user approval.
-- The installable RC is published. Do not describe V1.1.2 as final until the authorized Chrome and Profile B both pass, counts remain unchanged, and final main/tag/zip are pinned to one commit.
+- The installable RC is published and the main Chrome has passed. Do not describe V1.1.2 as final until Profile B passes (or the user explicitly waives that gate), primary counts remain unchanged, and final main/tag/zip are pinned to one commit.
 
 ## 2026-07-12 V1.1.1 Audit And Supabase Split Handoff
 

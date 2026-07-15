@@ -2,7 +2,7 @@
 
 > **Archived 2026-07-15:** this file is a historical checklist and evidence log. It is not the current task plan, is not automatically read or updated, and does not require future tasks to maintain a parallel progress ledger. References below to older workflow directories are factual history only; those workflows are retired for this repository.
 
-## Current Task: 2026-07-14 V1.1.2 Account Sync Closeout
+## Current Task: 2026-07-15 V1.1.2 Account Sync Closeout
 
 - [x] Back up main, local workspace state, and the existing private Supabase archive before account testing.
 - [x] Fix clean-checkout Web OAuth configuration and verify only the public WebCollect anon role is exposed.
@@ -10,13 +10,13 @@
 - [x] Handle old-client same-section empty inbox duplicates deterministically without deleting them or routing new captures by database row order.
 - [x] Remove consumed OAuth codes, restore custom-server HMR upgrades, and serialize the complete floating-capture queue drain.
 - [x] Reuse one GoTrue client per browser context and preserve Supabase's browser-managed foreground/background auth refresh lifecycle.
-- [x] Pass 129 Vitest cases, all 31 legacy scripts, all 13 Playwright cases, type check, lint, Web/extension builds, dependency audit, extension artifact/size, and isolated MV3 runtime.
+- [x] Pass 132 Vitest cases, all 31 legacy scripts, all 14 Playwright cases with one worker, type check, lint, Web/extension builds, dependency audit, extension artifact/size, and isolated MV3 runtime.
 - [x] Complete real Google OAuth sign-in/sign-out/re-sign-in and cloud sync in Profile A.
-- [x] Publish and byte-verify the installable V1.1.2 RC3 Prerelease, including tag, unique zip, manifest, SHA-256, and local unpacked copy.
-- [ ] Update the explicitly authorized signed-in Chrome from RC2 to RC3 without uninstalling it; verify manifest version, top-bar wallpaper switch, and real cloud wall.
-- [ ] User completes Google account/security confirmation in the independent Profile B; verify two sessions and unchanged `364 / 130 / 24 / 58` cloud counts.
+- [x] Publish and byte-verify the installable V1.1.2 RC6 Prerelease, including tag, unique zip, manifest, SHA-256, and local unpacked copy.
+- [x] Load RC6 in the explicitly authorized signed-in main Chrome without uninstalling it; verify version/date, stable extension ID, real account, cloud wall, sync badge, top-bar wallpaper switch, and Docu.md metadata.
+- [ ] User completes Google's passkey/Touch ID confirmation in the independent Profile B; verify two sessions and unchanged `364 / 130 / 24` primary cloud counts.
 - [x] Run the production Web build in an isolated APFS-cloned workspace without interrupting the OAuth server.
-- [ ] After both Profiles pass, finalize docs and publish the exact final V1.1.2 zip.
+- [ ] After Profile B passes, or the user explicitly waives that independent-session gate, finalize docs and publish the exact final V1.1.2 zip.
 
 Current evidence: `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`.
 
