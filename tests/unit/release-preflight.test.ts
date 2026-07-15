@@ -67,15 +67,18 @@ describe("extension release preflight", () => {
     expect(script).toContain("--prerelease");
   });
 
-  it("keeps one quiet, authoritative GitHub Release publisher", () => {
+  it("keeps GitHub Actions as the only authoritative Release publisher", () => {
     const preflight = readFileSync("scripts/release-preflight.mjs", "utf8");
     const releaseScript = readFileSync("scripts/release-extension.sh", "utf8");
     const tagWorkflow = readFileSync(".github/workflows/webcollect-release.yml", "utf8");
 
     expect(preflight).toContain('stdio: ["ignore", "pipe", "ignore"]');
-    expect(releaseScript).toContain("release create");
+    expect(releaseScript).not.toContain("release create");
+    expect(releaseScript).toContain("GitHub Actions will verify and publish the Release");
     expect(tagWorkflow).not.toContain("softprops/action-gh-release");
-    expect(tagWorkflow).not.toContain("Publish GitHub Release");
+    expect(tagWorkflow).toContain("contents: write");
+    expect(tagWorkflow).toContain("gh release create");
+    expect(tagWorkflow).toContain("--prerelease");
   });
 
   it("reuses git credentials when gh's own login is stale without printing the token", () => {

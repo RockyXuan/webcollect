@@ -6,7 +6,7 @@ on:
       - "webcollect-*"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify-tag:
@@ -39,3 +39,56 @@ jobs:
 
       - name: Verify Chrome extension package size
         run: pnpm test:extension-size
+
+      - name: Package Chrome extension
+        id: package
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          tag="${GITHUB_REF_NAME}"
+          if [[ ! "${tag}" =~ ^webcollect-([0-9]{4}-[0-9]{2}-[0-9]{2})-(.+)$ ]]; then
+            echo "Unsupported release tag: ${tag}" >&2
+            exit 1
+          fi
+
+          release_date="${BASH_REMATCH[1]}"
+          version_label="${BASH_REMATCH[2]}"
+          zip_name="WebCollect-Chrome-Extension-${version_label}-${release_date}.zip"
+
+          (cd extension/dist && zip -qr "${GITHUB_WORKSPACE}/${zip_name}" .)
+          echo "zip_name=${zip_name}" >> "${GITHUB_OUTPUT}"
+          echo "version_label=${version_label}" >> "${GITHUB_OUTPUT}"
+
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ZIP_NAME: ${{ steps.package.outputs.zip_name }}
+          VERSION_LABEL: ${{ steps.package.outputs.version_label }}
+        run: |
+          set -Eeuo pipefail
+
+          release_flags=()
+          if [[ "${GITHUB_REF_NAME}" =~ -rc\.[1-9][0-9]*$ ]]; then
+            release_flags+=(--prerelease)
+          fi
+
+          notes=(
+            "WebCollect Chrome extension ${VERSION_LABEL}."
+            ""
+            "- Fixes the disabled wallpaper mode flashing before the collection wall."
+            "- Resolves the startup mode before the first React render."
+            "- Avoids mounting or preloading wallpaper assets in collection mode."
+            "- Verified by unit, legacy, Playwright, Web build, and extension artifact checks."
+          )
+          printf '%s\n' "${notes[@]}" > release-notes.md
+
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" "${ZIP_NAME}" --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" "${ZIP_NAME}" \
+              --title "WebCollect ${VERSION_LABEL}" \
+              --notes-file release-notes.md \
+              "${release_flags[@]}"
+          fi

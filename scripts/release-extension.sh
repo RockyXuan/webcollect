@@ -78,10 +78,8 @@ if [[ -z "${TAG}" ]]; then
 fi
 
 PREFLIGHT_ARGS=()
-RELEASE_CREATE_ARGS=()
 if [[ "${TAG}" =~ -rc\.[1-9][0-9]*$ ]]; then
   PREFLIGHT_ARGS+=(--prerelease)
-  RELEASE_CREATE_ARGS+=(--prerelease)
 fi
 
 ZIP_NAME="$(extension_zip_filename "${TAG}")"
@@ -115,14 +113,9 @@ fi
 git_with_network push origin main
 git_with_network push origin "${TAG}"
 
-if scripts/gh-proxy.sh release view "${TAG}" --repo "${REPO}" >/dev/null 2>&1; then
-  scripts/gh-proxy.sh release upload "${TAG}" "${ZIP_PATH}" --repo "${REPO}" --clobber
-else
-  scripts/gh-proxy.sh release create "${TAG}" "${ZIP_PATH}" \
-    --repo "${REPO}" \
-    --title "${TAG}" \
-    --notes "WebCollect Chrome extension build for ${TAG}." \
-    "${RELEASE_CREATE_ARGS[@]}"
-fi
+RELEASE_URL="https://github.com/${REPO}/releases/tag/${TAG}"
+ASSET_URL="https://github.com/${REPO}/releases/download/${TAG}/${ZIP_NAME}"
 
-scripts/gh-proxy.sh release view "${TAG}" --repo "${REPO}" --json tagName,url,assets
+echo "The release tag was pushed. GitHub Actions will verify and publish the Release."
+echo "Release: ${RELEASE_URL}"
+echo "Asset: ${ASSET_URL}"
