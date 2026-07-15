@@ -39,7 +39,7 @@
 | `webcollect-v1.1.2-rc3-wallpaper-toggle-2048x1152-2026-07-14.png` | RC3 宽屏收藏墙顶部完整显示“壁纸”和开关 | 宽屏视觉、标签、工具栏溢出验收 | 控件宽 `134px`、整页无横向溢出，肉眼复核通过 |
 | `webcollect-v1.1.2-rc3-wallpaper-toggle-390x844-2026-07-14.png` | RC3 手机视口收起“壁纸”文字，保留图标和开关 | 移动端紧凑布局与可恢复横向滚动 | 整页无横向溢出；工具栏可横向滚动，开关尺寸稳定 |
 | `codex-clipboard-a43e37b0-4662-485d-81f8-5951db124c9d.png` | 用户已关闭顶部启动壁纸模式开关 | 关闭状态必须从新标签页首帧生效 | RC7 增加同步启动镜像，并在 React 挂载前读取 |
-| `codex-clipboard-0ac336af-db71-4fa0-a6aa-c048dff43c82.png` | 关闭后新建标签仍先闪出壁纸 | 首帧闪屏回归，不得仅靠异步 IndexedDB 初始化修复 | RC7 E2E 从 document 初始化监听，确认壁纸 stage 零挂载；真实扩展待加载 RC7 复核 |
+| `codex-clipboard-0ac336af-db71-4fa0-a6aa-c048dff43c82.png` | 关闭后新建标签仍先闪出壁纸 | 首帧闪屏回归，不得仅靠异步 IndexedDB 初始化修复 | RC7 E2E 从 document 初始化监听，确认壁纸 stage 零挂载；2026-07-16 真实扩展连续 4 个新标签均直接进入收藏墙 |
 
 ## 后续截图管理规则
 

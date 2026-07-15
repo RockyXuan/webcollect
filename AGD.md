@@ -1,13 +1,13 @@
 # WebCollect 全项目体检入口
 
-更新时间：2026-07-15
+更新时间：2026-07-16
 面向对象：Claude / Codex / 后续任何接手 WebCollect 的开发 agent
 当前主目录：`/Users/rockyx/vibe coding/Web Collect 0628`
 远端仓库：`https://github.com/RockyXuan/webcollect`
 主分支：`main`
 当前最新发布身份：`V1.1.1 / 2026年7月12日`
 当前 RC：`V1.1.2 / 2026年7月15日` RC7 已发布，tag `webcollect-2026-07-15-v1.1.2-rc.7` 固定到代码提交 `a3a2d2f429c2c56b4e8c4e33fdc6da831bec4679`；账号级收口见 `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`。
-当前主线：V1.1.2 RC7 已完成首帧无壁纸挂载的自动化验收、副屏本地预览和发布产物复核，但尚未装入真实扩展新标签页；RC6 仍保留此前主账号 Chrome 的真实账号、云同步和收藏墙证据。V1.1.1 仍是最新稳定版，发布 V1.1.2 正式版前还需真实 Chrome 加载 RC7 复核闪屏，并完成独立 Profile B 双会话核验，或由用户明确豁免对应门槛。
+当前主线：V1.1.2 RC7 已完成首帧无壁纸挂载的自动化验收、发布产物复核和真实账号 Chrome 新标签页验收。2026-07-16 在副屏辅助窗口中保持同一扩展 ID、未卸载扩展，连续 4 次关闭启动壁纸模式的新标签均直接进入收藏墙且未出现壁纸舞台；登录态、云同步和原有收藏均保留。V1.1.1 仍是最新稳定版，发布 V1.1.2 正式版前只剩独立 Profile B 双会话核验，或由用户明确豁免该门槛。
 
 ## 2026-07-15 项目工作流退役
 
@@ -24,12 +24,12 @@
 - 修复同一页面重复创建 Supabase `GoTrueClient` 的认证竞态；正常登出/登录保留 Supabase 官方的浏览器前后台刷新管理。
 - Release 发布不再依赖本机 `gh` 登录或读取 Git 凭据；本地脚本只做前置检查、构建、打包和推 tag，GitHub Actions 是唯一 Release 发布器，并在云端复跑扩展构建、产物和体积检查。
 - RC7 已发布为 GitHub Prerelease 并复核：Release `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-15-v1.1.2-rc.7`；zip 直链 `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-15-v1.1.2-rc.7/WebCollect-Chrome-Extension-v1.1.2-rc.7-2026-07-15.zip`；`16,942,028` bytes；SHA-256 `747dcdcf62134f42352d281521460116fd89b3d87ba8509f1a2f5ddfc3e8da9d`。
-- RC7 的 GitHub 下载件已复核并解压到 `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.7/unpacked`，清单为 WebCollect `1.1.2` / Manifest V3；RC6 仍是当前真实主 Chrome 已加载版本，RC7 未经新的安装确认不得冒充已安装。
+- RC7 的 GitHub 下载件已复核并解压到 `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.7/unpacked`，清单为 WebCollect `1.1.2` / Manifest V3。用户确认加载后，为保留稳定扩展 ID 和 IndexedDB，RC7 文件树被精确同步到 Chrome 原有的 `~/Downloads/WebCollect-v1.1.2-rc.6/unpacked` 加载路径并原位重新加载；`diff -qr` 确认两目录完全一致。Chrome 详情页仍显示旧文件夹名，但运行内容是 RC7，ID 仍为 `immpcmhmabobllnopedaoflcjneigbko`。
 - 收藏墙顶部“壁纸”入口现拆成一个融合式快捷控件：左侧进入当前壁纸页，右侧 `开/关` switch 只控制下次新标签页先显示壁纸还是直接进入主页；与壁纸设置弹窗共用同一 `defaultMode` 偏好。RC7 进一步把启动模式同步镜像到 localStorage，并在 React 首次挂载前读取；关闭时不创建壁纸图片、不预加载壁纸、也不允许壁纸 stage 短暂挂载。
 - 小松鼠浮窗收起时现在只露约半张脸并朝网页轻微侧头，鼠标悬停、键盘聚焦、拖动或打开面板时完整展开；隔离 Chromium 实测右侧可见 `50.07%`、左侧 `50.00%`，悬停后完整显示且点击可打开面板，控制台零错误。
 - 2026-07-14 主 Chrome 中的旧扩展再次上传了一个同分项空收集箱，使云端分类从 129 增至 130；V1.1.2 现按“同分项卡片数优先、创建时间与 ID 稳定排序”选择 canonical 收集箱，阻止数据库返回顺序把新收藏落到空重复项。现有两条空记录均保留，不自动删除。
 - 当前验证：135 条 Vitest、31 组历史脚本、14 条 Playwright、TypeScript、ESLint、Web/扩展生产构建、扩展产物/大小、隔离 MV3 runtime 和 GitHub CI 已通过；生产依赖审计通过 npm bulk advisory 接口确认无已知漏洞。
-- Profile A 的真实 Google 登录、退出、重登和云同步已通过；主账号 Chrome 的 RC6 真实墙和同步也已通过。RC7 在副屏专用 Chrome 窗口的本地预览中关闭开关后重载，壁纸 stage 数量始终为 0；真实扩展新标签页仍需加载 RC7 后复核。独立 Profile B 已加载 RC6，但 Google 要求通行密钥/Touch ID，仍需用户本人完成后才能形成第二个独立会话。
+- Profile A 的真实 Google 登录、退出、重登和云同步已通过。RC7 已在主账号 Chrome profile 的副屏辅助窗口中原位重新加载；`X rocky`、`云端已同步`、原有分类与卡片均保留。启动壁纸开关关闭时连续 4 个真实 `chrome://newtab` 都直接显示主页/收藏卡片，页面状态中无壁纸舞台或壁纸文案；该结果与零挂载 MutationObserver E2E 相互印证。独立 Profile B 已加载 RC6，但 Google 要求通行密钥/Touch ID，仍需用户本人完成后才能形成第二个独立会话。
 - 最近核对的云端为 `364 cards / 130 categories / 24 preferences / 60 snapshots / 0 tombstones / 1 workspace version`；130 个分类中包含两条本轮修复前由旧客户端产生的空收集箱，其中一条仍有分项偏好引用。未经用户明确批准不删除，也不把它们计作数据丢失。
 
 ## 2026-07-12 V1.1.1 全项目审计结论

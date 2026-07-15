@@ -1,11 +1,11 @@
 # WebCollect V1.1.2 account sync closeout
 
-Updated: 2026-07-15
+Updated: 2026-07-16
 Release candidate identity: `V1.1.2 / 2026年7月15日`
 RC tag: `webcollect-2026-07-15-v1.1.2-rc.7`
 Previous RC tags: `webcollect-2026-07-15-v1.1.2-rc.6`, `webcollect-2026-07-15-v1.1.2-rc.5`, `webcollect-2026-07-14-v1.1.2-rc.4`, `webcollect-2026-07-14-v1.1.2-rc.3`, `webcollect-2026-07-14-v1.1.2-rc.2`, `webcollect-2026-07-14-v1.1.2-rc.1`
 Planned final tag: `webcollect-2026-07-15-v1.1.2`
-Current gate: RC7 is published, downloaded, and byte-verified. Its first-frame wallpaper fix passed a zero-mount MutationObserver E2E and a secondary-display local Chrome preview, but RC7 has not yet replaced RC6 in the real extension new-tab page. RC6 retains the real-account, cloud-wall, metadata, and sync evidence. Final release still requires real Chrome RC7 flash verification plus a second independent Profile B session, or an explicit user waiver of the corresponding gate.
+Current gate: RC7 is published, downloaded, byte-verified, and loaded in the signed-in Chrome profile without uninstalling the stable extension ID. Its first-frame wallpaper fix passed the zero-mount MutationObserver E2E and four consecutive real `chrome://newtab` checks in a secondary-display auxiliary window. The real account, cloud wall, metadata, and sync evidence were preserved. Final release now requires only a second independent Profile B session, or an explicit user waiver of that gate.
 
 This patch follows the V1.1.1 full-project audit. It focuses on the last real-account observation and on defects found while reproducing a fresh Profile login. The PM split and the live WebCollect database migration remain documented in `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`.
 
@@ -33,8 +33,9 @@ This patch follows the V1.1.1 full-project audit. It focuses on the last real-ac
 - RC7 resolves startup mode synchronously before the first React render; collection mode no longer mounts the wallpaper stage or creates/preloads a wallpaper image. Strict Mode initialization is deduplicated.
 - Release publication is now performed only by the tag-triggered GitHub Actions workflow. The local script no longer depends on GitHub CLI OAuth or probes Git credentials.
 - `main` later gained CI-only commits through `6164c65d2fbf3c9276d2426ed51ba7791c79c7f8`; the RC7 binary remains pinned to the code identity above. GitHub CI run `29432392591` passed both the full verification job and the Node 24 / pnpm 11 bulk-advisory production audit.
-- RC6 remains the extension currently loaded in the user's real Chrome; RC7 must not be described as installed until a new explicit installation confirmation is received.
-- RC1 through RC6 remain historical evidence; RC7 supersedes them as the installable candidate.
+- On 2026-07-16, after explicit user confirmation, the verified RC7 tree was synchronized into the currently loaded unpacked source directory and Chrome's WebCollect extension was reloaded without uninstalling it. `diff -qr` confirmed that the loaded tree exactly matches `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.7/unpacked`.
+- Chrome still reports the legacy source path `~/Downloads/WebCollect-v1.1.2-rc.6/unpacked`; this is only the retained folder name used to preserve the stable extension ID and IndexedDB. The folder contents are byte-for-byte the RC7 unpacked tree.
+- The extension ID remained `immpcmhmabobllnopedaoflcjneigbko`, the manifest version remained `1.1.2`, and no extension-load error was reported. RC1 through RC6 remain historical evidence; RC7 is the installed candidate.
 
 ## Top-bar wallpaper startup switch acceptance
 
@@ -154,14 +155,14 @@ Fix:
 - Re-sign-in passed, the real account avatar rendered, cloud sync completed, and the callback URL returned to `/` without a stale code.
 - Supabase recorded one account session created/refreshed during this test window.
 
-### Authorized signed-in main Chrome
+### Authorized signed-in Chrome profile
 
-- The user explicitly authorized the existing main Chrome for this RC account closeout; only the WebCollect task tab was operated, and unrelated personal tabs were not opened or changed.
-- RC6 loaded under the stable extension ID and displayed `2026年7月15日 · V 1.1.2`.
+- The user explicitly authorized loading RC7 in the existing signed-in Chrome profile. A new auxiliary Chrome window was created and moved to the secondary display named `HandaCai`; the main X/personal-tab window was not operated.
+- RC7 was reloaded under the stable extension ID without uninstalling the previous candidate. The old source-folder label was retained only to preserve the installation identity and local data.
 - The real `X rocky` account, `云端已同步` badge, populated cloud wall, and account settings rendered without re-login.
-- The top-bar startup-wallpaper switch reported ON and a fresh new tab showed wallpaper first; the earlier OFF/refresh/restore regression run proved the preference no longer rolls back after a stale refresh.
+- The top-bar startup-wallpaper switch reported OFF. Four consecutive brand-new tabs opened as `新标签页 - WebCollect`, immediately exposed the home/category/card UI, and contained no wallpaper-stage or wallpaper-copy state. The automated document-initialization observer separately proved that `.wc-wallpaper-stage` mounted zero times, covering a transient flash too fast for a static screenshot.
 - The corrected card `docu.md — AI 负责写作，docu.md 完成其余工作。` remained present in the real wall.
-- The account panel and wall were inspected read-only. No card, category, preference, recycle-bin item, or login session was deleted or edited.
+- The account panel and wall were inspected read-only. No card, category, preference, recycle-bin item, login session, or IndexedDB database was deleted or edited.
 
 ### Profile B
 
@@ -209,7 +210,7 @@ Both rows are empty, but the project's highest-priority rule forbids deleting or
 ## Finalization checklist
 
 - [x] Publish V1.1.2 RC7 and verify its tag, code commit, prerelease flag, unique asset, size, SHA-256, and manifest.
-- [ ] Update the explicitly authorized signed-in Chrome to RC7 without uninstalling it; verify a brand-new extension tab has no wallpaper flash when startup wallpaper is off.
+- [x] Update the explicitly authorized signed-in Chrome profile to RC7 without uninstalling it; verify four brand-new extension tabs have no wallpaper flash when startup wallpaper is off.
 - [x] Retain the RC6 real-account, cloud-wall, sync-badge, metadata, and stable-extension-ID evidence without claiming it as RC7 evidence.
 - [ ] Complete Google OAuth in the independent Profile B.
 - [ ] Verify two recent sessions, both cloud walls, and unchanged `364 / 130 / 24` primary data counts.

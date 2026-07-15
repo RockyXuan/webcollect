@@ -4,14 +4,14 @@
 
 本仓库已退役 Superpowers（含 `superpowers:*` / `using-superpowers`）、`goal-zzx` / `zzx-goal` 和 `andrej-karpathy-coding`。不要安装、启用、调用或模仿它们。可按任务复杂度使用 Codex 原生计划或 goal；测试、Review、子代理和 worktree 均由当前任务风险决定。`tasks/todo.md`、`tasks/lessons.md`、`CODEX_GO_MODE_STATUS.md` 与 `docs/superpowers/` 仅为历史档案，不是当前执行入口。
 
-## 2026-07-15 V1.1.2 候选事实
+## 2026-07-16 V1.1.2 候选事实
 
 - 第一优先事实源：`docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`。
-- 已发布稳定版仍是 `V1.1.1`；`V1.1.2 RC6` 已发布为 Prerelease，tag `webcollect-2026-07-15-v1.1.2-rc.6`，本地安装目录为 `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.6/unpacked`。主账号 Chrome 已通过 RC6 真实验收；仅剩独立 Profile B 的 Google 通行密钥和双会话核验，或用户明确豁免该门槛后，才转正式版。
+- 已发布稳定版仍是 `V1.1.1`；`V1.1.2 RC7` 已发布为 Prerelease，tag `webcollect-2026-07-15-v1.1.2-rc.7`，校验目录为 `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.7/unpacked`。为保留扩展 ID 和 IndexedDB，该文件树已精确同步到 Chrome 既有的 `rc.6/unpacked` 路径并原位重载；主账号 Chrome profile 已通过 RC7 真实验收。仅剩独立 Profile B 的 Google 通行密钥和双会话核验，或用户明确豁免该门槛后，才转正式版。
 - 已修根因：干净 Web OAuth 配置、新 Profile 重复收集箱、旧客户端已有同分项空重复时的 canonical 选择、回调 code、HMR upgrade、浮窗并发目标、重复 GoTrue 客户端和错误的手动浏览器 refresh 生命周期。
-- 当前自动门禁：132 Vitest、31 组历史脚本、14 Playwright、TypeScript、ESLint、Web/扩展构建、依赖审计、扩展产物/体积/运行时均通过。RC6 另有顶部 `壁纸 | 开/关`、壁纸偏好防回滚、半脸浮窗和多视口浏览器证据。
+- 当前自动门禁：135 Vitest、31 组历史脚本、14 Playwright、TypeScript、ESLint、Web/扩展构建、依赖审计、扩展产物/体积/运行时均通过。RC7 另有顶部 `壁纸 | 开/关`、壁纸偏好防回滚、首帧壁纸零挂载、半脸浮窗和多视口浏览器证据。
 - 最近真实数据计数：`364 / 130 / 24 / 60 / 0 / 1`；不要删除 closeout 中记录的两条空收集箱，除非用户明确批准精确处理。
-- 用户已明确授权本轮操作其主 Chrome 中的 WebCollect 任务标签；RC6 已在相同固定扩展 ID 下加载，不要卸载。不要碰无关个人标签；账号、密码、通行密钥、验证码或 CAPTCHA 仍由用户本人处理。
+- RC7 已在相同固定扩展 ID 下加载，不要卸载。Chrome 验证应复用副屏专用辅助窗口，不要碰主屏的 X、视频或其他个人标签；账号、密码、通行密钥、验证码或 CAPTCHA 仍由用户本人处理。
 
 ## 2026-07-12 当前事实
 

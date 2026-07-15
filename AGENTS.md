@@ -1,8 +1,8 @@
 # WebCollect — 个人网页收藏墙
 
-## 2026-07-15 current account-sync entry
+## 2026-07-16 current account-sync entry
 
-Read `AGD.md` and `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md` first. RC6 has passed real-account verification in the explicitly authorized signed-in main Chrome. V1.1.2 is still a release candidate until independent Profile B completes Google OAuth/sync verification, or the user explicitly waives that second-session gate, and the final main/tag/zip identity is recorded; V1.1.1 remains the latest stable Release meanwhile. For this account-closeout task only, the user explicitly authorized operating the existing WebCollect task tab in the main signed-in Chrome; do not touch unrelated personal tabs.
+Read `AGD.md` and `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md` first. RC7 has passed real-account verification in the signed-in Chrome profile from a dedicated auxiliary window on the secondary display; the stable extension ID, IndexedDB, login, cloud sync, and existing wall were preserved. Four fresh new tabs opened directly to the collection while startup wallpaper was off, with no wallpaper-stage state. V1.1.2 remains a release candidate until independent Profile B completes Google OAuth/sync verification, or the user explicitly waives that second-session gate, and the final main/tag/zip identity is recorded; V1.1.1 remains the latest stable Release meanwhile. Keep future Chrome work in the secondary-display auxiliary window and do not touch unrelated personal tabs.
 
 ## 2026-07-15 Chrome workspace preference
 
