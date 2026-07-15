@@ -10,6 +10,7 @@ import {
 import { DEFAULT_WALLPAPER_PREFS, FALLBACK_WALLPAPERS, filterUsableWallpapers, mergeWallpaperLibrary, pruneWallpaperLibrary } from "./wallpaper-sources";
 import { markLocalSnapshotChanged, markSyncPreferenceChanged } from "./db";
 import { withStorageLock } from "./storage-lock";
+import { writeWallpaperStartupMode } from "./wallpaper-startup-mode";
 
 const wallpaperDb = localforage.createInstance({
   name: "WebCollect",
@@ -147,8 +148,10 @@ export async function saveWallpaperPrefs(prefs: Partial<WallpaperPrefs>): Promis
         toWallpaperSyncedSettings(previous || {}),
         toWallpaperSyncedSettings(prepared)
       ),
+      defaultMode: prepared.defaultMode,
     };
   });
+  writeWallpaperStartupMode(result.defaultMode);
   if (result.changed) {
     await markSyncPreferenceChanged("wallpaperPrefs");
     await markLocalSnapshotChanged();
@@ -165,8 +168,10 @@ export async function saveSyncedWallpaperPrefs(prefs: Partial<WallpaperPrefs>): 
         toWallpaperSyncedSettings(previous || {}),
         toWallpaperSyncedSettings(prepared)
       ),
+      defaultMode: prepared.defaultMode,
     };
   });
+  writeWallpaperStartupMode(result.defaultMode);
   if (result.changed) {
     await markSyncPreferenceChanged("wallpaperPrefs");
     await markLocalSnapshotChanged();
@@ -176,12 +181,14 @@ export async function saveSyncedWallpaperPrefs(prefs: Partial<WallpaperPrefs>): 
 export async function saveWallpaperRuntimePrefs(
   prefs: Partial<WallpaperPrefs>
 ): Promise<WallpaperPrefs> {
-  return withStorageLock("wallpaper-prefs-rmw", async () => {
+  const prepared = await withStorageLock("wallpaper-prefs-rmw", async () => {
     const stored = await wallpaperDb.getItem<Partial<WallpaperPrefs>>(WALLPAPER_PREFS_KEY);
     const prepared = mergeWallpaperRuntimePrefs(stored, prefs);
     await wallpaperDb.setItem(WALLPAPER_PREFS_KEY, prepared);
     return prepared;
   });
+  writeWallpaperStartupMode(prepared.defaultMode);
+  return prepared;
 }
 
 export async function getWallpaperLibrary(): Promise<WallpaperItem[]> {

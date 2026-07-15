@@ -24,11 +24,13 @@ import {
   shouldRefreshWallpapers,
 } from "./wallpaper-sources";
 import { selectWallpaperQuote } from "./wallpaper-quotes";
+import { readWallpaperStartupMode, writeWallpaperStartupMode } from "./wallpaper-startup-mode";
 import type { WallpaperItem, WallpaperMode, WallpaperPrefs } from "./wallpaper-types";
 
 const RECENT_QUOTE_LIMIT = 50;
 const RECENT_ASSET_LIMIT = 30;
 const RECENT_MEDIA_LIMIT = 20;
+let wallpaperInitializationPromise: Promise<void> | null = null;
 
 interface WallpaperState {
   mode: WallpaperMode;
@@ -98,9 +100,10 @@ function applyWallpaperDisplay(prefs: WallpaperPrefs, wallpaper: WallpaperItem):
 }
 
 export const useWallpaperStore = create<WallpaperState>((set, get) => ({
-  mode: "wallpaper",
+  mode: "collection",
   prefs: {
     ...DEFAULT_WALLPAPER_PREFS,
+    defaultMode: "collection",
     currentWallpaperId: INITIAL_WALLPAPER?.id || null,
     currentQuoteId: INITIAL_WALLPAPER?.quoteId || null,
   },
@@ -111,33 +114,39 @@ export const useWallpaperStore = create<WallpaperState>((set, get) => ({
 
   initialize: async () => {
     if (get().isReady) return;
+    if (!wallpaperInitializationPromise) {
+      wallpaperInitializationPromise = (async () => {
+        const [prefs, storedLibrary] = await Promise.all([
+          getWallpaperPrefs(),
+          getWallpaperLibrary(),
+        ]);
+        const wallpapers = pruneWallpaperLibrary(mergeWallpaperLibrary(FALLBACK_WALLPAPERS, storedLibrary));
+        const pool = getWallpaperPool(wallpapers, prefs);
+        const preferredCurrent = prefs.rotationInterval === "open"
+          ? pickWallpaperAvoidingRecent(pool, prefs.currentWallpaperId, prefs.recentAssetIds)
+            || getCurrentWallpaper(wallpapers, null, prefs)
+          : pool.find((item) => item.id === prefs.currentWallpaperId)
+            || pickWallpaperAvoidingRecent(pool, prefs.currentWallpaperId, prefs.recentAssetIds)
+            || getCurrentWallpaper(wallpapers, prefs.currentWallpaperId, prefs);
+        const nextPrefs = applyWallpaperDisplay(prefs, preferredCurrent || getCurrentWallpaper(wallpapers, prefs.currentWallpaperId, prefs));
 
-    const [prefs, storedLibrary] = await Promise.all([
-      getWallpaperPrefs(),
-      getWallpaperLibrary(),
-    ]);
-    const wallpapers = pruneWallpaperLibrary(mergeWallpaperLibrary(FALLBACK_WALLPAPERS, storedLibrary));
-    const pool = getWallpaperPool(wallpapers, prefs);
-    const preferredCurrent = prefs.rotationInterval === "open"
-      ? pickWallpaperAvoidingRecent(pool, prefs.currentWallpaperId, prefs.recentAssetIds)
-        || getCurrentWallpaper(wallpapers, null, prefs)
-      : pool.find((item) => item.id === prefs.currentWallpaperId)
-        || pickWallpaperAvoidingRecent(pool, prefs.currentWallpaperId, prefs.recentAssetIds)
-        || getCurrentWallpaper(wallpapers, prefs.currentWallpaperId, prefs);
-    const nextPrefs = applyWallpaperDisplay(prefs, preferredCurrent || getCurrentWallpaper(wallpapers, prefs.currentWallpaperId, prefs));
-
-    const persistedPrefs = await saveWallpaperRuntimePrefs(nextPrefs);
-    set({
-      prefs: persistedPrefs,
-      wallpapers,
-      mode: persistedPrefs.defaultMode,
-      isReady: true,
-      error: null,
-    });
-    void get().cacheCurrentAndNext();
-    if (shouldRefreshWallpapers(persistedPrefs)) {
-      void get().refreshOnlineWallpapers();
+        const persistedPrefs = await saveWallpaperRuntimePrefs(nextPrefs);
+        set({
+          prefs: persistedPrefs,
+          wallpapers,
+          mode: persistedPrefs.defaultMode,
+          isReady: true,
+          error: null,
+        });
+        void get().cacheCurrentAndNext();
+        if (shouldRefreshWallpapers(persistedPrefs)) {
+          void get().refreshOnlineWallpapers();
+        }
+      })().finally(() => {
+        wallpaperInitializationPromise = null;
+      });
     }
+    await wallpaperInitializationPromise;
   },
 
   enterCollection: () => {
@@ -173,6 +182,9 @@ export const useWallpaperStore = create<WallpaperState>((set, get) => ({
 
   updatePrefs: async (updates) => {
     const current = get();
+    if (updates.defaultMode) {
+      writeWallpaperStartupMode(updates.defaultMode);
+    }
     const prefs = {
       ...get().prefs,
       ...updates,
@@ -275,6 +287,18 @@ export const useWallpaperStore = create<WallpaperState>((set, get) => ({
 
 export function selectCurrentWallpaper(state: WallpaperState): WallpaperItem {
   return getCurrentWallpaper(state.wallpapers, state.prefs.currentWallpaperId, state.prefs);
+}
+
+export function primeWallpaperStartupMode(): WallpaperMode {
+  const mode = readWallpaperStartupMode() || "collection";
+  useWallpaperStore.setState((state) => ({
+    mode,
+    prefs: {
+      ...state.prefs,
+      defaultMode: mode,
+    },
+  }));
+  return mode;
 }
 
 export { getRotationMs };

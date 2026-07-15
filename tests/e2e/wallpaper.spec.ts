@@ -54,7 +54,7 @@ test("disabling wallpaper mode opens the next page directly in the collection", 
   await expect(page.locator(".wc-zoom-wallpaper")).toHaveCount(0);
 });
 
-test("top bar wallpaper switch changes the next-tab startup mode without opening settings", async ({ page }) => {
+test("top bar wallpaper switch opens a new page without ever mounting the wallpaper when disabled", async ({ page, context }) => {
   await page.goto("/");
   await expect(page.locator('[data-wallpaper-ready="true"]')).toBeVisible({ timeout: 30_000 });
   await page.keyboard.press("Enter");
@@ -69,17 +69,32 @@ test("top bar wallpaper switch changes the next-tab startup mode without opening
   await expect(startupSwitch).toContainText("关");
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  await page.reload();
-  await expect(page.getByText("WebCollect", { exact: true })).toBeVisible();
-  await expect(page.locator(".wc-zoom-wallpaper")).toHaveCount(0);
+  await context.addInitScript(() => {
+    const state = window as typeof window & { __wallpaperStageMounts?: number };
+    state.__wallpaperStageMounts = 0;
+    const observer = new MutationObserver(() => {
+      if (document.querySelector(".wc-wallpaper-stage")) {
+        state.__wallpaperStageMounts = (state.__wallpaperStageMounts || 0) + 1;
+      }
+    });
+    observer.observe(document, { childList: true, subtree: true });
+  });
 
-  const restoredSwitch = page.getByRole("switch", { name: "启动壁纸模式" });
+  const nextPage = await context.newPage();
+  await nextPage.goto("/");
+  await expect(nextPage.getByText("WebCollect", { exact: true })).toBeVisible();
+  await expect(nextPage.locator(".wc-wallpaper-stage")).toHaveCount(0);
+  await expect.poll(() => nextPage.evaluate(() => (
+    window as typeof window & { __wallpaperStageMounts?: number }
+  ).__wallpaperStageMounts || 0)).toBe(0);
+
+  const restoredSwitch = nextPage.getByRole("switch", { name: "启动壁纸模式" });
   await restoredSwitch.click();
   await expect(restoredSwitch).toHaveAttribute("aria-checked", "true");
   await expect(restoredSwitch).toContainText("开");
 
-  await page.reload();
-  await expect(page.locator('[data-wallpaper-ready="true"]')).toBeVisible({ timeout: 30_000 });
+  await nextPage.reload();
+  await expect(nextPage.locator('[data-wallpaper-ready="true"]')).toBeVisible({ timeout: 30_000 });
 });
 
 test("a late remote wallpaper refresh cannot restore a disabled startup mode", async ({ page }) => {
@@ -142,6 +157,7 @@ test("a late remote wallpaper refresh cannot restore a disabled startup mode", a
 
 test("repairs obsolete packaged wallpaper paths from IndexedDB", async ({ page }) => {
   await page.goto("/");
+  await expect(page.locator('[data-wallpaper-ready="true"]')).toBeVisible({ timeout: 30_000 });
   await page.waitForFunction(async () => {
     const databases = await indexedDB.databases();
     return databases.some((database) => database.name === "WebCollect");

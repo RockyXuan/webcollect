@@ -153,6 +153,8 @@ export function WallpaperShell({
     setImageLoadStage("display");
     setImageLoadError(null);
 
+    if (mode !== "wallpaper") return;
+
     const loadImage = (url: string, stage: WallpaperImageLoadStage) => {
       const image = new window.Image();
       image.decoding = "async";
@@ -185,7 +187,7 @@ export function WallpaperShell({
     return () => {
       active = false;
     };
-  }, [displayUrl, wallpaper.imageUrl]);
+  }, [displayUrl, mode, wallpaper.imageUrl]);
 
   const clearIdleHint = useCallback(() => {
     if (idleHintTimerRef.current !== null) {

@@ -11,7 +11,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { NewTabApp } from "./newtab-app";
+import { primeWallpaperStartupMode } from "@/lib/wallpaper-store";
 import "./extension.css";
+
+primeWallpaperStartupMode();
 
 const root = document.getElementById("root");
 if (root) {

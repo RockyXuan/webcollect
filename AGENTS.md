@@ -4,6 +4,10 @@
 
 Read `AGD.md` and `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md` first. RC6 has passed real-account verification in the explicitly authorized signed-in main Chrome. V1.1.2 is still a release candidate until independent Profile B completes Google OAuth/sync verification, or the user explicitly waives that second-session gate, and the final main/tag/zip identity is recorded; V1.1.1 remains the latest stable Release meanwhile. For this account-closeout task only, the user explicitly authorized operating the existing WebCollect task tab in the main signed-in Chrome; do not touch unrelated personal tabs.
 
+## 2026-07-15 Chrome workspace preference
+
+When two displays are connected, use the dedicated Chrome window on the secondary display that contains only the WebCollect task tab. Keep development previews and WebCollect verification in that window, and do not follow or operate the user's active main-display Chrome tabs. If the Chrome control interface cannot safely distinguish or inspect a `chrome://newtab` page, do not claim that internal tab because claiming can expose it as `about:blank`; use the secondary window for a localhost preview and rely on isolated extension tests until an installable candidate is loaded for manual new-tab verification. Fall back to the main display only when one display is connected or the user explicitly requests it.
+
 ## 2026-07-07 current audit entry
 
 For full-project handoff, Claude/Codex audit, latest user requirements, screenshot index, lessons, and open UX/functionality risks, read `AGD.md` first. If older handoff sections conflict with `AGD.md`, treat `AGD.md` and `docs/audit/webcollect-full-audit-brief-2026-07-07.md` as newer.

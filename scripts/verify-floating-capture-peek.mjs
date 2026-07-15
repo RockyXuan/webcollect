@@ -131,7 +131,7 @@ try {
   await page.waitForTimeout(320);
   const hover = await readFloatingState(page);
   assert(hover, "Hover state is missing");
-  assert(hover.buttonHovered, "Hover should activate the floating button hit target");
+  assert(hover.buttonHovered, `Hover should activate the floating button hit target: ${JSON.stringify(hover)}`);
   assert(hover.button.visibleWidth >= hover.button.width - 1, `Hover should reveal the full button: ${JSON.stringify(hover)}`);
   assert(hover.peekOpacity <= 0.05, "Hover should hide the standalone peek face");
   assert(hover.pillOpacity >= 0.95, "Hover should reveal the full WebCollect pill");

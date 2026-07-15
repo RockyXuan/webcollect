@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 
 const pageSource = readFileSync("src/app/page.tsx", "utf8");
 const extensionSource = readFileSync("extension/src/newtab-app.tsx", "utf8");
+const extensionEntrySource = readFileSync("extension/src/newtab.tsx", "utf8");
 const topNavSource = readFileSync("src/components/nav/top-nav.tsx", "utf8");
 const shellSource = readFileSync("src/components/wallpaper/wallpaper-shell.tsx", "utf8");
 const settingsSource = readFileSync("src/components/wallpaper/wallpaper-settings-dialog.tsx", "utf8");
@@ -74,6 +75,13 @@ assert.ok(storeSource.includes("pickWallpaperAvoidingRecent"), "Wallpaper store 
 assert.ok(storeSource.includes("getVisibleWallpaperId"), "Wallpaper store should rotate from the actually visible wallpaper instead of a stale persisted id");
 assert.ok(storeSource.includes("getWallpaperFetchCategories"), "Wallpaper refresh should use theme-aware fetch categories");
 assert.ok(storeSource.includes("INITIAL_WALLPAPER"), "Wallpaper store should avoid a science-image first paint before async preferences load");
+assert.ok(storeSource.includes('mode: "collection"'), "Wallpaper store should never assume wallpaper mode before preferences resolve");
+assert.ok(storeSource.includes("wallpaperInitializationPromise"), "Wallpaper initialization should be shared across Strict Mode effect replays");
+assert.ok(extensionEntrySource.includes("primeWallpaperStartupMode();"), "Extension should prime startup mode before the first React render");
+assert.ok(
+  extensionEntrySource.indexOf("primeWallpaperStartupMode();") < extensionEntrySource.indexOf("ReactDOM.createRoot"),
+  "Extension should resolve the startup-mode mirror before mounting React"
+);
 assert.ok(storeSource.includes("const fallbackCurrent = shouldSelectFresh"), "Wallpaper store should optimistically rotate to a local fallback during manual refresh");
 assert.ok(storeSource.includes("set({ prefs: optimisticPrefs, isRefreshing: true, error: null })"), "Wallpaper store should render the optimistic local refresh before remote providers finish");
 assert.ok(storeSource.includes("if (state.isRefreshing)") && storeSource.includes("options?.force || options?.selectFresh"), "Manual refresh should still perform a visible local rotation while a background refresh is already in flight");
@@ -84,6 +92,7 @@ assert.ok(wallpaperSourcesSource.includes("WALLPAPER_CACHE_NAME"), "Wallpaper ca
 assert.ok(wallpaperSourcesSource.includes("WALLPAPER_LEGACY_CACHE_NAMES"), "Wallpaper cache should delete legacy wallpaper caches");
 assert.equal(wallpaperSourcesSource.includes('caches.open("webcollect-wallpapers-v1")'), false, "Wallpaper cache must not keep writing the stale v1 cache");
 assert.equal(extensionHtmlSource.includes("zoom-nasa-cosmic-cliffs"), false, "Extension newtab must not preload a NASA wallpaper in Auto Mix");
+assert.equal(extensionHtmlSource.includes('rel="preload" as="image"'), false, "Extension must not preload a wallpaper before startup mode is known");
 assert.ok(pageSource.includes("onShowWallpaper={handleReturnToWallpaper}"), "Web page should expose the top-nav wallpaper button");
 assert.ok(extensionSource.includes("onShowWallpaper={handleReturnToWallpaper}"), "Extension newtab should expose the top-nav wallpaper button");
 assert.equal(shellSource.includes("handleCollectionMouseMove"), false, "Collection mode must not wire mouse fling gestures");
