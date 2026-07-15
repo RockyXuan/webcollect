@@ -9,6 +9,7 @@ import {
 } from "./wallpaper-types";
 import { DEFAULT_WALLPAPER_PREFS, FALLBACK_WALLPAPERS, filterUsableWallpapers, mergeWallpaperLibrary, pruneWallpaperLibrary } from "./wallpaper-sources";
 import { markLocalSnapshotChanged, markSyncPreferenceChanged } from "./db";
+import { withStorageLock } from "./storage-lock";
 
 const wallpaperDb = localforage.createInstance({
   name: "WebCollect",
@@ -94,6 +95,15 @@ export function applyWallpaperSyncedSettings(
   });
 }
 
+export function mergeWallpaperRuntimePrefs(
+  storedPrefs: Partial<WallpaperPrefs> | null | undefined,
+  runtimePrefs: Partial<WallpaperPrefs>
+): WallpaperPrefs {
+  const stored = normalizeWallpaperPrefs(storedPrefs);
+  const runtime = normalizeWallpaperPrefs(runtimePrefs);
+  return applyWallpaperSyncedSettings(runtime, toWallpaperSyncedSettings(stored));
+}
+
 function sameSyncedSettings(left: WallpaperSyncedSettings, right: WallpaperSyncedSettings): boolean {
   return left.defaultMode === right.defaultMode
     && left.themeMode === right.themeMode
@@ -128,23 +138,50 @@ export async function getWallpaperPrefs(): Promise<WallpaperPrefs> {
 }
 
 export async function saveWallpaperPrefs(prefs: Partial<WallpaperPrefs>): Promise<void> {
-  const previous = await wallpaperDb.getItem<Partial<WallpaperPrefs>>(WALLPAPER_PREFS_KEY);
-  const prepared = prepareWallpaperPrefsForSave(previous, prefs);
-  await wallpaperDb.setItem(WALLPAPER_PREFS_KEY, prepared);
-  if (!sameSyncedSettings(toWallpaperSyncedSettings(previous || {}), toWallpaperSyncedSettings(prepared))) {
+  const result = await withStorageLock("wallpaper-prefs-rmw", async () => {
+    const previous = await wallpaperDb.getItem<Partial<WallpaperPrefs>>(WALLPAPER_PREFS_KEY);
+    const prepared = prepareWallpaperPrefsForSave(previous, prefs);
+    await wallpaperDb.setItem(WALLPAPER_PREFS_KEY, prepared);
+    return {
+      changed: !sameSyncedSettings(
+        toWallpaperSyncedSettings(previous || {}),
+        toWallpaperSyncedSettings(prepared)
+      ),
+    };
+  });
+  if (result.changed) {
     await markSyncPreferenceChanged("wallpaperPrefs");
     await markLocalSnapshotChanged();
   }
 }
 
 export async function saveSyncedWallpaperPrefs(prefs: Partial<WallpaperPrefs>): Promise<void> {
-  const previous = await wallpaperDb.getItem<Partial<WallpaperPrefs>>(WALLPAPER_PREFS_KEY);
-  const prepared = normalizeWallpaperPrefs(prefs);
-  await wallpaperDb.setItem(WALLPAPER_PREFS_KEY, prepared);
-  if (!sameSyncedSettings(toWallpaperSyncedSettings(previous || {}), toWallpaperSyncedSettings(prepared))) {
+  const result = await withStorageLock("wallpaper-prefs-rmw", async () => {
+    const previous = await wallpaperDb.getItem<Partial<WallpaperPrefs>>(WALLPAPER_PREFS_KEY);
+    const prepared = normalizeWallpaperPrefs(prefs);
+    await wallpaperDb.setItem(WALLPAPER_PREFS_KEY, prepared);
+    return {
+      changed: !sameSyncedSettings(
+        toWallpaperSyncedSettings(previous || {}),
+        toWallpaperSyncedSettings(prepared)
+      ),
+    };
+  });
+  if (result.changed) {
     await markSyncPreferenceChanged("wallpaperPrefs");
     await markLocalSnapshotChanged();
   }
+}
+
+export async function saveWallpaperRuntimePrefs(
+  prefs: Partial<WallpaperPrefs>
+): Promise<WallpaperPrefs> {
+  return withStorageLock("wallpaper-prefs-rmw", async () => {
+    const stored = await wallpaperDb.getItem<Partial<WallpaperPrefs>>(WALLPAPER_PREFS_KEY);
+    const prepared = mergeWallpaperRuntimePrefs(stored, prefs);
+    await wallpaperDb.setItem(WALLPAPER_PREFS_KEY, prepared);
+    return prepared;
+  });
 }
 
 export async function getWallpaperLibrary(): Promise<WallpaperItem[]> {

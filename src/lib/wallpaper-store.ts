@@ -1,7 +1,13 @@
 "use client";
 
 import { create } from "zustand";
-import { getWallpaperLibrary, getWallpaperPrefs, saveWallpaperLibrary, saveWallpaperPrefs } from "./wallpaper-db";
+import {
+  getWallpaperLibrary,
+  getWallpaperPrefs,
+  saveWallpaperLibrary,
+  saveWallpaperPrefs,
+  saveWallpaperRuntimePrefs,
+} from "./wallpaper-db";
 import {
   DEFAULT_WALLPAPER_PREFS,
   FALLBACK_WALLPAPERS,
@@ -120,16 +126,16 @@ export const useWallpaperStore = create<WallpaperState>((set, get) => ({
         || getCurrentWallpaper(wallpapers, prefs.currentWallpaperId, prefs);
     const nextPrefs = applyWallpaperDisplay(prefs, preferredCurrent || getCurrentWallpaper(wallpapers, prefs.currentWallpaperId, prefs));
 
+    const persistedPrefs = await saveWallpaperRuntimePrefs(nextPrefs);
     set({
-      prefs: nextPrefs,
+      prefs: persistedPrefs,
       wallpapers,
-      mode: nextPrefs.defaultMode,
+      mode: persistedPrefs.defaultMode,
       isReady: true,
       error: null,
     });
-    await saveWallpaperPrefs(nextPrefs);
     void get().cacheCurrentAndNext();
-    if (shouldRefreshWallpapers(nextPrefs)) {
+    if (shouldRefreshWallpapers(persistedPrefs)) {
       void get().refreshOnlineWallpapers();
     }
   },
@@ -153,14 +159,16 @@ export const useWallpaperStore = create<WallpaperState>((set, get) => ({
     if (!next) return;
     const prefs = applyWallpaperDisplay(state.prefs, next);
     set({ prefs });
-    await saveWallpaperPrefs(prefs);
+    const persistedPrefs = await saveWallpaperRuntimePrefs(prefs);
+    set({ prefs: persistedPrefs });
     void get().cacheCurrentAndNext();
   },
 
   togglePaused: async () => {
     const prefs = { ...get().prefs, paused: !get().prefs.paused };
     set({ prefs });
-    await saveWallpaperPrefs(prefs);
+    const persistedPrefs = await saveWallpaperRuntimePrefs(prefs);
+    set({ prefs: persistedPrefs });
   },
 
   updatePrefs: async (updates) => {
@@ -195,8 +203,8 @@ export const useWallpaperStore = create<WallpaperState>((set, get) => ({
         );
         if (fallbackCurrent) {
           const prefs = applyWallpaperDisplay(state.prefs, fallbackCurrent);
-          set({ prefs });
-          await saveWallpaperPrefs(prefs);
+          const persistedPrefs = await saveWallpaperRuntimePrefs(prefs);
+          set({ prefs: persistedPrefs });
           void get().cacheCurrentAndNext();
         }
       }
@@ -220,7 +228,8 @@ export const useWallpaperStore = create<WallpaperState>((set, get) => ({
 
     set({ prefs: optimisticPrefs, isRefreshing: true, error: null });
     if (fallbackCurrent) {
-      void saveWallpaperPrefs(optimisticPrefs);
+      const persistedPrefs = await saveWallpaperRuntimePrefs(optimisticPrefs);
+      set({ prefs: persistedPrefs });
       void get().cacheCurrentAndNext();
     }
 
@@ -241,17 +250,19 @@ export const useWallpaperStore = create<WallpaperState>((set, get) => ({
           ...optimisticPrefs,
           lastRemoteRefreshAt: Date.now(),
         };
-      set({ wallpapers, prefs, isRefreshing: false, error: null });
-      await Promise.all([
+      const [, persistedPrefs] = await Promise.all([
         saveWallpaperLibrary(wallpapers),
-        saveWallpaperPrefs(prefs),
+        saveWallpaperRuntimePrefs(prefs),
       ]);
+      set({ wallpapers, prefs: persistedPrefs, isRefreshing: false, error: null });
       void get().cacheCurrentAndNext();
     } catch (error) {
       const message = error instanceof Error ? error.message : "壁纸更新失败";
-      set({ prefs: optimisticPrefs, isRefreshing: false, error: message });
       if (fallbackCurrent) {
-        await saveWallpaperPrefs(optimisticPrefs);
+        const persistedPrefs = await saveWallpaperRuntimePrefs(optimisticPrefs);
+        set({ prefs: persistedPrefs, isRefreshing: false, error: message });
+      } else {
+        set({ isRefreshing: false, error: message });
       }
     }
   },

@@ -82,6 +82,64 @@ test("top bar wallpaper switch changes the next-tab startup mode without opening
   await expect(page.locator('[data-wallpaper-ready="true"]')).toBeVisible({ timeout: 30_000 });
 });
 
+test("a late remote wallpaper refresh cannot restore a disabled startup mode", async ({ page }) => {
+  let releaseRefresh!: () => void;
+  const refreshGate = new Promise<void>((resolve) => {
+    releaseRefresh = resolve;
+  });
+  let markRefreshStarted!: () => void;
+  const refreshStarted = new Promise<void>((resolve) => {
+    markRefreshStarted = resolve;
+  });
+  let hasMarkedRefreshStarted = false;
+
+  await page.route("https://commons.wikimedia.org/w/api.php?**", async (route) => {
+    if (!hasMarkedRefreshStarted) {
+      hasMarkedRefreshStarted = true;
+      markRefreshStarted();
+    }
+    await refreshGate;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ query: { pages: {} } }),
+    });
+  });
+
+  await page.goto("/");
+  await expect(page.locator('[data-wallpaper-ready="true"]')).toBeVisible({ timeout: 30_000 });
+  await refreshStarted;
+  await page.keyboard.press("Enter");
+
+  const startupSwitch = page.getByRole("switch", { name: "启动壁纸模式" });
+  await startupSwitch.click();
+  await expect(startupSwitch).toHaveAttribute("aria-checked", "false");
+
+  releaseRefresh();
+  await page.waitForFunction(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("WebCollect");
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+    const transaction = database.transaction("webcollect_wallpaper", "readonly");
+    const request = transaction.objectStore("webcollect_wallpaper").get("wallpaperPrefs");
+    const prefs = await new Promise<Record<string, unknown> | undefined>((resolve, reject) => {
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result as Record<string, unknown> | undefined);
+    });
+    database.close();
+    return prefs?.defaultMode === "collection"
+      && typeof prefs.lastRemoteRefreshAt === "number"
+      && prefs.lastRemoteRefreshAt > 0;
+  });
+
+  await expect(startupSwitch).toHaveAttribute("aria-checked", "false");
+  await page.reload();
+  await expect(page.getByText("WebCollect", { exact: true })).toBeVisible();
+  await expect(page.locator(".wc-zoom-wallpaper")).toHaveCount(0);
+});
+
 test("repairs obsolete packaged wallpaper paths from IndexedDB", async ({ page }) => {
   await page.goto("/");
   await page.waitForFunction(async () => {
