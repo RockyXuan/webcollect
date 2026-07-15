@@ -24,6 +24,8 @@ jobs:
           node-version: "24"
 
       - name: Audit production dependencies
+        env:
+          pnpm_config_pm_on_fail: ignore
         run: npx --yes pnpm@11.13.0 audit --prod --audit-level=high --registry=https://registry.npmjs.org
 
   verify:

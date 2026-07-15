@@ -11,6 +11,7 @@ describe("continuous integration workflow", () => {
     expect(verifyJob).toBeGreaterThan(auditJob);
     expect(workflow).toContain('node-version: "24"');
     expect(workflow).toContain("npx --yes pnpm@11.13.0 audit --prod --audit-level=high");
+    expect(workflow).toContain("pnpm_config_pm_on_fail: ignore");
     expect(workflow.slice(auditJob, verifyJob)).not.toContain("pnpm/action-setup");
     expect(workflow.slice(verifyJob)).not.toContain("pnpm audit");
   });
