@@ -9,6 +9,12 @@
 当前 RC：`V1.1.2 / 2026年7月14日` RC3 已发布，tag `webcollect-2026-07-14-v1.1.2-rc.3` 固定到代码提交 `312a807bb20a1d99b2506a458c30edb6a8962081`；账号级收口见 `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`。
 当前主线：V1.1.2 RC 已进入 `main`；V1.1.1 仍是最新稳定版，必须等主 Chrome 和独立 Profile B 账号验收通过后才能发布 V1.1.2 正式版。
 
+## 2026-07-15 项目工作流退役
+
+- 当前生效规则见 `AGENTS.md`。本仓库不再调用、安装、启用或模仿 Superpowers、`goal-zzx` / `zzx-goal`、`andrej-karpathy-coding`。
+- 计划、原生 goal、测试、Review、子代理和 worktree 均按任务复杂度与风险自适应选择，不设置通用强制仪式。
+- `tasks/todo.md`、`tasks/lessons.md`、`CODEX_GO_MODE_STATUS.md` 和 `docs/superpowers/` 是历史档案，不再作为当前指令、必读文件或重复进度账本。
+
 ## 2026-07-14 V1.1.2 账号同步收口候选
 
 - 本轮不改用户 seed、收藏名称或分类内容；远程备份分支、私有 Supabase 归档和本地安全快照均已确认。
@@ -69,9 +75,7 @@
 4. `docs/audit/user-screenshot-index-2026-07-07.md`
 5. `PROJECT_SUMMARY.md`
 6. `HANDOFF.md`
-7. `tasks/lessons.md`
-8. `tasks/todo.md`
-9. `AGENTS.md`
+7. `AGENTS.md`
 
 如果这些文件和旧文档冲突，以 `AGD.md` 和 `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md` 为准；候选文档中明确标为待账号验收的事项不得提前视为已发布。
 

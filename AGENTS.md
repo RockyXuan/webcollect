@@ -8,6 +8,18 @@ Read `AGD.md` and `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13
 
 For full-project handoff, Claude/Codex audit, latest user requirements, screenshot index, lessons, and open UX/functionality risks, read `AGD.md` first. If older handoff sections conflict with `AGD.md`, treat `AGD.md` and `docs/audit/webcollect-full-audit-brief-2026-07-07.md` as newer.
 
+## 2026-07-15 project workflow retirement (CURRENT)
+
+For this repository, the following general-purpose workflows are retired and must not be installed, enabled, invoked, auto-selected, or imitated:
+
+- the Superpowers plugin, including `superpowers:*` and `using-superpowers`;
+- `goal-zzx` and `zzx-goal`;
+- `andrej-karpathy-coding`.
+
+This project rule applies even if those tools remain available globally. Do not modify global Codex configuration or unrelated skills. Use native planning or goal tracking only when the task benefits from it. Decide whether to plan, test first, review, use subagents, or create a worktree from the task's actual complexity and risk; none of those steps is mandatory by default.
+
+The former requirements to brainstorm or wait for design approval before every change, use strict TDD for every edit, create a worktree, use subagents or duplicate reviews, split work into a fixed number of phases, or continuously update `tasks/todo.md` and `tasks/lessons.md` are retired. `tasks/todo.md`, `tasks/lessons.md`, `CODEX_GO_MODE_STATUS.md`, and `docs/superpowers/` are historical archives, not active instructions or required progress ledgers.
+
 ## ⚠️ 开发第一要义：严禁擅自删除数据 (CRITICAL)
 
 > **这是所有规则中最重要的规则，违反此规则将导致用户数据丢失，必须回滚重做。**
@@ -725,31 +737,10 @@ const handleResizeStart = (e: React.MouseEvent) => {
                  └─ 单个卡片：min-w-[140px] flex-1（自适应）
 ```
 
-### 每次修改前的 Checklist
+### Risk-adaptive delivery rules
 
-```
-□ 1. 读取当前 seed.ts 和相关文件，确认数据不会丢失
-□ 2. 只改用户要求的文件和函数，标记不动的地方
-□ 3. 改完后 pnpm ts-check + pnpm lint 确认零错误
-□ 4. curl 确认服务存活
-□ 5. 在页面上实际操作修改的功能
-□ 6. 回归测试：拖拽、拉伸、添加/编辑/删除、升级/降级
-□ 7. 检查日志无新错误
-□ 8. git diff 确认只改了目标代码
-```
-# Coding Workflow Overlay (MANDATORY)
-
-Before any non-trivial coding task, read and follow:
-
-- `tasks/skills.md` - project coding skills and workflow rules
-- `tasks/lessons.md` - mistakes and user corrections that must not repeat
-- `tasks/todo.md` - active task checklist, verification, and review notes
-
-For tasks involving more than three steps, architecture decisions, sync/storage logic, or user-data risk:
-
-1. Write a concrete checklist in `tasks/todo.md`.
-2. Confirm the plan with the user unless they explicitly asked to continue immediately.
-3. Implement only the checked scope.
-4. Update checklist status as work progresses.
-5. Run the relevant verification commands before reporting completion.
-6. If the user corrects a mistake, add the lesson to `tasks/lessons.md`.
+- Inspect `git status` and the relevant code/data path before editing; preserve unrelated user changes.
+- For sync, migration, restore, deletion, or storage work, create the appropriate local/cloud backup and verify the complete user-owned data boundary first.
+- Keep the change scoped to the request. Planning depth, test strategy, review depth, browser choice, subagents, and worktrees are selected case by case.
+- Run the checks that prove the changed behavior: type/lint/build checks for affected code, focused data-integrity checks for persistence changes, and browser verification for visible or Chrome-specific behavior.
+- Check the final diff and report what was verified, what was skipped, and any remaining manual review. Do not claim completion from code inspection alone.

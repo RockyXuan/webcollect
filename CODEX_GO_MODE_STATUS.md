@@ -1,5 +1,7 @@
 # Codex Go Mode Status
 
+> **Archived 2026-07-15:** this file records historical goal/status facts only. It is not an active workflow, progress ledger, or instruction source. Project use of `goal-zzx` / `zzx-goal`, Superpowers, and `andrej-karpathy-coding` is retired; future work may use native planning or goal tracking only when useful.
+
 ## 2026-07-14 V1.1.2 Goal Status
 
 - [x] 建立 main 远程备份、私有云端归档校验和本地工作区快照。

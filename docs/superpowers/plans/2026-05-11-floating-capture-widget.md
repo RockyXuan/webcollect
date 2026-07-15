@@ -1,5 +1,7 @@
 # Floating Capture Widget Plan
 
+> **Historical archive only (retired 2026-07-15):** this plan records how the floating capture widget was designed in May 2026. The directory name is historical; the Superpowers workflow and all related skills are not active, required, or permitted as project instructions.
+
 ## Success Criteria
 
 1. Ordinary `http` and `https` pages show a small WebCollect capture entry when the extension is enabled.

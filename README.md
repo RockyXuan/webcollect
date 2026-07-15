@@ -4,16 +4,16 @@
 
 如果你是后续接手 WebCollect 的 Claude / Codex / 其他 agent，请先读：
 
-1. `AGD.md`
-2. `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`
-3. `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`
-4. `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`
-5. `docs/audit/claude-code-review-handoff-2026-07-07.md`
-6. `PROJECT_SUMMARY.md`
-7. `HANDOFF.md`
-8. `tasks/lessons.md`
-9. `tasks/todo.md`
-10. `AGENTS.md`
+1. `AGENTS.md`
+2. `AGD.md`
+3. `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`
+4. `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`
+5. `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`
+6. `docs/audit/claude-code-review-handoff-2026-07-07.md`
+7. `PROJECT_SUMMARY.md`
+8. `HANDOFF.md`
+
+项目已于 2026-07-15 退役 Superpowers、`goal-zzx` / `zzx-goal` 和 `andrej-karpathy-coding` 工作流。`tasks/todo.md`、`tasks/lessons.md`、`CODEX_GO_MODE_STATUS.md` 与 `docs/superpowers/` 只保留历史事实，不是新任务的必读、必写或执行入口。
 
 当前固定开发目录：`/Users/rockyx/vibe coding/Web Collect 0628`。
 当前最新功能版本：`V1.1.1 / 2026年7月12日`。

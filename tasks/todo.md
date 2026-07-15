@@ -1,5 +1,7 @@
 # WebCollect Task Plan
 
+> **Archived 2026-07-15:** this file is a historical checklist and evidence log. It is not the current task plan, is not automatically read or updated, and does not require future tasks to maintain a parallel progress ledger. References below to older workflow directories are factual history only; those workflows are retired for this repository.
+
 ## Current Task: 2026-07-14 V1.1.2 Account Sync Closeout
 
 - [x] Back up main, local workspace state, and the existing private Supabase archive before account testing.

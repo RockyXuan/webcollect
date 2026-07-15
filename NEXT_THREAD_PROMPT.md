@@ -1,5 +1,9 @@
 这是一个新的 Codex 线程，请继续开发 RockyXuan/webcollect。当前上下文很长，务必先按下面顺序接手，不要从旧假设继续。
 
+## 2026-07-15 工作流退役规则
+
+本仓库已退役 Superpowers（含 `superpowers:*` / `using-superpowers`）、`goal-zzx` / `zzx-goal` 和 `andrej-karpathy-coding`。不要安装、启用、调用或模仿它们。可按任务复杂度使用 Codex 原生计划或 goal；测试、Review、子代理和 worktree 均由当前任务风险决定。`tasks/todo.md`、`tasks/lessons.md`、`CODEX_GO_MODE_STATUS.md` 与 `docs/superpowers/` 仅为历史档案，不是当前执行入口。
+
 ## 2026-07-14 V1.1.2 候选事实
 
 - 第一优先事实源：`docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`。
@@ -36,9 +40,6 @@
    - `HANDOFF.md`
    - `NEXT_THREAD_PROMPT.md`
    - `AGENTS.md`
-   - `tasks/lessons.md`
-   - `tasks/todo.md`
-   - `CODEX_GO_MODE_STATUS.md`
 4. 运行并汇报：
 
 ```bash

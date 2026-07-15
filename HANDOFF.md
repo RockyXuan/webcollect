@@ -1,5 +1,7 @@
 # Project Handoff
 
+> **2026-07-15 current workflow rule:** this repository has retired Superpowers (including `superpowers:*` / `using-superpowers`), `goal-zzx` / `zzx-goal`, and `andrej-karpathy-coding`. Do not install, enable, invoke, or imitate them. Any older instruction below that requires `tasks/todo.md`, `tasks/lessons.md`, `CODEX_GO_MODE_STATUS.md`, fixed phase counts, strict TDD, worktrees, subagents, or duplicate reviews is historical and superseded by `AGENTS.md`.
+
 ## 2026-07-14 V1.1.2 Account Sync Release Candidate
 
 This section supersedes older development status. V1.1.1 remains the latest stable Release until the V1.1.2 RC is installed and the final account gate passes.
@@ -56,8 +58,6 @@ This section supersedes older handoff notes below when there is a conflict.
 - `docs/audit/webcollect-full-audit-brief-2026-07-07.md`
 - `docs/audit/user-screenshot-index-2026-07-07.md`
 - `PROJECT_SUMMARY.md`
-- `tasks/lessons.md`
-- `tasks/todo.md`
 - `AGENTS.md`
 
 ### Latest Completed Work To Preserve
@@ -142,7 +142,7 @@ Results:
 - Wallpaper refresh and quote quality remain user-sensitive; do not claim it is complete without checking installed extension behavior.
 - Website favicon/icon caching is improved but still needs long-running real use observation for small/niche sites.
 
-### Required Next-Thread Preflight
+### Historical Next-Thread Preflight (retired as a mandatory workflow)
 
 Run these before code changes:
 
@@ -161,9 +161,6 @@ Then read:
 - `HANDOFF.md`
 - `NEXT_THREAD_PROMPT.md`
 - `AGENTS.md`
-- `tasks/lessons.md`
-- `tasks/todo.md`
-- `CODEX_GO_MODE_STATUS.md`
 
 ### Recommended Next Steps
 
@@ -396,8 +393,8 @@ Chrome extension loading:
 - `scripts/test-workspace-search.ts` - focused search behavior checks.
 - `scripts/test-pinned-bookmarks.ts` - focused bookmark-bar behavior checks.
 - `scripts/test-cloud-snapshots.ts` - focused cloud snapshot serialization/dedupe checks.
-- `tasks/todo.md` - running implementation checklist.
-- `tasks/lessons.md` - important lessons and data-safety notes from this long thread.
+- `tasks/todo.md` - historical implementation checklist; not a required current ledger.
+- `tasks/lessons.md` - historical lessons archive; current enforceable safeguards live in `AGENTS.md`.
 
 ## 5. What Has Been Done
 
@@ -494,7 +491,7 @@ Project review tooling:
 
 ## 8. Recommended Next Steps
 
-1. Pull the branch on the Mac mini and read this file, `AGENTS.md`, `tasks/lessons.md`, and `tasks/todo.md`.
+1. Pull the branch on the Mac mini and read this file plus `AGENTS.md`; consult historical task archives only when a specific old decision needs context.
 2. Run `git status -sb` before touching anything. Do not overwrite user changes.
 3. Install dependencies with `corepack pnpm install --frozen-lockfile`.
 4. Run the regression commands: `corepack pnpm ts-check`, `corepack pnpm lint`, `corepack pnpm build:ext`, `corepack pnpm exec next build --webpack`, and `git diff --check`.
@@ -535,7 +532,7 @@ Not fully verified in this handoff pass:
 
 - Start with code and git status. If this document conflicts with the code, trust code and `git status`.
 - Do not assume old chat context is complete or reliable. This handoff is a summary, not a substitute for reading the changed files.
-- Treat `tasks/lessons.md` as important guardrails, especially around data restoration and sync.
+- Treat `AGENTS.md` as the current guardrail source; `tasks/lessons.md` is historical context only.
 - Never use Homely import data as a recovery source unless the user explicitly asks.
 - Keep `.gitignore` exclusions for local old-thread exports and `tmp/`.
 - Do not commit real secrets, `.env*`, browser profile data, or downloaded thread exports.

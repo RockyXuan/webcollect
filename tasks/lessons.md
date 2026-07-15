@@ -1,6 +1,6 @@
 # WebCollect Lessons
 
-Update this file whenever the user corrects the implementation or a preventable bug appears.
+> **Archived 2026-07-15:** this is a historical lessons record, not an automatically maintained instruction file. New tasks do not have to read or update it. Current enforceable product, data-safety, verification, and browser rules live in `AGENTS.md`.
 
 ## 2026-07-07: Handoff Docs Must Become A Single Audit Entry
 
@@ -315,10 +315,11 @@ Verification checklist:
 - Manual top-bar sync should trigger cloud sync without opening the user menu.
 - Simulated/real remote 5xx errors should show a concise message while preserving local data.
 
-## 2026-05-11: Future Work Protocol For WebCollect
+## 2026-05-11: Historical Work Protocol (retired 2026-07-15)
+
+The former mandatory read/write ritual around this file and `tasks/todo.md` is retired. The following project-specific safeguards remain useful as historical context, but agents choose the planning and verification depth appropriate to the current risk.
 
 Before touching code:
-- Read `AGENTS.md`, this file, and the current `tasks/todo.md`.
 - State the narrow scope and which files are likely to change.
 - For data-sensitive work, inspect whether the change can delete, flatten, duplicate, or resurrect user data.
 
@@ -333,7 +334,6 @@ Before delivery:
 - Run `corepack pnpm build:ext`.
 - When feasible, run `next build --webpack` through the Windows Next binary.
 - Rebuild the extension package when extension files changed.
-- Record any new user correction here so the next session does not repeat the same mistake.
 
 ## 2026-05-11: Category Parent Links Must Be Written Atomically
 
