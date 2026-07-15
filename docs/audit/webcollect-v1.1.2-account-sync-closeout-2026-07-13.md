@@ -2,10 +2,10 @@
 
 Updated: 2026-07-15
 Release candidate identity: `V1.1.2 / 2026年7月15日`
-RC tag: `webcollect-2026-07-15-v1.1.2-rc.6`
-Previous RC tags: `webcollect-2026-07-15-v1.1.2-rc.5`, `webcollect-2026-07-14-v1.1.2-rc.4`, `webcollect-2026-07-14-v1.1.2-rc.3`, `webcollect-2026-07-14-v1.1.2-rc.2`, `webcollect-2026-07-14-v1.1.2-rc.1`
+RC tag: `webcollect-2026-07-15-v1.1.2-rc.7`
+Previous RC tags: `webcollect-2026-07-15-v1.1.2-rc.6`, `webcollect-2026-07-15-v1.1.2-rc.5`, `webcollect-2026-07-14-v1.1.2-rc.4`, `webcollect-2026-07-14-v1.1.2-rc.3`, `webcollect-2026-07-14-v1.1.2-rc.2`, `webcollect-2026-07-14-v1.1.2-rc.1`
 Planned final tag: `webcollect-2026-07-15-v1.1.2`
-Current gate: RC6 is published, downloaded, byte-verified, and loaded under the stable extension ID in the user's explicitly authorized signed-in Chrome. The real account, cloud wall, startup-wallpaper switch, metadata fix, and sync badge passed there. The only remaining account-level gate is a second independent Profile B session; Google reached its passkey/Touch ID step, which requires the user. Do not call the final release complete until that independent-session proof passes or the user explicitly waives it.
+Current gate: RC7 is published, downloaded, and byte-verified. Its first-frame wallpaper fix passed a zero-mount MutationObserver E2E and a secondary-display local Chrome preview, but RC7 has not yet replaced RC6 in the real extension new-tab page. RC6 retains the real-account, cloud-wall, metadata, and sync evidence. Final release still requires real Chrome RC7 flash verification plus a second independent Profile B session, or an explicit user waiver of the corresponding gate.
 
 This patch follows the V1.1.1 full-project audit. It focuses on the last real-account observation and on defects found while reproducing a fresh Profile login. The PM split and the live WebCollect database migration remain documented in `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`.
 
@@ -21,25 +21,26 @@ This patch follows the V1.1.1 full-project audit. It focuses on the last real-ac
 - `src/lib/seed.ts` is byte-for-byte unchanged from the baseline commit.
 - Tests use isolated IndexedDB and temporary Chrome Profiles. They do not clear or rename the user's real categories or cards.
 
-## Current RC6 publication receipt
+## Current RC7 publication receipt
 
-- Code identity: `b9b41fcc828ca00e96cd1e0c29e0f4994c483b2d` at tag `webcollect-2026-07-15-v1.1.2-rc.6`.
-- Release: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-15-v1.1.2-rc.6` (GitHub Prerelease).
-- Asset: `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-15-v1.1.2-rc.6/WebCollect-Chrome-Extension-v1.1.2-rc.6-2026-07-15.zip` (`16,941,931` bytes).
-- SHA-256: `2e9496d8554f160343c9237221f34f2b698b8b9f0b184975f50ab8a8eae0db8a`.
-- Downloaded zip: `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.6/WebCollect-Chrome-Extension-v1.1.2-rc.6-2026-07-15.zip`.
-- Unpacked extension: `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.6/unpacked`.
-- The downloaded archive declares WebCollect `1.1.2` / Manifest V3; its unpacked contents match `extension/dist` exactly.
-- The user's signed-in Chrome now loads RC6 from the unpacked folder above under extension ID `immpcmhmabobllnopedaoflcjneigbko`; it was replaced without uninstalling, preserving IndexedDB and the real wall.
-- RC4 made prerelease publication guarded and repeatable, RC5 retained a hoverable edge-peeking mascot and dated the build for July 15, and RC6 prevents a stale startup refresh from rolling the wallpaper-mode preference back.
-- `main` later gained documentation-only commit `40d597eb0363bb9872c7859757191b7fb9de2099`; the RC6 binary remains pinned to the code identity above.
-- RC1 through RC5 remain historical evidence; RC6 supersedes them for installation and account acceptance.
+- Code identity: `a3a2d2f429c2c56b4e8c4e33fdc6da831bec4679` at tag `webcollect-2026-07-15-v1.1.2-rc.7`.
+- Release: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-15-v1.1.2-rc.7` (GitHub Prerelease).
+- Asset: `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-15-v1.1.2-rc.7/WebCollect-Chrome-Extension-v1.1.2-rc.7-2026-07-15.zip` (`16,942,028` bytes).
+- SHA-256: `747dcdcf62134f42352d281521460116fd89b3d87ba8509f1a2f5ddfc3e8da9d`.
+- Downloaded verification copy: `/private/tmp/WebCollect-Chrome-Extension-v1.1.2-rc.7-github.zip`.
+- The downloaded archive declares WebCollect `1.1.2` / Manifest V3 and the expected stable key, icons, new-tab override, service worker, and floating capture content script.
+- RC7 resolves startup mode synchronously before the first React render; collection mode no longer mounts the wallpaper stage or creates/preloads a wallpaper image. Strict Mode initialization is deduplicated.
+- Release publication is now performed only by the tag-triggered GitHub Actions workflow. The local script no longer depends on GitHub CLI OAuth or probes Git credentials.
+- `main` later gained CI-only commits through `6164c65d2fbf3c9276d2426ed51ba7791c79c7f8`; the RC7 binary remains pinned to the code identity above. GitHub CI run `29432392591` passed both the full verification job and the Node 24 / pnpm 11 bulk-advisory production audit.
+- RC6 remains the extension currently loaded in the user's real Chrome; RC7 must not be described as installed until a new explicit installation confirmation is received.
+- RC1 through RC6 remain historical evidence; RC7 supersedes them as the installable candidate.
 
 ## Top-bar wallpaper startup switch acceptance
 
 - The left half of the fused control enters the wallpaper page immediately; it does not change the saved startup preference.
 - The right half is an accessible `role="switch"` with visible `开/关` state and persists the existing `defaultMode` preference used by the wallpaper settings dialog.
 - Turning it off keeps the current collection visible and makes the next reload/new tab enter the collection directly; turning it back on makes the next reload/new tab show wallpaper first.
+- RC7 stores a synchronous startup-mode mirror and reads it before `createRoot`; a document-initialization MutationObserver confirmed that `.wc-wallpaper-stage` is never mounted, even transiently, when the mode is off.
 - The switch does not open the wallpaper settings dialog and rapid clicks are serialized while IndexedDB persistence is in flight.
 - Isolated Chromium acceptance passed at `2048x1152`, `1440x900`, `1024x768`, and `390x844`; all had zero document-level horizontal overflow. The mobile toolbar retains its deliberate recoverable horizontal scroller.
 
@@ -206,8 +207,9 @@ Both rows are empty, but the project's highest-priority rule forbids deleting or
 
 ## Finalization checklist
 
-- [x] Publish V1.1.2 RC6 and verify its tag, code commit, prerelease flag, unique asset, size, SHA-256, manifest, and unpacked contents.
-- [x] Update the explicitly authorized signed-in Chrome to RC6 without uninstalling it; verify the loaded version/date, real account, cloud wall, sync badge, top-bar switch, metadata fix, and stable extension ID.
+- [x] Publish V1.1.2 RC7 and verify its tag, code commit, prerelease flag, unique asset, size, SHA-256, and manifest.
+- [ ] Update the explicitly authorized signed-in Chrome to RC7 without uninstalling it; verify a brand-new extension tab has no wallpaper flash when startup wallpaper is off.
+- [x] Retain the RC6 real-account, cloud-wall, sync-badge, metadata, and stable-extension-ID evidence without claiming it as RC7 evidence.
 - [ ] Complete Google OAuth in the independent Profile B.
 - [ ] Verify two recent sessions, both cloud walls, and unchanged `364 / 130 / 24` primary data counts.
 - [ ] Record the user's decision for both proven-empty category artifacts; default is retain.
@@ -215,5 +217,5 @@ Both rows are empty, but the project's highest-priority rule forbids deleting or
 - [x] Re-run Web E2E against the stable OAuth server and production build in an isolated APFS-cloned workspace without interrupting Profile B.
 - [x] Update `AGD.md`, handoff/status files, and this document with the exact RC code commit.
 - [x] Push the verified RC code to `main`.
-- [x] Publish and verify RC6 asset `WebCollect-Chrome-Extension-v1.1.2-rc.6-2026-07-15.zip`.
+- [x] Publish and verify RC7 asset `WebCollect-Chrome-Extension-v1.1.2-rc.7-2026-07-15.zip`.
 - [ ] Publish final `WebCollect-Chrome-Extension-v1.1.2-2026-07-15.zip` after account acceptance or an explicit user waiver of the independent Profile B gate.
