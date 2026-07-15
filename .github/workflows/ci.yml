@@ -23,13 +23,8 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Setup audit pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 11.4.0
-
       - name: Audit production dependencies
-        run: pnpm audit --prod --audit-level=high --registry=https://registry.npmjs.org
+        run: corepack pnpm@11.4.0 audit --prod --audit-level=high --registry=https://registry.npmjs.org
 
   verify:
     runs-on: ubuntu-latest
