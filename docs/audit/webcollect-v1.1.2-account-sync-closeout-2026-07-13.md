@@ -27,7 +27,8 @@ This patch follows the V1.1.1 full-project audit. It focuses on the last real-ac
 - Release: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-15-v1.1.2-rc.7` (GitHub Prerelease).
 - Asset: `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-15-v1.1.2-rc.7/WebCollect-Chrome-Extension-v1.1.2-rc.7-2026-07-15.zip` (`16,942,028` bytes).
 - SHA-256: `747dcdcf62134f42352d281521460116fd89b3d87ba8509f1a2f5ddfc3e8da9d`.
-- Downloaded verification copy: `/private/tmp/WebCollect-Chrome-Extension-v1.1.2-rc.7-github.zip`.
+- Downloaded zip: `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.7/WebCollect-Chrome-Extension-v1.1.2-rc.7-2026-07-15.zip`.
+- Unpacked extension: `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.7/unpacked`.
 - The downloaded archive declares WebCollect `1.1.2` / Manifest V3 and the expected stable key, icons, new-tab override, service worker, and floating capture content script.
 - RC7 resolves startup mode synchronously before the first React render; collection mode no longer mounts the wallpaper stage or creates/preloads a wallpaper image. Strict Mode initialization is deduplicated.
 - Release publication is now performed only by the tag-triggered GitHub Actions workflow. The local script no longer depends on GitHub CLI OAuth or probes Git credentials.

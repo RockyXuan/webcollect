@@ -24,7 +24,7 @@
 - 修复同一页面重复创建 Supabase `GoTrueClient` 的认证竞态；正常登出/登录保留 Supabase 官方的浏览器前后台刷新管理。
 - Release 发布不再依赖本机 `gh` 登录或读取 Git 凭据；本地脚本只做前置检查、构建、打包和推 tag，GitHub Actions 是唯一 Release 发布器，并在云端复跑扩展构建、产物和体积检查。
 - RC7 已发布为 GitHub Prerelease 并复核：Release `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-15-v1.1.2-rc.7`；zip 直链 `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-15-v1.1.2-rc.7/WebCollect-Chrome-Extension-v1.1.2-rc.7-2026-07-15.zip`；`16,942,028` bytes；SHA-256 `747dcdcf62134f42352d281521460116fd89b3d87ba8509f1a2f5ddfc3e8da9d`。
-- RC7 的 GitHub 下载件已在 `/private/tmp/WebCollect-Chrome-Extension-v1.1.2-rc.7-github.zip` 复核为 WebCollect `1.1.2` / Manifest V3；RC6 仍是当前真实主 Chrome 已加载版本，RC7 未经新的安装确认不得冒充已安装。
+- RC7 的 GitHub 下载件已复核并解压到 `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.7/unpacked`，清单为 WebCollect `1.1.2` / Manifest V3；RC6 仍是当前真实主 Chrome 已加载版本，RC7 未经新的安装确认不得冒充已安装。
 - 收藏墙顶部“壁纸”入口现拆成一个融合式快捷控件：左侧进入当前壁纸页，右侧 `开/关` switch 只控制下次新标签页先显示壁纸还是直接进入主页；与壁纸设置弹窗共用同一 `defaultMode` 偏好。RC7 进一步把启动模式同步镜像到 localStorage，并在 React 首次挂载前读取；关闭时不创建壁纸图片、不预加载壁纸、也不允许壁纸 stage 短暂挂载。
 - 小松鼠浮窗收起时现在只露约半张脸并朝网页轻微侧头，鼠标悬停、键盘聚焦、拖动或打开面板时完整展开；隔离 Chromium 实测右侧可见 `50.07%`、左侧 `50.00%`，悬停后完整显示且点击可打开面板，控制台零错误。
 - 2026-07-14 主 Chrome 中的旧扩展再次上传了一个同分项空收集箱，使云端分类从 129 增至 130；V1.1.2 现按“同分项卡片数优先、创建时间与 ID 稳定排序”选择 canonical 收集箱，阻止数据库返回顺序把新收藏落到空重复项。现有两条空记录均保留，不自动删除。
