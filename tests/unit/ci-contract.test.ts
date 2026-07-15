@@ -5,7 +5,7 @@ describe("continuous integration contract", () => {
   it("runs every release-grade command on main and pull requests", () => {
     const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
     expect(workflow).toContain(
-      "run: corepack pnpm@11.4.0 audit --prod --audit-level=high --registry=https://registry.npmjs.org"
+      "run: npx --yes pnpm@11.13.0 audit --prod --audit-level=high --registry=https://registry.npmjs.org"
     );
     expect(workflow).toContain("run: pnpm test:legacy");
     expect(workflow).toContain("run: pnpm build\n");

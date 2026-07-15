@@ -21,10 +21,10 @@ jobs:
       - name: Setup audit Node
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
 
       - name: Audit production dependencies
-        run: corepack pnpm@11.4.0 audit --prod --audit-level=high --registry=https://registry.npmjs.org
+        run: npx --yes pnpm@11.13.0 audit --prod --audit-level=high --registry=https://registry.npmjs.org
 
   verify:
     runs-on: ubuntu-latest

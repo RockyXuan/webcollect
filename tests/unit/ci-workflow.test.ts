@@ -9,8 +9,8 @@ describe("continuous integration workflow", () => {
 
     expect(auditJob).toBeGreaterThan(-1);
     expect(verifyJob).toBeGreaterThan(auditJob);
-    expect(workflow).toContain('node-version: "22"');
-    expect(workflow).toContain("corepack pnpm@11.4.0 audit --prod --audit-level=high");
+    expect(workflow).toContain('node-version: "24"');
+    expect(workflow).toContain("npx --yes pnpm@11.13.0 audit --prod --audit-level=high");
     expect(workflow.slice(auditJob, verifyJob)).not.toContain("pnpm/action-setup");
     expect(workflow.slice(verifyJob)).not.toContain("pnpm audit");
   });
