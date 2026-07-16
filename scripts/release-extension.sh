@@ -5,6 +5,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
 REPO="${GITHUB_REPOSITORY:-RockyXuan/webcollect}"
+if [[ "${1:-}" == "--" ]]; then
+  shift
+fi
 TAG="${1:-}"
 GITHUB_PROXY="${GITHUB_PROXY:-http://127.0.0.1:7897}"
 
@@ -96,12 +99,20 @@ else
 fi
 
 git_with_network fetch origin main --tags
-"${NODE_BIN}" "scripts/release-preflight.mjs" "${TAG}" "${PREFLIGHT_ARGS[@]}"
+if [[ "${#PREFLIGHT_ARGS[@]}" -gt 0 ]]; then
+  "${NODE_BIN}" "scripts/release-preflight.mjs" "${TAG}" "${PREFLIGHT_ARGS[@]}"
+else
+  "${NODE_BIN}" "scripts/release-preflight.mjs" "${TAG}"
+fi
 
 corepack pnpm@9.0.0 build:ext
 corepack pnpm@9.0.0 test:extension-artifact
 corepack pnpm@9.0.0 test:extension-size
-"${NODE_BIN}" "scripts/release-preflight.mjs" "${TAG}" --built "${PREFLIGHT_ARGS[@]}"
+if [[ "${#PREFLIGHT_ARGS[@]}" -gt 0 ]]; then
+  "${NODE_BIN}" "scripts/release-preflight.mjs" "${TAG}" --built "${PREFLIGHT_ARGS[@]}"
+else
+  "${NODE_BIN}" "scripts/release-preflight.mjs" "${TAG}" --built
+fi
 
 rm -f "${ZIP_PATH}"
 (cd extension/dist && zip -qr "${ZIP_PATH}" .)

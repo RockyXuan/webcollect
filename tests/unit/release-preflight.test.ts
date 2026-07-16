@@ -65,6 +65,8 @@ describe("extension release preflight", () => {
     expect(script).toContain("test:extension-artifact");
     expect(script).toContain("test:extension-size");
     expect(script).toContain("--prerelease");
+    expect(script.indexOf('if [[ "${1:-}" == "--" ]]')).toBeLessThan(script.indexOf('TAG="${1:-}"'));
+    expect(script.match(/if \[\[ "\$\{#PREFLIGHT_ARGS\[@\]\}" -gt 0 \]\]; then/g)).toHaveLength(2);
   });
 
   it("keeps GitHub Actions as the only authoritative Release publisher", () => {
