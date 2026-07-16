@@ -8,43 +8,378 @@
     linear-gradient(180deg, rgba(248, 250, 252, 0.72), rgba(241, 245, 249, 0.94));
 }
 
-.wc-mindmap-skeleton {
+.wc-resolution-viewport-mindmap {
+  display: flex;
+  height: 100vh;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.wc-resolution-viewport-mindmap .wc-resolution-canvas-header-only {
+  flex: none;
+}
+
+.wc-resolution-viewport-mindmap .wc-mindmap-stage {
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.wc-mindmap-canvas {
   position: absolute;
   inset: 0;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+
+.wc-mindmap-canvas.is-panning {
+  cursor: grabbing;
+}
+
+.wc-mindmap-world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.wc-mindmap-edges {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.wc-mindmap-edges path {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.wc-mindmap-node {
+  --mindmap-node-color: #4f46e5;
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  box-sizing: border-box;
+  user-select: none;
+  border-radius: 14px;
+  cursor: default;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.wc-mindmap-node-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wc-mindmap-node-section {
+  height: 56px;
+  padding: 0 22px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 18px;
+  background: var(--wc-primary-gradient);
+  box-shadow: 0 16px 42px rgba(79, 70, 229, 0.42);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.wc-mindmap-root-icon {
+  flex: none;
+  font-size: 19px;
+}
+
+.wc-mindmap-node-category {
+  height: 46px;
+  padding: 0 16px;
+  border: 1px solid var(--wc-border-strong);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(239, 246, 255, 0.72));
+  box-shadow: var(--wc-shadow-sm);
+  backdrop-filter: blur(18px);
+  font-size: 14.5px;
+  font-weight: 650;
+}
+
+.wc-mindmap-category-dot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--mindmap-node-color);
+}
+
+.wc-mindmap-node-group {
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: var(--wc-shadow-xs);
+  color: var(--wc-text-secondary);
+  backdrop-filter: blur(12px);
+  font-size: 13px;
+  font-weight: 620;
+}
+
+.wc-mindmap-group-bar {
+  width: 3px;
+  height: 14px;
+  flex: none;
+  border-radius: 2px;
+  background: var(--wc-primary-gradient);
+}
+
+.wc-mindmap-node-card {
+  width: 208px;
+  height: 44px;
+  padding: 0 10px;
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 9px 24px rgba(37, 99, 235, 0.085);
+}
+
+.wc-mindmap-node-card:hover {
+  border-color: rgba(37, 99, 235, 0.45);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 15px 34px rgba(37, 99, 235, 0.16);
+}
+
+.wc-mindmap-favicon {
   display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: 10px;
-  color: #64748b;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #fff;
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.wc-mindmap-favicon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.wc-mindmap-semantic-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.wc-mindmap-fallback-icon {
+  background: var(--mindmap-node-color);
+}
+
+.wc-mindmap-node-card .wc-mindmap-node-label {
+  flex: 1;
+  font-size: 12.5px;
+}
+
+.wc-mindmap-star {
+  flex: none;
+  color: #cbd5e1;
+  font-size: 13px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.wc-mindmap-node-card:hover .wc-mindmap-star,
+.wc-mindmap-star.is-pinned {
+  opacity: 1;
+}
+
+.wc-mindmap-star.is-pinned {
+  color: #f59e0b;
+}
+
+.wc-mindmap-layout-rail {
+  position: absolute;
+  z-index: 25;
+  top: 50%;
+  left: 18px;
+  display: flex;
+  padding: 10px;
+  transform: translateY(-50%);
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid rgba(147, 197, 253, 0.36);
+  border-radius: 20px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(239, 246, 255, 0.6));
+  box-shadow: var(--wc-shadow-md);
+  backdrop-filter: blur(22px);
+}
+
+.wc-mindmap-rail-label {
+  margin-bottom: 2px;
+  color: var(--wc-text-muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-align: center;
 }
 
-.wc-mindmap-skeleton strong {
-  color: #334155;
-  font-family: var(--font-serif, ui-serif, Georgia, serif);
-  font-size: 1.05rem;
-}
-
-.wc-mindmap-skeleton span:last-child {
-  font-size: 0.78rem;
-  font-weight: 600;
-}
-
-.wc-mindmap-skeleton-icon {
+.wc-mindmap-layout-button {
+  position: relative;
   display: grid;
-  width: 44px;
-  height: 44px;
+  width: 58px;
+  height: 46px;
   place-items: center;
-  border: 1px solid rgba(99, 102, 241, 0.18);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.82);
-  color: #4f46e5;
-  box-shadow: 0 12px 36px rgba(79, 70, 229, 0.1);
+  border: 1px solid transparent;
+  border-radius: 13px;
+  transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
-.wc-mindmap-skeleton-icon svg {
-  width: 20px;
-  height: 20px;
+.wc-mindmap-layout-button:hover {
+  background: rgba(219, 234, 254, 0.6);
+}
+
+.wc-mindmap-layout-button[aria-pressed="true"] {
+  border-color: var(--wc-border-strong);
+  background: var(--wc-surface-strong);
+  box-shadow: var(--wc-shadow-xs);
+}
+
+.wc-mindmap-layout-button img {
+  width: 34px;
+  height: 26px;
+}
+
+.wc-mindmap-layout-tip {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 10px);
+  padding: 5px 11px;
+  transform: translateY(-50%);
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.85);
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 550;
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: opacity 0.15s ease;
+}
+
+.wc-mindmap-layout-button:hover .wc-mindmap-layout-tip {
+  opacity: 1;
+}
+
+.wc-mindmap-zoom-cluster {
+  position: absolute;
+  z-index: 25;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  padding: 6px;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid rgba(147, 197, 253, 0.36);
+  border-radius: 999px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(239, 246, 255, 0.6));
+  box-shadow: var(--wc-shadow-sm);
+  backdrop-filter: blur(22px);
+}
+
+.wc-mindmap-zoom-button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--wc-text-secondary);
+  font-size: 15px;
+  font-weight: 600;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.wc-mindmap-zoom-button:hover {
+  background: rgba(219, 234, 254, 0.7);
+  color: var(--wc-primary);
+}
+
+.wc-mindmap-zoom-percent {
+  min-width: 46px;
+  color: var(--wc-text-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 620;
+  text-align: center;
+}
+
+.wc-mindmap-zoom-fit {
+  width: auto;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.wc-mindmap-legend {
+  position: absolute;
+  z-index: 25;
+  bottom: 18px;
+  left: 18px;
+  display: flex;
+  padding: 8px 16px;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--wc-border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: var(--wc-shadow-xs);
+  color: var(--wc-text-secondary);
+  backdrop-filter: blur(14px);
+  font-size: 11.5px;
+}
+
+.wc-mindmap-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.wc-mindmap-legend-item i {
+  display: block;
+  border-radius: 4px;
+}
+
+.wc-mindmap-legend-item .is-section {
+  width: 14px;
+  height: 8px;
+  background: var(--wc-primary-gradient);
+}
+
+.wc-mindmap-legend-item .is-category {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #8b5cf6;
+}
+
+.wc-mindmap-legend-item .is-group {
+  width: 3px;
+  height: 11px;
+  background: var(--wc-primary-gradient);
+}
+
+.wc-mindmap-legend-item .is-card {
+  width: 12px;
+  height: 8px;
+  border: 1px solid #93c5fd;
+  background: #fff;
+}
+
+.wc-mindmap-legend-separator {
+  color: #cbd5e1;
 }
 
 .wc-resolution-canvas.wc-resolution-canvas-header-only {

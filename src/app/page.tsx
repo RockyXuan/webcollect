@@ -202,7 +202,7 @@ export default function HomePage() {
       mode={wallpaperMode}
       onEnterCollection={handleEnterCollection}
     >
-    <div className="wc-resolution-viewport">
+    <div className={`wc-resolution-viewport${collectionViewMode === "mindmap" ? " wc-resolution-viewport-mindmap" : ""}`}>
     <div className={`wc-resolution-canvas ${collectionViewMode === "classic" ? "min-h-screen" : "wc-resolution-canvas-header-only"}`}>
       <TopNav
         onAddCard={handleAddCard}
