@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { TopNav } from "@/components/nav/top-nav";
 import { SortableGrid } from "@/components/layout/sortable-grid";
 import { CardDialog } from "@/components/dialogs/card-dialog";
@@ -10,7 +10,7 @@ import { SectionShipDialog } from "@/components/dialogs/section-ship-dialog";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { HotRecommendation } from "@/components/hot-recommendation";
 import { WallpaperShell } from "@/components/wallpaper/wallpaper-shell";
-import { MindmapView } from "@/components/mindmap/mindmap-view";
+import { MindmapView, type MindmapSearchTarget } from "@/components/mindmap/mindmap-view";
 import type { CollectionViewMode } from "@/components/mindmap/types";
 import { useAppStore } from "@/lib/store";
 import { useAuthStore } from "@/lib/auth-store";
@@ -65,6 +65,13 @@ export default function HomePage() {
   const [isCreatingParent, setIsCreatingParent] = useState(false);
   const [emergencyRestorePrompt, setEmergencyRestorePrompt] = useState<EmergencyRestorePrompt | null>(null);
   const [collectionViewMode, setCollectionViewMode] = useState<CollectionViewMode>("classic");
+  const [requestedViewMode, setRequestedViewMode] = useState<CollectionViewMode>("classic");
+  const [viewTransitionPhase, setViewTransitionPhase] = useState<"idle" | "exiting" | "entering">("idle");
+  const [mindmapSearchTarget, setMindmapSearchTarget] = useState<MindmapSearchTarget | null>(null);
+  const viewTransitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const viewTransitionFrameRef = useRef<number | null>(null);
+  const viewTransitionTokenRef = useRef(0);
+  const mindmapSearchRequestRef = useRef(0);
 
   useEffect(() => {
     const init = async () => {
@@ -158,6 +165,37 @@ export default function HomePage() {
     returnToWallpaper();
   }, [returnToWallpaper]);
 
+  const handleCollectionViewModeChange = useCallback((mode: CollectionViewMode) => {
+    setRequestedViewMode(mode);
+    const token = ++viewTransitionTokenRef.current;
+    if (viewTransitionTimerRef.current) clearTimeout(viewTransitionTimerRef.current);
+    if (viewTransitionFrameRef.current !== null) cancelAnimationFrame(viewTransitionFrameRef.current);
+    if (mode === collectionViewMode) {
+      setViewTransitionPhase("idle");
+      return;
+    }
+    setViewTransitionPhase("exiting");
+    viewTransitionTimerRef.current = setTimeout(() => {
+      if (viewTransitionTokenRef.current !== token) return;
+      setCollectionViewMode(mode);
+      setViewTransitionPhase("entering");
+      viewTransitionFrameRef.current = requestAnimationFrame(() => {
+        viewTransitionFrameRef.current = requestAnimationFrame(() => {
+          if (viewTransitionTokenRef.current === token) setViewTransitionPhase("idle");
+        });
+      });
+    }, 180);
+  }, [collectionViewMode]);
+
+  const handleRevealMindmapCategory = useCallback((target: { sectionId: string; categoryId: string }) => {
+    setMindmapSearchTarget({ ...target, requestId: ++mindmapSearchRequestRef.current });
+  }, []);
+
+  useEffect(() => () => {
+    if (viewTransitionTimerRef.current) clearTimeout(viewTransitionTimerRef.current);
+    if (viewTransitionFrameRef.current !== null) cancelAnimationFrame(viewTransitionFrameRef.current);
+  }, []);
+
   const handleConfirmEmergencyRestore = useCallback(async () => {
     const prompt = emergencyRestorePrompt;
     if (!prompt?.snapshotId) return;
@@ -210,11 +248,13 @@ export default function HomePage() {
         onAddCategory={handleAddCategory}
         onRecycleBin={() => setRecycleBinOpen(true)}
         onShowWallpaper={handleReturnToWallpaper}
-        collectionViewMode={collectionViewMode}
-        onCollectionViewModeChange={setCollectionViewMode}
+        collectionViewMode={requestedViewMode}
+        onCollectionViewModeChange={handleCollectionViewModeChange}
+        onRevealMindmapCategory={handleRevealMindmapCategory}
       />
 
-      {collectionViewMode === "classic" && <main className="wc-shell wc-page-main space-y-7 px-5 py-7">
+      {collectionViewMode === "classic" && <div className={`wc-collection-view is-${viewTransitionPhase}`} data-testid="collection-view-classic">
+      <main className="wc-shell wc-page-main space-y-7 px-5 py-7">
         <ErrorBoundary>
           <SortableGrid
             onAddCard={handleAddCard}
@@ -237,19 +277,22 @@ export default function HomePage() {
         <ErrorBoundary>
           <HotRecommendation />
         </ErrorBoundary>
-      </main>}
+      </main>
 
-      {collectionViewMode === "classic" && <footer className="mt-6 py-7">
+      <footer className="mt-6 py-7">
         <div className="wc-shell px-5 text-center text-xs text-slate-400">
           <p>WebCollect - 你的个人网页收藏墙</p>
         </div>
-      </footer>}
+      </footer>
+      </div>}
     </div>
 
       {collectionViewMode === "mindmap" && (
-        <ErrorBoundary>
-          <MindmapView />
-        </ErrorBoundary>
+        <div className={`wc-collection-view is-${viewTransitionPhase}`} data-testid="collection-view-mindmap">
+          <ErrorBoundary>
+            <MindmapView searchTarget={mindmapSearchTarget} />
+          </ErrorBoundary>
+        </div>
       )}
 
       <ErrorBoundary>

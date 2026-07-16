@@ -15,6 +15,7 @@ interface MindmapNodeProps {
   descendantCount?: number;
   chipSide?: "right" | "left" | "down";
   dragging?: boolean;
+  highlighted?: boolean;
   onToggleCollapse?: (nodeId: string) => void;
   onNodePointerDown?: (event: ReactPointerEvent<HTMLDivElement>, nodeId: string) => void;
   onNodePointerMove?: (event: ReactPointerEvent<HTMLDivElement>, nodeId: string) => void;
@@ -75,6 +76,7 @@ function MindmapNodeComponent({
   descendantCount = 0,
   chipSide = "right",
   dragging = false,
+  highlighted = false,
   onToggleCollapse,
   onNodePointerDown,
   onNodePointerMove,
@@ -94,7 +96,7 @@ function MindmapNodeComponent({
 
   return (
     <div
-      className={`wc-mindmap-node wc-mindmap-node-${node.type}${dragging ? " is-dragging" : ""}`}
+      className={`wc-mindmap-node wc-mindmap-node-${node.type}${dragging ? " is-dragging" : ""}${highlighted ? " is-search-highlight" : ""}`}
       style={style}
       data-mindmap-node={node.id}
       data-node-type={node.type}

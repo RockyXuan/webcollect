@@ -75,6 +75,7 @@ interface TopNavProps {
   onShowWallpaper?: () => void;
   collectionViewMode?: CollectionViewMode;
   onCollectionViewModeChange?: (mode: CollectionViewMode) => void;
+  onRevealMindmapCategory?: (target: { sectionId: string; categoryId: string }) => void;
 }
 
 type SearchPanelItem = {
@@ -209,6 +210,7 @@ export function TopNav({
   onShowWallpaper,
   collectionViewMode,
   onCollectionViewModeChange,
+  onRevealMindmapCategory,
 }: TopNavProps) {
   const {
     searchQuery,
@@ -357,17 +359,29 @@ export function TopNav({
         return;
       }
 
-      if (item.sectionId) {
-        void setActiveSection(item.sectionId);
-      }
-
-      if (item.type === "category" && item.targetId) {
-        revealSearchTarget(`[data-wc-category-id="${escapeSelectorValue(item.targetId)}"]`);
+      if (
+        item.type === "category"
+        && item.targetId
+        && item.sectionId
+        && collectionViewMode === "mindmap"
+        && onRevealMindmapCategory
+      ) {
+        const sectionId = item.sectionId;
+        const categoryId = item.targetId;
+        void (async () => {
+          if (sectionId !== activeSectionId) await setActiveSection(sectionId);
+          onRevealMindmapCategory({ sectionId, categoryId });
+        })();
+      } else {
+        if (item.sectionId) void setActiveSection(item.sectionId);
+        if (item.type === "category" && item.targetId) {
+          revealSearchTarget(`[data-wc-category-id="${escapeSelectorValue(item.targetId)}"]`);
+        }
       }
 
       setIsSearchPanelOpen(false);
     },
-    [linkOpenMode, revealSearchTarget, searchEngine, setActiveSection, trimmedSearchQuery]
+    [activeSectionId, collectionViewMode, linkOpenMode, onRevealMindmapCategory, revealSearchTarget, searchEngine, setActiveSection, trimmedSearchQuery]
   );
 
   const handleSearchEngineChange = (engine: SearchEngineId) => {

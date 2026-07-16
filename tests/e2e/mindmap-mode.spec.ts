@@ -3,6 +3,23 @@ import { buildMindmapTree, fitCamera, layoutMindmap } from "@/components/mindmap
 import type { Category, CollectionSection, WebCard } from "@/lib/types";
 import { openCollection } from "./helpers";
 
+const browserErrors = new WeakMap<Page, string[]>();
+
+test.beforeEach(async ({ page }) => {
+  const errors: string[] = [];
+  browserErrors.set(page, errors);
+  page.on("console", (message) => {
+    if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+      errors.push(message.text());
+    }
+  });
+  page.on("pageerror", (error) => errors.push(error.message));
+});
+
+test.afterEach(async ({ page }) => {
+  expect(browserErrors.get(page) || []).toEqual([]);
+});
+
 const PROTECTED_KEYS = [
   "cards",
   "categories",
@@ -38,6 +55,7 @@ async function readProtectedCollectionState(page: Page): Promise<Record<string, 
 
 const fixtureSections: CollectionSection[] = [
   { id: "section-default", name: "主页", order: 0, createdAt: 1, updatedAt: 1 },
+  { id: "section-research", name: "资料", order: 1, createdAt: 2, updatedAt: 2 },
 ];
 const fixtureCategories: Category[] = [
   { id: "cat-work", name: "工作", icon: "briefcase", color: "#b8860b", order: 0, createdAt: 1, sectionId: "section-default", isParent: true },
@@ -45,6 +63,8 @@ const fixtureCategories: Category[] = [
   { id: "cat-inbox", name: "收集箱", icon: "inbox", color: "#888888", order: 99, createdAt: 5, sectionId: "section-default", isParent: true },
   { id: "group-common", name: "常用", icon: "star", color: "#b8860b", order: 0, createdAt: 3, sectionId: "section-default", parentId: "cat-work" },
   { id: "group-tools", name: "AI 工具", icon: "wrench", color: "#8b5cf6", order: 0, createdAt: 4, sectionId: "section-default", parentId: "cat-ai" },
+  { id: "cat-research", name: "资料分类", icon: "book-open", color: "#4a7c59", order: 0, createdAt: 6, sectionId: "section-research", isParent: true },
+  { id: "group-reading", name: "待读", icon: "book-open", color: "#4a7c59", order: 0, createdAt: 7, sectionId: "section-research", parentId: "cat-research" },
 ];
 const fixtureCard = (id: string, title: string, categoryId: string, order: number): WebCard => ({
   id,
@@ -58,7 +78,7 @@ const fixtureCard = (id: string, title: string, categoryId: string, order: numbe
   fullDesc: "",
   note: "",
   abbreviation: title.slice(0, 1),
-  imageUrl: "",
+  imageUrl: "/assets/mascots/chipmunk-head.png",
 });
 const fixtureCards: WebCard[] = [
   fixtureCard("notion", "Notion", "group-common", 0),
@@ -67,7 +87,54 @@ const fixtureCards: WebCard[] = [
   fixtureCard("chatgpt", "ChatGPT", "group-tools", 0),
   fixtureCard("claude", "Claude", "group-tools", 1),
   fixtureCard("gemini", "Gemini", "group-tools", 2),
+  fixtureCard("reader", "Reader", "group-reading", 0),
 ];
+
+async function enterMindmap(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "导图", exact: true }).click();
+  await expect(page.getByTestId("collection-view-mindmap")).toHaveClass(/is-idle/);
+  await expect(page.getByTestId("mindmap-stage")).toHaveAttribute("data-mindmap-hydrated", "true");
+}
+
+async function readViewState(page: Page, sectionId: string): Promise<unknown> {
+  return page.evaluate(async (key) => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("WebCollect");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      const transaction = database.transaction("webcollect_data", "readonly");
+      const request = transaction.objectStore("webcollect_data").get(key);
+      return await new Promise((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    } finally {
+      database.close();
+    }
+  }, `mindmapViewState:${sectionId}`);
+}
+
+async function writeViewState(page: Page, sectionId: string, value: unknown): Promise<void> {
+  await page.evaluate(async ({ key, value: rawValue }) => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("WebCollect");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      const transaction = database.transaction("webcollect_data", "readwrite");
+      transaction.objectStore("webcollect_data").put(rawValue, key);
+      await new Promise<void>((resolve, reject) => {
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+      });
+    } finally {
+      database.close();
+    }
+  }, { key: `mindmapViewState:${sectionId}`, value });
+}
 
 async function writeIsolatedMindmapFixture(page: Page): Promise<void> {
   await page.evaluate(async (fixture) => {
@@ -105,7 +172,7 @@ test("classic and mindmap modes share one header without mutating collection dat
   await expect(page.getByRole("main")).toBeVisible();
   await expect(page.getByTestId("mindmap-stage")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "导图", exact: true }).click();
+  await enterMindmap(page);
   await expect(page.getByTestId("mindmap-stage")).toBeVisible();
   await expect(page.getByRole("main")).toHaveCount(0);
   await expect(page.getByRole("navigation")).toHaveCount(1);
@@ -167,7 +234,7 @@ test("mindmap layouts match the Fable geometry at 1920x1080", async ({ page }) =
   await writeIsolatedMindmapFixture(page);
   await page.reload();
   await openCollection(page);
-  await page.getByRole("button", { name: "导图", exact: true }).click();
+  await enterMindmap(page);
 
   const protectedFixture = await readProtectedCollectionState(page);
   const tree = buildMindmapTree(fixtureSections, fixtureCategories, fixtureCards, "section-default");
@@ -226,7 +293,7 @@ test("mindmap drag, collapse, and hover preview preserve collection data", async
   await writeIsolatedMindmapFixture(page);
   await page.reload();
   await openCollection(page);
-  await page.getByRole("button", { name: "导图", exact: true }).click();
+  await enterMindmap(page);
   const before = await readProtectedCollectionState(page);
 
   const category = page.locator('[data-mindmap-node="cat:cat-work"]');
@@ -286,4 +353,93 @@ test("mindmap drag, collapse, and hover preview preserve collection data", async
   await expect(page.getByTestId("mindmap-hover-preview")).toHaveCount(0);
 
   expect(await readProtectedCollectionState(page)).toEqual(before);
+});
+
+test("mindmap view state stays independent per section and survives classic roundtrips", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/");
+  await openCollection(page);
+  await writeIsolatedMindmapFixture(page);
+  await page.reload();
+  await openCollection(page);
+  const before = await readProtectedCollectionState(page);
+  await enterMindmap(page);
+
+  await page.getByRole("button", { name: "双侧脑图" }).click();
+  await page.getByRole("button", { name: "放大" }).click();
+  await page.getByRole("button", { name: "收起“工作”" }).click();
+  await expect.poll(() => readViewState(page, "section-default")).toMatchObject({
+    layout: "bilateral",
+    collapsed: expect.arrayContaining(["cat:cat-work"]),
+  });
+
+  await page.getByRole("button", { name: "资料", exact: true }).click();
+  await expect(page.getByTestId("mindmap-stage")).toHaveAttribute("data-mindmap-hydrated", "true");
+  await expect(page.getByTestId("mindmap-stage")).toHaveAttribute("data-mindmap-layout", "logic-right");
+  await page.getByRole("button", { name: "下行组织图" }).click();
+  await expect.poll(() => readViewState(page, "section-research")).toMatchObject({ layout: "tree-down" });
+
+  await page.getByRole("button", { name: "主页", exact: true }).click();
+  await expect(page.getByTestId("mindmap-stage")).toHaveAttribute("data-mindmap-hydrated", "true");
+  await expect(page.getByTestId("mindmap-stage")).toHaveAttribute("data-mindmap-layout", "bilateral");
+  await expect(page.getByRole("button", { name: "展开“工作”，包含 4 个后代" })).toBeVisible();
+
+  await page.getByRole("button", { name: "经典", exact: true }).click();
+  await expect(page.getByTestId("collection-view-classic")).toHaveClass(/is-idle/);
+  await enterMindmap(page);
+  await expect(page.getByTestId("mindmap-stage")).toHaveAttribute("data-mindmap-layout", "bilateral");
+  await expect(page.getByRole("button", { name: "展开“工作”，包含 4 个后代" })).toBeVisible();
+  expect(await readProtectedCollectionState(page)).toEqual(before);
+});
+
+test("corrupt mindmap state is normalized in memory without rewriting the legacy value", async ({ page }) => {
+  await page.goto("/");
+  await openCollection(page);
+  await writeIsolatedMindmapFixture(page);
+  const corrupt = {
+    layout: "retired-layout",
+    collapsed: ["cat:cat-work", "cat:stale"],
+    offsets: { "logic-right": { "cat:stale": { dx: 9, dy: 4 } } },
+    camera: { x: 33, y: 44, k: 99 },
+    updatedAt: 11,
+  };
+  await writeViewState(page, "section-default", corrupt);
+  await page.reload();
+  await openCollection(page);
+  await enterMindmap(page);
+
+  await expect(page.getByTestId("mindmap-stage")).toHaveAttribute("data-mindmap-layout", "logic-right");
+  await expect(page.getByTestId("mindmap-zoom-percent")).toHaveText("200%");
+  expect(await readViewState(page, "section-default")).toEqual(corrupt);
+});
+
+test("rapid mode changes keep one view and category search focuses the right section", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/");
+  await openCollection(page);
+  await writeIsolatedMindmapFixture(page);
+  await page.reload();
+  await openCollection(page);
+
+  await page.getByRole("button", { name: "导图", exact: true }).click();
+  await page.getByRole("button", { name: "经典", exact: true }).click();
+  await page.waitForTimeout(240);
+  await expect(page.getByTestId("collection-view-classic")).toHaveCount(1);
+  await expect(page.getByTestId("collection-view-mindmap")).toHaveCount(0);
+  await enterMindmap(page);
+  await expect(page.locator('[data-testid^="collection-view-"]')).toHaveCount(1);
+
+  const search = page.getByPlaceholder("搜索网站、分组或分类...");
+  await search.fill("资料分类");
+  await page.getByRole("button", { name: /^资料分类 资料 \/ 资料分类/ }).click();
+  await expect(page.getByRole("button", { name: "资料", exact: true })).toHaveClass(/wc-section-tab-active/);
+  await expect(page.locator('[data-mindmap-node="cat:cat-research"]')).toHaveClass(/is-search-highlight/);
+  const stage = await page.getByTestId("mindmap-stage").boundingBox();
+  const target = await page.locator('[data-mindmap-node="cat:cat-research"]').boundingBox();
+  expect(stage && target).toBeTruthy();
+  if (stage && target) {
+    expect(Math.abs(target.x + target.width / 2 - (stage.x + stage.width / 2))).toBeLessThanOrEqual(2);
+    expect(Math.abs(target.y + target.height / 2 - (stage.y + stage.height / 2))).toBeLessThanOrEqual(2);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(1080);
 });

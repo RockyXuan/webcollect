@@ -1,11 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { loadMindmapViewState, saveMindmapViewState } from "@/lib/mindmap-view-state";
 import { useAppStore } from "@/lib/store";
 import { buildMindmapTree, fitCamera, layoutMindmap } from "./layout-engine";
 import { MindmapNode } from "./mindmap-node";
 import { NodeHoverPreview, type MindmapPreviewTarget } from "./node-hover-preview";
-import type { MindmapCamera, MindmapLayoutId, MindmapNode as MindmapNodeModel } from "./types";
+import type {
+  MindmapCamera,
+  MindmapLayoutId,
+  MindmapNode as MindmapNodeModel,
+  MindmapViewState,
+} from "./types";
 
 const LAYOUTS: Array<{ id: MindmapLayoutId; label: string; asset: string }> = [
   { id: "logic-right", label: "右侧逻辑图（默认）", asset: "/mindmap/layout-logic-right.svg" },
@@ -18,11 +24,21 @@ const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 2;
 const ZOOM_STEP = 1.15;
 
+export interface MindmapSearchTarget {
+  sectionId: string;
+  categoryId: string;
+  requestId: number;
+}
+
+interface MindmapViewProps {
+  searchTarget?: MindmapSearchTarget | null;
+}
+
 function clampZoom(value: number): number {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
 }
 
-const EMPTY_OFFSETS = (): Record<MindmapLayoutId, Record<string, { dx: number; dy: number }>> => ({
+const EMPTY_OFFSETS = (): MindmapViewState["offsets"] => ({
   "logic-right": {},
   bilateral: {},
   "tree-down": {},
@@ -48,13 +64,14 @@ function descendantCount(node: MindmapNodeModel): number {
   return node.children.reduce((count, child) => count + 1 + descendantCount(child), 0);
 }
 
-export function MindmapView() {
+export function MindmapView({ searchTarget = null }: MindmapViewProps) {
   const sections = useAppStore((state) => state.sections);
   const categories = useAppStore((state) => state.categories);
   const cards = useAppStore((state) => state.cards);
   const activeSectionId = useAppStore((state) => state.activeSectionId);
   const pinnedBookmarkItems = useAppStore((state) => state.pinnedBookmarkItems);
   const stageRef = useRef<HTMLElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
   const panRef = useRef<{ pointerId: number; x: number; y: number; camera: MindmapCamera } | null>(null);
   const dragRef = useRef<{
     pointerId: number;
@@ -69,7 +86,15 @@ export function MindmapView() {
   const previewShowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewUnmountTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wheelPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hydrationRequestRef = useRef(0);
+  const lastSearchRequestRef = useRef(0);
   const lastAutoFitKeyRef = useRef("");
+  const skipNextAutoFitRef = useRef(false);
+  const activeStateSectionRef = useRef(activeSectionId);
+  const dirtyRef = useRef(false);
   const [layout, setLayout] = useState<MindmapLayoutId>("logic-right");
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const [offsets, setOffsets] = useState(EMPTY_OFFSETS);
@@ -79,6 +104,9 @@ export function MindmapView() {
   const [isPanning, setIsPanning] = useState(false);
   const [previewTarget, setPreviewTarget] = useState<MindmapPreviewTarget | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  const [dirtyRevision, setDirtyRevision] = useState(0);
+  const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
 
   const tree = useMemo(
     () => buildMindmapTree(sections, categories, cards, activeSectionId),
@@ -105,18 +133,46 @@ export function MindmapView() {
   const treeSignature = useMemo(() => Object.keys(nodeById).sort().join("|"), [nodeById]);
   const collapsedSignature = useMemo(() => [...collapsed].sort().join("|"), [collapsed]);
   const autoFitKey = `${activeSectionId}|${layout}|${treeSignature}|${collapsedSignature}|${viewport.width}x${viewport.height}`;
+  const viewStateRef = useRef<MindmapViewState>({
+    layout,
+    collapsed: [],
+    offsets,
+    camera,
+    updatedAt: 0,
+  });
 
-  const fit = useCallback(() => {
+  viewStateRef.current = {
+    layout,
+    collapsed: [...collapsed],
+    offsets,
+    camera,
+    updatedAt: Date.now(),
+  };
+
+  const markDirty = useCallback(() => {
+    dirtyRef.current = true;
+    setDirtyRevision((value) => value + 1);
+  }, []);
+
+  const persistSectionState = useCallback((sectionId: string, state: MindmapViewState) => {
+    void saveMindmapViewState(sectionId, state).catch((error) => {
+      console.error("[WebCollect] Mindmap view state save failed", error);
+    });
+  }, []);
+
+  const fit = useCallback((persist = true) => {
     if (!viewport.width || !viewport.height) return;
     setCamera(fitCamera(layoutResult.bounds, viewport));
-  }, [layoutResult.bounds, viewport]);
+    if (persist) markDirty();
+  }, [layoutResult.bounds, markDirty, viewport]);
 
   useLayoutEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
     const updateViewport = () => {
-      const rect = stage.getBoundingClientRect();
-      setViewport({ width: rect.width, height: rect.height });
+      // Layout dimensions must not inherit the temporary scale used by the
+      // 180ms classic↔mindmap transition.
+      setViewport({ width: stage.clientWidth, height: stage.clientHeight });
     };
     updateViewport();
     const observer = new ResizeObserver(updateViewport);
@@ -124,11 +180,66 @@ export function MindmapView() {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    const previousSectionId = activeStateSectionRef.current;
+    if (previousSectionId !== activeSectionId && dirtyRef.current) {
+      persistSectionState(previousSectionId, viewStateRef.current);
+    }
+    activeStateSectionRef.current = activeSectionId;
+    dirtyRef.current = false;
+    if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    const requestId = ++hydrationRequestRef.current;
+    setHydrated(false);
+    setHighlightedNodeId(null);
+    const validNodeIds = new Set(Object.keys(nodeById));
+    void loadMindmapViewState(activeSectionId, validNodeIds).then(({ exists, state }) => {
+      if (hydrationRequestRef.current !== requestId || activeStateSectionRef.current !== activeSectionId) return;
+      setLayout(state.layout);
+      setCollapsed(new Set(state.collapsed));
+      setOffsets(state.offsets);
+      setCamera(state.camera);
+      skipNextAutoFitRef.current = exists;
+      lastAutoFitKeyRef.current = "";
+      setHydrated(true);
+    }).catch((error) => {
+      if (hydrationRequestRef.current !== requestId) return;
+      console.error("[WebCollect] Mindmap view state load failed", error);
+      setLayout("logic-right");
+      setCollapsed(new Set());
+      setOffsets(EMPTY_OFFSETS());
+      setCamera({ x: 0, y: 0, k: 1 });
+      skipNextAutoFitRef.current = false;
+      setHydrated(true);
+    });
+    // Rehydrate only when the active section changes. Live collection edits rebuild the tree in place.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSectionId, persistSectionState]);
+
+  useEffect(() => {
+    if (!hydrated || !dirtyRef.current) return;
+    if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    const sectionId = activeSectionId;
+    const state = viewStateRef.current;
+    persistTimerRef.current = setTimeout(() => {
+      persistSectionState(sectionId, state);
+      if (activeStateSectionRef.current === sectionId) dirtyRef.current = false;
+    }, 120);
+    return () => {
+      if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    };
+  }, [activeSectionId, dirtyRevision, hydrated, persistSectionState]);
+
   useLayoutEffect(() => {
+    if (!hydrated || !viewport.width || !viewport.height) return;
     if (lastAutoFitKeyRef.current === autoFitKey) return;
     lastAutoFitKeyRef.current = autoFitKey;
-    fit();
-  }, [autoFitKey, fit]);
+    if (skipNextAutoFitRef.current) {
+      skipNextAutoFitRef.current = false;
+      return;
+    }
+    fit(false);
+    markDirty();
+  }, [autoFitKey, fit, hydrated, markDirty, viewport.height, viewport.width]);
 
   const clearPreviewTimers = useCallback(() => {
     if (previewShowTimerRef.current) clearTimeout(previewShowTimerRef.current);
@@ -146,7 +257,7 @@ export function MindmapView() {
     else previewUnmountTimerRef.current = setTimeout(() => setPreviewTarget(null), 180);
   }, [clearPreviewTimers]);
 
-  const zoomAt = useCallback((nextZoom: number, anchorX: number, anchorY: number) => {
+  const zoomAt = useCallback((nextZoom: number, anchorX: number, anchorY: number, persist = true) => {
     hidePreview();
     setCamera((current) => {
       const k = clampZoom(nextZoom);
@@ -154,19 +265,29 @@ export function MindmapView() {
       const worldY = (anchorY - current.y) / current.k;
       return { x: anchorX - worldX * k, y: anchorY - worldY * k, k };
     });
-  }, [hidePreview]);
+    if (persist) markDirty();
+  }, [hidePreview, markDirty]);
 
   const zoomFromCenter = useCallback((factor: number) => {
     zoomAt(camera.k * factor, viewport.width / 2, viewport.height / 2);
   }, [camera.k, viewport, zoomAt]);
 
-  const handleWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
+  const handleWheel = useCallback((event: WheelEvent) => {
     event.preventDefault();
     const rect = stageRef.current?.getBoundingClientRect();
     if (!rect) return;
     const factor = Math.exp(-event.deltaY * 0.0015);
-    zoomAt(camera.k * factor, event.clientX - rect.left, event.clientY - rect.top);
-  }, [camera.k, zoomAt]);
+    zoomAt(camera.k * factor, event.clientX - rect.left, event.clientY - rect.top, false);
+    if (wheelPersistTimerRef.current) clearTimeout(wheelPersistTimerRef.current);
+    wheelPersistTimerRef.current = setTimeout(markDirty, 180);
+  }, [camera.k, markDirty, zoomAt]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.addEventListener("wheel", handleWheel, { passive: false });
+    return () => canvas.removeEventListener("wheel", handleWheel);
+  }, [handleWheel]);
 
   const handlePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || (event.target as HTMLElement).closest("[data-mindmap-node]")) return;
@@ -190,7 +311,8 @@ export function MindmapView() {
     if (panRef.current?.pointerId !== event.pointerId) return;
     panRef.current = null;
     setIsPanning(false);
-  }, []);
+    markDirty();
+  }, [markDirty]);
 
   const handleToggleCollapse = useCallback((nodeId: string) => {
     hidePreview();
@@ -200,7 +322,8 @@ export function MindmapView() {
       else next.add(nodeId);
       return next;
     });
-  }, [hidePreview]);
+    markDirty();
+  }, [hidePreview, markDirty]);
 
   const handleNodePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>, nodeId: string) => {
     if (event.button !== 0) return;
@@ -250,10 +373,11 @@ export function MindmapView() {
           [nodeId]: { dx: drag.base.dx + finalDelta.dx, dy: drag.base.dy + finalDelta.dy },
         },
       }));
+      markDirty();
     }
     dragRef.current = null;
     setDragDelta(null);
-  }, [layout]);
+  }, [layout, markDirty]);
 
   const handleCardPointerEnter = useCallback((element: HTMLDivElement, node: MindmapNodeModel, card: (typeof cards)[number]) => {
     clearPreviewTimers();
@@ -280,12 +404,45 @@ export function MindmapView() {
     if (previewHideTimerRef.current) clearTimeout(previewHideTimerRef.current);
   }, []);
 
+  useEffect(() => {
+    if (!hydrated || !searchTarget || searchTarget.sectionId !== activeSectionId) return;
+    if (lastSearchRequestRef.current === searchTarget.requestId) return;
+    const targetNode = Object.values(nodeById).find((node) =>
+      (node.type === "category" || node.type === "group") && node.refId === searchTarget.categoryId);
+    if (!targetNode || !viewport.width || !viewport.height) return;
+    lastSearchRequestRef.current = searchTarget.requestId;
+    const nextCollapsed = new Set(collapsed);
+    let ancestorId = parentIds[targetNode.id];
+    while (ancestorId) {
+      nextCollapsed.delete(ancestorId);
+      ancestorId = parentIds[ancestorId];
+    }
+    setCollapsed(nextCollapsed);
+    const focusedLayout = layoutMindmap(tree, layout, nextCollapsed, offsets[layout]);
+    const position = focusedLayout.positions[targetNode.id];
+    if (!position) return;
+    lastAutoFitKeyRef.current = autoFitKey;
+    setCamera((current) => ({
+      x: viewport.width / 2 - (position.x + position.width / 2) * current.k,
+      y: viewport.height / 2 - (position.y + position.height / 2) * current.k,
+      k: current.k,
+    }));
+    setHighlightedNodeId(targetNode.id);
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    highlightTimerRef.current = setTimeout(() => setHighlightedNodeId(null), 1600);
+    markDirty();
+  }, [activeSectionId, autoFitKey, collapsed, hydrated, layout, markDirty, nodeById, offsets, parentIds, searchTarget, tree, viewport.height, viewport.width]);
+
   useEffect(() => () => {
     panRef.current = null;
     dragRef.current = null;
     if (dragFrameRef.current !== null) cancelAnimationFrame(dragFrameRef.current);
+    if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    if (wheelPersistTimerRef.current) clearTimeout(wheelPersistTimerRef.current);
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
     clearPreviewTimers();
-  }, [clearPreviewTimers]);
+    if (dirtyRef.current) persistSectionState(activeStateSectionRef.current, viewStateRef.current);
+  }, [clearPreviewTimers, persistSectionState]);
 
   return (
     <section
@@ -294,10 +451,11 @@ export function MindmapView() {
       aria-label="导图模式"
       data-testid="mindmap-stage"
       data-mindmap-layout={layout}
+      data-mindmap-hydrated={hydrated ? "true" : "false"}
     >
       <div
+        ref={canvasRef}
         className={`wc-mindmap-canvas${isPanning ? " is-panning" : ""}`}
-        onWheel={handleWheel}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={endPan}
@@ -334,6 +492,7 @@ export function MindmapView() {
                   descendantCount={descendantCount(node)}
                   chipSide={layout === "tree-down" ? "down" : layout === "bilateral" && layoutResult.positions[node.id].x + layoutResult.positions[node.id].width / 2 < layoutResult.positions[tree.id].x + layoutResult.positions[tree.id].width / 2 ? "left" : "right"}
                   dragging={dragDelta?.nodeId === node.id}
+                  highlighted={highlightedNodeId === node.id}
                   onToggleCollapse={handleToggleCollapse}
                   onNodePointerDown={handleNodePointerDown}
                   onNodePointerMove={handleNodePointerMove}
@@ -358,7 +517,12 @@ export function MindmapView() {
             className="wc-mindmap-layout-button"
             aria-label={item.label}
             aria-pressed={layout === item.id}
-            onClick={() => setLayout(item.id)}
+            onClick={() => {
+              if (layout === item.id) return;
+              setLayout(item.id);
+              skipNextAutoFitRef.current = false;
+              markDirty();
+            }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={item.asset} alt="" aria-hidden="true" />
@@ -383,7 +547,7 @@ export function MindmapView() {
         <button type="button" className="wc-mindmap-zoom-button" aria-label="缩小" onClick={() => zoomFromCenter(1 / ZOOM_STEP)}>−</button>
         <div className="wc-mindmap-zoom-percent" data-testid="mindmap-zoom-percent">{Math.round(camera.k * 100)}%</div>
         <button type="button" className="wc-mindmap-zoom-button" aria-label="放大" onClick={() => zoomFromCenter(ZOOM_STEP)}>＋</button>
-        <button type="button" className="wc-mindmap-zoom-button wc-mindmap-zoom-fit" onClick={fit}>适应画布</button>
+        <button type="button" className="wc-mindmap-zoom-button wc-mindmap-zoom-fit" onClick={() => fit(true)}>适应画布</button>
       </div>
       <NodeHoverPreview
         target={previewTarget}
