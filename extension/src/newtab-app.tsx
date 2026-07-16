@@ -7,7 +7,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAppStore } from "@/lib/store";
 import { useAuthStore } from "@/lib/auth-store";
 import { useWarehouseStore } from "@/lib/store-warehouse";
@@ -29,6 +29,8 @@ import { RecycleBinDialog } from "@/components/dialogs/recycle-bin-dialog";
 import { ImportDialog } from "@/components/dialogs/import-dialog";
 import { SectionShipDialog } from "@/components/dialogs/section-ship-dialog";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { MindmapView, type MindmapSearchTarget } from "@/components/mindmap/mindmap-view";
+import type { CollectionViewMode } from "@/components/mindmap/types";
 import { WallpaperShell } from "@/components/wallpaper/wallpaper-shell";
 import { useWallpaperStore } from "@/lib/wallpaper-store";
 import {
@@ -59,6 +61,14 @@ function formatSnapshotDate(timestamp: number | undefined): string {
 
 export function NewTabApp() {
   const [view, setView] = useState<View>("main");
+  const [collectionViewMode, setCollectionViewMode] = useState<CollectionViewMode>("classic");
+  const [requestedViewMode, setRequestedViewMode] = useState<CollectionViewMode>("classic");
+  const [viewTransitionPhase, setViewTransitionPhase] = useState<"idle" | "exiting" | "entering">("idle");
+  const [mindmapSearchTarget, setMindmapSearchTarget] = useState<MindmapSearchTarget | null>(null);
+  const viewTransitionTokenRef = useRef(0);
+  const viewTransitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const viewTransitionFrameRef = useRef<number | null>(null);
+  const mindmapSearchRequestRef = useRef(0);
   const wallpaperMode = useWallpaperStore((state) => state.mode);
   const enterCollection = useWallpaperStore((state) => state.enterCollection);
   const returnToWallpaper = useWallpaperStore((state) => state.returnToWallpaper);
@@ -225,6 +235,37 @@ export function NewTabApp() {
     returnToWallpaper();
   }, [returnToWallpaper]);
 
+  const handleCollectionViewModeChange = useCallback((mode: CollectionViewMode) => {
+    setRequestedViewMode(mode);
+    const token = ++viewTransitionTokenRef.current;
+    if (viewTransitionTimerRef.current) clearTimeout(viewTransitionTimerRef.current);
+    if (viewTransitionFrameRef.current !== null) cancelAnimationFrame(viewTransitionFrameRef.current);
+    if (mode === collectionViewMode) {
+      setViewTransitionPhase("idle");
+      return;
+    }
+    setViewTransitionPhase("exiting");
+    viewTransitionTimerRef.current = setTimeout(() => {
+      if (viewTransitionTokenRef.current !== token) return;
+      setCollectionViewMode(mode);
+      setViewTransitionPhase("entering");
+      viewTransitionFrameRef.current = requestAnimationFrame(() => {
+        viewTransitionFrameRef.current = requestAnimationFrame(() => {
+          if (viewTransitionTokenRef.current === token) setViewTransitionPhase("idle");
+        });
+      });
+    }, 180);
+  }, [collectionViewMode]);
+
+  const handleRevealMindmapCategory = useCallback((target: { sectionId: string; categoryId: string }) => {
+    setMindmapSearchTarget({ ...target, requestId: ++mindmapSearchRequestRef.current });
+  }, []);
+
+  useEffect(() => () => {
+    if (viewTransitionTimerRef.current) clearTimeout(viewTransitionTimerRef.current);
+    if (viewTransitionFrameRef.current !== null) cancelAnimationFrame(viewTransitionFrameRef.current);
+  }, []);
+
   const handleConfirmEmergencyRestore = useCallback(async () => {
     const prompt = emergencyRestorePrompt;
     if (!prompt?.snapshotId) return;
@@ -273,7 +314,8 @@ export function NewTabApp() {
     >
     <div className="min-h-screen">
       {view === "main" ? (
-        <>
+        <div className={`wc-resolution-viewport${collectionViewMode === "mindmap" ? " wc-resolution-viewport-mindmap" : ""}`}>
+          <div className={`wc-resolution-canvas ${collectionViewMode === "classic" ? "min-h-screen" : "wc-resolution-canvas-header-only"}`}>
           <TopNav
             onAddCard={handleAddCard}
             onAddGroup={handleAddGroup}
@@ -281,8 +323,12 @@ export function NewTabApp() {
             onRecycleBin={() => setRecycleBinOpen(true)}
             onWarehouse={() => setView("warehouse")}
             onShowWallpaper={handleReturnToWallpaper}
+            collectionViewMode={requestedViewMode}
+            onCollectionViewModeChange={handleCollectionViewModeChange}
+            onRevealMindmapCategory={handleRevealMindmapCategory}
           />
 
+          {collectionViewMode === "classic" && <div className={`wc-collection-view is-${viewTransitionPhase}`} data-testid="collection-view-classic">
           <main className="wc-shell wc-page-main space-y-7 px-5 py-7">
             <ErrorBoundary>
               <SortableGrid
@@ -313,6 +359,21 @@ export function NewTabApp() {
               <p>WebCollect</p>
             </div>
           </footer>
+          </div>}
+          </div>
+
+          {collectionViewMode === "mindmap" && (
+            <div className={`wc-collection-view is-${viewTransitionPhase}`} data-testid="collection-view-mindmap">
+              <ErrorBoundary>
+                <MindmapView
+                  searchTarget={mindmapSearchTarget}
+                  onAddCategory={handleAddCategory}
+                  onAddGroup={handleAddGroup}
+                  onAddCard={handleAddCard}
+                />
+              </ErrorBoundary>
+            </div>
+          )}
 
           <ErrorBoundary>
             <CardDialog
@@ -344,7 +405,7 @@ export function NewTabApp() {
               item={sectionShipItem}
             />
           </ErrorBoundary>
-        </>
+        </div>
       ) : (
         <>
           <nav className="sticky top-0 z-50 border-b border-white/60 bg-white/70 backdrop-blur-2xl">

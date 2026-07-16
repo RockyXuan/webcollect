@@ -3,6 +3,7 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import '../../src/styles/zoom-wallpaper.css';
+@import '../../src/styles/mindmap.css';
 
 /* Tell Tailwind to scan the shared source files for utility classes */
 @source '../../../src/components';
