@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useAppStore } from "@/lib/store";
 import { buildMindmapTree, fitCamera, layoutMindmap } from "./layout-engine";
 import { MindmapNode } from "./mindmap-node";
+import { NodeHoverPreview, type MindmapPreviewTarget } from "./node-hover-preview";
 import type { MindmapCamera, MindmapLayoutId, MindmapNode as MindmapNodeModel } from "./types";
 
 const LAYOUTS: Array<{ id: MindmapLayoutId; label: string; asset: string }> = [
@@ -21,14 +22,30 @@ function clampZoom(value: number): number {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
 }
 
-function indexNodes(root: MindmapNodeModel): Record<string, MindmapNodeModel> {
+const EMPTY_OFFSETS = (): Record<MindmapLayoutId, Record<string, { dx: number; dy: number }>> => ({
+  "logic-right": {},
+  bilateral: {},
+  "tree-down": {},
+  indent: {},
+});
+
+function indexNodes(root: MindmapNodeModel): {
+  nodes: Record<string, MindmapNodeModel>;
+  parentIds: Record<string, string | undefined>;
+} {
   const nodes: Record<string, MindmapNodeModel> = {};
-  const walk = (node: MindmapNodeModel): void => {
+  const parentIds: Record<string, string | undefined> = {};
+  const walk = (node: MindmapNodeModel, parentId?: string): void => {
     nodes[node.id] = node;
-    node.children.forEach(walk);
+    parentIds[node.id] = parentId;
+    node.children.forEach((child) => walk(child, node.id));
   };
   walk(root);
-  return nodes;
+  return { nodes, parentIds };
+}
+
+function descendantCount(node: MindmapNodeModel): number {
+  return node.children.reduce((count, child) => count + 1 + descendantCount(child), 0);
 }
 
 export function MindmapView() {
@@ -39,22 +56,55 @@ export function MindmapView() {
   const pinnedBookmarkItems = useAppStore((state) => state.pinnedBookmarkItems);
   const stageRef = useRef<HTMLElement>(null);
   const panRef = useRef<{ pointerId: number; x: number; y: number; camera: MindmapCamera } | null>(null);
+  const dragRef = useRef<{
+    pointerId: number;
+    nodeId: string;
+    startX: number;
+    startY: number;
+    base: { dx: number; dy: number };
+    moved: boolean;
+    latest: { dx: number; dy: number };
+  } | null>(null);
+  const dragFrameRef = useRef<number | null>(null);
+  const previewShowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewUnmountTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastAutoFitKeyRef = useRef("");
   const [layout, setLayout] = useState<MindmapLayoutId>("logic-right");
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  const [offsets, setOffsets] = useState(EMPTY_OFFSETS);
+  const [dragDelta, setDragDelta] = useState<{ nodeId: string; dx: number; dy: number } | null>(null);
   const [camera, setCamera] = useState<MindmapCamera>({ x: 0, y: 0, k: 1 });
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [isPanning, setIsPanning] = useState(false);
+  const [previewTarget, setPreviewTarget] = useState<MindmapPreviewTarget | null>(null);
+  const [previewVisible, setPreviewVisible] = useState(false);
 
   const tree = useMemo(
     () => buildMindmapTree(sections, categories, cards, activeSectionId),
     [sections, categories, cards, activeSectionId],
   );
-  const nodeById = useMemo(() => indexNodes(tree), [tree]);
+  const { nodes: nodeById, parentIds } = useMemo(() => indexNodes(tree), [tree]);
   const cardsById = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
   const pinnedSet = useMemo(
     () => new Set(pinnedBookmarkItems.map((item) => item.cardId)),
     [pinnedBookmarkItems],
   );
-  const layoutResult = useMemo(() => layoutMindmap(tree, layout), [tree, layout]);
+  const renderedOffsets = useMemo(() => {
+    if (!dragDelta) return offsets[layout];
+    const base = offsets[layout][dragDelta.nodeId] || { dx: 0, dy: 0 };
+    return {
+      ...offsets[layout],
+      [dragDelta.nodeId]: { dx: base.dx + dragDelta.dx, dy: base.dy + dragDelta.dy },
+    };
+  }, [dragDelta, layout, offsets]);
+  const layoutResult = useMemo(
+    () => layoutMindmap(tree, layout, collapsed, renderedOffsets),
+    [tree, layout, collapsed, renderedOffsets],
+  );
+  const treeSignature = useMemo(() => Object.keys(nodeById).sort().join("|"), [nodeById]);
+  const collapsedSignature = useMemo(() => [...collapsed].sort().join("|"), [collapsed]);
+  const autoFitKey = `${activeSectionId}|${layout}|${treeSignature}|${collapsedSignature}|${viewport.width}x${viewport.height}`;
 
   const fit = useCallback(() => {
     if (!viewport.width || !viewport.height) return;
@@ -75,17 +125,36 @@ export function MindmapView() {
   }, []);
 
   useLayoutEffect(() => {
+    if (lastAutoFitKeyRef.current === autoFitKey) return;
+    lastAutoFitKeyRef.current = autoFitKey;
     fit();
-  }, [fit]);
+  }, [autoFitKey, fit]);
+
+  const clearPreviewTimers = useCallback(() => {
+    if (previewShowTimerRef.current) clearTimeout(previewShowTimerRef.current);
+    if (previewHideTimerRef.current) clearTimeout(previewHideTimerRef.current);
+    if (previewUnmountTimerRef.current) clearTimeout(previewUnmountTimerRef.current);
+    previewShowTimerRef.current = null;
+    previewHideTimerRef.current = null;
+    previewUnmountTimerRef.current = null;
+  }, []);
+
+  const hidePreview = useCallback((immediate = true) => {
+    clearPreviewTimers();
+    setPreviewVisible(false);
+    if (immediate) setPreviewTarget(null);
+    else previewUnmountTimerRef.current = setTimeout(() => setPreviewTarget(null), 180);
+  }, [clearPreviewTimers]);
 
   const zoomAt = useCallback((nextZoom: number, anchorX: number, anchorY: number) => {
+    hidePreview();
     setCamera((current) => {
       const k = clampZoom(nextZoom);
       const worldX = (anchorX - current.x) / current.k;
       const worldY = (anchorY - current.y) / current.k;
       return { x: anchorX - worldX * k, y: anchorY - worldY * k, k };
     });
-  }, []);
+  }, [hidePreview]);
 
   const zoomFromCenter = useCallback((factor: number) => {
     zoomAt(camera.k * factor, viewport.width / 2, viewport.height / 2);
@@ -101,10 +170,11 @@ export function MindmapView() {
 
   const handlePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || (event.target as HTMLElement).closest("[data-mindmap-node]")) return;
+    hidePreview();
     event.currentTarget.setPointerCapture(event.pointerId);
     panRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, camera };
     setIsPanning(true);
-  }, [camera]);
+  }, [camera, hidePreview]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const pan = panRef.current;
@@ -122,9 +192,100 @@ export function MindmapView() {
     setIsPanning(false);
   }, []);
 
+  const handleToggleCollapse = useCallback((nodeId: string) => {
+    hidePreview();
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (next.has(nodeId)) next.delete(nodeId);
+      else next.add(nodeId);
+      return next;
+    });
+  }, [hidePreview]);
+
+  const handleNodePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>, nodeId: string) => {
+    if (event.button !== 0) return;
+    event.stopPropagation();
+    hidePreview();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      pointerId: event.pointerId,
+      nodeId,
+      startX: event.clientX,
+      startY: event.clientY,
+      base: offsets[layout][nodeId] || { dx: 0, dy: 0 },
+      moved: false,
+      latest: { dx: 0, dy: 0 },
+    };
+  }, [hidePreview, layout, offsets]);
+
+  const handleNodePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>, nodeId: string) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId || drag.nodeId !== nodeId) return;
+    const screenDx = event.clientX - drag.startX;
+    const screenDy = event.clientY - drag.startY;
+    if (!drag.moved && Math.hypot(screenDx, screenDy) <= 3) return;
+    drag.moved = true;
+    drag.latest = { dx: screenDx / camera.k, dy: screenDy / camera.k };
+    if (dragFrameRef.current !== null) return;
+    dragFrameRef.current = requestAnimationFrame(() => {
+      dragFrameRef.current = null;
+      const current = dragRef.current;
+      if (current?.moved) setDragDelta({ nodeId: current.nodeId, ...current.latest });
+    });
+  }, [camera.k]);
+
+  const finishNodeDrag = useCallback((event: React.PointerEvent<HTMLDivElement>, nodeId: string, commit: boolean) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId || drag.nodeId !== nodeId) return;
+    if (dragFrameRef.current !== null) {
+      cancelAnimationFrame(dragFrameRef.current);
+      dragFrameRef.current = null;
+    }
+    if (commit && drag.moved) {
+      const finalDelta = drag.latest;
+      setOffsets((current) => ({
+        ...current,
+        [layout]: {
+          ...current[layout],
+          [nodeId]: { dx: drag.base.dx + finalDelta.dx, dy: drag.base.dy + finalDelta.dy },
+        },
+      }));
+    }
+    dragRef.current = null;
+    setDragDelta(null);
+  }, [layout]);
+
+  const handleCardPointerEnter = useCallback((element: HTMLDivElement, node: MindmapNodeModel, card: (typeof cards)[number]) => {
+    clearPreviewTimers();
+    previewShowTimerRef.current = setTimeout(() => {
+      const path: string[] = [];
+      let currentId = parentIds[node.id];
+      while (currentId) {
+        const current = nodeById[currentId];
+        if (current) path.unshift(current.label);
+        currentId = parentIds[currentId];
+      }
+      setPreviewTarget({ card, path, anchor: element.getBoundingClientRect(), pinned: pinnedSet.has(card.id) });
+      requestAnimationFrame(() => setPreviewVisible(true));
+    }, 380);
+  }, [clearPreviewTimers, nodeById, parentIds, pinnedSet]);
+
+  const schedulePreviewHide = useCallback(() => {
+    if (previewShowTimerRef.current) clearTimeout(previewShowTimerRef.current);
+    if (previewHideTimerRef.current) clearTimeout(previewHideTimerRef.current);
+    previewHideTimerRef.current = setTimeout(() => hidePreview(false), 200);
+  }, [hidePreview]);
+
+  const keepPreviewOpen = useCallback(() => {
+    if (previewHideTimerRef.current) clearTimeout(previewHideTimerRef.current);
+  }, []);
+
   useEffect(() => () => {
     panRef.current = null;
-  }, []);
+    dragRef.current = null;
+    if (dragFrameRef.current !== null) cancelAnimationFrame(dragFrameRef.current);
+    clearPreviewTimers();
+  }, [clearPreviewTimers]);
 
   return (
     <section
@@ -169,6 +330,18 @@ export function MindmapView() {
                   position={layoutResult.positions[node.id]}
                   card={node.type === "card" ? cardsById.get(node.refId) : undefined}
                   pinned={node.type === "card" && pinnedSet.has(node.refId)}
+                  collapsed={collapsed.has(node.id)}
+                  descendantCount={descendantCount(node)}
+                  chipSide={layout === "tree-down" ? "down" : layout === "bilateral" && layoutResult.positions[node.id].x + layoutResult.positions[node.id].width / 2 < layoutResult.positions[tree.id].x + layoutResult.positions[tree.id].width / 2 ? "left" : "right"}
+                  dragging={dragDelta?.nodeId === node.id}
+                  onToggleCollapse={handleToggleCollapse}
+                  onNodePointerDown={handleNodePointerDown}
+                  onNodePointerMove={handleNodePointerMove}
+                  onNodePointerUp={(event, id) => finishNodeDrag(event, id, true)}
+                  onNodePointerCancel={(event, id) => finishNodeDrag(event, id, false)}
+                  onNodeLostPointerCapture={(event, id) => finishNodeDrag(event, id, false)}
+                  onCardPointerEnter={handleCardPointerEnter}
+                  onCardPointerLeave={schedulePreviewHide}
                 />
               );
             })}
@@ -212,6 +385,12 @@ export function MindmapView() {
         <button type="button" className="wc-mindmap-zoom-button" aria-label="放大" onClick={() => zoomFromCenter(ZOOM_STEP)}>＋</button>
         <button type="button" className="wc-mindmap-zoom-button wc-mindmap-zoom-fit" onClick={fit}>适应画布</button>
       </div>
+      <NodeHoverPreview
+        target={previewTarget}
+        visible={previewVisible}
+        onPointerEnter={keepPreviewOpen}
+        onPointerLeave={schedulePreviewHide}
+      />
     </section>
   );
 }

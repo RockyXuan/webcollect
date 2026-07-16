@@ -6,6 +6,7 @@ import {
   layoutBilateral,
   layoutIndent,
   layoutLogicRight,
+  layoutMindmap,
   layoutTreeDown,
 } from "@/components/mindmap/layout-engine";
 
@@ -108,6 +109,26 @@ describe("mindmap layout engine", () => {
     expect(result.positions["grp:group-a"]).toBeUndefined();
     expect(result.positions["card:card-direct"]).toBeUndefined();
     expect(result.edges.some((edge) => edge.parentId === "cat:cat-a")).toBe(false);
+  });
+
+  it("accumulates a dragged ancestor offset across its real subtree only", () => {
+    const base = layoutMindmap(tree, "logic-right");
+    const moved = layoutMindmap(tree, "logic-right", new Set(), {
+      "cat:cat-a": { dx: 36, dy: -18 },
+      "grp:group-a": { dx: 7, dy: 5 },
+    });
+    const category = moved.positions["cat:cat-a"];
+    const group = moved.positions["grp:group-a"];
+    const card = moved.positions["card:card-group-1"];
+    const sibling = moved.positions["cat:cat-b"];
+
+    expect(category.x - base.positions["cat:cat-a"].x).toBe(36);
+    expect(category.y - base.positions["cat:cat-a"].y).toBe(-18);
+    expect(group.x - base.positions["grp:group-a"].x).toBe(43);
+    expect(group.y - base.positions["grp:group-a"].y).toBe(-13);
+    expect(card.x - base.positions["card:card-group-1"].x).toBe(43);
+    expect(card.y - base.positions["card:card-group-1"].y).toBe(-13);
+    expect(sibling).toEqual(base.positions["cat:cat-b"]);
   });
 
   it("stacks cards vertically in the tree-down group spine", () => {

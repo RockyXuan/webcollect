@@ -67,8 +67,69 @@
   box-sizing: border-box;
   user-select: none;
   border-radius: 14px;
-  cursor: default;
+  cursor: grab;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.wc-mindmap-node:active,
+.wc-mindmap-node.is-dragging {
+  cursor: grabbing;
+}
+
+.wc-mindmap-node.is-dragging {
+  z-index: 20;
+}
+
+.wc-mindmap-chip {
+  position: absolute;
+  z-index: 5;
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 1.5px solid var(--wc-border-strong);
+  border-radius: 999px;
+  background: var(--wc-surface-strong);
+  box-shadow: var(--wc-shadow-xs);
+  color: var(--wc-primary);
+  font-size: 10.5px;
+  font-weight: 700;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: opacity 0.15s ease, transform 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.wc-mindmap-chip::before {
+  position: absolute;
+  inset: -7px;
+  content: "";
+}
+
+.wc-mindmap-node:hover .wc-mindmap-chip,
+.wc-mindmap-chip.is-persistent {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.wc-mindmap-chip:hover {
+  border-color: var(--wc-primary);
+  background: var(--wc-primary);
+  color: #fff;
+}
+
+.wc-mindmap-chip.is-right {
+  top: calc(50% - 22px);
+  right: -10px;
+}
+
+.wc-mindmap-chip.is-left {
+  top: calc(50% - 22px);
+  left: -10px;
+}
+
+.wc-mindmap-chip.is-down {
+  bottom: -10px;
+  left: calc(50% - 22px);
 }
 
 .wc-mindmap-node-label {
@@ -380,6 +441,133 @@
 
 .wc-mindmap-legend-separator {
   color: #cbd5e1;
+}
+
+.wc-mindmap-preview {
+  position: fixed;
+  z-index: 60;
+  width: 296px;
+  padding: 16px 16px 14px;
+  border: 1px solid rgba(147, 197, 253, 0.5);
+  border-radius: 20px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(239, 246, 255, 0.86));
+  box-shadow: var(--wc-shadow-md);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(6px) scale(0.97);
+  backdrop-filter: blur(26px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.wc-mindmap-preview.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.wc-mindmap-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 10px;
+}
+
+.wc-mindmap-preview-heading {
+  min-width: 0;
+}
+
+.wc-mindmap-preview-favicon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 11px;
+  background: #fff;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.wc-mindmap-preview-favicon img,
+.wc-mindmap-preview-favicon svg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.wc-mindmap-preview-favicon.is-fallback {
+  background: var(--wc-primary-gradient);
+}
+
+.wc-mindmap-preview-title {
+  overflow: hidden;
+  font-size: 14.5px;
+  font-weight: 680;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wc-mindmap-preview-url {
+  max-width: 210px;
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--wc-text-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wc-mindmap-preview-description {
+  margin: 0 0 12px;
+  color: var(--wc-text-secondary);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.wc-mindmap-preview-path {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 12px;
+  color: var(--wc-text-muted);
+  font-size: 11px;
+}
+
+.wc-mindmap-preview-path b {
+  overflow: hidden;
+  color: var(--wc-text-secondary);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wc-mindmap-preview-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.wc-mindmap-preview-button {
+  flex: 1;
+  padding: 7px 0;
+  border-radius: 11px;
+  font-size: 12.5px;
+  font-weight: 620;
+  text-align: center;
+}
+
+.wc-mindmap-preview-button.is-primary {
+  background: var(--wc-primary-gradient);
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.3);
+  color: #fff;
+}
+
+.wc-mindmap-preview-button.is-ghost {
+  border: 1px solid var(--wc-border-strong);
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--wc-primary);
 }
 
 .wc-resolution-canvas.wc-resolution-canvas-header-only {

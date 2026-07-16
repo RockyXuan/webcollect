@@ -370,8 +370,25 @@ export function layoutMindmap(
   root: MindmapNode,
   layout: MindmapLayoutId,
   collapsed: ReadonlySet<string> = new Set(),
+  offsets: Readonly<Record<string, { dx: number; dy: number }>> = {},
 ): MindmapLayoutResult {
   const positions = layoutPositions(root, layout, collapsed);
+  const applyOffsets = (
+    node: MindmapNode,
+    inherited: { dx: number; dy: number },
+  ): void => {
+    const own = offsets[node.id] || { dx: 0, dy: 0 };
+    const cumulative = { dx: inherited.dx + own.dx, dy: inherited.dy + own.dy };
+    const position = positions[node.id];
+    if (position) {
+      position.x += cumulative.dx;
+      position.y += cumulative.dy;
+    }
+    if (!collapsed.has(node.id)) {
+      node.children.forEach((child) => applyOffsets(child, cumulative));
+    }
+  };
+  applyOffsets(root, { dx: 0, dy: 0 });
   const edges: MindmapEdge[] = [];
   const walk = (node: MindmapNode, ancestors: readonly MindmapNode[]): void => {
     const parentPosition = positions[node.id];

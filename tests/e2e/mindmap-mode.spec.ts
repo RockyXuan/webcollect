@@ -218,3 +218,72 @@ test("mindmap layouts match the Fable geometry at 1920x1080", async ({ page }) =
   expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(1080);
   expect(await readProtectedCollectionState(page)).toEqual(protectedFixture);
 });
+
+test("mindmap drag, collapse, and hover preview preserve collection data", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/");
+  await openCollection(page);
+  await writeIsolatedMindmapFixture(page);
+  await page.reload();
+  await openCollection(page);
+  await page.getByRole("button", { name: "导图", exact: true }).click();
+  const before = await readProtectedCollectionState(page);
+
+  const category = page.locator('[data-mindmap-node="cat:cat-work"]');
+  const card = page.locator('[data-mindmap-node="card:notion"]');
+  const sibling = page.locator('[data-mindmap-node="cat:cat-ai"]');
+  const categoryBefore = await category.boundingBox();
+  const cardBefore = await card.boundingBox();
+  const siblingBefore = await sibling.boundingBox();
+  const edgeBefore = await page.locator('.wc-mindmap-edges path').first().getAttribute("d");
+  expect(categoryBefore && cardBefore && siblingBefore).toBeTruthy();
+  if (!categoryBefore || !cardBefore || !siblingBefore) return;
+
+  await page.mouse.move(categoryBefore.x + categoryBefore.width / 2, categoryBefore.y + categoryBefore.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(categoryBefore.x + categoryBefore.width / 2 + 84, categoryBefore.y + categoryBefore.height / 2 + 42, { steps: 5 });
+  await page.mouse.up();
+
+  const categoryAfter = await category.boundingBox();
+  const cardAfter = await card.boundingBox();
+  const siblingAfter = await sibling.boundingBox();
+  expect(categoryAfter && cardAfter && siblingAfter).toBeTruthy();
+  if (!categoryAfter || !cardAfter || !siblingAfter) return;
+  expect(categoryAfter.x - categoryBefore.x).toBeCloseTo(84, 0);
+  expect(categoryAfter.y - categoryBefore.y).toBeCloseTo(42, 0);
+  expect(cardAfter.x - cardBefore.x).toBeCloseTo(84, 0);
+  expect(cardAfter.y - cardBefore.y).toBeCloseTo(42, 0);
+  expect(siblingAfter.x).toBeCloseTo(siblingBefore.x, 0);
+  expect(siblingAfter.y).toBeCloseTo(siblingBefore.y, 0);
+  await expect.poll(() => page.locator('.wc-mindmap-edges path').first().getAttribute("d")).not.toBe(edgeBefore);
+
+  const collapseButton = page.getByRole("button", { name: "收起“工作”" });
+  await collapseButton.click();
+  await expect(page.getByRole("button", { name: "展开“工作”，包含 4 个后代" })).toBeVisible();
+  await expect(page.locator('[data-mindmap-node="grp:group-common"]')).toHaveCount(0);
+  await expect(card).toHaveCount(0);
+  await page.getByRole("button", { name: "展开“工作”，包含 4 个后代" }).click();
+  await expect(card).toBeVisible();
+
+  const cardBox = await card.boundingBox();
+  expect(cardBox).not.toBeNull();
+  if (!cardBox) return;
+  await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
+  await expect(page.getByTestId("mindmap-hover-preview")).toBeVisible({ timeout: 1_200 });
+  await expect(page.getByTestId("mindmap-hover-preview")).toContainText("Notion");
+  await expect(page.getByTestId("mindmap-hover-preview")).toContainText("主页 › 工作 › 常用");
+  const previewBox = await page.getByTestId("mindmap-hover-preview").boundingBox();
+  expect(previewBox).not.toBeNull();
+  if (!previewBox) return;
+  expect(previewBox.x).toBeGreaterThanOrEqual(8);
+  expect(previewBox.y).toBeGreaterThanOrEqual(8);
+  expect(previewBox.x + previewBox.width).toBeLessThanOrEqual(1912);
+  expect(previewBox.y + previewBox.height).toBeLessThanOrEqual(1072);
+  await page.mouse.move(previewBox.x + 20, previewBox.y + 20);
+  await page.waitForTimeout(260);
+  await expect(page.getByTestId("mindmap-hover-preview")).toBeVisible();
+  await page.getByRole("button", { name: "放大" }).click();
+  await expect(page.getByTestId("mindmap-hover-preview")).toHaveCount(0);
+
+  expect(await readProtectedCollectionState(page)).toEqual(before);
+});
