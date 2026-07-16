@@ -19,7 +19,9 @@ import {
   Command,
   FileText,
   Folder,
+  GitFork,
   Globe2,
+  Grid2X2,
   GripVertical,
   Home,
   Layers,
@@ -62,6 +64,7 @@ import { useAppStore } from "@/lib/store";
 import { getRenderedVisualScale } from "@/lib/visual-scale";
 import { searchWorkspace } from "@/lib/workspace-search";
 import type { CollectionSection } from "@/lib/types";
+import type { CollectionViewMode } from "@/components/mindmap/types";
 
 interface TopNavProps {
   onAddCard?: (categoryId?: string) => void;
@@ -70,6 +73,8 @@ interface TopNavProps {
   onRecycleBin?: () => void;
   onWarehouse?: () => void;
   onShowWallpaper?: () => void;
+  collectionViewMode?: CollectionViewMode;
+  onCollectionViewModeChange?: (mode: CollectionViewMode) => void;
 }
 
 type SearchPanelItem = {
@@ -202,6 +207,8 @@ export function TopNav({
   onRecycleBin,
   onWarehouse,
   onShowWallpaper,
+  collectionViewMode,
+  onCollectionViewModeChange,
 }: TopNavProps) {
   const {
     searchQuery,
@@ -675,6 +682,30 @@ export function TopNav({
               )}
             </Button>
             <WarehouseButton onClick={onWarehouse} />
+            {collectionViewMode && onCollectionViewModeChange && (
+              <div className="wc-view-mode-toggle" role="group" aria-label="收藏视图模式">
+                <button
+                  type="button"
+                  className="wc-view-mode-button"
+                  aria-pressed={collectionViewMode === "classic"}
+                  onClick={() => onCollectionViewModeChange("classic")}
+                  title="经典模式"
+                >
+                  <Grid2X2 aria-hidden="true" />
+                  <span>经典</span>
+                </button>
+                <button
+                  type="button"
+                  className="wc-view-mode-button"
+                  aria-pressed={collectionViewMode === "mindmap"}
+                  onClick={() => onCollectionViewModeChange("mindmap")}
+                  title="导图模式"
+                >
+                  <GitFork aria-hidden="true" />
+                  <span>导图</span>
+                </button>
+              </div>
+            )}
             <UserMenu />
           </div>
         </div>

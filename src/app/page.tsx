@@ -10,6 +10,8 @@ import { SectionShipDialog } from "@/components/dialogs/section-ship-dialog";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { HotRecommendation } from "@/components/hot-recommendation";
 import { WallpaperShell } from "@/components/wallpaper/wallpaper-shell";
+import { MindmapView } from "@/components/mindmap/mindmap-view";
+import type { CollectionViewMode } from "@/components/mindmap/types";
 import { useAppStore } from "@/lib/store";
 import { useAuthStore } from "@/lib/auth-store";
 import { saveCards, saveCategories, setInitialized, withoutLocalChangeEvents } from "@/lib/db";
@@ -62,6 +64,7 @@ export default function HomePage() {
   const [defaultParentId, setDefaultParentId] = useState<string | undefined>();
   const [isCreatingParent, setIsCreatingParent] = useState(false);
   const [emergencyRestorePrompt, setEmergencyRestorePrompt] = useState<EmergencyRestorePrompt | null>(null);
+  const [collectionViewMode, setCollectionViewMode] = useState<CollectionViewMode>("classic");
 
   useEffect(() => {
     const init = async () => {
@@ -200,16 +203,18 @@ export default function HomePage() {
       onEnterCollection={handleEnterCollection}
     >
     <div className="wc-resolution-viewport">
-    <div className="wc-resolution-canvas min-h-screen">
+    <div className={`wc-resolution-canvas ${collectionViewMode === "classic" ? "min-h-screen" : "wc-resolution-canvas-header-only"}`}>
       <TopNav
         onAddCard={handleAddCard}
         onAddGroup={handleAddGroup}
         onAddCategory={handleAddCategory}
         onRecycleBin={() => setRecycleBinOpen(true)}
         onShowWallpaper={handleReturnToWallpaper}
+        collectionViewMode={collectionViewMode}
+        onCollectionViewModeChange={setCollectionViewMode}
       />
 
-      <main className="wc-shell wc-page-main space-y-7 px-5 py-7">
+      {collectionViewMode === "classic" && <main className="wc-shell wc-page-main space-y-7 px-5 py-7">
         <ErrorBoundary>
           <SortableGrid
             onAddCard={handleAddCard}
@@ -232,13 +237,20 @@ export default function HomePage() {
         <ErrorBoundary>
           <HotRecommendation />
         </ErrorBoundary>
-      </main>
+      </main>}
 
-      <footer className="mt-6 py-7">
+      {collectionViewMode === "classic" && <footer className="mt-6 py-7">
         <div className="wc-shell px-5 text-center text-xs text-slate-400">
           <p>WebCollect - 你的个人网页收藏墙</p>
         </div>
-      </footer>
+      </footer>}
+    </div>
+
+      {collectionViewMode === "mindmap" && (
+        <ErrorBoundary>
+          <MindmapView />
+        </ErrorBoundary>
+      )}
 
       <ErrorBoundary>
         <CardDialog
@@ -293,7 +305,6 @@ export default function HomePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
     </div>
     </WallpaperShell>
   );

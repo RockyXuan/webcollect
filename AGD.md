@@ -11,6 +11,12 @@
 当前主线：V1.1.2 RC7 已完成首帧无壁纸挂载的自动化验收、发布产物复核和真实账号 Chrome 新标签页验收。2026-07-16 在副屏辅助窗口中保持同一扩展 ID、未卸载扩展，连续 4 次关闭启动壁纸模式的新标签均直接进入收藏墙且未出现壁纸舞台；登录态、云同步和原有收藏均保留。同日用户明确豁免独立 Profile B 门槛，并批准按上述证据发布 V1.1.2 正式版；Windows 与 Mac 的日常同时使用作为后续跨设备观察，不再要求在本机另建 Chrome Profile。
 下一大型功能建议从新线程开始；接手时先读 `HANDOFF.md` 和已经去除旧目标的 `NEXT_THREAD_PROMPT.md`，再根据用户的新功能描述确定范围，不要继续执行旧线程或旧 Release 计划。
 
+## 2026-07-16 V1.2.0 导图模式设计入口
+
+- 实施规范：`docs/design/mindmap-mode/claude-fable-mindmap-ui-spec-2026-07-15.md`。
+- 可交互大样：`docs/design/mindmap-mode/mindmap-mockup.html`；桌面像素基准见 `docs/design/mockups/2026-07-15-mindmap-*.png`。
+- 按 M0→M7 顺序实施；导图是现有 Zustand 收藏树的另一种视图，不复制业务数据，不进入 dirty sets、快照或云同步，也不得修改 `db.ts`、`sync.ts`、seed、Chrome storage 或 Supabase Schema。
+
 ## 2026-07-15 项目工作流退役
 
 - 当前生效规则见 `AGENTS.md`。本仓库不再调用、安装、启用或模仿 Superpowers、`goal-zzx` / `zzx-goal`、`andrej-karpathy-coding`。

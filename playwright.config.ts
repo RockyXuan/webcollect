@@ -5,6 +5,9 @@ const port = Number(process.env.WEBCOLLECT_E2E_PORT || 5014);
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
+  // Next dev compiles the shared collection route on first use. Capping local
+  // concurrency avoids five cold pages competing for that first compilation.
+  workers: 2,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "github" : "list",
