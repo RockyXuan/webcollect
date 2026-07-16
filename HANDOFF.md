@@ -2,24 +2,27 @@
 
 > **2026-07-15 current workflow rule:** this repository has retired Superpowers (including `superpowers:*` / `using-superpowers`), `goal-zzx` / `zzx-goal`, and `andrej-karpathy-coding`. Do not install, enable, invoke, or imitate them. Any older instruction below that requires `tasks/todo.md`, `tasks/lessons.md`, `CODEX_GO_MODE_STATUS.md`, fixed phase counts, strict TDD, worktrees, subagents, or duplicate reviews is historical and superseded by `AGENTS.md`.
 
-## 2026-07-16 V1.1.2 Account Sync Release Candidate
+## 2026-07-16 V1.1.2 Final Release
 
-This section supersedes older development status. V1.1.1 remains the latest stable Release until the V1.1.2 RC is installed and the final account gate passes.
+This section supersedes older development status. The user explicitly waived the independent Profile B gate on 2026-07-16 and approved the tested RC7 line for final V1.1.2 publication.
 
-- Candidate version/date: `V1.1.2 / 2026年7月15日`.
-- Candidate closeout: `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`.
+- Stable version/date: `V1.1.2 / 2026年7月15日`.
+- Final tag: `webcollect-2026-07-15-v1.1.2`.
+- Final Release: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-15-v1.1.2`; direct zip: `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-15-v1.1.2/WebCollect-Chrome-Extension-v1.1.2-2026-07-15.zip`.
+- Closeout: `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`.
 - Baseline and remote backup: `main@ea45b53` and `codex/backup-pre-oauth-2026-07-13`.
 - Published RC identity: tag `webcollect-2026-07-15-v1.1.2-rc.7`, code commit `a3a2d2f429c2c56b4e8c4e33fdc6da831bec4679`, asset `WebCollect-Chrome-Extension-v1.1.2-rc.7-2026-07-15.zip`, SHA-256 `747dcdcf62134f42352d281521460116fd89b3d87ba8509f1a2f5ddfc3e8da9d`.
 - RC Prerelease: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-15-v1.1.2-rc.7`; direct zip: `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-15-v1.1.2-rc.7/WebCollect-Chrome-Extension-v1.1.2-rc.7-2026-07-15.zip`.
 - Verified RC7 folder: `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.7/unpacked`. To preserve the stable extension ID and IndexedDB, this exact tree was synchronized into Chrome's existing `~/Downloads/WebCollect-v1.1.2-rc.6/unpacked` source path and reloaded without uninstalling; `diff -qr` confirms both trees are identical.
 - RC7 includes the edge-peeking mascot, fused top-bar `壁纸 | 开/关` control, July 15 version date, stale-refresh guard, and synchronous first-frame startup-mode resolution that prevents even a transient wallpaper mount when the mode is off.
 - Fixed: clean-checkout Web OAuth configuration, fresh-Profile inbox duplication, deterministic canonical inbox selection when old clients already produced same-section duplicates, OAuth code cleanup, custom-server HMR upgrades, concurrent floating-capture destination creation, duplicate GoTrue clients, and browser auth refresh lifecycle misuse.
-- Verified so far: 135 Vitest cases, all 31 legacy scripts, all 14 Playwright cases with one worker, TypeScript, ESLint, Web/extension production builds, dependency audit, extension artifact/size, multi-viewport visual checks, and isolated MV3 runtime.
+- Verified: 138 Vitest cases, all 31 legacy scripts, all 14 Playwright cases, TypeScript, ESLint, Web/extension production builds, extension artifact/size, multi-viewport visual checks, and isolated MV3 runtime. The npm Bulk Advisory gate checked 207 production packages with zero advisories at every severity.
 - Real account: Profile A passed Google sign-in, local-scope sign-out, re-sign-in, validated session, and cloud sync. RC7 then passed in the signed-in Chrome profile from a secondary-display auxiliary window: stable ID, `X rocky`, cloud wall, sync badge, startup-wallpaper OFF state, four direct-to-collection new tabs, and preserved data all verified without touching the main personal window.
-- Profile B loads RC6 but remains logged out because Google reached its passkey/Touch ID challenge. It created no cloud data and remains the only independent second-session gate.
+- Profile B loaded RC6 but remained logged out because Google reached its passkey/Touch ID challenge. It created no cloud data; this historical attempt is no longer a release gate.
 - Data state is `364 cards / 130 categories / 24 preferences / 60 snapshots / 0 tombstones`; the old extension added one empty category while primary data counts otherwise stayed unchanged.
 - Two exact empty inbox artifacts are documented in the closeout. One still has a section-preference reference; neither may be deleted without explicit user approval.
-- The installable RC is published and the signed-in Chrome profile has passed. Do not describe V1.1.2 as final until Profile B passes (or the user explicitly waives that gate), primary counts remain unchanged, and final main/tag/zip are pinned to one commit.
+- Future real extension/OAuth checks use the user's existing signed-in primary Chrome profile. Do not create a separate Chrome account/Profile merely for acceptance; with two displays, use a dedicated auxiliary window in the same profile on the secondary display and leave unrelated personal tabs untouched.
+- Windows and Mac real usage provide ongoing cross-device observation. It is not a local second-Profile release gate.
 
 ## 2026-07-12 V1.1.1 Audit And Supabase Split Handoff
 
@@ -228,9 +231,9 @@ If `gh` or DNS fails inside Codex, do not keep retrying. Report that the GitHub 
 ### Browser Workspace Rule
 
 - For local development previews, prefer the Codex in-app Browser / `@Browser`.
-- If Chrome is required, use the Chrome secondary window and the `Codex Workbench` tab group.
-- Do not use the user's primary Chrome window or current active tab as the task workspace.
-- If the browser context is occupied or changed by the user, return to `@Browser`, Safari, the Chrome secondary window, or `Codex Workbench`; do not repeatedly open new tabs in the user's main browser.
+- If real extension behavior or login state requires Chrome, use the user's existing signed-in primary Chrome profile; do not create a separate test Profile/account.
+- With two displays, use a dedicated auxiliary window in that same profile on the secondary display and the `Codex Workbench` tab group. Do not operate unrelated personal tabs or reuse the user's current active personal tab.
+- If the browser context is occupied or changed by the user, return to `@Browser`, Safari, the dedicated secondary-display window, or `Codex Workbench`; do not repeatedly open new tabs in the personal browsing window.
 
 ### Recommended Next Steps
 

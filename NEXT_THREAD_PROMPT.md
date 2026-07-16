@@ -4,19 +4,19 @@
 
 本仓库已退役 Superpowers（含 `superpowers:*` / `using-superpowers`）、`goal-zzx` / `zzx-goal` 和 `andrej-karpathy-coding`。不要安装、启用、调用或模仿它们。可按任务复杂度使用 Codex 原生计划或 goal；测试、Review、子代理和 worktree 均由当前任务风险决定。`tasks/todo.md`、`tasks/lessons.md`、`CODEX_GO_MODE_STATUS.md` 与 `docs/superpowers/` 仅为历史档案，不是当前执行入口。
 
-## 2026-07-16 V1.1.2 候选事实
+## 2026-07-16 V1.1.2 正式版事实
 
 - 第一优先事实源：`docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`。
-- 已发布稳定版仍是 `V1.1.1`；`V1.1.2 RC7` 已发布为 Prerelease，tag `webcollect-2026-07-15-v1.1.2-rc.7`，校验目录为 `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.7/unpacked`。为保留扩展 ID 和 IndexedDB，该文件树已精确同步到 Chrome 既有的 `rc.6/unpacked` 路径并原位重载；主账号 Chrome profile 已通过 RC7 真实验收。仅剩独立 Profile B 的 Google 通行密钥和双会话核验，或用户明确豁免该门槛后，才转正式版。
+- 最新稳定版是 `V1.1.2 / 2026年7月15日`；正式 tag `webcollect-2026-07-15-v1.1.2`，Release `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-15-v1.1.2`，zip `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-15-v1.1.2/WebCollect-Chrome-Extension-v1.1.2-2026-07-15.zip`。RC7 校验目录为 `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.7/unpacked`；为保留扩展 ID 和 IndexedDB，该文件树已精确同步到 Chrome 既有的 `rc.6/unpacked` 路径并原位重载，主账号 Chrome profile 已通过真实验收。
 - 已修根因：干净 Web OAuth 配置、新 Profile 重复收集箱、旧客户端已有同分项空重复时的 canonical 选择、回调 code、HMR upgrade、浮窗并发目标、重复 GoTrue 客户端和错误的手动浏览器 refresh 生命周期。
-- 当前自动门禁：135 Vitest、31 组历史脚本、14 Playwright、TypeScript、ESLint、Web/扩展构建、依赖审计、扩展产物/体积/运行时均通过。RC7 另有顶部 `壁纸 | 开/关`、壁纸偏好防回滚、首帧壁纸零挂载、半脸浮窗和多视口浏览器证据。
+- 当前自动门禁：138 Vitest、31 组历史脚本、14 Playwright、TypeScript、ESLint、Web/扩展构建、npm Bulk Advisory 生产依赖审计、扩展产物/体积/运行时均通过。RC7 另有顶部 `壁纸 | 开/关`、壁纸偏好防回滚、首帧壁纸零挂载、半脸浮窗和多视口浏览器证据。
 - 最近真实数据计数：`364 / 130 / 24 / 60 / 0 / 1`；不要删除 closeout 中记录的两条空收集箱，除非用户明确批准精确处理。
-- RC7 已在相同固定扩展 ID 下加载，不要卸载。Chrome 验证应复用副屏专用辅助窗口，不要碰主屏的 X、视频或其他个人标签；账号、密码、通行密钥、验证码或 CAPTCHA 仍由用户本人处理。
+- 用户已明确取消独立 Profile B 门槛。以后需要真实登录态、扩展或新标签页验收时，复用现有已登录主 Chrome profile，不再另建本机 Chrome 账号/Profile；双屏时在同一 profile 的副屏专用辅助窗口操作，不碰主屏的 X、视频或其他个人标签。账号、密码、通行密钥、验证码或 CAPTCHA 仍由用户本人处理。
 
 ## 2026-07-12 当前事实
 
-- 最新版本：`V1.1.1 / 2026年7月12日`
-- 最新 Release：`webcollect-2026-07-12-v1.1.1`
+- 最新版本：`V1.1.2 / 2026年7月15日`
+- 最新 Release：`webcollect-2026-07-15-v1.1.2`
 - PM 已迁出旧 Supabase；WebCollect 云端迁移已执行并验证数据计数不变。
 - 第一优先事实源：`docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`。
 - 旧文档里“SQL 待执行”“PM 仍共库”“下一版 V1.0.4”等说法已过期。
@@ -55,7 +55,7 @@ git ls-remote --heads origin main
 
 ## 2026-07-07 最新背景
 
-以下是 `V1.0.3 / 2026年7月2日` 的历史背景；当前版本与状态以文件顶部的 V1.1.1 事实和 closeout 为准。7 月 1 日和 7 月 2 日已经完成：
+以下是 `V1.0.3 / 2026年7月2日` 的历史背景；当前版本与状态以文件顶部的 V1.1.2 事实和 closeout 为准。7 月 1 日和 7 月 2 日已经完成：
 
 - 扩展浮窗保存目标不再静默错放到主页或默认收集箱。
 - 顶部分项支持编辑、行内改名、新增和排序，`主页` 固定。
@@ -118,7 +118,7 @@ git diff --check
 - 如果要写计划，下次先翻译成中文给用户看。
 - 不要把完成某个小阶段当成最终完成；只有核心功能、验证、构建、发布都完成，才说完成。
 - 对 UI 改动要真实视觉验证，不能只靠代码推断。
-- 本地预览优先用 in-app Browser；必须用 Chrome 时用辅助窗口或 `Codex Workbench`，不要操作用户主 Chrome 窗口。
+- 本地预览优先用 in-app Browser；必须验证真实扩展/OAuth 时使用用户现有主 Chrome profile，不另建 Profile。双屏时用同一 profile 的副屏辅助窗口或 `Codex Workbench`，不要操作无关个人标签。
 - 数据安全第一：不清空 IndexedDB，不重置 Supabase，不用默认数据覆盖用户真实云端数据。
 - 任何扩展可测试版本必须提供 GitHub Release 和 zip 直链。
 - 扩展包文件名日期要放在最后，便于用户一眼看到日期。

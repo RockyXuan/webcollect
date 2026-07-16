@@ -1,11 +1,20 @@
 # WebCollect V1.1.2 account sync closeout
 
 Updated: 2026-07-16
-Release candidate identity: `V1.1.2 / 2026年7月15日`
+Final release identity: `V1.1.2 / 2026年7月15日`
 RC tag: `webcollect-2026-07-15-v1.1.2-rc.7`
 Previous RC tags: `webcollect-2026-07-15-v1.1.2-rc.6`, `webcollect-2026-07-15-v1.1.2-rc.5`, `webcollect-2026-07-14-v1.1.2-rc.4`, `webcollect-2026-07-14-v1.1.2-rc.3`, `webcollect-2026-07-14-v1.1.2-rc.2`, `webcollect-2026-07-14-v1.1.2-rc.1`
-Planned final tag: `webcollect-2026-07-15-v1.1.2`
-Current gate: RC7 is published, downloaded, byte-verified, and loaded in the signed-in Chrome profile without uninstalling the stable extension ID. Its first-frame wallpaper fix passed the zero-mount MutationObserver E2E and four consecutive real `chrome://newtab` checks in a secondary-display auxiliary window. The real account, cloud wall, metadata, and sync evidence were preserved. Final release now requires only a second independent Profile B session, or an explicit user waiver of that gate.
+Final tag: `webcollect-2026-07-15-v1.1.2`
+Final Release: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-15-v1.1.2`
+Final asset: `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-15-v1.1.2/WebCollect-Chrome-Extension-v1.1.2-2026-07-15.zip`
+Current gate: cleared. RC7 is published, downloaded, byte-verified, and loaded in the signed-in primary Chrome profile without uninstalling the stable extension ID. Its first-frame wallpaper fix passed the zero-mount MutationObserver E2E and four consecutive real `chrome://newtab` checks in a secondary-display auxiliary window. On 2026-07-16 the user explicitly waived the independent Profile B requirement and approved final publication based on these results and the automated suite.
+
+## Release gate decision
+
+- The user normally operates WebCollect on Windows and Mac, so real cross-device behavior continues to be observed in daily use.
+- A second local Chrome account/Profile on this Mac is no longer required for development, acceptance, or release.
+- Future real extension/OAuth verification uses the existing signed-in primary Chrome profile. With two displays, a dedicated auxiliary window in that same profile should remain on the secondary display so unrelated personal tabs are not touched.
+- This decision waives only the redundant local second-session ceremony. It does not waive data protection, session validation, sync correctness, automated tests, or production build checks.
 
 This patch follows the V1.1.1 full-project audit. It focuses on the last real-account observation and on defects found while reproducing a fresh Profile login. The PM split and the live WebCollect database migration remain documented in `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`.
 
@@ -32,10 +41,11 @@ This patch follows the V1.1.1 full-project audit. It focuses on the last real-ac
 - The downloaded archive declares WebCollect `1.1.2` / Manifest V3 and the expected stable key, icons, new-tab override, service worker, and floating capture content script.
 - RC7 resolves startup mode synchronously before the first React render; collection mode no longer mounts the wallpaper stage or creates/preloads a wallpaper image. Strict Mode initialization is deduplicated.
 - Release publication is now performed only by the tag-triggered GitHub Actions workflow. The local script no longer depends on GitHub CLI OAuth or probes Git credentials.
+- On 2026-07-16 npm retired the legacy Audit endpoint used by pnpm. CI and the tag workflow now share `scripts/audit-production.mjs`, which posts the exact installed production inventory to npm's official Bulk Advisory API, validates the response, and fails closed on High/Critical findings or API errors. The final run checked 207 packages and returned zero advisories at every severity.
 - `main` later gained CI-only commits through `6164c65d2fbf3c9276d2426ed51ba7791c79c7f8`; the RC7 binary remains pinned to the code identity above. GitHub CI run `29432392591` passed both the full verification job and the Node 24 / pnpm 11 bulk-advisory production audit.
 - On 2026-07-16, after explicit user confirmation, the verified RC7 tree was synchronized into the currently loaded unpacked source directory and Chrome's WebCollect extension was reloaded without uninstalling it. `diff -qr` confirmed that the loaded tree exactly matches `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.7/unpacked`.
 - Chrome still reports the legacy source path `~/Downloads/WebCollect-v1.1.2-rc.6/unpacked`; this is only the retained folder name used to preserve the stable extension ID and IndexedDB. The folder contents are byte-for-byte the RC7 unpacked tree.
-- The extension ID remained `immpcmhmabobllnopedaoflcjneigbko`, the manifest version remained `1.1.2`, and no extension-load error was reported. RC1 through RC6 remain historical evidence; RC7 is the installed candidate.
+- The extension ID remained `immpcmhmabobllnopedaoflcjneigbko`, the manifest version remained `1.1.2`, and no extension-load error was reported. RC1 through RC6 remain historical evidence; the installed RC7 tree is the real-browser basis accepted for the final release.
 
 ## Top-bar wallpaper startup switch acceptance
 
@@ -164,16 +174,16 @@ Fix:
 - The corrected card `docu.md — AI 负责写作，docu.md 完成其余工作。` remained present in the real wall.
 - The account panel and wall were inspected read-only. No card, category, preference, recycle-bin item, login session, or IndexedDB database was deleted or edited.
 
-### Profile B
+### Historical Profile B attempt
 
 - Dedicated physical Chrome process and separate user-data directory: `/private/tmp/webcollect-oauth-profile-b2-20260713`.
 - Remote debugging is isolated on `127.0.0.1:9227`.
 - The previous login window was closed before Google callback and is not counted as a passing session.
 - RC6 loaded successfully with the same extension ID, version `1.1.2`, active service worker, working new-tab page, and no GoTrue warning before Google handoff.
 - Google OAuth reached the account passkey/Touch ID challenge. It was not bypassed; after the Google page expired, the Profile returned cleanly to WebCollect's `Google 登录` state.
-- Profile B has not synced or created cloud data and is not counted as a passing second session.
+- Profile B did not sync or create cloud data. This historical attempt is not counted as a passing session and is no longer a release gate.
 - Password, second factor, CAPTCHA, and Google safety approval must be completed by the user. They are not copied, scripted, or bypassed.
-- Pending acceptance after the user completes the challenge: real avatar and sync badge render, existing wall loads, cloud remains `364 / 130 / 24`, no additional inbox is uploaded, and two recent account sessions are visible concurrently.
+- No further action is required for this temporary Profile unless the user explicitly asks to revive it.
 
 ## Empty artifacts requiring explicit approval
 
@@ -193,11 +203,11 @@ The older signed-in Chrome extension created another empty row while this RC was
 
 Both rows are empty, but the project's highest-priority rule forbids deleting or rewriting any category without explicit user approval. The second row is also still referenced by a preference. V1.1.2 prevents either row from causing another bootstrap duplicate, but retains both rows and their evidence.
 
-## Verification receipt before the final account gate
+## Verification receipt accepted for final release
 
-- Vitest: 23 files, 132 tests passed.
+- Vitest: 26 files, 138 tests passed.
 - Legacy compatibility: all 31 scripts passed.
-- Playwright Web E2E: all 14 tests passed with one worker; four cold-start timeouts seen under five concurrent workers passed individually and did not reproduce as product assertion failures.
+- Playwright Web E2E: all 14 tests passed with five workers in the final release run.
 - TypeScript and ESLint: passed.
 - Web production build: all 10 routes/pages and the custom server bundle passed.
 - Extension build, background artifact, and 25 MiB size gate passed; unpacked size is 17.1 MiB.
@@ -212,12 +222,12 @@ Both rows are empty, but the project's highest-priority rule forbids deleting or
 - [x] Publish V1.1.2 RC7 and verify its tag, code commit, prerelease flag, unique asset, size, SHA-256, and manifest.
 - [x] Update the explicitly authorized signed-in Chrome profile to RC7 without uninstalling it; verify four brand-new extension tabs have no wallpaper flash when startup wallpaper is off.
 - [x] Retain the RC6 real-account, cloud-wall, sync-badge, metadata, and stable-extension-ID evidence without claiming it as RC7 evidence.
-- [ ] Complete Google OAuth in the independent Profile B.
-- [ ] Verify two recent sessions, both cloud walls, and unchanged `364 / 130 / 24` primary data counts.
-- [ ] Record the user's decision for both proven-empty category artifacts; default is retain.
+- [x] Record the user's explicit 2026-07-16 waiver of independent Profile B Google OAuth and two-session simulation.
+- [x] Use ongoing Windows and Mac operation as cross-device observation rather than a local second-Profile release blocker.
+- [x] Retain both proven-empty category artifacts; no deletion was authorized, and V1.1.2 prevents them from creating further duplicates.
 - [x] Re-run unit, legacy, TypeScript, ESLint, extension build/runtime, dependency audit, and Supabase advisors after the latest auth fix.
-- [x] Re-run Web E2E against the stable OAuth server and production build in an isolated APFS-cloned workspace without interrupting Profile B.
+- [x] Re-run Web E2E against the stable OAuth server and production build.
 - [x] Update `AGD.md`, handoff/status files, and this document with the exact RC code commit.
 - [x] Push the verified RC code to `main`.
 - [x] Publish and verify RC7 asset `WebCollect-Chrome-Extension-v1.1.2-rc.7-2026-07-15.zip`.
-- [ ] Publish final `WebCollect-Chrome-Extension-v1.1.2-2026-07-15.zip` after account acceptance or an explicit user waiver of the independent Profile B gate.
+- [x] Publish final `WebCollect-Chrome-Extension-v1.1.2-2026-07-15.zip` through the tag-triggered GitHub Actions workflow after the explicit user waiver of the independent Profile B gate.

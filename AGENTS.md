@@ -1,12 +1,12 @@
 # WebCollect — 个人网页收藏墙
 
-## 2026-07-16 current account-sync entry
+## 2026-07-16 current V1.1.2 release entry
 
-Read `AGD.md` and `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md` first. RC7 has passed real-account verification in the signed-in Chrome profile from a dedicated auxiliary window on the secondary display; the stable extension ID, IndexedDB, login, cloud sync, and existing wall were preserved. Four fresh new tabs opened directly to the collection while startup wallpaper was off, with no wallpaper-stage state. V1.1.2 remains a release candidate until independent Profile B completes Google OAuth/sync verification, or the user explicitly waives that second-session gate, and the final main/tag/zip identity is recorded; V1.1.1 remains the latest stable Release meanwhile. Keep future Chrome work in the secondary-display auxiliary window and do not touch unrelated personal tabs.
+Read `AGD.md` and `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md` first. RC7 passed automated gates and real-account verification in the signed-in primary Chrome profile: the stable extension ID, IndexedDB, login, cloud sync, existing wall, and four direct-to-collection new tabs were preserved. On 2026-07-16 the user explicitly waived the separate Profile B gate and approved V1.1.2 for final release. Do not recreate that gate or require another local Chrome account/Profile for routine development or release acceptance. The user's normal Windows and Mac usage provides ongoing real cross-device observation.
 
 ## 2026-07-15 Chrome workspace preference
 
-When two displays are connected, use the dedicated Chrome window on the secondary display that contains only the WebCollect task tab. Keep development previews and WebCollect verification in that window, and do not follow or operate the user's active main-display Chrome tabs. If the Chrome control interface cannot safely distinguish or inspect a `chrome://newtab` page, do not claim that internal tab because claiming can expose it as `about:blank`; use the secondary window for a localhost preview and rely on isolated extension tests until an installable candidate is loaded for manual new-tab verification. Fall back to the main display only when one display is connected or the user explicitly requests it.
+When real login state, Chrome extension behavior, or `chrome://newtab` verification is required, use the user's existing signed-in primary Chrome profile; do not launch a separate Chrome profile/account merely to simulate a second session. When two displays are connected, use a dedicated auxiliary window in that same profile on the secondary display and keep only WebCollect task tabs there. Do not follow or operate the user's active main-display personal tabs. If the Chrome control interface cannot safely distinguish or inspect an internal tab, use the auxiliary window for a localhost preview and rely on isolated extension tests until an installable build is available. Fall back to the main display only when one display is connected or the user explicitly requests it.
 
 ## 2026-07-07 current audit entry
 

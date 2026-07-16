@@ -16,12 +16,11 @@
 项目已于 2026-07-15 退役 Superpowers、`goal-zzx` / `zzx-goal` 和 `andrej-karpathy-coding` 工作流。`tasks/todo.md`、`tasks/lessons.md`、`CODEX_GO_MODE_STATUS.md` 与 `docs/superpowers/` 只保留历史事实，不是新任务的必读、必写或执行入口。
 
 当前固定开发目录：`/Users/rockyx/vibe coding/Web Collect 0628`。
-当前最新功能版本：`V1.1.1 / 2026年7月12日`。
-当前 RC：`V1.1.2 / 2026年7月15日` RC6 已发布为 Prerelease，并已在用户授权的主 Chrome 通过真实账号验收；仅剩独立 Profile B 的第二会话验收。
-RC Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-15-v1.1.2-rc.6`。
-RC zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-15-v1.1.2-rc.6/WebCollect-Chrome-Extension-v1.1.2-rc.6-2026-07-15.zip`。
-最新 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-12-v1.1.1`。
-Chrome 扩展 zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-12-v1.1.1/WebCollect-Chrome-Extension-v1.1.1-2026-07-12.zip`。
+当前最新功能版本：`V1.1.2 / 2026年7月15日`。
+正式 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-15-v1.1.2`。
+扩展 zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-15-v1.1.2/WebCollect-Chrome-Extension-v1.1.2-2026-07-15.zip`。
+历史 RC7：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-15-v1.1.2-rc.7`。
+上一稳定版：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-12-v1.1.1`。
 如果旧说明和 `AGD.md` 冲突，以 `AGD.md` 为准。
 
 这是一个基于 [Next.js 16](https://nextjs.org) + [shadcn/ui](https://ui.shadcn.com) 的全栈应用项目，由扣子编程 CLI 创建。

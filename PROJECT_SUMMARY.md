@@ -1,10 +1,10 @@
 # WebCollect Project Summary
 
-## 2026-07-14 V1.1.2 候选接手入口
+## 2026-07-16 V1.1.2 正式版接手入口
 
-优先读 `AGD.md` 与 `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`。当前稳定版仍是 V1.1.1；V1.1.2 先以 RC 安装到用户明确授权的主 Chrome，再用独立 Profile B 完成第二会话验收。
+优先读 `AGD.md` 与 `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`。当前稳定版为 `V1.1.2 / 2026年7月15日`。RC7 已通过自动化和用户现有已登录主 Chrome profile 的真实验收；用户于 2026-07-16 明确取消独立 Profile B 门槛并批准正式发布。
 
-本轮候选修复：Web 本地 OAuth 公共配置、新 Profile 重复收集箱、同分项已有空重复时的 canonical 选择、OAuth code 清理、HMR WebSocket、浮窗并发重复目标、重复 Supabase 客户端和浏览器刷新生命周期。旧扩展在 2026-07-14 又上传一条空收集箱，云端现为 `364 cards / 130 categories / 24 preferences / 58 snapshots`；代码不删除现有记录，只阻止继续生成并确保新收藏落入已有卡片的收集箱。
+本轮正式版修复：Web 本地 OAuth 公共配置、新 Profile 重复收集箱、同分项已有空重复时的 canonical 选择、OAuth code 清理、HMR WebSocket、浮窗并发重复目标、重复 Supabase 客户端和浏览器刷新生命周期。旧扩展在 2026-07-14 又上传一条空收集箱，最近核对的云端为 `364 cards / 130 categories / 24 preferences / 60 snapshots`；代码不删除现有记录，只阻止继续生成并确保新收藏落入已有卡片的收集箱。
 
 ## 2026-07-12 最新接手入口
 
@@ -12,10 +12,10 @@
 
 当前最新状态：
 
-- 最新提交：以 Release tag `webcollect-2026-07-12-v1.1.1` 指向为准
-- 最新版本：`V1.1.1 / 2026年7月12日`
-- 最新 Release：`webcollect-2026-07-12-v1.1.1`
-- 最新 zip：`WebCollect-Chrome-Extension-v1.1.1-2026-07-12.zip`
+- 最新提交：以 Release tag `webcollect-2026-07-15-v1.1.2` 指向为准
+- 最新版本：`V1.1.2 / 2026年7月15日`
+- 最新 Release：`webcollect-2026-07-15-v1.1.2`
+- 最新 zip：`WebCollect-Chrome-Extension-v1.1.2-2026-07-15.zip`
 - 最新新增文档：
   - `AGD.md`
   - `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`
@@ -123,4 +123,4 @@ git diff --check
   `WebCollect-Chrome-Extension-capture-panel-ux-2026-06-28.zip`
 - 推送前必须确认 `git status -sb`，不要混入旧目录或无关文件。
 - 不要用 `git reset --hard` 或清空 IndexedDB/Supabase 修问题。
-- Chrome 验证优先用辅助窗口 / Codex Workbench，不要操作用户主 Chrome 窗口。
+- 真实扩展/OAuth 验收使用用户现有已登录主 Chrome profile，不另建测试账号/Profile；双屏时用同一 profile 的副屏辅助窗口 / Codex Workbench，禁止触碰无关个人标签。

@@ -9,10 +9,12 @@ describe("continuous integration workflow", () => {
 
     expect(auditJob).toBeGreaterThan(-1);
     expect(verifyJob).toBeGreaterThan(auditJob);
-    expect(workflow).toContain('node-version: "24"');
-    expect(workflow).toContain("npx --yes pnpm@11.13.0 audit --prod --audit-level=high");
-    expect(workflow).toContain("pnpm_config_pm_on_fail: ignore");
-    expect(workflow.slice(auditJob, verifyJob)).not.toContain("pnpm/action-setup");
-    expect(workflow.slice(verifyJob)).not.toContain("pnpm audit");
+    expect(workflow).toContain('node-version: "20"');
+    expect(workflow.slice(auditJob, verifyJob)).toContain("pnpm/action-setup");
+    expect(workflow.slice(auditJob, verifyJob)).toContain("pnpm install --frozen-lockfile");
+    expect(workflow.slice(auditJob, verifyJob)).toContain("pnpm audit:prod");
+    expect(workflow).not.toContain("pnpm_config_pm_on_fail");
+    expect(workflow).not.toContain("npx --yes pnpm@11.13.0 audit");
+    expect(workflow.slice(verifyJob)).not.toContain("pnpm audit:prod");
   });
 });
