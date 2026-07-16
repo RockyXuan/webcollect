@@ -2,6 +2,7 @@
 
 import { memo, useMemo, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
+import { Plus } from "lucide-react";
 import type { WebCard } from "@/lib/types";
 import { getSemanticSiteIcon, getSiteIconCandidates } from "@/lib/site-icons";
 import type { MindmapNode as MindmapNodeModel, MindmapNodePosition } from "./types";
@@ -16,7 +17,11 @@ interface MindmapNodeProps {
   chipSide?: "right" | "left" | "down";
   dragging?: boolean;
   highlighted?: boolean;
+  entering?: boolean;
+  addLabel?: string;
   onToggleCollapse?: (nodeId: string) => void;
+  onAdd?: (node: MindmapNodeModel) => void;
+  onActivate?: (node: MindmapNodeModel) => void;
   onNodePointerDown?: (event: ReactPointerEvent<HTMLDivElement>, nodeId: string) => void;
   onNodePointerMove?: (event: ReactPointerEvent<HTMLDivElement>, nodeId: string) => void;
   onNodePointerUp?: (event: ReactPointerEvent<HTMLDivElement>, nodeId: string) => void;
@@ -77,7 +82,11 @@ function MindmapNodeComponent({
   chipSide = "right",
   dragging = false,
   highlighted = false,
+  entering = false,
+  addLabel,
   onToggleCollapse,
+  onAdd,
+  onActivate,
   onNodePointerDown,
   onNodePointerMove,
   onNodePointerUp,
@@ -96,7 +105,7 @@ function MindmapNodeComponent({
 
   return (
     <div
-      className={`wc-mindmap-node wc-mindmap-node-${node.type}${dragging ? " is-dragging" : ""}${highlighted ? " is-search-highlight" : ""}`}
+      className={`wc-mindmap-node wc-mindmap-node-${node.type}${dragging ? " is-dragging" : ""}${highlighted ? " is-search-highlight" : ""}${entering ? " is-entering" : ""}`}
       style={style}
       data-mindmap-node={node.id}
       data-node-type={node.type}
@@ -113,6 +122,7 @@ function MindmapNodeComponent({
       onPointerLeave={() => {
         if (node.type === "card") onCardPointerLeave?.();
       }}
+      onClick={() => onActivate?.(node)}
     >
       {node.type === "section" && <span className="wc-mindmap-root-icon" aria-hidden="true">🐿️</span>}
       {node.type === "category" && <span className="wc-mindmap-category-dot" aria-hidden="true" />}
@@ -121,6 +131,21 @@ function MindmapNodeComponent({
       <span className="wc-mindmap-node-label">{node.label}</span>
       {node.type === "card" && (
         <span className={`wc-mindmap-star${pinned ? " is-pinned" : ""}`} aria-hidden="true">★</span>
+      )}
+      {addLabel && (
+        <button
+          type="button"
+          className="wc-mindmap-add-button"
+          aria-label={addLabel}
+          title={addLabel}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            onAdd?.(node);
+          }}
+        >
+          <Plus aria-hidden="true" />
+        </button>
       )}
       {descendantCount > 0 && (
         <button

@@ -290,7 +290,12 @@ export default function HomePage() {
       {collectionViewMode === "mindmap" && (
         <div className={`wc-collection-view is-${viewTransitionPhase}`} data-testid="collection-view-mindmap">
           <ErrorBoundary>
-            <MindmapView searchTarget={mindmapSearchTarget} />
+            <MindmapView
+              searchTarget={mindmapSearchTarget}
+              onAddCategory={handleAddCategory}
+              onAddGroup={handleAddGroup}
+              onAddCard={handleAddCard}
+            />
           </ErrorBoundary>
         </div>
       )}

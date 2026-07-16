@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { loadMindmapViewState, saveMindmapViewState } from "@/lib/mindmap-view-state";
+import { openWebCollectUrl } from "@/lib/platform";
 import { useAppStore } from "@/lib/store";
 import { buildMindmapTree, fitCamera, layoutMindmap } from "./layout-engine";
 import { MindmapNode } from "./mindmap-node";
@@ -32,6 +33,9 @@ export interface MindmapSearchTarget {
 
 interface MindmapViewProps {
   searchTarget?: MindmapSearchTarget | null;
+  onAddCategory: () => void;
+  onAddGroup: (parentId?: string) => void;
+  onAddCard: (categoryId?: string) => void;
 }
 
 function clampZoom(value: number): number {
@@ -64,12 +68,14 @@ function descendantCount(node: MindmapNodeModel): number {
   return node.children.reduce((count, child) => count + 1 + descendantCount(child), 0);
 }
 
-export function MindmapView({ searchTarget = null }: MindmapViewProps) {
+export function MindmapView({ searchTarget = null, onAddCategory, onAddGroup, onAddCard }: MindmapViewProps) {
   const sections = useAppStore((state) => state.sections);
   const categories = useAppStore((state) => state.categories);
   const cards = useAppStore((state) => state.cards);
   const activeSectionId = useAppStore((state) => state.activeSectionId);
   const pinnedBookmarkItems = useAppStore((state) => state.pinnedBookmarkItems);
+  const linkOpenMode = useAppStore((state) => state.linkOpenMode);
+  const togglePinBookmark = useAppStore((state) => state.togglePinBookmark);
   const stageRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const panRef = useRef<{ pointerId: number; x: number; y: number; camera: MindmapCamera } | null>(null);
@@ -95,6 +101,9 @@ export function MindmapView({ searchTarget = null }: MindmapViewProps) {
   const skipNextAutoFitRef = useRef(false);
   const activeStateSectionRef = useRef(activeSectionId);
   const dirtyRef = useRef(false);
+  const knownNodeIdsBySectionRef = useRef(new Map<string, Set<string>>());
+  const enteringTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suppressActivationRef = useRef<{ nodeId: string; until: number } | null>(null);
   const [layout, setLayout] = useState<MindmapLayoutId>("logic-right");
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const [offsets, setOffsets] = useState(EMPTY_OFFSETS);
@@ -107,6 +116,7 @@ export function MindmapView({ searchTarget = null }: MindmapViewProps) {
   const [hydrated, setHydrated] = useState(false);
   const [dirtyRevision, setDirtyRevision] = useState(0);
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
+  const [enteringNodeIds, setEnteringNodeIds] = useState<Set<string>>(() => new Set());
 
   const tree = useMemo(
     () => buildMindmapTree(sections, categories, cards, activeSectionId),
@@ -118,6 +128,30 @@ export function MindmapView({ searchTarget = null }: MindmapViewProps) {
     () => new Set(pinnedBookmarkItems.map((item) => item.cardId)),
     [pinnedBookmarkItems],
   );
+
+  useEffect(() => {
+    if (!previewTarget) return;
+    const pinned = pinnedSet.has(previewTarget.card.id);
+    if (previewTarget.pinned !== pinned) {
+      setPreviewTarget((current) => current ? { ...current, pinned } : current);
+    }
+  }, [pinnedSet, previewTarget]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const nextNodeIds = new Set(Object.keys(nodeById));
+    const previousNodeIds = knownNodeIdsBySectionRef.current.get(activeSectionId);
+    knownNodeIdsBySectionRef.current.set(activeSectionId, nextNodeIds);
+    if (!previousNodeIds) {
+      setEnteringNodeIds(new Set());
+      return;
+    }
+    const addedNodeIds = new Set([...nextNodeIds].filter((nodeId) => !previousNodeIds.has(nodeId)));
+    if (addedNodeIds.size === 0) return;
+    setEnteringNodeIds(addedNodeIds);
+    if (enteringTimerRef.current) clearTimeout(enteringTimerRef.current);
+    enteringTimerRef.current = setTimeout(() => setEnteringNodeIds(new Set()), 440);
+  }, [activeSectionId, hydrated, nodeById]);
   const renderedOffsets = useMemo(() => {
     if (!dragDelta) return offsets[layout];
     const base = offsets[layout][dragDelta.nodeId] || { dx: 0, dy: 0 };
@@ -373,11 +407,38 @@ export function MindmapView({ searchTarget = null }: MindmapViewProps) {
           [nodeId]: { dx: drag.base.dx + finalDelta.dx, dy: drag.base.dy + finalDelta.dy },
         },
       }));
+      suppressActivationRef.current = { nodeId, until: performance.now() + 280 };
       markDirty();
     }
     dragRef.current = null;
     setDragDelta(null);
   }, [layout, markDirty]);
+
+  const handleNodeAdd = useCallback((node: MindmapNodeModel) => {
+    hidePreview();
+    if (node.type === "section") onAddCategory();
+    else if (node.type === "category") onAddGroup(node.refId);
+    else if (node.type === "group") onAddCard(node.refId);
+  }, [hidePreview, onAddCard, onAddCategory, onAddGroup]);
+
+  const handleNodeActivate = useCallback((node: MindmapNodeModel) => {
+    if (node.type !== "card") return;
+    const suppressed = suppressActivationRef.current;
+    if (suppressed?.nodeId === node.id && performance.now() < suppressed.until) return;
+    const card = cardsById.get(node.refId);
+    if (!card) return;
+    hidePreview();
+    openWebCollectUrl(card.url, linkOpenMode);
+  }, [cardsById, hidePreview, linkOpenMode]);
+
+  const handlePreviewOpen = useCallback((card: (typeof cards)[number]) => {
+    hidePreview();
+    openWebCollectUrl(card.url, linkOpenMode);
+  }, [hidePreview, linkOpenMode]);
+
+  const handlePreviewTogglePin = useCallback((cardId: string) => {
+    togglePinBookmark(cardId);
+  }, [togglePinBookmark]);
 
   const handleCardPointerEnter = useCallback((element: HTMLDivElement, node: MindmapNodeModel, card: (typeof cards)[number]) => {
     clearPreviewTimers();
@@ -429,6 +490,7 @@ export function MindmapView({ searchTarget = null }: MindmapViewProps) {
     }));
     setHighlightedNodeId(targetNode.id);
     if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    if (enteringTimerRef.current) clearTimeout(enteringTimerRef.current);
     highlightTimerRef.current = setTimeout(() => setHighlightedNodeId(null), 1600);
     markDirty();
   }, [activeSectionId, autoFitKey, collapsed, hydrated, layout, markDirty, nodeById, offsets, parentIds, searchTarget, tree, viewport.height, viewport.width]);
@@ -493,7 +555,11 @@ export function MindmapView({ searchTarget = null }: MindmapViewProps) {
                   chipSide={layout === "tree-down" ? "down" : layout === "bilateral" && layoutResult.positions[node.id].x + layoutResult.positions[node.id].width / 2 < layoutResult.positions[tree.id].x + layoutResult.positions[tree.id].width / 2 ? "left" : "right"}
                   dragging={dragDelta?.nodeId === node.id}
                   highlighted={highlightedNodeId === node.id}
+                  entering={enteringNodeIds.has(node.id)}
+                  addLabel={node.type === "section" ? "新建分类" : node.type === "category" ? `在“${node.label}”中新建分组` : node.type === "group" ? `在“${node.label}”中添加网站` : undefined}
                   onToggleCollapse={handleToggleCollapse}
+                  onAdd={handleNodeAdd}
+                  onActivate={handleNodeActivate}
                   onNodePointerDown={handleNodePointerDown}
                   onNodePointerMove={handleNodePointerMove}
                   onNodePointerUp={(event, id) => finishNodeDrag(event, id, true)}
@@ -554,6 +620,8 @@ export function MindmapView({ searchTarget = null }: MindmapViewProps) {
         visible={previewVisible}
         onPointerEnter={keepPreviewOpen}
         onPointerLeave={schedulePreviewHide}
+        onOpen={handlePreviewOpen}
+        onTogglePin={handlePreviewTogglePin}
       />
     </section>
   );

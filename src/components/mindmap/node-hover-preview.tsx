@@ -17,6 +17,8 @@ interface NodeHoverPreviewProps {
   visible: boolean;
   onPointerEnter: () => void;
   onPointerLeave: () => void;
+  onOpen: (card: WebCard) => void;
+  onTogglePin: (cardId: string) => void;
 }
 
 function PreviewIcon({ card }: { card: WebCard }) {
@@ -44,7 +46,14 @@ function PreviewIcon({ card }: { card: WebCard }) {
   return <span className="wc-mindmap-preview-favicon is-fallback" aria-hidden="true">{card.abbreviation || card.title.slice(0, 1) || "?"}</span>;
 }
 
-export function NodeHoverPreview({ target, visible, onPointerEnter, onPointerLeave }: NodeHoverPreviewProps) {
+export function NodeHoverPreview({
+  target,
+  visible,
+  onPointerEnter,
+  onPointerLeave,
+  onOpen,
+  onTogglePin,
+}: NodeHoverPreviewProps) {
   const previewRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: 8, top: 8 });
 
@@ -70,7 +79,8 @@ export function NodeHoverPreview({ target, visible, onPointerEnter, onPointerLea
     <div
       ref={previewRef}
       className={`wc-mindmap-preview${visible ? " is-visible" : ""}`}
-      role="tooltip"
+      role="dialog"
+      aria-label={`${target.card.title} 网页预览`}
       data-testid="mindmap-hover-preview"
       style={position}
       onPointerEnter={onPointerEnter}
@@ -85,9 +95,22 @@ export function NodeHoverPreview({ target, visible, onPointerEnter, onPointerLea
       </div>
       <p className="wc-mindmap-preview-description">{description}</p>
       <div className="wc-mindmap-preview-path">位置：<b>{target.path.join(" › ")}</b></div>
-      <div className="wc-mindmap-preview-actions" aria-hidden="true">
-        <span className="wc-mindmap-preview-button is-primary">打开网页</span>
-        <span className="wc-mindmap-preview-button is-ghost">{target.pinned ? "★ 已在收藏栏" : "☆ 收藏栏"}</span>
+      <div className="wc-mindmap-preview-actions">
+        <button
+          type="button"
+          className="wc-mindmap-preview-button is-primary"
+          onClick={() => onOpen(target.card)}
+        >
+          打开网页
+        </button>
+        <button
+          type="button"
+          className="wc-mindmap-preview-button is-ghost"
+          aria-pressed={target.pinned}
+          onClick={() => onTogglePin(target.card.id)}
+        >
+          {target.pinned ? "★ 已在收藏栏" : "☆ 收藏栏"}
+        </button>
       </div>
     </div>,
     document.body,

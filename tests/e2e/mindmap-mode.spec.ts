@@ -81,7 +81,7 @@ const fixtureCard = (id: string, title: string, categoryId: string, order: numbe
   imageUrl: "/assets/mascots/chipmunk-head.png",
 });
 const fixtureCards: WebCard[] = [
-  fixtureCard("notion", "Notion", "group-common", 0),
+  { ...fixtureCard("notion", "Notion", "group-common", 0), url: "/mindmap-target" },
   fixtureCard("google", "Google", "group-common", 1),
   fixtureCard("github", "GitHub", "group-common", 2),
   fixtureCard("chatgpt", "ChatGPT", "group-tools", 0),
@@ -160,8 +160,30 @@ async function writeIsolatedMindmapFixture(page: Page): Promise<void> {
     categories: fixtureCategories,
     collectionSections: fixtureSections,
     activeCollectionSectionId: "section-default",
+    pinnedBookmarkItems: [],
+    linkOpenMode: "new-active-tab",
     initialized: true,
   });
+}
+
+async function readCollectionKey(page: Page, key: string): Promise<unknown> {
+  return page.evaluate(async (storageKey) => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("WebCollect");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      const transaction = database.transaction("webcollect_data", "readonly");
+      const request = transaction.objectStore("webcollect_data").get(storageKey);
+      return await new Promise((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    } finally {
+      database.close();
+    }
+  }, key);
 }
 
 test("classic and mindmap modes share one header without mutating collection data", async ({ page }) => {
@@ -442,4 +464,144 @@ test("rapid mode changes keep one view and category search focuses the right sec
     expect(Math.abs(target.y + target.height / 2 - (stage.y + stage.height / 2))).toBeLessThanOrEqual(2);
   }
   expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(1080);
+});
+
+test("mindmap additions reuse the existing dialogs and collection write path", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/");
+  await openCollection(page);
+  await writeIsolatedMindmapFixture(page);
+  await page.reload();
+  await openCollection(page);
+  await enterMindmap(page);
+
+  const beforeCancel = await readProtectedCollectionState(page);
+  const rootNode = page.locator('[data-node-type="section"]');
+  await rootNode.getByRole("button", { name: "新建分类" }).click();
+  await expect(page.getByRole("heading", { name: "新建分类" })).toBeVisible();
+  await page.getByRole("button", { name: "取消", exact: true }).click();
+  expect(await readProtectedCollectionState(page)).toEqual(beforeCancel);
+
+  await rootNode.getByRole("button", { name: "新建分类" }).click();
+  await page.getByLabel("分类名称").fill("导图新增分类");
+  await page.getByRole("button", { name: "创建", exact: true }).click();
+  const newCategory = page.locator('[data-node-type="category"]').filter({ hasText: "导图新增分类" });
+  await expect(newCategory).toBeVisible();
+  await expect(newCategory).toHaveClass(/is-entering/);
+
+  const workCategory = page.locator('[data-mindmap-node="cat:cat-work"]');
+  await workCategory.getByRole("button", { name: "在“工作”中新建分组" }).click();
+  await expect(page.getByRole("heading", { name: "新建分组" })).toBeVisible();
+  await page.getByLabel("分组名称").fill("导图新增分组");
+  await page.getByRole("button", { name: "创建", exact: true }).click();
+  const newGroup = page.locator('[data-node-type="group"]').filter({ hasText: "导图新增分组" });
+  await expect(newGroup).toBeVisible();
+
+  const categories = (await readCollectionKey(page, "categories")) as Category[];
+  const createdGroup = categories.find((category) => category.name === "导图新增分组");
+  expect(createdGroup?.parentId).toBe("cat-work");
+  expect(createdGroup?.sectionId).toBe("section-default");
+
+  const commonGroup = page.locator('[data-mindmap-node="grp:group-common"]');
+  await commonGroup.getByRole("button", { name: "在“常用”中添加网站" }).click();
+  await expect(page.getByRole("heading", { name: "添加网站" })).toBeVisible();
+  await expect(page.getByRole("combobox")).toContainText("常用");
+  await page.getByLabel("网页链接").fill("https://mindmap-added.example.com");
+  await page.getByLabel("网站名称").fill("导图新增网页");
+  await page.getByRole("button", { name: "添加", exact: true }).click();
+  const newCard = page.locator('[data-node-type="card"]').filter({ hasText: "导图新增网页" });
+  await expect(newCard).toBeVisible();
+  await expect(newCard).toHaveClass(/is-entering/);
+
+  const afterAdd = await readProtectedCollectionState(page);
+  expect(afterAdd.cards).not.toEqual(beforeCancel.cards);
+  expect(afterAdd.categories).not.toEqual(beforeCancel.categories);
+  expect(afterAdd.syncDirtySets).not.toEqual(beforeCancel.syncDirtySets);
+
+  await page.getByRole("button", { name: "经典", exact: true }).click();
+  await expect(page.getByTestId("collection-view-classic")).toHaveClass(/is-idle/);
+  await expect(page.getByText("导图新增分类", { exact: true })).toBeVisible();
+  await expect(page.getByText("导图新增分组", { exact: true })).toBeVisible();
+  await expect(page.getByText("导图新增网页", { exact: true })).toBeVisible();
+});
+
+test("classic collection additions, edits, and soft deletes rebuild the mindmap", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/");
+  await openCollection(page);
+  await writeIsolatedMindmapFixture(page);
+  await page.reload();
+  await openCollection(page);
+
+  await page.getByRole("button", { name: "网页", exact: true }).click();
+  await page.getByRole("combobox").click();
+  await page.getByRole("option", { name: "常用" }).click();
+  await page.getByLabel("网页链接").fill("https://example.com/classic-added-target");
+  await page.getByLabel("网站名称").fill("经典新增网页");
+  await page.getByRole("button", { name: "添加", exact: true }).click();
+  const classicCard = page.locator(".wc-site-tile").filter({ hasText: "经典新增网页" });
+  await expect(classicCard).toBeVisible();
+
+  await enterMindmap(page);
+  await expect(page.locator('[data-node-type="card"]').filter({ hasText: "经典新增网页" })).toBeVisible();
+
+  await page.getByRole("button", { name: "经典", exact: true }).click();
+  await expect(page.getByTestId("collection-view-classic")).toHaveClass(/is-idle/);
+  const editableCard = page.locator(".wc-site-tile").filter({ hasText: "经典新增网页" });
+  await editableCard.getByRole("button", { name: "网页更多操作" }).focus();
+  await page.getByRole("button", { name: "编辑详情" }).click();
+  await page.getByLabel("网站名称").fill("经典修改网页");
+  await page.getByRole("button", { name: "保存", exact: true }).click();
+  await expect(page.locator(".wc-site-tile").filter({ hasText: "经典修改网页" })).toBeVisible();
+
+  await enterMindmap(page);
+  await expect(page.locator('[data-node-type="card"]').filter({ hasText: "经典修改网页" })).toBeVisible();
+  await expect(page.locator('[data-node-type="card"]').filter({ hasText: "经典新增网页" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "经典", exact: true }).click();
+  await expect(page.getByTestId("collection-view-classic")).toHaveClass(/is-idle/);
+  const deletableCard = page.locator(".wc-site-tile").filter({ hasText: "经典修改网页" });
+  await deletableCard.getByRole("button", { name: "网页更多操作" }).focus();
+  await page.getByRole("button", { name: "删除网页" }).click();
+  await expect(deletableCard).toHaveCount(0);
+
+  await enterMindmap(page);
+  await expect(page.locator('[data-node-type="card"]').filter({ hasText: "经典修改网页" })).toHaveCount(0);
+  const recycleBin = await readCollectionKey(page, "recycleBin");
+  expect(recycleBin).toEqual(expect.arrayContaining([
+    expect.objectContaining({ type: "card", name: "经典修改网页" }),
+  ]));
+});
+
+test("mindmap card activation and preview actions reuse link and bookmark preferences", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/");
+  await openCollection(page);
+  await writeIsolatedMindmapFixture(page);
+  await page.reload();
+  await openCollection(page);
+  await enterMindmap(page);
+
+  const notion = page.locator('[data-mindmap-node="card:notion"]');
+  await notion.hover();
+  const preview = page.getByTestId("mindmap-hover-preview");
+  await expect(preview).toBeVisible({ timeout: 2_000 });
+  const pinButton = preview.getByRole("button", { name: "☆ 收藏栏" });
+  await pinButton.click();
+  await expect(preview.getByRole("button", { name: "★ 已在收藏栏" })).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(() => readCollectionKey(page, "pinnedBookmarkItems")).toEqual([
+    expect.objectContaining({ cardId: "notion" }),
+  ]);
+
+  const previewPopupPromise = page.waitForEvent("popup");
+  await preview.getByRole("button", { name: "打开网页" }).click();
+  const previewPopup = await previewPopupPromise;
+  await expect.poll(() => previewPopup.url()).toContain("/mindmap-target");
+  await previewPopup.close();
+
+  const nodePopupPromise = page.waitForEvent("popup");
+  await notion.click();
+  const nodePopup = await nodePopupPromise;
+  await expect.poll(() => nodePopup.url()).toContain("/mindmap-target");
+  await nodePopup.close();
 });
