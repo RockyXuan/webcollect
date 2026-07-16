@@ -7,7 +7,9 @@
 主分支：`main`
 当前最新发布身份：`V1.1.2 / 2026年7月15日`
 正式发布 tag：`webcollect-2026-07-15-v1.1.2`；Release `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-15-v1.1.2`；zip `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-15-v1.1.2/WebCollect-Chrome-Extension-v1.1.2-2026-07-15.zip`。
+已验证正式版源码提交：`b7b4f75e8eb8f4f2763b0ede04b1f8a49a12962d`；正式 zip SHA-256：`79cc7fb01d678e2af24cc8b733353a4a12a6b7ddceba71a5514e7f7f7c9a1192`。后续若 `main` 仅增加交接文档提交，不代表应用已有新版本。
 当前主线：V1.1.2 RC7 已完成首帧无壁纸挂载的自动化验收、发布产物复核和真实账号 Chrome 新标签页验收。2026-07-16 在副屏辅助窗口中保持同一扩展 ID、未卸载扩展，连续 4 次关闭启动壁纸模式的新标签均直接进入收藏墙且未出现壁纸舞台；登录态、云同步和原有收藏均保留。同日用户明确豁免独立 Profile B 门槛，并批准按上述证据发布 V1.1.2 正式版；Windows 与 Mac 的日常同时使用作为后续跨设备观察，不再要求在本机另建 Chrome Profile。
+下一大型功能建议从新线程开始；接手时先读 `HANDOFF.md` 和已经去除旧目标的 `NEXT_THREAD_PROMPT.md`，再根据用户的新功能描述确定范围，不要继续执行旧线程或旧 Release 计划。
 
 ## 2026-07-15 项目工作流退役
 

@@ -7,10 +7,13 @@
 This section supersedes older development status. The user explicitly waived the independent Profile B gate on 2026-07-16 and approved the tested RC7 line for final V1.1.2 publication.
 
 - Stable version/date: `V1.1.2 / 2026年7月15日`.
+- Verified release source: `main` and tag `webcollect-2026-07-15-v1.1.2` both point to `b7b4f75e8eb8f4f2763b0ede04b1f8a49a12962d`. Any commit after it may be documentation-only handoff maintenance; do not confuse that with a newer application release.
 - Final tag: `webcollect-2026-07-15-v1.1.2`.
 - Final Release: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-15-v1.1.2`; direct zip: `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-15-v1.1.2/WebCollect-Chrome-Extension-v1.1.2-2026-07-15.zip`.
+- Final zip: `16,942,028` bytes; SHA-256 `79cc7fb01d678e2af24cc8b733353a4a12a6b7ddceba71a5514e7f7f7c9a1192`; downloaded GitHub asset and packaged `manifest.json` were rechecked after publication.
+- Final GitHub evidence: CI run `29468884175` and tag verification/Release run `29468911858` both succeeded.
 - Closeout: `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`.
-- Baseline and remote backup: `main@ea45b53` and `codex/backup-pre-oauth-2026-07-13`.
+- Historical pre-OAuth baseline and remote backup: `main@ea45b53` and `codex/backup-pre-oauth-2026-07-13`.
 - Published RC identity: tag `webcollect-2026-07-15-v1.1.2-rc.7`, code commit `a3a2d2f429c2c56b4e8c4e33fdc6da831bec4679`, asset `WebCollect-Chrome-Extension-v1.1.2-rc.7-2026-07-15.zip`, SHA-256 `747dcdcf62134f42352d281521460116fd89b3d87ba8509f1a2f5ddfc3e8da9d`.
 - RC Prerelease: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-15-v1.1.2-rc.7`; direct zip: `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-15-v1.1.2-rc.7/WebCollect-Chrome-Extension-v1.1.2-rc.7-2026-07-15.zip`.
 - Verified RC7 folder: `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.7/unpacked`. To preserve the stable extension ID and IndexedDB, this exact tree was synchronized into Chrome's existing `~/Downloads/WebCollect-v1.1.2-rc.6/unpacked` source path and reloaded without uninstalling; `diff -qr` confirms both trees are identical.
@@ -23,6 +26,15 @@ This section supersedes older development status. The user explicitly waived the
 - Two exact empty inbox artifacts are documented in the closeout. One still has a section-preference reference; neither may be deleted without explicit user approval.
 - Future real extension/OAuth checks use the user's existing signed-in primary Chrome profile. Do not create a separate Chrome account/Profile merely for acceptance; with two displays, use a dedicated auxiliary window in the same profile on the secondary display and leave unrelated personal tabs untouched.
 - Windows and Mac real usage provide ongoing cross-device observation. It is not a local second-Profile release gate.
+
+## Next Major Feature Thread
+
+- Start the next large feature in a new thread. This handoff intentionally closes the long audit/RC/release context at the verified V1.1.2 boundary.
+- Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, and the V1.1.2 closeout before changing code.
+- Ask for or read the user's new feature description, then inspect only the relevant implementation paths before choosing scope, tests, version bump, and release plan.
+- Preserve the V1.1.2 data and sync guarantees. Do not reset IndexedDB, Supabase, extension storage, categories, cards, preferences, snapshots, or the two documented empty inbox artifacts.
+- A substantial new user-facing capability will normally justify `V1.2.0`; decide after understanding its actual breadth. Use the real completion date and keep package, manifest, UI version, tag, Release, and zip identity aligned.
+- The copy-paste startup prompt is maintained in `NEXT_THREAD_PROMPT.md`. Older sections below are historical evidence only.
 
 ## 2026-07-12 V1.1.1 Audit And Supabase Split Handoff
 
