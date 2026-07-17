@@ -1,6 +1,10 @@
 # WebCollect — 个人网页收藏墙
 
-## 2026-07-16 current V1.2.0 release entry
+## 2026-07-17 current V1.2.1 release entry
+
+Read `AGD.md` and `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md` first. V1.2.1 closes the independent Fable review polish items: current-layout reset/refit, immediate favicon letter fallback, stable bilateral branch direction, indexed descendant counts, dialog focus return, and local classic/mindmap mode memory. First use and invalid/unavailable storage still default to classic; the only new preference key is localStorage `webcollect_collection_view_mode`, and it is not synced or stored in IndexedDB, Chrome storage, snapshots, dirty sets, or Supabase. The V1.2.0 `mindmapViewState:<sectionId>` data boundary remains unchanged.
+
+## 2026-07-16 previous V1.2.0 release entry
 
 Read `AGD.md` and `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md` first. V1.2.0 adds the Fable-style 导图模式 as a second collection view while preserving the V1.1.2 data/sync guarantees. The only new persistent data is local view state under `mindmapViewState:<sectionId>` in the existing `WebCollect/webcollect_data` IndexedDB store; it is not part of dirty sets, snapshots, Chrome storage, Supabase, or sync preferences. Classic mode remains the default startup path.
 

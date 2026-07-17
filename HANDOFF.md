@@ -2,6 +2,19 @@
 
 > **2026-07-15 current workflow rule:** this repository has retired Superpowers (including `superpowers:*` / `using-superpowers`), `goal-zzx` / `zzx-goal`, and `andrej-karpathy-coding`. Do not install, enable, invoke, or imitate them. Any older instruction below that requires `tasks/todo.md`, `tasks/lessons.md`, `CODEX_GO_MODE_STATUS.md`, fixed phase counts, strict TDD, worktrees, subagents, or duplicate reviews is historical and superseded by `AGENTS.md`.
 
+## 2026-07-17 V1.2.1 Mindmap Polish Release
+
+This section supersedes the V1.2.0 development status once tag `webcollect-2026-07-17-v1.2.1` is published.
+
+- Stable version/date: `V1.2.1 / 2026年7月17日`.
+- Final tag: `webcollect-2026-07-17-v1.2.1`.
+- Final Release: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-17-v1.2.1`; direct zip: `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-17-v1.2.1/WebCollect-Chrome-Extension-v1.2.1-2026-07-17.zip`.
+- Closeout: `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`.
+- Scope: closes the independent Fable review with a current-layout reset/refit control, immediate favicon letter fallback, inherited bilateral side metadata, indexed descendant counts, and focus return to the original add button after dialog close.
+- Mode behavior: first use remains classic. User choices are remembered locally through localStorage `webcollect_collection_view_mode`; invalid values or unavailable storage fall back to classic without deleting the stored value. This preference does not sync across devices.
+- Data contract: `mindmapViewState:<sectionId>` remains view-only IndexedDB state. The mode key is localStorage only. Neither participates in dirty sets, snapshots, Chrome storage, Supabase, collection sync, or business schemas.
+- The audit intake commit is `8859022`; the functional implementation commit is `586912a`. Final release commit, GitHub run IDs, official zip SHA-256, and primary-profile Chrome evidence are recorded in the closeout after publication by a documentation-only follow-up commit, which is not a new application version.
+
 ## 2026-07-16 V1.2.0 Mindmap Release
 
 This section supersedes older development status once the `webcollect-2026-07-16-v1.2.0` tag is published.
@@ -43,11 +56,11 @@ This section supersedes older development status. The user explicitly waived the
 
 ## Next Major Feature Thread
 
-- Start the next large feature in a new thread. This handoff intentionally closes the long audit/RC/release context at the verified V1.1.2 boundary.
-- Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, and the V1.1.2 closeout before changing code.
+- Start the next large feature in a new thread. This handoff closes the mindmap review/polish/release context at the verified V1.2.1 boundary.
+- Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, and the V1.2.1 closeout before changing code.
 - Ask for or read the user's new feature description, then inspect only the relevant implementation paths before choosing scope, tests, version bump, and release plan.
-- Preserve the V1.1.2 data and sync guarantees. Do not reset IndexedDB, Supabase, extension storage, categories, cards, preferences, snapshots, or the two documented empty inbox artifacts.
-- A substantial new user-facing capability will normally justify `V1.2.0`; decide after understanding its actual breadth. Use the real completion date and keep package, manifest, UI version, tag, Release, and zip identity aligned.
+- Preserve the V1.2.1 data and sync guarantees. Do not reset IndexedDB, Supabase, extension storage, categories, cards, preferences, snapshots, local view state, mode preference, or the two documented empty inbox artifacts.
+- Decide the next version only after understanding the feature's actual breadth. Use the real completion date and keep package, manifest, UI version, tag, Release, and zip identity aligned.
 - The copy-paste startup prompt is maintained in `NEXT_THREAD_PROMPT.md`. Older sections below are historical evidence only.
 
 ## 2026-07-12 V1.1.1 Audit And Supabase Split Handoff
