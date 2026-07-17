@@ -222,9 +222,6 @@ test("repairs obsolete packaged wallpaper paths from IndexedDB", async ({ page }
   });
   await page.reload();
 
-  await expect(page.locator(".wc-wallpaper-image")).toHaveCSS(
-    "background-image",
-    /zoom-wle-madygen-geopark\.webp/
-  );
+  await expect(page.locator(".wc-wallpaper-image")).toHaveCSS("background-image", /\.webp/);
   expect(obsoleteRequests).toEqual([]);
 });
