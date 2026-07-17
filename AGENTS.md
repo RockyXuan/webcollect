@@ -1,6 +1,10 @@
 # WebCollect — 个人网页收藏墙
 
-## 2026-07-16 current V1.1.2 release entry
+## 2026-07-16 current V1.2.0 release entry
+
+Read `AGD.md` and `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md` first. V1.2.0 adds the Fable-style 导图模式 as a second collection view while preserving the V1.1.2 data/sync guarantees. The only new persistent data is local view state under `mindmapViewState:<sectionId>` in the existing `WebCollect/webcollect_data` IndexedDB store; it is not part of dirty sets, snapshots, Chrome storage, Supabase, or sync preferences. Classic mode remains the default startup path.
+
+## 2026-07-16 previous V1.1.2 release entry
 
 Read `AGD.md` and `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md` first. RC7 passed automated gates and real-account verification in the signed-in primary Chrome profile: the stable extension ID, IndexedDB, login, cloud sync, existing wall, and four direct-to-collection new tabs were preserved. On 2026-07-16 the user explicitly waived the separate Profile B gate and approved V1.1.2 for final release. Do not recreate that gate or require another local Chrome account/Profile for routine development or release acceptance. The user's normal Windows and Mac usage provides ongoing real cross-device observation.
 

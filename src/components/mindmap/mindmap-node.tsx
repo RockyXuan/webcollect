@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useMemo, useState } from "react";
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { Plus } from "lucide-react";
 import type { WebCard } from "@/lib/types";
 import { getSemanticSiteIcon, getSiteIconCandidates } from "@/lib/site-icons";
@@ -17,11 +17,16 @@ interface MindmapNodeProps {
   chipSide?: "right" | "left" | "down";
   dragging?: boolean;
   highlighted?: boolean;
+  focused?: boolean;
   entering?: boolean;
+  tabIndex?: number;
+  ariaLevel?: number;
   addLabel?: string;
   onToggleCollapse?: (nodeId: string) => void;
   onAdd?: (node: MindmapNodeModel) => void;
   onActivate?: (node: MindmapNodeModel) => void;
+  onFocusNode?: (nodeId: string) => void;
+  onNodeKeyDown?: (event: ReactKeyboardEvent<HTMLDivElement>, node: MindmapNodeModel) => void;
   onNodePointerDown?: (event: ReactPointerEvent<HTMLDivElement>, nodeId: string) => void;
   onNodePointerMove?: (event: ReactPointerEvent<HTMLDivElement>, nodeId: string) => void;
   onNodePointerUp?: (event: ReactPointerEvent<HTMLDivElement>, nodeId: string) => void;
@@ -82,11 +87,16 @@ function MindmapNodeComponent({
   chipSide = "right",
   dragging = false,
   highlighted = false,
+  focused = false,
   entering = false,
+  tabIndex = -1,
+  ariaLevel = 1,
   addLabel,
   onToggleCollapse,
   onAdd,
   onActivate,
+  onFocusNode,
+  onNodeKeyDown,
   onNodePointerDown,
   onNodePointerMove,
   onNodePointerUp,
@@ -105,12 +115,19 @@ function MindmapNodeComponent({
 
   return (
     <div
-      className={`wc-mindmap-node wc-mindmap-node-${node.type}${dragging ? " is-dragging" : ""}${highlighted ? " is-search-highlight" : ""}${entering ? " is-entering" : ""}`}
+      className={`wc-mindmap-node wc-mindmap-node-${node.type}${dragging ? " is-dragging" : ""}${highlighted ? " is-search-highlight" : ""}${focused ? " is-focused" : ""}${entering ? " is-entering" : ""}`}
       style={style}
+      role="treeitem"
+      tabIndex={tabIndex}
+      aria-level={ariaLevel}
+      aria-expanded={descendantCount > 0 ? !collapsed : undefined}
+      aria-selected={focused ? "true" : undefined}
       data-mindmap-node={node.id}
       data-node-type={node.type}
       data-collapsed={collapsed ? "true" : "false"}
       aria-label={`${node.type === "section" ? "分项" : node.type === "category" ? "分类" : node.type === "group" ? "分组" : "网页"}：${node.label}`}
+      onFocus={() => onFocusNode?.(node.id)}
+      onKeyDown={(event) => onNodeKeyDown?.(event, node)}
       onPointerDown={(event) => onNodePointerDown?.(event, node.id)}
       onPointerMove={(event) => onNodePointerMove?.(event, node.id)}
       onPointerUp={(event) => onNodePointerUp?.(event, node.id)}

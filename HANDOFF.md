@@ -2,6 +2,20 @@
 
 > **2026-07-15 current workflow rule:** this repository has retired Superpowers (including `superpowers:*` / `using-superpowers`), `goal-zzx` / `zzx-goal`, and `andrej-karpathy-coding`. Do not install, enable, invoke, or imitate them. Any older instruction below that requires `tasks/todo.md`, `tasks/lessons.md`, `CODEX_GO_MODE_STATUS.md`, fixed phase counts, strict TDD, worktrees, subagents, or duplicate reviews is historical and superseded by `AGENTS.md`.
 
+## 2026-07-16 V1.2.0 Mindmap Release
+
+This section supersedes older development status once the `webcollect-2026-07-16-v1.2.0` tag is published.
+
+- Stable version/date: `V1.2.0 / 2026年7月16日`.
+- Final tag: `webcollect-2026-07-16-v1.2.0`.
+- Final Release: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-16-v1.2.0`; direct zip: `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-16-v1.2.0/WebCollect-Chrome-Extension-v1.2.0-2026-07-16.zip`.
+- Closeout: `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md`.
+- Scope: adds the Fable-style 导图模式 beside the classic collection wall. Classic remains the default startup mode; TopNav, dialogs, BookmarkBar, sync, snapshots, recycle bin, sections, categories, cards, and preferences continue to use the V1.1.2 paths.
+- Data contract: the only new persisted key family is `mindmapViewState:<sectionId>` in the existing localforage `WebCollect/webcollect_data` store. It stores layout, collapsed nodes, offsets, camera, and updatedAt only. It is not synced, snapshotted, dirty-tracked, written to Chrome storage, or represented in Supabase.
+- Implemented: M0 skeleton/switch, M1 layout engine, M2 read-only canvas, M3 drag/collapse/hover, M4 per-section persistence/search focus, M5 existing collection actions, M6 extension new-tab view, and M7 tree semantics, keyboard navigation, compact 390px controls, reduced-motion compatibility, empty state, and 300+ node viewport culling.
+- Real Chrome evidence before publication: the installed stable extension ID `immpcmhmabobllnopedaoflcjneigbko` was preserved by syncing the new build into the existing unpacked source path and reloading in the signed-in primary Chrome profile. Classic showed the same 7 sections / 63 visible cards / recycle count 15 before and after reload; 导图 then rendered 63 web nodes, 11 category nodes, and 13 group nodes across all four layouts. Console inspection found no mindmap runtime crash; only pre-existing favicon/CSP/resource warnings were present.
+- Release evidence fields such as final main commit, GitHub CI run, tag workflow run, official zip size, and SHA-256 are appended after publication by a docs-only closeout commit. That commit is not a new application version.
+
 ## 2026-07-16 V1.1.2 Final Release
 
 This section supersedes older development status. The user explicitly waived the independent Profile B gate on 2026-07-16 and approved the tested RC7 line for final V1.1.2 publication.

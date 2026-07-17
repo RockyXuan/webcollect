@@ -80,10 +80,10 @@ jobs:
           notes=(
             "WebCollect Chrome extension ${VERSION_LABEL}."
             ""
-            "- Fixes the disabled wallpaper mode flashing before the collection wall."
-            "- Resolves the startup mode before the first React render."
-            "- Avoids mounting or preloading wallpaper assets in collection mode."
-            "- Verified by unit, legacy, Playwright, Web build, and extension artifact checks."
+            "- Adds the Fable-style mindmap collection view with four layouts."
+            "- Preserves classic mode, existing data, sync state, snapshots, Chrome storage, and Supabase schema."
+            "- Persists only per-section mindmap view state locally under mindmapViewState:<sectionId>."
+            "- Verified by unit, legacy, Playwright, Web build, extension artifact, size, and production dependency checks."
           )
           printf '%s\n' "${notes[@]}" > release-notes.md
 

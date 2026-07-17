@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { loadMindmapViewState, saveMindmapViewState } from "@/lib/mindmap-view-state";
 import { openWebCollectUrl } from "@/lib/platform";
 import { useAppStore } from "@/lib/store";
@@ -24,6 +25,9 @@ const LAYOUTS: Array<{ id: MindmapLayoutId; label: string; asset: string }> = [
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 2;
 const ZOOM_STEP = 1.15;
+const VIRTUALIZE_NODE_THRESHOLD = 300;
+const VIRTUALIZE_OVERSCAN = 240;
+const FOCUS_VIEW_MARGIN = 96;
 
 export interface MindmapSearchTarget {
   sectionId: string;
@@ -66,6 +70,16 @@ function indexNodes(root: MindmapNodeModel): {
 
 function descendantCount(node: MindmapNodeModel): number {
   return node.children.reduce((count, child) => count + 1 + descendantCount(child), 0);
+}
+
+function nodeDepth(nodeId: string, parentIds: Record<string, string | undefined>): number {
+  let depth = 1;
+  let currentId = parentIds[nodeId];
+  while (currentId) {
+    depth += 1;
+    currentId = parentIds[currentId];
+  }
+  return depth;
 }
 
 export function MindmapView({ searchTarget = null, onAddCategory, onAddGroup, onAddCard }: MindmapViewProps) {
@@ -116,6 +130,7 @@ export function MindmapView({ searchTarget = null, onAddCategory, onAddGroup, on
   const [hydrated, setHydrated] = useState(false);
   const [dirtyRevision, setDirtyRevision] = useState(0);
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
+  const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
   const [enteringNodeIds, setEnteringNodeIds] = useState<Set<string>>(() => new Set());
 
   const tree = useMemo(
@@ -164,6 +179,39 @@ export function MindmapView({ searchTarget = null, onAddCategory, onAddGroup, on
     () => layoutMindmap(tree, layout, collapsed, renderedOffsets),
     [tree, layout, collapsed, renderedOffsets],
   );
+  const renderedNodeIds = useMemo(() => {
+    const visibleNodeIds = layoutResult.visibleNodeIds;
+    if (visibleNodeIds.length <= VIRTUALIZE_NODE_THRESHOLD || !viewport.width || !viewport.height) {
+      return visibleNodeIds;
+    }
+    const minX = (0 - camera.x) / camera.k - VIRTUALIZE_OVERSCAN;
+    const minY = (0 - camera.y) / camera.k - VIRTUALIZE_OVERSCAN;
+    const maxX = (viewport.width - camera.x) / camera.k + VIRTUALIZE_OVERSCAN;
+    const maxY = (viewport.height - camera.y) / camera.k + VIRTUALIZE_OVERSCAN;
+    const previewNodeId = previewTarget ? `card:${previewTarget.card.id}` : null;
+    const keepNodeIds = new Set([
+      tree.id,
+      focusedNodeId,
+      dragDelta?.nodeId,
+      previewNodeId,
+    ].filter((nodeId): nodeId is string => Boolean(nodeId)));
+
+    return visibleNodeIds.filter((nodeId) => {
+      if (keepNodeIds.has(nodeId)) return true;
+      const position = layoutResult.positions[nodeId];
+      if (!position) return false;
+      return position.x + position.width >= minX
+        && position.x <= maxX
+        && position.y + position.height >= minY
+        && position.y <= maxY;
+    });
+  }, [camera.k, camera.x, camera.y, dragDelta?.nodeId, focusedNodeId, layoutResult.positions, layoutResult.visibleNodeIds, previewTarget, tree.id, viewport.height, viewport.width]);
+  const renderedNodeIdSet = useMemo(() => new Set(renderedNodeIds), [renderedNodeIds]);
+  const visibleNodeIdSet = useMemo(() => new Set(layoutResult.visibleNodeIds), [layoutResult.visibleNodeIds]);
+  const renderedEdges = useMemo(() => {
+    if (layoutResult.visibleNodeIds.length <= VIRTUALIZE_NODE_THRESHOLD) return layoutResult.edges;
+    return layoutResult.edges.filter((edge) => renderedNodeIdSet.has(edge.parentId) && renderedNodeIdSet.has(edge.childId));
+  }, [layoutResult.edges, layoutResult.visibleNodeIds.length, renderedNodeIdSet]);
   const treeSignature = useMemo(() => Object.keys(nodeById).sort().join("|"), [nodeById]);
   const collapsedSignature = useMemo(() => [...collapsed].sort().join("|"), [collapsed]);
   const autoFitKey = `${activeSectionId}|${layout}|${treeSignature}|${collapsedSignature}|${viewport.width}x${viewport.height}`;
@@ -200,6 +248,47 @@ export function MindmapView({ searchTarget = null, onAddCategory, onAddGroup, on
     if (persist) markDirty();
   }, [layoutResult.bounds, markDirty, viewport]);
 
+  const focusNodeElement = useCallback((nodeId: string) => {
+    requestAnimationFrame(() => {
+      const nodeElement = [...(stageRef.current?.querySelectorAll<HTMLElement>("[data-mindmap-node]") || [])]
+        .find((element) => element.dataset.mindmapNode === nodeId);
+      nodeElement?.focus({ preventScroll: true });
+    });
+  }, []);
+
+  const ensureNodeInViewport = useCallback((nodeId: string, persist = true) => {
+    const position = layoutResult.positions[nodeId];
+    if (!position || !viewport.width || !viewport.height) return;
+    setCamera((current) => {
+      let nextX = current.x;
+      let nextY = current.y;
+      const left = position.x * current.k + current.x;
+      const top = position.y * current.k + current.y;
+      const right = (position.x + position.width) * current.k + current.x;
+      const bottom = (position.y + position.height) * current.k + current.y;
+      const safeLeft = FOCUS_VIEW_MARGIN;
+      const safeTop = FOCUS_VIEW_MARGIN;
+      const safeRight = viewport.width - FOCUS_VIEW_MARGIN;
+      const safeBottom = viewport.height - FOCUS_VIEW_MARGIN;
+
+      if (left < safeLeft) nextX += safeLeft - left;
+      else if (right > safeRight) nextX -= right - safeRight;
+      if (top < safeTop) nextY += safeTop - top;
+      else if (bottom > safeBottom) nextY -= bottom - safeBottom;
+
+      if (nextX === current.x && nextY === current.y) return current;
+      if (persist) markDirty();
+      return { ...current, x: nextX, y: nextY };
+    });
+  }, [layoutResult.positions, markDirty, viewport.height, viewport.width]);
+
+  const focusMindmapNode = useCallback((nodeId: string, moveDomFocus = true) => {
+    if (!nodeById[nodeId]) return;
+    setFocusedNodeId(nodeId);
+    ensureNodeInViewport(nodeId);
+    if (moveDomFocus) focusNodeElement(nodeId);
+  }, [ensureNodeInViewport, focusNodeElement, nodeById]);
+
   useLayoutEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
@@ -213,6 +302,13 @@ export function MindmapView({ searchTarget = null, onAddCategory, onAddGroup, on
     observer.observe(stage);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!focusedNodeId || !nodeById[focusedNodeId]) {
+      setFocusedNodeId(tree.id);
+    }
+  }, [focusedNodeId, hydrated, nodeById, tree.id]);
 
   useEffect(() => {
     const previousSectionId = activeStateSectionRef.current;
@@ -431,6 +527,66 @@ export function MindmapView({ searchTarget = null, onAddCategory, onAddGroup, on
     openWebCollectUrl(card.url, linkOpenMode);
   }, [cardsById, hidePreview, linkOpenMode]);
 
+  const handleFocusNode = useCallback((nodeId: string) => {
+    if (!nodeById[nodeId]) return;
+    setFocusedNodeId(nodeId);
+    ensureNodeInViewport(nodeId, false);
+  }, [ensureNodeInViewport, nodeById]);
+
+  const handleNodeKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>, node: MindmapNodeModel) => {
+    if (event.defaultPrevented) return;
+    const focusTarget = (nodeId: string | undefined): void => {
+      if (!nodeId) return;
+      event.preventDefault();
+      focusMindmapNode(nodeId);
+    };
+
+    if (event.key === "Enter") {
+      event.preventDefault();
+      handleNodeActivate(node);
+      return;
+    }
+
+    if (event.key === " ") {
+      if (descendantCount(node) > 0) {
+        event.preventDefault();
+        handleToggleCollapse(node.id);
+        focusMindmapNode(node.id);
+      }
+      return;
+    }
+
+    if (event.key === "ArrowLeft") {
+      focusTarget(parentIds[node.id]);
+      return;
+    }
+
+    if (event.key === "ArrowRight") {
+      const firstChild = node.children[0];
+      if (!firstChild) return;
+      if (collapsed.has(node.id)) {
+        event.preventDefault();
+        handleToggleCollapse(node.id);
+        requestAnimationFrame(() => focusMindmapNode(firstChild.id));
+        return;
+      }
+      focusTarget(firstChild.id);
+      return;
+    }
+
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+    const parentId = parentIds[node.id];
+    const siblings = parentId
+      ? (nodeById[parentId]?.children || []).filter((child) => visibleNodeIdSet.has(child.id))
+      : [tree].filter((child) => visibleNodeIdSet.has(child.id));
+    const index = siblings.findIndex((sibling) => sibling.id === node.id);
+    if (index === -1) return;
+    const nextIndex = event.key === "ArrowUp"
+      ? Math.max(0, index - 1)
+      : Math.min(siblings.length - 1, index + 1);
+    focusTarget(siblings[nextIndex]?.id);
+  }, [collapsed, focusMindmapNode, handleNodeActivate, handleToggleCollapse, nodeById, parentIds, tree, visibleNodeIdSet]);
+
   const handlePreviewOpen = useCallback((card: (typeof cards)[number]) => {
     hidePreview();
     openWebCollectUrl(card.url, linkOpenMode);
@@ -489,11 +645,13 @@ export function MindmapView({ searchTarget = null, onAddCategory, onAddGroup, on
       k: current.k,
     }));
     setHighlightedNodeId(targetNode.id);
+    setFocusedNodeId(targetNode.id);
+    focusNodeElement(targetNode.id);
     if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
     if (enteringTimerRef.current) clearTimeout(enteringTimerRef.current);
     highlightTimerRef.current = setTimeout(() => setHighlightedNodeId(null), 1600);
     markDirty();
-  }, [activeSectionId, autoFitKey, collapsed, hydrated, layout, markDirty, nodeById, offsets, parentIds, searchTarget, tree, viewport.height, viewport.width]);
+  }, [activeSectionId, autoFitKey, collapsed, focusNodeElement, hydrated, layout, markDirty, nodeById, offsets, parentIds, searchTarget, tree, viewport.height, viewport.width]);
 
   useEffect(() => () => {
     panRef.current = null;
@@ -514,6 +672,8 @@ export function MindmapView({ searchTarget = null, onAddCategory, onAddGroup, on
       data-testid="mindmap-stage"
       data-mindmap-layout={layout}
       data-mindmap-hydrated={hydrated ? "true" : "false"}
+      data-mindmap-total-nodes={layoutResult.visibleNodeIds.length}
+      data-mindmap-rendered-nodes={renderedNodeIds.length}
     >
       <div
         ref={canvasRef}
@@ -529,7 +689,7 @@ export function MindmapView({ searchTarget = null, onAddCategory, onAddGroup, on
           style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.k})` }}
         >
           <svg className="wc-mindmap-edges" width="1" height="1" aria-hidden="true">
-            {layoutResult.edges.map((edge) => (
+            {renderedEdges.map((edge) => (
               <path
                 key={edge.id}
                 d={edge.path}
@@ -539,8 +699,8 @@ export function MindmapView({ searchTarget = null, onAddCategory, onAddGroup, on
               />
             ))}
           </svg>
-          <div className="wc-mindmap-nodes">
-            {layoutResult.visibleNodeIds.map((nodeId) => {
+          <div className="wc-mindmap-nodes" role="tree" aria-label="导图节点">
+            {renderedNodeIds.map((nodeId) => {
               const node = nodeById[nodeId];
               if (!node) return null;
               return (
@@ -555,11 +715,16 @@ export function MindmapView({ searchTarget = null, onAddCategory, onAddGroup, on
                   chipSide={layout === "tree-down" ? "down" : layout === "bilateral" && layoutResult.positions[node.id].x + layoutResult.positions[node.id].width / 2 < layoutResult.positions[tree.id].x + layoutResult.positions[tree.id].width / 2 ? "left" : "right"}
                   dragging={dragDelta?.nodeId === node.id}
                   highlighted={highlightedNodeId === node.id}
+                  focused={focusedNodeId === node.id}
                   entering={enteringNodeIds.has(node.id)}
+                  tabIndex={focusedNodeId === node.id ? 0 : -1}
+                  ariaLevel={nodeDepth(node.id, parentIds)}
                   addLabel={node.type === "section" ? "新建分类" : node.type === "category" ? `在“${node.label}”中新建分组` : node.type === "group" ? `在“${node.label}”中添加网站` : undefined}
                   onToggleCollapse={handleToggleCollapse}
                   onAdd={handleNodeAdd}
                   onActivate={handleNodeActivate}
+                  onFocusNode={handleFocusNode}
+                  onNodeKeyDown={handleNodeKeyDown}
                   onNodePointerDown={handleNodePointerDown}
                   onNodePointerMove={handleNodePointerMove}
                   onNodePointerUp={(event, id) => finishNodeDrag(event, id, true)}
@@ -573,6 +738,15 @@ export function MindmapView({ searchTarget = null, onAddCategory, onAddGroup, on
           </div>
         </div>
       </div>
+
+      {tree.children.length === 0 && (
+        <div className="wc-mindmap-empty" role="status">
+          <span className="wc-mindmap-empty-kicker">导图为空</span>
+          <h2>这个分项还没有分类或网页</h2>
+          <p>先新建分类，或切回经典模式添加网页；数据会继续走现有保存和同步流程。</p>
+          <button type="button" className="wc-mindmap-empty-action" onClick={onAddCategory}>新建分类</button>
+        </div>
+      )}
 
       <div className="wc-mindmap-layout-rail" aria-label="布局">
         <div className="wc-mindmap-rail-label">布局</div>

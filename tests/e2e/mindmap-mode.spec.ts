@@ -91,7 +91,7 @@ const fixtureCards: WebCard[] = [
 ];
 
 async function enterMindmap(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "导图", exact: true }).click();
+  await page.getByRole("button", { name: /^导图/ }).click();
   await expect(page.getByTestId("collection-view-mindmap")).toHaveClass(/is-idle/);
   await expect(page.getByTestId("mindmap-stage")).toHaveAttribute("data-mindmap-hydrated", "true");
 }
@@ -159,6 +159,43 @@ async function writeIsolatedMindmapFixture(page: Page): Promise<void> {
     cards: fixtureCards,
     categories: fixtureCategories,
     collectionSections: fixtureSections,
+    activeCollectionSectionId: "section-default",
+    pinnedBookmarkItems: [],
+    linkOpenMode: "new-active-tab",
+    initialized: true,
+  });
+}
+
+async function writeLargeMindmapFixture(page: Page, cardCount = 330): Promise<void> {
+  const largeCards = Array.from({ length: cardCount }, (_, index): WebCard => ({
+    ...fixtureCard(`large-${index.toString().padStart(3, "0")}`, `Large ${index.toString().padStart(3, "0")}`, "group-large", index),
+    url: `https://large-${index}.example.com`,
+  }));
+  await page.evaluate(async (fixture) => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("WebCollect");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      const transaction = database.transaction("webcollect_data", "readwrite");
+      const store = transaction.objectStore("webcollect_data");
+      for (const [key, value] of Object.entries(fixture)) store.put(value, key);
+      await new Promise<void>((resolve, reject) => {
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(transaction.error);
+      });
+    } finally {
+      database.close();
+    }
+  }, {
+    cards: largeCards,
+    categories: [
+      { id: "cat-large", name: "大树分类", icon: "layers", color: "#4a7c59", order: 0, createdAt: 1, sectionId: "section-default", isParent: true },
+      { id: "group-large", name: "大树分组", icon: "book-open", color: "#4a7c59", order: 0, createdAt: 2, sectionId: "section-default", parentId: "cat-large" },
+    ],
+    collectionSections: [{ id: "section-default", name: "主页", order: 0, createdAt: 1, updatedAt: 1 }],
     activeCollectionSectionId: "section-default",
     pinnedBookmarkItems: [],
     linkOpenMode: "new-active-tab",
@@ -604,4 +641,117 @@ test("mindmap card activation and preview actions reuse link and bookmark prefer
   const nodePopup = await nodePopupPromise;
   await expect.poll(() => nodePopup.url()).toContain("/mindmap-target");
   await nodePopup.close();
+});
+
+test("mindmap exposes tree semantics and keyboard navigation", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/");
+  await openCollection(page);
+  await writeIsolatedMindmapFixture(page);
+  await page.reload();
+  await openCollection(page);
+  await enterMindmap(page);
+
+  const tree = page.getByRole("tree", { name: "导图节点" });
+  await expect(tree).toBeVisible();
+  await expect(page.locator('[data-mindmap-node="sec:section-default"]')).toHaveAttribute("role", "treeitem");
+  await expect(page.locator('[data-mindmap-node="sec:section-default"]')).toHaveAttribute("aria-level", "1");
+  await expect(page.locator('[data-mindmap-node="card:notion"]')).toHaveAttribute("aria-level", "4");
+
+  const root = page.locator('[data-mindmap-node="sec:section-default"]');
+  await root.focus();
+  await expect(root).toBeFocused();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator('[data-mindmap-node="cat:cat-work"]')).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.locator('[data-mindmap-node="cat:cat-ai"]')).toBeFocused();
+  await page.keyboard.press("ArrowLeft");
+  await expect(root).toBeFocused();
+
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator('[data-mindmap-node="cat:cat-work"]')).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(page.locator('[data-mindmap-node="cat:cat-work"]')).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator('[data-mindmap-node="grp:group-common"]')).toHaveCount(0);
+  await page.keyboard.press("Space");
+  await expect(page.locator('[data-mindmap-node="cat:cat-work"]')).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator('[data-mindmap-node="cat:cat-work"]')).toBeFocused();
+
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator('[data-mindmap-node="grp:group-common"]')).toBeFocused();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator('[data-mindmap-node="card:notion"]')).toBeFocused();
+  const popupPromise = page.waitForEvent("popup");
+  await page.keyboard.press("Enter");
+  const popup = await popupPromise;
+  await expect.poll(() => popup.url()).toContain("/mindmap-target");
+  await popup.close();
+});
+
+test("mindmap compact viewport keeps controls usable without horizontal document overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await openCollection(page);
+  await writeIsolatedMindmapFixture(page);
+  await page.reload();
+  await openCollection(page);
+  await enterMindmap(page);
+
+  await expect(page.getByTestId("mindmap-stage")).toBeVisible();
+  const overflow = await page.evaluate(() => ({
+    html: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    body: document.body.scrollWidth - document.body.clientWidth,
+  }));
+  expect(overflow.html).toBeLessThanOrEqual(1);
+  expect(overflow.body).toBeLessThanOrEqual(1);
+
+  const rail = page.locator(".wc-mindmap-layout-rail");
+  await expect(rail).toBeVisible();
+  await expect(rail).toHaveCSS("flex-direction", "row");
+  const railBox = await rail.boundingBox();
+  expect(railBox).not.toBeNull();
+  if (railBox) {
+    expect(railBox.x).toBeGreaterThanOrEqual(0);
+    expect(railBox.x + railBox.width).toBeLessThanOrEqual(390);
+  }
+  await expect(page.getByRole("button", { name: "双侧脑图" })).toBeVisible();
+  await page.getByRole("button", { name: "双侧脑图" }).click();
+  await expect(page.getByRole("button", { name: "双侧脑图" })).toHaveAttribute("aria-pressed", "true");
+});
+
+test("mindmap virtualizes large trees while preserving layout metadata and focus", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await openCollection(page);
+  await writeLargeMindmapFixture(page);
+  await page.reload();
+  await openCollection(page);
+  await enterMindmap(page);
+
+  const counts = await page.getByTestId("mindmap-stage").evaluate((element) => ({
+    total: Number(element.getAttribute("data-mindmap-total-nodes")),
+    rendered: Number(element.getAttribute("data-mindmap-rendered-nodes")),
+  }));
+  expect(counts.total).toBeGreaterThan(300);
+  expect(counts.rendered).toBeGreaterThan(0);
+  expect(counts.rendered).toBeLessThan(counts.total);
+  expect(await page.locator('[data-node-type="card"]').count()).toBe(counts.rendered - 3);
+
+  const root = page.locator('[data-mindmap-node="sec:section-default"]');
+  await root.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator('[data-mindmap-node="cat:cat-large"]')).toBeFocused();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator('[data-mindmap-node="grp:group-large"]')).toBeFocused();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator('[data-mindmap-node="card:large-000"]')).toBeFocused();
+
+  await page.getByRole("button", { name: "适应画布" }).click();
+  await expect(page.getByTestId("mindmap-zoom-percent")).toBeVisible();
+  const afterFit = await page.getByTestId("mindmap-stage").evaluate((element) => ({
+    total: Number(element.getAttribute("data-mindmap-total-nodes")),
+    rendered: Number(element.getAttribute("data-mindmap-rendered-nodes")),
+  }));
+  expect(afterFit.total).toBe(counts.total);
+  expect(afterFit.rendered).toBeLessThanOrEqual(afterFit.total);
 });
