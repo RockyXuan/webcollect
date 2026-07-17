@@ -47,6 +47,8 @@ const eslintConfig = defineConfig([
     'extension/dist/**',
     'extension/src/**',
     'extension/background.js',
+    // Supabase Edge Functions run under Deno and have their own checks.
+    'supabase/functions/**',
     'tmp/**',
     // Script files (CommonJS):
     'scripts/**/*.js',

@@ -20,7 +20,8 @@
     "test:extension-size": "node scripts/test-extension-package-size.mjs",
     "ts-check": "tsc -p tsconfig.json",
     "validate:quotes": "node --import tsx scripts/test-wallpaper-quotes.ts",
-    "build:ext": "node ./extension/build.mjs"
+    "build:ext": "node ./extension/build.mjs",
+    "check:edge": "deno fmt --check supabase/functions/bookmark-search && deno lint supabase/functions/bookmark-search && deno check --node-modules-dir=manual supabase/functions/bookmark-search/index.ts && deno test --node-modules-dir=manual supabase/functions/bookmark-search"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

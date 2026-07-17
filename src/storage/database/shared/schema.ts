@@ -1,4 +1,4 @@
-import { pgTable, foreignKey, uuid, text, boolean, integer, timestamp, serial, jsonb, bigint, unique } from "drizzle-orm/pg-core"
+import { pgTable, foreignKey, uuid, text, boolean, integer, timestamp, serial, jsonb, bigint, unique, primaryKey, index, vector, check } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 
@@ -130,6 +130,32 @@ export const cards = pgTable("cards", {
 			foreignColumns: [categories.id],
 			name: "cards_category_id_categories_id_fk"
 		}).onDelete("cascade"),
+]);
+
+export const bookmarkSearchEmbeddings = pgTable("bookmark_search_embeddings", {
+	userId: uuid("user_id").notNull(),
+	cardId: uuid("card_id").notNull(),
+	contentHash: text("content_hash").notNull(),
+	model: text().notNull(),
+	embedding: vector({ dimensions: 1536 }).notNull(),
+	indexedAt: timestamp("indexed_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	indexVersion: integer("index_version").default(1).notNull(),
+}, (table) => [
+	primaryKey({ columns: [table.userId, table.cardId] }),
+	foreignKey({
+		columns: [table.userId],
+		foreignColumns: [users.id],
+		name: "bookmark_search_embeddings_user_id_users_id_fk"
+	}).onDelete("cascade"),
+	foreignKey({
+		columns: [table.cardId],
+		foreignColumns: [cards.id],
+		name: "bookmark_search_embeddings_card_id_cards_id_fk"
+	}).onDelete("cascade"),
+	index("bookmark_search_embeddings_user_id_idx").on(table.userId),
+	check("bookmark_search_embeddings_content_hash_check", sql`${table.contentHash} ~ '^[0-9a-f]{64}$'`),
+	check("bookmark_search_embeddings_model_check", sql`${table.model} = 'text-embedding-3-small'`),
+	check("bookmark_search_embeddings_index_version_check", sql`${table.indexVersion} > 0`),
 ]);
 
 export const users = pgTable("users", {

@@ -28,6 +28,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.8.2
+
+      - name: Verify smart-search Edge Function
+        run: pnpm check:edge
+
       - name: Audit production dependencies
         run: pnpm audit:prod
 
