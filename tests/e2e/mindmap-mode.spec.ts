@@ -793,7 +793,7 @@ test("classic collection additions, edits, and soft deletes rebuild the mindmap"
   await expect(page.getByTestId("collection-view-classic")).toHaveClass(/is-idle/);
   const deletableCard = page.locator(".wc-site-tile").filter({ hasText: "经典修改网页" });
   await deletableCard.getByRole("button", { name: "网页更多操作" }).focus();
-  await page.getByRole("button", { name: "删除网页" }).click();
+  await page.getByRole("button", { name: "删除网页" }).press("Enter");
   await expect(deletableCard).toHaveCount(0);
 
   await enterMindmap(page);
