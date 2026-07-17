@@ -8,7 +8,7 @@ Release: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-0
 
 Asset: `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-17-v1.2.1/WebCollect-Chrome-Extension-v1.2.1-2026-07-17.zip`
 
-This closeout records the V1.2.1 polish release built from the independent Fable review in `docs/audit/claude-fable-mindmap-review-2026-07-17.md`. Release-run, downloaded-asset, and primary-profile Chrome evidence are deliberately left as pending until those checks actually complete. They will be appended after publication by a documentation-only commit, which is not a new application version.
+This closeout records the V1.2.1 polish release built from the independent Fable review in `docs/audit/claude-fable-mindmap-review-2026-07-17.md`. GitHub CI, tag workflow, Release, downloaded-asset evidence, and the policy-bounded primary-profile Chrome reload were verified after publication. This follow-up is documentation-only and is not a new application version.
 
 ## Review intake and decisions
 
@@ -57,14 +57,14 @@ V1.2.1 does not clear, overwrite, migrate, or duplicate user collections.
 - New local-only UI preference: localStorage `webcollect_collection_view_mode`.
 - Neither key is part of Chrome storage, snapshots, dirty sets, Supabase, collection sync, or cross-device preference sync.
 - Resetting a mindmap layout writes only the target view-state offsets and camera.
-- The protected seed SHA-256 remains `0e48761b595d8303dd71c4f7a8d216424301abdec2d87b2e13533c82c58c2621` before final release verification.
+- The protected seed SHA-256 remained `0e48761b595d8303dd71c4f7a8d216424301abdec2d87b2e13533c82c58c2621` through final release verification.
 
 ## Commits
 
 - Review intake: `8859022` — `docs(audit): mindmap V1.2.0 independent review - pass with polish items`.
 - Functional implementation: `586912a` — `feat(mindmap): polish persistent interactions`.
-- Release/version/documentation: this release-preparation commit; its final tagged SHA is recorded after publication to avoid a self-referential commit hash.
-- Post-release evidence commit: pending and documentation-only.
+- Release/version/documentation and tagged release commit: `6320578baab4ca24b368fb5c05e77b0c0fd5e54a` — `release: prepare WebCollect v1.2.1 mindmap polish`.
+- Post-release evidence: this documentation-only closeout commit; it does not move the V1.2.1 tag or create another application version.
 
 ## Verification completed before release preparation
 
@@ -106,18 +106,28 @@ The Codex in-app Browser reused one isolated context at `http://127.0.0.1:5014/`
 - Visual inspection at the Browser's 1280×720 viewport found no control overlap or document overflow. The full Playwright gate separately passed the 1920×1080 geometry and 390×844 compact-layout coverage.
 - Browser console inspection reported 0 errors.
 
-Push to `main` and successful main CI remain pending until the release commit is created.
+The same release commit was pushed to `main`; main CI completed successfully before the tag was created.
 
 ## Publication and official asset evidence
 
-Pending until the GitHub tag workflow completes:
-
-- Final release commit and tagged commit.
-- Main CI run and tag workflow run.
-- Published Release state and unique official asset.
-- Downloaded official zip byte size and SHA-256.
-- Manifest V3, version, stable key, new-tab override, background worker, and archive entry count.
+- Final release and tagged commit: `6320578baab4ca24b368fb5c05e77b0c0fd5e54a`.
+- Main CI: [run 29554414094](https://github.com/RockyXuan/webcollect/actions/runs/29554414094), successful. `audit-production` and `verify` both passed; `verify` completed after the full 29-test browser suite.
+- Tag workflow: [run 29554667683](https://github.com/RockyXuan/webcollect/actions/runs/29554667683), successful. It re-audited production dependencies, rebuilt the extension, checked the artifact and size, packaged the zip, and published the Release.
+- Release: [WebCollect v1.2.1](https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-17-v1.2.1), published on 2026-07-17, not a draft or prerelease.
+- Official asset: [WebCollect-Chrome-Extension-v1.2.1-2026-07-17.zip](https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-17-v1.2.1/WebCollect-Chrome-Extension-v1.2.1-2026-07-17.zip). Exactly one Release asset was published.
+- Official zip size: `16,957,003` bytes.
+- Official zip SHA-256: `28ff22082b527b59ccf4f3d1f3e50d374b813bd3f1fd07d0ec95a8dc4b0138d3`; the local rehash matched GitHub's reported digest.
+- Downloaded archive: 46 entries (41 files plus 5 directories). Its unpacked file tree matched the locally verified `extension/dist` exactly.
+- Downloaded manifest: Manifest V3, name `WebCollect`, version `1.2.1`, stable key present, new-tab override `newtab.html`, and background service worker `background.js`.
+- The stable manifest key resolves to extension ID `immpcmhmabobllnopedaoflcjneigbko`.
 
 ## Primary Chrome profile evidence
 
-Pending until the official package is available. The final smoke check must reuse the already signed-in primary Chrome profile, stable extension ID, and existing unpacked source path. It must not uninstall the extension, create a second profile, clear IndexedDB/Chrome storage, or operate unrelated personal tabs. If Chrome internal-page automation is blocked, the check may request one manual reload and must stop at the policy boundary rather than bypass it.
+- The existing installed source path `/Users/rockyx/Downloads/WebCollect-v1.1.2-rc.6/unpacked` still contained V1.2.0 before this update and retained the stable manifest key.
+- A byte-for-byte append-only backup was created at `/private/tmp/webcollect-installed-extension-backups/unpacked-before-v1.2.1-final-20260717` before replacing any source file.
+- The downloaded official V1.2.1 tree was synchronized into that same source path. `diff -qr` then confirmed the installed source and official unpacked package were identical; the manifest reported `1.2.1` and stable ID `immpcmhmabobllnopedaoflcjneigbko`.
+- No extension uninstall, second Chrome profile, IndexedDB reset, Chrome storage reset, Supabase operation, or collection-data mutation was performed. Unrelated personal tabs were not claimed or operated.
+- Chrome exposed the existing WebCollect extension detail tabs, but its browser security policy rejected both automated `chrome://newtab` navigation and claiming the `chrome://extensions` internal tab. The verification stopped at that boundary without raw CDP, profile inspection, Computer Use, or another bypass.
+- After the official files were synchronized, the user clicked the existing detail page's reload icon and opened a new tab. The user confirmed completion, and the read-only Chrome tab inventory independently observed a newly opened `新标签页 - WebCollect` at `2026-07-17T06:05:01.256Z`, proving that the primary profile's new-tab override was again being served by WebCollect after reload.
+- Chrome's internal-page policy prevented DOM-level inspection of that real new tab. Final runtime confidence therefore combines the user's direct visual confirmation, the observed WebCollect-owned new-tab identity, the exact official-package/source-tree match, the stable extension ID, the completed 29/29 browser regression suite, and the earlier same-profile V1.2.0 read-only data-preservation evidence. No claim is made that internal-page DOM or IndexedDB contents were re-read through a prohibited route.
+- The V1.2.1 release and Chrome closeout are complete. No additional profile, reinstall, destructive storage action, or manual release step remains.
