@@ -6,26 +6,27 @@
 
 1. `AGENTS.md`
 2. `AGD.md`
-3. `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`
-4. `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md`
-5. `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`
-6. `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`
-7. `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`
-8. `docs/audit/claude-code-review-handoff-2026-07-07.md`
-9. `PROJECT_SUMMARY.md`
-10. `HANDOFF.md`
+3. `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`
+4. `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`
+5. `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md`
+6. `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`
+7. `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`
+8. `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`
+9. `docs/audit/claude-code-review-handoff-2026-07-07.md`
+10. `PROJECT_SUMMARY.md`
+11. `HANDOFF.md`
 
 项目已于 2026-07-15 退役 Superpowers、`goal-zzx` / `zzx-goal` 和 `andrej-karpathy-coding` 工作流。`tasks/todo.md`、`tasks/lessons.md`、`CODEX_GO_MODE_STATUS.md` 与 `docs/superpowers/` 只保留历史事实，不是新任务的必读、必写或执行入口。
 
 当前固定开发目录：`/Users/rockyx/vibe coding/Web Collect 0628`。
-当前最新功能版本：`V1.2.1 / 2026年7月17日`。
-正式 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-17-v1.2.1`。
-扩展 zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-17-v1.2.1/WebCollect-Chrome-Extension-v1.2.1-2026-07-17.zip`。
-上一稳定版：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-16-v1.2.0`。
+当前最新功能版本：`V1.2.2 / 2026年7月17日`。
+正式 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-17-v1.2.2`。
+扩展 zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-17-v1.2.2/WebCollect-Chrome-Extension-v1.2.2-2026-07-17.zip`。
+上一稳定版：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-17-v1.2.1`。
 历史 RC7：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-15-v1.1.2-rc.7`。
 如果旧说明和 `AGD.md` 冲突，以 `AGD.md` 为准。
 
-V1.2.1 为导图模式增加当前布局重置、favicon 即时字母兜底、稳定双侧分支方向、后代计数索引和添加对话框焦点闭环。首次仍默认经典；用户切换后只在本机 localStorage `webcollect_collection_view_mode` 记住上次的经典/导图模式。该偏好及既有 `mindmapViewState:<sectionId>` 均不进入业务数据或云同步。
+V1.2.2 修复顶栏在中等桌面宽度下的两处 UI 问题：Google 登录保持单行，搜索引擎选择器与已登录云同步状态不再重叠。V1.2.1 的导图模式、模式记忆及全部数据/同步边界保持不变。
 
 这是一个基于 [Next.js 16](https://nextjs.org) + [shadcn/ui](https://ui.shadcn.com) 的全栈应用项目，由扣子编程 CLI 创建。
 

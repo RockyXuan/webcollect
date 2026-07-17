@@ -2,6 +2,18 @@
 
 > **2026-07-15 current workflow rule:** this repository has retired Superpowers (including `superpowers:*` / `using-superpowers`), `goal-zzx` / `zzx-goal`, and `andrej-karpathy-coding`. Do not install, enable, invoke, or imitate them. Any older instruction below that requires `tasks/todo.md`, `tasks/lessons.md`, `CODEX_GO_MODE_STATUS.md`, fixed phase counts, strict TDD, worktrees, subagents, or duplicate reviews is historical and superseded by `AGENTS.md`.
 
+## 2026-07-17 V1.2.2 Header Layout Release
+
+This section supersedes the V1.2.1 development status once tag `webcollect-2026-07-17-v1.2.2` is published.
+
+- Stable version/date: `V1.2.2 / 2026年7月17日`.
+- Final tag: `webcollect-2026-07-17-v1.2.2`.
+- Final Release: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-17-v1.2.2`; direct zip: `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-17-v1.2.2/WebCollect-Chrome-Extension-v1.2.2-2026-07-17.zip`.
+- Closeout: `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`.
+- Scope: keeps Google 登录 on one line and prevents a real cloud-sync badge from overlapping the search-engine selector by giving 1181–1799px desktops a dedicated action row.
+- Data contract: no data or persistence path changed. V1.2.1's local mode preference and V1.2.0's mindmap view-state boundary remain intact.
+- Publication evidence is appended to the closeout after CI, tag workflow, official asset verification, and the policy-bounded primary-profile reload. That append-only documentation commit is not a new application version.
+
 ## 2026-07-17 V1.2.1 Mindmap Polish Release
 
 This section supersedes the V1.2.0 development status once tag `webcollect-2026-07-17-v1.2.1` is published.
@@ -56,10 +68,10 @@ This section supersedes older development status. The user explicitly waived the
 
 ## Next Major Feature Thread
 
-- Start the next large feature in a new thread. This handoff closes the mindmap review/polish/release context at the verified V1.2.1 boundary.
-- Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, and the V1.2.1 closeout before changing code.
+- Start the next large feature in a new thread. This handoff closes the header-layout patch at the verified V1.2.2 boundary.
+- Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, and the V1.2.2 closeout before changing code.
 - Ask for or read the user's new feature description, then inspect only the relevant implementation paths before choosing scope, tests, version bump, and release plan.
-- Preserve the V1.2.1 data and sync guarantees. Do not reset IndexedDB, Supabase, extension storage, categories, cards, preferences, snapshots, local view state, mode preference, or the two documented empty inbox artifacts.
+- Preserve the V1.2.2 data and sync guarantees. Do not reset IndexedDB, Supabase, extension storage, categories, cards, preferences, snapshots, local view state, mode preference, or the two documented empty inbox artifacts.
 - Decide the next version only after understanding the feature's actual breadth. Use the real completion date and keep package, manifest, UI version, tag, Release, and zip identity aligned.
 - The copy-paste startup prompt is maintained in `NEXT_THREAD_PROMPT.md`. Older sections below are historical evidence only.
 

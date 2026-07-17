@@ -1,6 +1,10 @@
 # WebCollect — 个人网页收藏墙
 
-## 2026-07-17 current V1.2.1 release entry
+## 2026-07-17 current V1.2.2 release entry
+
+Read `AGD.md` and `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md` first. V1.2.2 fixes two top-header responsive defects without changing business behavior: the Google sign-in label is forced to one line, and intermediate desktop widths move the complete action toolbar to a dedicated row before a real sync badge can overlap the search-engine selector. The Web and extension CSS stay aligned. No storage key, schema, collection action, sync path, snapshot path, permission, or extension ID changed.
+
+## 2026-07-17 previous V1.2.1 release entry
 
 Read `AGD.md` and `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md` first. V1.2.1 closes the independent Fable review polish items: current-layout reset/refit, immediate favicon letter fallback, stable bilateral branch direction, indexed descendant counts, dialog focus return, and local classic/mindmap mode memory. First use and invalid/unavailable storage still default to classic; the only new preference key is localStorage `webcollect_collection_view_mode`, and it is not synced or stored in IndexedDB, Chrome storage, snapshots, dirty sets, or Supabase. The V1.2.0 `mindmapViewState:<sectionId>` data boundary remains unchanged.
 

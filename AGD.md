@@ -5,11 +5,18 @@
 当前主目录：`/Users/rockyx/vibe coding/Web Collect 0628`
 远端仓库：`https://github.com/RockyXuan/webcollect`
 主分支：`main`
-当前最新发布身份：`V1.2.1 / 2026年7月17日`
-正式发布 tag：`webcollect-2026-07-17-v1.2.1`；Release `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-17-v1.2.1`；zip `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-17-v1.2.1/WebCollect-Chrome-Extension-v1.2.1-2026-07-17.zip`。
-V1.2.1 closeout：`docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`。发布提交 `6320578baab4ca24b368fb5c05e77b0c0fd5e54a`；main CI `29554414094`、Release workflow `29554667683` 全绿；正式 zip SHA-256 `28ff22082b527b59ccf4f3d1f3e50d374b813bd3f1fd07d0ec95a8dc4b0138d3`。官方文件已在现有主 Chrome profile 原加载路径重载，稳定 ID 保留，并由用户确认及只读 tab inventory 共同验证新标签页仍由 WebCollect 接管。其后的纯文档 closeout commit 不是新的应用版本。
-上一稳定边界：`V1.2.0 / 2026年7月16日`，源码提交及 tag `552afecda54e1fd00d06b942e1cf1979aa4302d7` / `webcollect-2026-07-16-v1.2.0`，zip SHA-256 `48a32652af3ffd4a9320d9eb39f0799a1ceb157a2fa7f7ee7544c8c7eefcaac8`。
-当前主线：V1.2.1 收口 Fable 独立审查提出的导图打磨项。首次使用、损坏偏好或 localStorage 不可用时仍默认经典；用户切换后以本机 localStorage `webcollect_collection_view_mode` 记住经典/导图，不跨设备同步。导图继续只在 IndexedDB `WebCollect/webcollect_data` 下使用 `mindmapViewState:<sectionId>` 保存视图状态，不进入 dirty sets、快照、Chrome storage、Supabase 或同步偏好。
+当前最新发布身份：`V1.2.2 / 2026年7月17日`
+正式发布 tag：`webcollect-2026-07-17-v1.2.2`；Release `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-17-v1.2.2`；zip `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-17-v1.2.2/WebCollect-Chrome-Extension-v1.2.2-2026-07-17.zip`。
+V1.2.2 closeout：`docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`。发布提交、main CI、Release workflow、正式 zip SHA-256 与主 Chrome profile 原位重载证据将在发布后以纯文档提交补齐；该提交不是新的应用版本。
+上一稳定边界：`V1.2.1 / 2026年7月17日`，发布提交及 tag `6320578baab4ca24b368fb5c05e77b0c0fd5e54a` / `webcollect-2026-07-17-v1.2.1`，zip SHA-256 `28ff22082b527b59ccf4f3d1f3e50d374b813bd3f1fd07d0ec95a8dc4b0138d3`。
+当前主线：V1.2.2 只修复顶栏中等桌面宽度的 Google 登录换行与搜索/同步控件重叠。V1.2.1 的导图功能、模式记忆、数据与同步边界保持不变。
+
+## 2026-07-17 V1.2.2 顶栏响应式修复入口
+
+- 实施收口：`docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`。
+- Google 登录按钮及账户容器不可压缩、文字强制单行；1181–1799px 桌面宽度把工具栏放入独立第二行，1800px 起保留原单行桌面布局。
+- 自动化以真实同步状态胶囊尺寸覆盖 1366、1536、1728、1800、2048px，确保搜索区、搜索引擎选择器、同步状态和登录入口不重叠；390px 继续无文档横向溢出。
+- V1.2.2 不新增存储 key，不改变收藏、分类、分项、偏好、回收站、快照、同步协议、Chrome 扩展 ID、权限或 Supabase Schema。
 
 ## 2026-07-17 V1.2.1 导图打磨与验收入口
 

@@ -1669,6 +1669,7 @@
 
 .wc-login-button {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 8px;
   border: 1px solid rgba(255, 255, 255, 0.78);
@@ -1677,8 +1678,18 @@
   color: #1e293b;
   padding: 8px 12px;
   font-size: 0.78rem;
+  line-height: 1;
+  white-space: nowrap;
   box-shadow: 0 12px 30px rgba(37, 99, 235, 0.10);
   backdrop-filter: blur(16px);
+}
+
+.wc-user-menu {
+  flex: 0 0 auto;
+}
+
+.wc-login-button svg {
+  flex: 0 0 auto;
 }
 
 .wc-login-button:hover {
@@ -2156,6 +2167,24 @@
   padding-inline: 18px;
   font-size: 0.9rem;
 }
+}
+
+@media (min-width: 1181px) and (max-width: 1799px) {
+  .wc-resolution-canvas .wc-header-grid {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 10px 12px;
+  }
+
+  .wc-resolution-canvas .wc-header-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .wc-resolution-canvas .wc-header-actions::-webkit-scrollbar {
+    height: 0;
+  }
 }
 
 /* Category block resize handles */

@@ -198,7 +198,7 @@ export function UserMenu() {
 
   if (!isLoggedIn) {
     return (
-      <div className="relative flex items-center gap-1.5" ref={menuRef}>
+      <div className="wc-user-menu relative flex items-center gap-1.5" ref={menuRef}>
         <button
           onClick={loginWithGoogle}
           className="wc-login-button"
@@ -372,7 +372,7 @@ export function UserMenu() {
   const captureSizePercent = Math.round(captureSizeScale * 100);
 
   return (
-    <div className="relative" ref={menuRef}>
+    <div className="wc-user-menu relative" ref={menuRef}>
       <LocalSnapshotDialog open={snapshotOpen} onOpenChange={setSnapshotOpen} />
       <AlertDialog open={allLinksDialogOpen} onOpenChange={setAllLinksDialogOpen}>
         <AlertDialogContent>

@@ -4,13 +4,13 @@
 
 ## 先确认当前基线
 
-- 已验证稳定版：`V1.2.1 / 2026年7月17日`。
-- 正式 tag：`webcollect-2026-07-17-v1.2.1`。
-- Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-17-v1.2.1`。
-- zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-17-v1.2.1/WebCollect-Chrome-Extension-v1.2.1-2026-07-17.zip`。
-- V1.2.1 closeout：`docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`。
-- V1.2.1 完成导图布局重置、favicon 即时字母兜底、双侧分支方向、后代索引和对话框焦点打磨。首次仍默认经典；用户切换后通过本机 localStorage `webcollect_collection_view_mode` 记住上次模式，不跨设备同步。
-- V1.2.0 是上一稳定边界：源码提交及 tag `552afecda54e1fd00d06b942e1cf1979aa4302d7` / `webcollect-2026-07-16-v1.2.0`，zip SHA-256 `48a32652af3ffd4a9320d9eb39f0799a1ceb157a2fa7f7ee7544c8c7eefcaac8`。
+- 已验证稳定版：`V1.2.2 / 2026年7月17日`。
+- 正式 tag：`webcollect-2026-07-17-v1.2.2`。
+- Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-17-v1.2.2`。
+- zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-17-v1.2.2/WebCollect-Chrome-Extension-v1.2.2-2026-07-17.zip`。
+- V1.2.2 closeout：`docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`。
+- V1.2.2 修复 Google 登录换行与搜索引擎/同步状态重叠；不新增存储 key，不改变导图、收藏或同步行为。
+- V1.2.1 是上一稳定边界：发布提交及 tag `6320578baab4ca24b368fb5c05e77b0c0fd5e54a` / `webcollect-2026-07-17-v1.2.1`，zip SHA-256 `28ff22082b527b59ccf4f3d1f3e50d374b813bd3f1fd07d0ec95a8dc4b0138d3`。
 
 ## 第一件事
 
@@ -19,11 +19,12 @@
 1. `AGENTS.md`
 2. `AGD.md`
 3. `HANDOFF.md`
-4. `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`
-5. `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md`
-6. `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`
-7. `PROJECT_SUMMARY.md`
-8. 本文件
+4. `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`
+5. `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`
+6. `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md`
+7. `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`
+8. `PROJECT_SUMMARY.md`
+9. 本文件
 
 然后运行并用中文简要汇报：
 
@@ -32,7 +33,7 @@ pwd
 git status -sb
 git log --oneline --decorate -8
 git remote -v
-git tag --list 'webcollect-2026-07-17-v1.2.1' --points-at HEAD
+git tag --list 'webcollect-2026-07-17-v1.2.2' --points-at HEAD
 ```
 
 不要使用旧目录 `/Users/rockyx/Documents/webcollect`，也不要从旧分支、旧 RC 或旧交接目标继续开发。
@@ -52,7 +53,7 @@ git tag --list 'webcollect-2026-07-17-v1.2.1' --points-at HEAD
 - 不得清空、覆盖或重置用户 IndexedDB、Supabase、Chrome storage、收藏、分类、分项、偏好、回收站、快照或同步状态。
 - 不得用 `seed.ts` 覆盖真实用户数据；未经明确授权，不删除 closeout 中记录的两条空收集箱。
 - 保留 V1.1.2 已修复的同步修订、tombstone、canonical 收集箱、并发浮窗队列、OAuth、启动壁纸零闪烁和发布门槛。
-- 保留 V1.2.1 导图的数据边界：视图状态只存 `mindmapViewState:<sectionId>`，模式只存 localStorage `webcollect_collection_view_mode`；不得把它们加入同步、快照、Chrome storage 或云 schema。
+- 保留 V1.2.2 数据边界：导图视图状态只存 `mindmapViewState:<sectionId>`，模式只存 localStorage `webcollect_collection_view_mode`；不得把它们加入同步、快照、Chrome storage 或云 schema。
 - 保留搜索引擎选择、壁纸模式开关、顶部分项编辑、分类轻量编辑、翻译、目标分类、小松鼠品牌和半脸悬停浮窗。
 - 新功能若触及同步或迁移，必须先用隔离数据和快照验证；任何真实云端破坏性操作仍需在执行前说明。
 

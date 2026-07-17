@@ -80,10 +80,9 @@ jobs:
           notes=(
             "WebCollect Chrome extension ${VERSION_LABEL}."
             ""
-            "- Adds a reset control for the current mindmap layout without changing other layouts or collapse state."
-            "- Remembers the last classic or mindmap view locally, with classic as the safe first-run fallback."
-            "- Keeps favicon letters visible while images load, stabilizes bilateral branch controls, and improves large-tree indexing."
-            "- Restores keyboard focus to mindmap add buttons after dialogs close."
+            "- Keeps the Google sign-in label on one line at compact desktop widths."
+            "- Moves the action toolbar to a dedicated responsive row before it can overlap the search engine or cloud-sync badge."
+            "- Covers the signed-in sync geometry at 1366, 1536, 1728, 1800, and 2048 pixel desktop widths."
             "- Preserves collection data, sync state, snapshots, Chrome storage, and Supabase schema."
             "- Verified by unit, legacy, Playwright, Web build, extension artifact, size, and production dependency checks."
           )
