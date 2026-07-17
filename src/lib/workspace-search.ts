@@ -3,6 +3,10 @@ import type { Category, CollectionSection, WebCard } from "./types";
 const DEFAULT_SECTION_ID = "section-default";
 const MAX_RESULTS_PER_GROUP = 8;
 const CJK_STOP_WORDS = new Set(["的", "了", "和", "与", "及", "或", "在", "为", "是"]);
+const MATCH_REASON_ORDER: WorkspaceSearchMatchReason[] = ["title", "url", "path", "description", "fuzzy"];
+
+export type WorkspaceSearchMatchReason = "title" | "url" | "path" | "description" | "fuzzy";
+export type WorkspaceSearchMatchKind = "exact" | "lexical" | "fuzzy";
 
 export type WorkspaceSearchResultType = "card" | "category" | "section";
 
@@ -26,11 +30,19 @@ interface SearchFields {
   description: string[];
 }
 
+interface NormalizedSearchFields {
+  name: string;
+  url: string;
+  context: string;
+  description: string;
+}
+
 interface SearchEntryBase extends WorkspaceSearchContext {
   id: string;
   type: WorkspaceSearchResultType;
   label: string;
   fields: SearchFields;
+  normalizedFields: NormalizedSearchFields;
   searchableText: string;
 }
 
@@ -54,16 +66,25 @@ export type WorkspaceSearchEntry = CardSearchEntry | CategorySearchEntry | Secti
 export interface CardSearchResult extends CardSearchEntry {
   score: number;
   matchedTokens: string[];
+  matchReasons: WorkspaceSearchMatchReason[];
+  matchKind: WorkspaceSearchMatchKind;
+  exactMatch: boolean;
 }
 
 export interface CategorySearchResult extends CategorySearchEntry {
   score: number;
   matchedTokens: string[];
+  matchReasons: WorkspaceSearchMatchReason[];
+  matchKind: WorkspaceSearchMatchKind;
+  exactMatch: boolean;
 }
 
 export interface SectionSearchResult extends SectionSearchEntry {
   score: number;
   matchedTokens: string[];
+  matchReasons: WorkspaceSearchMatchReason[];
+  matchKind: WorkspaceSearchMatchKind;
+  exactMatch: boolean;
 }
 
 export interface WorkspaceSearchIndex {
@@ -150,6 +171,7 @@ export function buildWorkspaceSearchIndex(input: WorkspaceSearchInput): Workspac
       category,
       ...context,
       fields,
+      normalizedFields: normalizeSearchFields(fields),
       searchableText: buildSearchableText(fields),
     };
   });
@@ -178,6 +200,7 @@ export function buildWorkspaceSearchIndex(input: WorkspaceSearchInput): Workspac
       card,
       ...context,
       fields,
+      normalizedFields: normalizeSearchFields(fields),
       searchableText: buildSearchableText(fields),
     };
   });
@@ -196,6 +219,7 @@ export function buildWorkspaceSearchIndex(input: WorkspaceSearchInput): Workspac
       section,
       pathLabels: [section.name],
       fields,
+      normalizedFields: normalizeSearchFields(fields),
       searchableText: buildSearchableText(fields),
     };
   });
@@ -266,6 +290,15 @@ function buildSearchableText(fields: SearchFields): string {
   );
 }
 
+function normalizeSearchFields(fields: SearchFields): NormalizedSearchFields {
+  return {
+    name: normalizeSearchText(fields.name.filter(Boolean).join(" ")),
+    url: normalizeSearchText(fields.url.filter(Boolean).join(" ")),
+    context: normalizeSearchText(fields.context.filter(Boolean).join(" ")),
+    description: normalizeSearchText(fields.description.filter(Boolean).join(" ")),
+  };
+}
+
 function getUrlDomain(url: string): string {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
@@ -278,51 +311,167 @@ function scoreEntries<T extends WorkspaceSearchEntry>(
   entries: T[],
   query: string,
   tokens: string[],
-): Array<T & { score: number; matchedTokens: string[] }> {
+): Array<T & {
+  score: number;
+  matchedTokens: string[];
+  matchReasons: WorkspaceSearchMatchReason[];
+  matchKind: WorkspaceSearchMatchKind;
+  exactMatch: boolean;
+}> {
   return entries
     .map((entry) => {
-      const score = scoreEntry(entry, query, tokens);
-      return score > 0 ? { ...entry, score, matchedTokens: tokens } : null;
+      const match = scoreEntry(entry, query, tokens);
+      return match ? { ...entry, ...match } : null;
     })
-    .filter((entry): entry is T & { score: number; matchedTokens: string[] } => Boolean(entry))
-    .sort((a, b) => b.score - a.score || a.label.localeCompare(b.label, "zh-Hans-CN"));
+    .filter((entry): entry is T & {
+      score: number;
+      matchedTokens: string[];
+      matchReasons: WorkspaceSearchMatchReason[];
+      matchKind: WorkspaceSearchMatchKind;
+      exactMatch: boolean;
+    } => Boolean(entry))
+    .sort((a, b) => Number(b.exactMatch) - Number(a.exactMatch)
+      || b.score - a.score
+      || a.label.localeCompare(b.label, "zh-Hans-CN"));
 }
 
-function scoreEntry(entry: WorkspaceSearchEntry, query: string, tokens: string[]): number {
+interface TokenScore {
+  score: number;
+  reason: Exclude<WorkspaceSearchMatchReason, "fuzzy">;
+  fuzzy: boolean;
+}
+
+interface EntryScore {
+  score: number;
+  matchedTokens: string[];
+  matchReasons: WorkspaceSearchMatchReason[];
+  matchKind: WorkspaceSearchMatchKind;
+  exactMatch: boolean;
+}
+
+function scoreEntry(entry: WorkspaceSearchEntry, query: string, tokens: string[]): EntryScore | null {
   const phrase = normalizeSearchText(query);
   let score = 0;
+  let fuzzyMatched = false;
+  const matchedTokens: string[] = [];
+  const reasons = new Set<WorkspaceSearchMatchReason>();
 
   for (const token of tokens) {
     const tokenScore = scoreToken(entry, token);
-    if (tokenScore <= 0) return 0;
-    score += tokenScore;
+    if (!tokenScore) continue;
+    score += tokenScore.score;
+    matchedTokens.push(token);
+    reasons.add(tokenScore.reason);
+    if (tokenScore.fuzzy) {
+      fuzzyMatched = true;
+      reasons.add("fuzzy");
+    }
   }
 
-  const normalizedName = normalizeSearchText(entry.fields.name.join(" "));
-  if (normalizedName === phrase) score += 800;
-  if (normalizedName.startsWith(phrase)) score += 360;
+  const minimumMatches = tokens.length <= 2 ? tokens.length : Math.ceil(tokens.length * 0.6);
+  if (matchedTokens.length < minimumMatches) return null;
+
+  const { name } = entry.normalizedFields;
+  const exactMatch = entry.fields.name.some((value) => normalizeSearchText(value) === phrase)
+    || entry.fields.url.some((value) => normalizeSearchText(value) === phrase);
+  if (exactMatch) score += 800;
+  if (name.startsWith(phrase)) score += 360;
   if (entry.searchableText.includes(phrase)) score += 180;
+  score -= (tokens.length - matchedTokens.length) * 90;
 
   if (entry.type === "card") score += 30;
   if (entry.type === "category") score += 20;
 
-  return score;
+  return {
+    score,
+    matchedTokens,
+    matchReasons: MATCH_REASON_ORDER.filter((reason) => reasons.has(reason)),
+    matchKind: exactMatch ? "exact" : fuzzyMatched ? "fuzzy" : "lexical",
+    exactMatch,
+  };
 }
 
-function scoreToken(entry: WorkspaceSearchEntry, token: string): number {
-  const name = normalizeSearchText(entry.fields.name.join(" "));
-  const url = normalizeSearchText(entry.fields.url.join(" "));
-  const context = normalizeSearchText(entry.fields.context.join(" "));
-  const description = normalizeSearchText(entry.fields.description.join(" "));
+function scoreToken(entry: WorkspaceSearchEntry, token: string): TokenScore | null {
+  const { name, url, context, description } = entry.normalizedFields;
 
-  if (name === token) return 1200;
-  if (name.startsWith(token)) return 950;
-  if (name.includes(token)) return 760;
-  if (url === token) return 720;
-  if (url.includes(token)) return 620;
-  if (context === token) return 560;
-  if (context.includes(token)) return 440;
-  if (description.includes(token)) return 260;
-  if (entry.searchableText.includes(token)) return 120;
-  return 0;
+  if (name === token) return { score: 1200, reason: "title", fuzzy: false };
+  if (name.startsWith(token)) return { score: 950, reason: "title", fuzzy: false };
+  if (name.includes(token)) return { score: 760, reason: "title", fuzzy: false };
+  if (url === token) return { score: 720, reason: "url", fuzzy: false };
+  if (url.includes(token)) return { score: 620, reason: "url", fuzzy: false };
+  if (context === token) return { score: 560, reason: "path", fuzzy: false };
+  if (context.includes(token)) return { score: 440, reason: "path", fuzzy: false };
+  if (description.includes(token)) return { score: 260, reason: "description", fuzzy: false };
+
+  if (!/^[a-z0-9]+$/i.test(token) || token.length < 4) return null;
+
+  const fuzzyCandidates: Array<{ value: string; score: number; reason: TokenScore["reason"] }> = [
+    { value: name, score: 520, reason: "title" },
+    { value: url, score: 400, reason: "url" },
+    { value: context, score: 300, reason: "path" },
+    { value: description, score: 180, reason: "description" },
+  ];
+
+  let best: TokenScore | null = null;
+  for (const candidate of fuzzyCandidates) {
+    const similarity = bestLatinWordSimilarity(token, candidate.value);
+    if (similarity < 0.72) continue;
+    const next = {
+      score: Math.round(candidate.score * similarity),
+      reason: candidate.reason,
+      fuzzy: true,
+    };
+    if (!best || next.score > best.score) best = next;
+  }
+  return best;
+}
+
+function bestLatinWordSimilarity(token: string, field: string): number {
+  let best = 0;
+  const words = field.match(/[a-z0-9]+/giu) ?? [];
+  for (const word of words) {
+    if (word.length < 4 || Math.abs(word.length - token.length) > 2) continue;
+    const maxLength = Math.max(word.length, token.length);
+    const maxDistance = maxLength <= 5 ? 1 : 2;
+    const distance = damerauLevenshteinDistance(token, word, maxDistance);
+    if (distance > maxDistance) continue;
+    best = Math.max(best, 1 - distance / maxLength);
+  }
+  return best;
+}
+
+function damerauLevenshteinDistance(left: string, right: string, limit: number): number {
+  if (left === right) return 0;
+  if (Math.abs(left.length - right.length) > limit) return limit + 1;
+
+  let previousPrevious = Array.from({ length: right.length + 1 }, (_, index) => index);
+  let previous = previousPrevious.slice();
+
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    const current = [leftIndex];
+    let rowMinimum = current[0];
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      const substitutionCost = left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1;
+      let value = Math.min(
+        current[rightIndex - 1] + 1,
+        previous[rightIndex] + 1,
+        previous[rightIndex - 1] + substitutionCost,
+      );
+      if (
+        leftIndex > 1
+        && rightIndex > 1
+        && left[leftIndex - 1] === right[rightIndex - 2]
+        && left[leftIndex - 2] === right[rightIndex - 1]
+      ) {
+        value = Math.min(value, previousPrevious[rightIndex - 2] + 1);
+      }
+      current[rightIndex] = value;
+      rowMinimum = Math.min(rowMinimum, value);
+    }
+    if (rowMinimum > limit) return limit + 1;
+    previousPrevious = previous;
+    previous = current;
+  }
+
+  return previous[right.length];
 }
