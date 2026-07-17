@@ -12,7 +12,8 @@ This section supersedes the V1.2.1 development status once tag `webcollect-2026-
 - Closeout: `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`.
 - Scope: keeps Google 登录 on one line and prevents a real cloud-sync badge from overlapping the search-engine selector by giving 1181–1799px desktops a dedicated action row.
 - Data contract: no data or persistence path changed. V1.2.1's local mode preference and V1.2.0's mindmap view-state boundary remain intact.
-- Publication evidence is appended to the closeout after CI, tag workflow, official asset verification, and the policy-bounded primary-profile reload. That append-only documentation commit is not a new application version.
+- Tagged application commit: `b2a2063cb986574ffdf6e0c13c3988da6c02a26a`. Main CI `29566934939` and Release workflow `29567324457` succeeded. The official zip is `16,957,068` bytes with SHA-256 `80ed3d0ad969d0ad3eb2485cc9a77729565a7dda0f05dcc4926f3245ec40c998`; its 41-file tree exactly matches the local release build and the existing unpacked installation source after an append-only backup and non-deleting sync.
+- The existing signed-in primary Chrome profile reloaded the stable extension ID in place and then showed version `1.2.2`, `X rocky`, `云端已同步`, the preserved section tabs, recycle-bin count 15, bookmark bar, categories, groups, and cards. The repaired header had no search/sync/account overlap. No unrelated personal tab or collection data was operated. The follow-up closeout commit is documentation-only and is not a new application version.
 
 ## 2026-07-17 V1.2.1 Mindmap Polish Release
 

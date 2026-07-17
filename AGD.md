@@ -7,7 +7,7 @@
 主分支：`main`
 当前最新发布身份：`V1.2.2 / 2026年7月17日`
 正式发布 tag：`webcollect-2026-07-17-v1.2.2`；Release `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-17-v1.2.2`；zip `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-17-v1.2.2/WebCollect-Chrome-Extension-v1.2.2-2026-07-17.zip`。
-V1.2.2 closeout：`docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`。发布提交、main CI、Release workflow、正式 zip SHA-256 与主 Chrome profile 原位重载证据将在发布后以纯文档提交补齐；该提交不是新的应用版本。
+V1.2.2 closeout：`docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`。应用提交 `b2a2063cb986574ffdf6e0c13c3988da6c02a26a`；main CI `29566934939`、Release workflow `29567324457` 均通过；正式 zip 为 `16,957,068` bytes，SHA-256 `80ed3d0ad969d0ad3eb2485cc9a77729565a7dda0f05dcc4926f3245ec40c998`。官方包与本地/现有安装源的 41 文件树完全一致，并已在主 Chrome profile 保持原 ID 原位重载；后续纯文档证据提交不是新的应用版本。
 上一稳定边界：`V1.2.1 / 2026年7月17日`，发布提交及 tag `6320578baab4ca24b368fb5c05e77b0c0fd5e54a` / `webcollect-2026-07-17-v1.2.1`，zip SHA-256 `28ff22082b527b59ccf4f3d1f3e50d374b813bd3f1fd07d0ec95a8dc4b0138d3`。
 当前主线：V1.2.2 只修复顶栏中等桌面宽度的 Google 登录换行与搜索/同步控件重叠。V1.2.1 的导图功能、模式记忆、数据与同步边界保持不变。
 
