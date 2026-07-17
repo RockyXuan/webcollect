@@ -2,7 +2,25 @@ import { DomUtils, parseDocument } from "htmlparser2";
 
 const MAX_TITLE_LENGTH = 70;
 const MAX_DESCRIPTION_LENGTH = 280;
-const BLOCKED_TAGS = new Set(["nav", "header", "footer", "aside", "form", "script", "style", "noscript", "svg"]);
+const DEFAULT_KNOWLEDGE_MAX_CHARS = 6000;
+const BLOCKED_TAGS = new Set([
+  "nav",
+  "header",
+  "footer",
+  "aside",
+  "form",
+  "script",
+  "style",
+  "noscript",
+  "svg",
+  "template",
+  "iframe",
+  "button",
+  "input",
+  "select",
+  "textarea",
+]);
+const KNOWLEDGE_TAGS = new Set(["h1", "h2", "h3", "p", "li", "blockquote", "dt", "dd"]);
 const NOISE_ATTRIBUTE_PATTERN = /(?:^|[-_\s])(nav|menu|footer|header|sidebar|breadcrumb|cookie|consent|modal|login|signup|social|share)(?:$|[-_\s])/i;
 const CONTENT_TYPE_PRIORITY = {
   NewsArticle: 100,
@@ -155,6 +173,16 @@ function jsonLdObjects(elements) {
   return objects;
 }
 
+function parsePageHtml(html) {
+  const document = parseDocument(String(html || ""), {
+    decodeEntities: true,
+    lowerCaseAttributeNames: true,
+    lowerCaseTags: true,
+  });
+  const elements = collectElements(document.children);
+  return { elements, structured: jsonLdObjects(elements) };
+}
+
 function jsonLdTypePriority(value) {
   const types = Array.isArray(value?.["@type"]) ? value["@type"] : [value?.["@type"]];
   return types.reduce((highest, type) => Math.max(highest, CONTENT_TYPE_PRIORITY[type] || 0), 0);
@@ -173,6 +201,7 @@ function hasBlockedAncestor(element) {
   while (current) {
     if (isElement(current)) {
       if (BLOCKED_TAGS.has(current.name)) return true;
+      if ("hidden" in (current.attribs || {}) || attribute(current, "aria-hidden").toLowerCase() === "true") return true;
       const marker = `${attribute(current, "id")} ${attribute(current, "class")} ${attribute(current, "role")}`;
       if (NOISE_ATTRIBUTE_PATTERN.test(marker)) return true;
     }
@@ -279,14 +308,7 @@ function faviconHref(elements) {
   return "";
 }
 
-export function extractMetadataFromHtml(html, url) {
-  const document = parseDocument(String(html || ""), {
-    decodeEntities: true,
-    lowerCaseAttributeNames: true,
-    lowerCaseTags: true,
-  });
-  const elements = collectElements(document.children);
-  const structured = jsonLdObjects(elements);
+function extractMetadataFromParsedPage(elements, structured, url) {
   const titleCandidates = [];
   for (const object of structured) {
     const text = jsonLdText(object, ["headline", "name"]);
@@ -342,4 +364,99 @@ export function extractMetadataFromHtml(html, url) {
   const favicon = resolveAssetUrl(faviconHref(elements), url);
 
   return { title, description, image, favicon };
+}
+
+export function extractMetadataFromHtml(html, url) {
+  const { elements, structured } = parsePageHtml(html);
+  return extractMetadataFromParsedPage(elements, structured, url);
+}
+
+function normalizeKnowledgeKey(value) {
+  return normalizeText(value).toLocaleLowerCase("und");
+}
+
+function collectKnowledgeSegments(elements, structured) {
+  const segments = [];
+  const normalizedSegments = [];
+
+  const append = (value) => {
+    const text = normalizeText(value);
+    if (text.length < 4) return;
+    const normalized = normalizeKnowledgeKey(text);
+    if (!normalized) return;
+    if (normalizedSegments.some((existing) => (
+      existing === normalized
+      || (normalized.length >= 24 && existing.length > normalized.length && existing.includes(normalized))
+    ))) return;
+    segments.push(text);
+    normalizedSegments.push(normalized);
+  };
+
+  for (const object of [...structured].sort((left, right) => jsonLdTypePriority(right) - jsonLdTypePriority(left))) {
+    for (const key of ["articleBody", "text", "description", "abstract"]) {
+      const value = object?.[key];
+      if (typeof value === "string") append(value);
+    }
+  }
+
+  const contentElements = elements.filter((element) => KNOWLEDGE_TAGS.has(element.name) && !hasBlockedAncestor(element));
+  const preferredElements = contentElements.filter((element) => hasContentAncestor(element));
+  for (const element of preferredElements.length > 0 ? preferredElements : contentElements) {
+    append(elementText(element));
+  }
+
+  return segments;
+}
+
+function truncateKnowledgeSegment(value, maxChars) {
+  const characters = Array.from(normalizeText(value));
+  if (characters.length <= maxChars) return characters.join("");
+  const candidate = characters.slice(0, maxChars).join("").trimEnd();
+  const lastSpace = candidate.lastIndexOf(" ");
+  return lastSpace > maxChars * 0.55 ? candidate.slice(0, lastSpace) : candidate;
+}
+
+function buildKnowledgeResult(segments, maxChars) {
+  let text = "";
+  let segmentCount = 0;
+  let truncated = false;
+
+  for (const segment of segments) {
+    const separator = text ? "\n" : "";
+    if (Array.from(`${text}${separator}${segment}`).length <= maxChars) {
+      text = `${text}${separator}${segment}`;
+      segmentCount += 1;
+      continue;
+    }
+
+    truncated = true;
+    if (!text) {
+      text = truncateKnowledgeSegment(segment, maxChars);
+      segmentCount = text ? 1 : 0;
+    }
+    break;
+  }
+
+  return { text, truncated, segmentCount };
+}
+
+function extractKnowledgeFromParsedPage(elements, structured, options = {}) {
+  const requestedMaxChars = Number(options.maxChars);
+  const maxChars = Number.isFinite(requestedMaxChars)
+    ? Math.min(12_000, Math.max(256, Math.floor(requestedMaxChars)))
+    : DEFAULT_KNOWLEDGE_MAX_CHARS;
+  return buildKnowledgeResult(collectKnowledgeSegments(elements, structured), maxChars);
+}
+
+export function extractKnowledgeText(html, options = {}) {
+  const { elements, structured } = parsePageHtml(html);
+  return extractKnowledgeFromParsedPage(elements, structured, options);
+}
+
+export function extractPageContentFromHtml(html, url, options = {}) {
+  const { elements, structured } = parsePageHtml(html);
+  return {
+    metadata: extractMetadataFromParsedPage(elements, structured, url),
+    knowledge: extractKnowledgeFromParsedPage(elements, structured, options),
+  };
 }
