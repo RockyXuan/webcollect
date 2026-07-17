@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import localforage from "localforage";
 import {
+  clearMindmapLayoutOffsets,
   loadMindmapViewState,
   mindmapViewStateKey,
   normalizeMindmapViewState,
@@ -32,6 +33,21 @@ describe("mindmap view state", () => {
     expect(normalized.collapsed).toEqual(["cat:valid"]);
     expect(normalized.offsets["logic-right"]).toEqual({ "cat:valid": { dx: 12, dy: -8 } });
     expect(normalized.camera).toEqual({ x: 0, y: 40, k: 2 });
+  });
+
+  it("clears only the requested layout offsets", () => {
+    const offsets = {
+      "logic-right": { "cat:one": { dx: 12, dy: 8 } },
+      bilateral: { "cat:two": { dx: -30, dy: 5 } },
+      "tree-down": { "grp:one": { dx: 4, dy: 11 } },
+      indent: {},
+    };
+
+    const reset = clearMindmapLayoutOffsets(offsets, "bilateral");
+    expect(reset).toEqual({ ...offsets, bilateral: {} });
+    expect(reset["logic-right"]).toBe(offsets["logic-right"]);
+    expect(reset["tree-down"]).toBe(offsets["tree-down"]);
+    expect(offsets.bilateral).toEqual({ "cat:two": { dx: -30, dy: 5 } });
   });
 
   it("writes only its section key and restores the safe state", async () => {

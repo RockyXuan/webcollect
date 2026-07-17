@@ -12,15 +12,17 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { NewTabApp } from "./newtab-app";
 import { primeWallpaperStartupMode } from "@/lib/wallpaper-store";
+import { readCollectionViewMode } from "@/lib/collection-view-mode";
 import "./extension.css";
 
 primeWallpaperStartupMode();
+const initialCollectionViewMode = readCollectionViewMode();
 
 const root = document.getElementById("root");
 if (root) {
   ReactDOM.createRoot(root).render(
     <React.StrictMode>
-      <NewTabApp />
+      <NewTabApp initialCollectionViewMode={initialCollectionViewMode} />
     </React.StrictMode>
   );
 }

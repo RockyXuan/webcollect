@@ -20,6 +20,16 @@ export function mindmapViewStateKey(sectionId: string): string {
   return `mindmapViewState:${sectionId}`;
 }
 
+export function clearMindmapLayoutOffsets(
+  offsets: MindmapViewState["offsets"],
+  layout: MindmapLayoutId,
+): MindmapViewState["offsets"] {
+  return {
+    ...offsets,
+    [layout]: {},
+  };
+}
+
 function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }

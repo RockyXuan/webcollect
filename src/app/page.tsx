@@ -12,6 +12,8 @@ import { HotRecommendation } from "@/components/hot-recommendation";
 import { WallpaperShell } from "@/components/wallpaper/wallpaper-shell";
 import { MindmapView, type MindmapSearchTarget } from "@/components/mindmap/mindmap-view";
 import type { CollectionViewMode } from "@/components/mindmap/types";
+import { readCollectionViewMode, writeCollectionViewMode } from "@/lib/collection-view-mode";
+import { restoreDialogTriggerFocus } from "@/lib/dialog-trigger-focus";
 import { useAppStore } from "@/lib/store";
 import { useAuthStore } from "@/lib/auth-store";
 import { saveCards, saveCategories, setInitialized, withoutLocalChangeEvents } from "@/lib/db";
@@ -66,12 +68,22 @@ export default function HomePage() {
   const [emergencyRestorePrompt, setEmergencyRestorePrompt] = useState<EmergencyRestorePrompt | null>(null);
   const [collectionViewMode, setCollectionViewMode] = useState<CollectionViewMode>("classic");
   const [requestedViewMode, setRequestedViewMode] = useState<CollectionViewMode>("classic");
+  const [collectionViewModeReady, setCollectionViewModeReady] = useState(false);
   const [viewTransitionPhase, setViewTransitionPhase] = useState<"idle" | "exiting" | "entering">("idle");
   const [mindmapSearchTarget, setMindmapSearchTarget] = useState<MindmapSearchTarget | null>(null);
   const viewTransitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const viewTransitionFrameRef = useRef<number | null>(null);
   const viewTransitionTokenRef = useRef(0);
   const mindmapSearchRequestRef = useRef(0);
+  const cardDialogTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const categoryDialogTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    const storedMode = readCollectionViewMode();
+    setCollectionViewMode(storedMode);
+    setRequestedViewMode(storedMode);
+    setCollectionViewModeReady(true);
+  }, []);
 
   useEffect(() => {
     const init = async () => {
@@ -124,26 +136,30 @@ export default function HomePage() {
     init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleAddCard = useCallback((categoryId?: string) => {
+  const handleAddCard = useCallback((categoryId?: string, trigger?: HTMLButtonElement) => {
+    cardDialogTriggerRef.current = trigger || null;
     setEditingCard(null);
     setDefaultCategoryId(categoryId || "");
     setCardDialogOpen(true);
   }, []);
 
   const handleEditCard = useCallback((card: WebCard) => {
+    cardDialogTriggerRef.current = null;
     setEditingCard(card);
     setDefaultCategoryId("");
     setCardDialogOpen(true);
   }, []);
 
-  const handleAddCategory = useCallback(() => {
+  const handleAddCategory = useCallback((trigger?: HTMLButtonElement) => {
+    categoryDialogTriggerRef.current = trigger || null;
     setEditingCategory(null);
     setDefaultParentId(undefined);
     setIsCreatingParent(true);
     setCategoryDialogOpen(true);
   }, []);
 
-  const handleAddGroup = useCallback((parentId?: string) => {
+  const handleAddGroup = useCallback((parentId?: string, trigger?: HTMLButtonElement) => {
+    categoryDialogTriggerRef.current = trigger || null;
     setEditingCategory(null);
     setDefaultParentId(parentId);
     setIsCreatingParent(false);
@@ -151,6 +167,7 @@ export default function HomePage() {
   }, []);
 
   const handleEditCategory = useCallback((category: Category) => {
+    categoryDialogTriggerRef.current = null;
     setEditingCategory(category);
     setDefaultParentId(undefined);
     setIsCreatingParent(false);
@@ -166,6 +183,7 @@ export default function HomePage() {
   }, [returnToWallpaper]);
 
   const handleCollectionViewModeChange = useCallback((mode: CollectionViewMode) => {
+    writeCollectionViewMode(mode);
     setRequestedViewMode(mode);
     const token = ++viewTransitionTokenRef.current;
     if (viewTransitionTimerRef.current) clearTimeout(viewTransitionTimerRef.current);
@@ -186,6 +204,22 @@ export default function HomePage() {
       });
     }, 180);
   }, [collectionViewMode]);
+
+  const handleCardDialogOpenChange = useCallback((open: boolean) => {
+    setCardDialogOpen(open);
+    if (open) return;
+    const trigger = cardDialogTriggerRef.current;
+    cardDialogTriggerRef.current = null;
+    restoreDialogTriggerFocus(trigger);
+  }, []);
+
+  const handleCategoryDialogOpenChange = useCallback((open: boolean) => {
+    setCategoryDialogOpen(open);
+    if (open) return;
+    const trigger = categoryDialogTriggerRef.current;
+    categoryDialogTriggerRef.current = null;
+    restoreDialogTriggerFocus(trigger);
+  }, []);
 
   const handleRevealMindmapCategory = useCallback((target: { sectionId: string; categoryId: string }) => {
     setMindmapSearchTarget({ ...target, requestId: ++mindmapSearchRequestRef.current });
@@ -240,20 +274,24 @@ export default function HomePage() {
       mode={wallpaperMode}
       onEnterCollection={handleEnterCollection}
     >
-    <div className={`wc-resolution-viewport${collectionViewMode === "mindmap" ? " wc-resolution-viewport-mindmap" : ""}`}>
-    <div className={`wc-resolution-canvas ${collectionViewMode === "classic" ? "min-h-screen" : "wc-resolution-canvas-header-only"}`}>
+    <div className={`wc-resolution-viewport${collectionViewModeReady && collectionViewMode === "mindmap" ? " wc-resolution-viewport-mindmap" : ""}`}>
+    <div className={`wc-resolution-canvas ${!collectionViewModeReady || collectionViewMode === "classic" ? "min-h-screen" : "wc-resolution-canvas-header-only"}`}>
       <TopNav
         onAddCard={handleAddCard}
         onAddGroup={handleAddGroup}
         onAddCategory={handleAddCategory}
         onRecycleBin={() => setRecycleBinOpen(true)}
         onShowWallpaper={handleReturnToWallpaper}
-        collectionViewMode={requestedViewMode}
+        collectionViewMode={collectionViewModeReady ? requestedViewMode : undefined}
         onCollectionViewModeChange={handleCollectionViewModeChange}
         onRevealMindmapCategory={handleRevealMindmapCategory}
       />
 
-      {collectionViewMode === "classic" && <div className={`wc-collection-view is-${viewTransitionPhase}`} data-testid="collection-view-classic">
+      {!collectionViewModeReady && (
+        <div className="wc-view-mode-loading-shell" data-testid="collection-view-mode-loading" aria-hidden="true" />
+      )}
+
+      {collectionViewModeReady && collectionViewMode === "classic" && <div className={`wc-collection-view is-${viewTransitionPhase}`} data-testid="collection-view-classic">
       <main className="wc-shell wc-page-main space-y-7 px-5 py-7">
         <ErrorBoundary>
           <SortableGrid
@@ -287,7 +325,7 @@ export default function HomePage() {
       </div>}
     </div>
 
-      {collectionViewMode === "mindmap" && (
+      {collectionViewModeReady && collectionViewMode === "mindmap" && (
         <div className={`wc-collection-view is-${viewTransitionPhase}`} data-testid="collection-view-mindmap">
           <ErrorBoundary>
             <MindmapView
@@ -303,7 +341,7 @@ export default function HomePage() {
       <ErrorBoundary>
         <CardDialog
           open={cardDialogOpen}
-          onOpenChange={setCardDialogOpen}
+          onOpenChange={handleCardDialogOpenChange}
           editingCard={editingCard}
           defaultCategoryId={defaultCategoryId}
         />
@@ -311,7 +349,7 @@ export default function HomePage() {
       <ErrorBoundary>
         <CategoryDialog
           open={categoryDialogOpen}
-          onOpenChange={setCategoryDialogOpen}
+          onOpenChange={handleCategoryDialogOpenChange}
           editingCategory={editingCategory}
           defaultParentId={defaultParentId}
           isParent={isCreatingParent}

@@ -3,7 +3,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { WebCard } from "@/lib/types";
-import { getSemanticSiteIcon, getSiteIconCandidates } from "@/lib/site-icons";
+import { ReadOnlySiteIcon } from "./read-only-site-icon";
 
 export interface MindmapPreviewTarget {
   card: WebCard;
@@ -19,31 +19,6 @@ interface NodeHoverPreviewProps {
   onPointerLeave: () => void;
   onOpen: (card: WebCard) => void;
   onTogglePin: (cardId: string) => void;
-}
-
-function PreviewIcon({ card }: { card: WebCard }) {
-  const [candidateIndex, setCandidateIndex] = useState(0);
-  const candidates = getSiteIconCandidates(card);
-  const semantic = getSemanticSiteIcon(card);
-  const candidate = candidates[candidateIndex] || "";
-  const SemanticIcon = semantic?.Icon;
-
-  if (semantic && SemanticIcon && (semantic.prefer || !candidate)) {
-    return (
-      <span className="wc-mindmap-preview-favicon wc-mindmap-semantic-icon" style={{ background: semantic.background, color: semantic.color }} aria-hidden="true">
-        <SemanticIcon />
-      </span>
-    );
-  }
-  if (candidate) {
-    return (
-      <span className="wc-mindmap-preview-favicon" aria-hidden="true">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={candidate} alt="" onError={() => setCandidateIndex((index) => index + 1)} />
-      </span>
-    );
-  }
-  return <span className="wc-mindmap-preview-favicon is-fallback" aria-hidden="true">{card.abbreviation || card.title.slice(0, 1) || "?"}</span>;
 }
 
 export function NodeHoverPreview({
@@ -87,7 +62,11 @@ export function NodeHoverPreview({
       onPointerLeave={onPointerLeave}
     >
       <div className="wc-mindmap-preview-head">
-        <PreviewIcon card={target.card} />
+        <ReadOnlySiteIcon
+          card={target.card}
+          className="wc-mindmap-preview-favicon"
+          fallbackClassName="is-fallback"
+        />
         <div className="wc-mindmap-preview-heading">
           <div className="wc-mindmap-preview-title">{target.card.title}</div>
           <div className="wc-mindmap-preview-url">{target.card.url}</div>

@@ -131,6 +131,27 @@ describe("mindmap layout engine", () => {
     expect(sibling).toEqual(base.positions["cat:cat-b"]);
   });
 
+  it("keeps bilateral branch side metadata stable after offsets cross the root", () => {
+    const base = layoutMindmap(tree, "bilateral");
+    const leftBranch = tree.children[1];
+    const leftPosition = base.positions[leftBranch.id];
+    const rootPosition = base.positions[tree.id];
+    expect(base.sideByNodeId[leftBranch.id]).toBe("left");
+
+    const moved = layoutMindmap(tree, "bilateral", new Set(), {
+      [leftBranch.id]: {
+        dx: rootPosition.x + rootPosition.width + 500 - leftPosition.x,
+        dy: 0,
+      },
+    });
+    expect(moved.positions[leftBranch.id].x).toBeGreaterThan(rootPosition.x + rootPosition.width);
+    expect(moved.sideByNodeId[leftBranch.id]).toBe("left");
+    for (const child of leftBranch.children) {
+      expect(moved.sideByNodeId[child.id]).toBe("left");
+    }
+    expect(moved.sideByNodeId[tree.children[0].id]).toBe("right");
+  });
+
   it("stacks cards vertically in the tree-down group spine", () => {
     const result = layoutTreeDown(tree);
     const first = result.positions["card:card-group-1"];

@@ -31,6 +31,8 @@ import { SectionShipDialog } from "@/components/dialogs/section-ship-dialog";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { MindmapView, type MindmapSearchTarget } from "@/components/mindmap/mindmap-view";
 import type { CollectionViewMode } from "@/components/mindmap/types";
+import { writeCollectionViewMode } from "@/lib/collection-view-mode";
+import { restoreDialogTriggerFocus } from "@/lib/dialog-trigger-focus";
 import { WallpaperShell } from "@/components/wallpaper/wallpaper-shell";
 import { useWallpaperStore } from "@/lib/wallpaper-store";
 import {
@@ -59,16 +61,22 @@ function formatSnapshotDate(timestamp: number | undefined): string {
   }).format(new Date(timestamp));
 }
 
-export function NewTabApp() {
+interface NewTabAppProps {
+  initialCollectionViewMode?: CollectionViewMode;
+}
+
+export function NewTabApp({ initialCollectionViewMode = "classic" }: NewTabAppProps) {
   const [view, setView] = useState<View>("main");
-  const [collectionViewMode, setCollectionViewMode] = useState<CollectionViewMode>("classic");
-  const [requestedViewMode, setRequestedViewMode] = useState<CollectionViewMode>("classic");
+  const [collectionViewMode, setCollectionViewMode] = useState<CollectionViewMode>(initialCollectionViewMode);
+  const [requestedViewMode, setRequestedViewMode] = useState<CollectionViewMode>(initialCollectionViewMode);
   const [viewTransitionPhase, setViewTransitionPhase] = useState<"idle" | "exiting" | "entering">("idle");
   const [mindmapSearchTarget, setMindmapSearchTarget] = useState<MindmapSearchTarget | null>(null);
   const viewTransitionTokenRef = useRef(0);
   const viewTransitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const viewTransitionFrameRef = useRef<number | null>(null);
   const mindmapSearchRequestRef = useRef(0);
+  const cardDialogTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const categoryDialogTriggerRef = useRef<HTMLButtonElement | null>(null);
   const wallpaperMode = useWallpaperStore((state) => state.mode);
   const enterCollection = useWallpaperStore((state) => state.enterCollection);
   const returnToWallpaper = useWallpaperStore((state) => state.returnToWallpaper);
@@ -192,27 +200,31 @@ export function NewTabApp() {
   }, []);
 
   // 鈹€鈹€ Card handlers 鈹€鈹€
-  const handleAddCard = useCallback((categoryId?: string) => {
+  const handleAddCard = useCallback((categoryId?: string, trigger?: HTMLButtonElement) => {
+    cardDialogTriggerRef.current = trigger || null;
     setEditingCard(null);
     setDefaultCategoryId(categoryId || "");
     setCardDialogOpen(true);
   }, []);
 
   const handleEditCard = useCallback((card: WebCard) => {
+    cardDialogTriggerRef.current = null;
     setEditingCard(card);
     setDefaultCategoryId("");
     setCardDialogOpen(true);
   }, []);
 
   // 鈹€鈹€ Category handlers 鈹€鈹€
-  const handleAddCategory = useCallback(() => {
+  const handleAddCategory = useCallback((trigger?: HTMLButtonElement) => {
+    categoryDialogTriggerRef.current = trigger || null;
     setEditingCategory(null);
     setDefaultParentId(undefined);
     setIsCreatingParent(true);
     setCategoryDialogOpen(true);
   }, []);
 
-  const handleAddGroup = useCallback((parentId?: string) => {
+  const handleAddGroup = useCallback((parentId?: string, trigger?: HTMLButtonElement) => {
+    categoryDialogTriggerRef.current = trigger || null;
     setEditingCategory(null);
     setDefaultParentId(parentId);
     setIsCreatingParent(false);
@@ -220,6 +232,7 @@ export function NewTabApp() {
   }, []);
 
   const handleEditCategory = useCallback((category: Category) => {
+    categoryDialogTriggerRef.current = null;
     setEditingCategory(category);
     setDefaultParentId(undefined);
     setIsCreatingParent(false);
@@ -236,6 +249,7 @@ export function NewTabApp() {
   }, [returnToWallpaper]);
 
   const handleCollectionViewModeChange = useCallback((mode: CollectionViewMode) => {
+    writeCollectionViewMode(mode);
     setRequestedViewMode(mode);
     const token = ++viewTransitionTokenRef.current;
     if (viewTransitionTimerRef.current) clearTimeout(viewTransitionTimerRef.current);
@@ -256,6 +270,22 @@ export function NewTabApp() {
       });
     }, 180);
   }, [collectionViewMode]);
+
+  const handleCardDialogOpenChange = useCallback((open: boolean) => {
+    setCardDialogOpen(open);
+    if (open) return;
+    const trigger = cardDialogTriggerRef.current;
+    cardDialogTriggerRef.current = null;
+    restoreDialogTriggerFocus(trigger);
+  }, []);
+
+  const handleCategoryDialogOpenChange = useCallback((open: boolean) => {
+    setCategoryDialogOpen(open);
+    if (open) return;
+    const trigger = categoryDialogTriggerRef.current;
+    categoryDialogTriggerRef.current = null;
+    restoreDialogTriggerFocus(trigger);
+  }, []);
 
   const handleRevealMindmapCategory = useCallback((target: { sectionId: string; categoryId: string }) => {
     setMindmapSearchTarget({ ...target, requestId: ++mindmapSearchRequestRef.current });
@@ -378,7 +408,7 @@ export function NewTabApp() {
           <ErrorBoundary>
             <CardDialog
               open={cardDialogOpen}
-              onOpenChange={setCardDialogOpen}
+              onOpenChange={handleCardDialogOpenChange}
               editingCard={editingCard}
               defaultCategoryId={defaultCategoryId}
             />
@@ -386,7 +416,7 @@ export function NewTabApp() {
           <ErrorBoundary>
             <CategoryDialog
               open={categoryDialogOpen}
-              onOpenChange={setCategoryDialogOpen}
+              onOpenChange={handleCategoryDialogOpenChange}
               editingCategory={editingCategory}
               defaultParentId={defaultParentId}
               isParent={isCreatingParent}

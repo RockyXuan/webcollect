@@ -54,6 +54,7 @@ export interface MindmapLayoutResult {
   edges: MindmapEdge[];
   bounds: MindmapBounds;
   visibleNodeIds: string[];
+  sideByNodeId: Record<string, "left" | "right">;
 }
 
 export interface MindmapViewState {

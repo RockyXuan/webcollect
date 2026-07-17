@@ -309,6 +309,27 @@ function layoutPositions(
   return positions;
 }
 
+function visibleSideByNodeId(
+  root: MindmapNode,
+  layout: MindmapLayoutId,
+  collapsed: ReadonlySet<string>,
+): Record<string, "left" | "right"> {
+  const sides: Record<string, "left" | "right"> = { [root.id]: "right" };
+  const assignBranch = (node: MindmapNode, side: "left" | "right"): void => {
+    sides[node.id] = side;
+    if (!collapsed.has(node.id)) {
+      node.children.forEach((child) => assignBranch(child, side));
+    }
+  };
+
+  if (layout === "bilateral" && !collapsed.has(root.id)) {
+    root.children.forEach((child, index) => assignBranch(child, index % 2 === 0 ? "right" : "left"));
+  } else if (!collapsed.has(root.id)) {
+    root.children.forEach((child) => assignBranch(child, "right"));
+  }
+  return sides;
+}
+
 function categoryColor(node: MindmapNode, ancestors: readonly MindmapNode[]): string {
   if (node.type === "category") return node.color || FALLBACK_COLOR;
   for (let index = ancestors.length - 1; index >= 0; index -= 1) {
@@ -414,6 +435,7 @@ export function layoutMindmap(
     edges,
     bounds: boundsOf(positions),
     visibleNodeIds: Object.keys(positions),
+    sideByNodeId: visibleSideByNodeId(root, layout, collapsed),
   };
 }
 

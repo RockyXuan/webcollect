@@ -344,6 +344,7 @@
 }
 
 .wc-mindmap-favicon {
+  position: relative;
   display: grid;
   width: 26px;
   height: 26px;
@@ -351,16 +352,44 @@
   place-items: center;
   overflow: hidden;
   border-radius: 8px;
-  background: #fff;
+  background: var(--mindmap-node-color, #64748b);
   color: #fff;
   font-size: 11.5px;
   font-weight: 700;
 }
 
-.wc-mindmap-favicon img {
+.wc-mindmap-layered-icon {
+  isolation: isolate;
+}
+
+.wc-mindmap-icon-fallback-text {
+  position: relative;
+  z-index: 0;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0 3px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wc-mindmap-icon-overlay {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: contain;
+  opacity: 0;
+  transition: opacity 0.14s ease;
+}
+
+.wc-mindmap-icon-overlay.is-loaded {
+  opacity: 1;
+}
+
+span.wc-mindmap-icon-overlay {
+  display: grid;
+  place-items: center;
 }
 
 .wc-mindmap-semantic-icon svg {
@@ -465,6 +494,41 @@
 
 .wc-mindmap-layout-button:hover .wc-mindmap-layout-tip {
   opacity: 1;
+}
+
+.wc-mindmap-rail-separator {
+  width: 42px;
+  height: 1px;
+  margin: 2px auto;
+  background: rgba(148, 163, 184, 0.28);
+}
+
+.wc-mindmap-reset-button {
+  position: relative;
+  display: grid;
+  width: 58px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  color: var(--wc-text-muted);
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.wc-mindmap-reset-button:hover:not(:disabled) {
+  border-color: rgba(147, 197, 253, 0.38);
+  background: rgba(219, 234, 254, 0.6);
+  color: var(--wc-text-strong);
+}
+
+.wc-mindmap-reset-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.wc-mindmap-reset-button svg {
+  width: 17px;
+  height: 17px;
 }
 
 .wc-mindmap-zoom-cluster {
@@ -608,6 +672,7 @@
 }
 
 .wc-mindmap-preview-favicon {
+  position: relative;
   display: grid;
   width: 38px;
   height: 38px;
@@ -615,21 +680,24 @@
   place-items: center;
   overflow: hidden;
   border-radius: 11px;
-  background: #fff;
+  background: var(--wc-primary-gradient);
   color: #fff;
   font-size: 16px;
   font-weight: 700;
 }
 
-.wc-mindmap-preview-favicon img,
-.wc-mindmap-preview-favicon svg {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
 .wc-mindmap-preview-favicon.is-fallback {
   background: var(--wc-primary-gradient);
+}
+
+.wc-mindmap-preview-favicon .wc-mindmap-semantic-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.wc-view-mode-loading-shell {
+  min-height: calc(100vh - 104px);
+  background: rgba(248, 250, 252, 0.18);
 }
 
 .wc-mindmap-preview-title {
@@ -865,6 +933,19 @@
 
   .wc-mindmap-layout-button {
     width: 48px;
+    height: 42px;
+    flex: 0 0 auto;
+  }
+
+  .wc-mindmap-rail-separator {
+    width: 1px;
+    height: 28px;
+    margin: auto 2px;
+    flex: 0 0 auto;
+  }
+
+  .wc-mindmap-reset-button {
+    width: 42px;
     height: 42px;
     flex: 0 0 auto;
   }

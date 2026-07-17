@@ -1,10 +1,10 @@
 "use client";
 
-import { memo, useMemo, useState } from "react";
+import { memo } from "react";
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { Plus } from "lucide-react";
 import type { WebCard } from "@/lib/types";
-import { getSemanticSiteIcon, getSiteIconCandidates } from "@/lib/site-icons";
+import { ReadOnlySiteIcon } from "./read-only-site-icon";
 import type { MindmapNode as MindmapNodeModel, MindmapNodePosition } from "./types";
 
 interface MindmapNodeProps {
@@ -23,7 +23,7 @@ interface MindmapNodeProps {
   ariaLevel?: number;
   addLabel?: string;
   onToggleCollapse?: (nodeId: string) => void;
-  onAdd?: (node: MindmapNodeModel) => void;
+  onAdd?: (node: MindmapNodeModel, trigger: HTMLButtonElement) => void;
   onActivate?: (node: MindmapNodeModel) => void;
   onFocusNode?: (nodeId: string) => void;
   onNodeKeyDown?: (event: ReactKeyboardEvent<HTMLDivElement>, node: MindmapNodeModel) => void;
@@ -34,47 +34,6 @@ interface MindmapNodeProps {
   onNodeLostPointerCapture?: (event: ReactPointerEvent<HTMLDivElement>, nodeId: string) => void;
   onCardPointerEnter?: (element: HTMLDivElement, node: MindmapNodeModel, card: WebCard) => void;
   onCardPointerLeave?: () => void;
-}
-
-function ReadOnlyCardIcon({ card }: { card: WebCard }) {
-  const [candidateIndex, setCandidateIndex] = useState(0);
-  const candidates = useMemo(() => getSiteIconCandidates(card), [card]);
-  const semantic = useMemo(() => getSemanticSiteIcon(card), [card]);
-  const candidate = candidates[candidateIndex] || "";
-  const useSemantic = Boolean(semantic && (semantic.prefer || !candidate));
-  const SemanticIcon = semantic?.Icon;
-
-  if (useSemantic && SemanticIcon) {
-    return (
-      <span
-        className="wc-mindmap-favicon wc-mindmap-semantic-icon"
-        style={{ background: semantic?.background, color: semantic?.color }}
-        aria-hidden="true"
-      >
-        <SemanticIcon />
-      </span>
-    );
-  }
-
-  if (candidate) {
-    return (
-      <span className="wc-mindmap-favicon" aria-hidden="true">
-        {/* The read-only map advances through the existing favicon candidates but never persists them. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={candidate}
-          alt=""
-          onError={() => setCandidateIndex((index) => index + 1)}
-        />
-      </span>
-    );
-  }
-
-  return (
-    <span className="wc-mindmap-favicon wc-mindmap-fallback-icon" aria-hidden="true">
-      {card.abbreviation || card.title.slice(0, 1) || "?"}
-    </span>
-  );
 }
 
 function MindmapNodeComponent({
@@ -127,7 +86,9 @@ function MindmapNodeComponent({
       data-collapsed={collapsed ? "true" : "false"}
       aria-label={`${node.type === "section" ? "分项" : node.type === "category" ? "分类" : node.type === "group" ? "分组" : "网页"}：${node.label}`}
       onFocus={() => onFocusNode?.(node.id)}
-      onKeyDown={(event) => onNodeKeyDown?.(event, node)}
+      onKeyDown={(event) => {
+        if (event.target === event.currentTarget) onNodeKeyDown?.(event, node);
+      }}
       onPointerDown={(event) => onNodePointerDown?.(event, node.id)}
       onPointerMove={(event) => onNodePointerMove?.(event, node.id)}
       onPointerUp={(event) => onNodePointerUp?.(event, node.id)}
@@ -144,7 +105,13 @@ function MindmapNodeComponent({
       {node.type === "section" && <span className="wc-mindmap-root-icon" aria-hidden="true">🐿️</span>}
       {node.type === "category" && <span className="wc-mindmap-category-dot" aria-hidden="true" />}
       {node.type === "group" && <span className="wc-mindmap-group-bar" aria-hidden="true" />}
-      {node.type === "card" && card && <ReadOnlyCardIcon card={card} />}
+      {node.type === "card" && card && (
+        <ReadOnlySiteIcon
+          card={card}
+          className="wc-mindmap-favicon"
+          fallbackClassName="wc-mindmap-fallback-icon"
+        />
+      )}
       <span className="wc-mindmap-node-label">{node.label}</span>
       {node.type === "card" && (
         <span className={`wc-mindmap-star${pinned ? " is-pinned" : ""}`} aria-hidden="true">★</span>
@@ -158,7 +125,7 @@ function MindmapNodeComponent({
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => {
             event.stopPropagation();
-            onAdd?.(node);
+            onAdd?.(node, event.currentTarget);
           }}
         >
           <Plus aria-hidden="true" />

@@ -2,12 +2,18 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { loadMindmapViewState, saveMindmapViewState } from "@/lib/mindmap-view-state";
+import { RotateCcw } from "lucide-react";
+import {
+  clearMindmapLayoutOffsets,
+  loadMindmapViewState,
+  saveMindmapViewState,
+} from "@/lib/mindmap-view-state";
 import { openWebCollectUrl } from "@/lib/platform";
 import { useAppStore } from "@/lib/store";
 import { buildMindmapTree, fitCamera, layoutMindmap } from "./layout-engine";
 import { MindmapNode } from "./mindmap-node";
 import { NodeHoverPreview, type MindmapPreviewTarget } from "./node-hover-preview";
+import { indexMindmapNodes } from "./tree-index";
 import type {
   MindmapCamera,
   MindmapLayoutId,
@@ -37,9 +43,9 @@ export interface MindmapSearchTarget {
 
 interface MindmapViewProps {
   searchTarget?: MindmapSearchTarget | null;
-  onAddCategory: () => void;
-  onAddGroup: (parentId?: string) => void;
-  onAddCard: (categoryId?: string) => void;
+  onAddCategory: (trigger?: HTMLButtonElement) => void;
+  onAddGroup: (parentId?: string, trigger?: HTMLButtonElement) => void;
+  onAddCard: (categoryId?: string, trigger?: HTMLButtonElement) => void;
 }
 
 function clampZoom(value: number): number {
@@ -52,25 +58,6 @@ const EMPTY_OFFSETS = (): MindmapViewState["offsets"] => ({
   "tree-down": {},
   indent: {},
 });
-
-function indexNodes(root: MindmapNodeModel): {
-  nodes: Record<string, MindmapNodeModel>;
-  parentIds: Record<string, string | undefined>;
-} {
-  const nodes: Record<string, MindmapNodeModel> = {};
-  const parentIds: Record<string, string | undefined> = {};
-  const walk = (node: MindmapNodeModel, parentId?: string): void => {
-    nodes[node.id] = node;
-    parentIds[node.id] = parentId;
-    node.children.forEach((child) => walk(child, node.id));
-  };
-  walk(root);
-  return { nodes, parentIds };
-}
-
-function descendantCount(node: MindmapNodeModel): number {
-  return node.children.reduce((count, child) => count + 1 + descendantCount(child), 0);
-}
 
 function nodeDepth(nodeId: string, parentIds: Record<string, string | undefined>): number {
   let depth = 1;
@@ -137,7 +124,11 @@ export function MindmapView({ searchTarget = null, onAddCategory, onAddGroup, on
     () => buildMindmapTree(sections, categories, cards, activeSectionId),
     [sections, categories, cards, activeSectionId],
   );
-  const { nodes: nodeById, parentIds } = useMemo(() => indexNodes(tree), [tree]);
+  const {
+    nodes: nodeById,
+    parentIds,
+    descendantCounts,
+  } = useMemo(() => indexMindmapNodes(tree), [tree]);
   const cardsById = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
   const pinnedSet = useMemo(
     () => new Set(pinnedBookmarkItems.map((item) => item.cardId)),
@@ -179,6 +170,7 @@ export function MindmapView({ searchTarget = null, onAddCategory, onAddGroup, on
     () => layoutMindmap(tree, layout, collapsed, renderedOffsets),
     [tree, layout, collapsed, renderedOffsets],
   );
+  const canResetCurrentLayout = Object.keys(offsets[layout]).length > 0;
   const renderedNodeIds = useMemo(() => {
     const visibleNodeIds = layoutResult.visibleNodeIds;
     if (visibleNodeIds.length <= VIRTUALIZE_NODE_THRESHOLD || !viewport.width || !viewport.height) {
@@ -455,6 +447,19 @@ export function MindmapView({ searchTarget = null, onAddCategory, onAddGroup, on
     markDirty();
   }, [hidePreview, markDirty]);
 
+  const handleResetLayout = useCallback(() => {
+    if (!canResetCurrentLayout) return;
+    hidePreview();
+    const resetOffsets = clearMindmapLayoutOffsets(offsets, layout);
+    const automaticLayout = layoutMindmap(tree, layout, collapsed, {});
+    setOffsets(resetOffsets);
+    setDragDelta(null);
+    if (viewport.width && viewport.height) {
+      setCamera(fitCamera(automaticLayout.bounds, viewport));
+    }
+    markDirty();
+  }, [canResetCurrentLayout, collapsed, hidePreview, layout, markDirty, offsets, tree, viewport]);
+
   const handleNodePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>, nodeId: string) => {
     if (event.button !== 0) return;
     event.stopPropagation();
@@ -510,11 +515,11 @@ export function MindmapView({ searchTarget = null, onAddCategory, onAddGroup, on
     setDragDelta(null);
   }, [layout, markDirty]);
 
-  const handleNodeAdd = useCallback((node: MindmapNodeModel) => {
+  const handleNodeAdd = useCallback((node: MindmapNodeModel, trigger: HTMLButtonElement) => {
     hidePreview();
-    if (node.type === "section") onAddCategory();
-    else if (node.type === "category") onAddGroup(node.refId);
-    else if (node.type === "group") onAddCard(node.refId);
+    if (node.type === "section") onAddCategory(trigger);
+    else if (node.type === "category") onAddGroup(node.refId, trigger);
+    else if (node.type === "group") onAddCard(node.refId, trigger);
   }, [hidePreview, onAddCard, onAddCategory, onAddGroup]);
 
   const handleNodeActivate = useCallback((node: MindmapNodeModel) => {
@@ -548,7 +553,7 @@ export function MindmapView({ searchTarget = null, onAddCategory, onAddGroup, on
     }
 
     if (event.key === " ") {
-      if (descendantCount(node) > 0) {
+      if (descendantCounts[node.id] > 0) {
         event.preventDefault();
         handleToggleCollapse(node.id);
         focusMindmapNode(node.id);
@@ -585,7 +590,7 @@ export function MindmapView({ searchTarget = null, onAddCategory, onAddGroup, on
       ? Math.max(0, index - 1)
       : Math.min(siblings.length - 1, index + 1);
     focusTarget(siblings[nextIndex]?.id);
-  }, [collapsed, focusMindmapNode, handleNodeActivate, handleToggleCollapse, nodeById, parentIds, tree, visibleNodeIdSet]);
+  }, [collapsed, descendantCounts, focusMindmapNode, handleNodeActivate, handleToggleCollapse, nodeById, parentIds, tree, visibleNodeIdSet]);
 
   const handlePreviewOpen = useCallback((card: (typeof cards)[number]) => {
     hidePreview();
@@ -711,8 +716,8 @@ export function MindmapView({ searchTarget = null, onAddCategory, onAddGroup, on
                   card={node.type === "card" ? cardsById.get(node.refId) : undefined}
                   pinned={node.type === "card" && pinnedSet.has(node.refId)}
                   collapsed={collapsed.has(node.id)}
-                  descendantCount={descendantCount(node)}
-                  chipSide={layout === "tree-down" ? "down" : layout === "bilateral" && layoutResult.positions[node.id].x + layoutResult.positions[node.id].width / 2 < layoutResult.positions[tree.id].x + layoutResult.positions[tree.id].width / 2 ? "left" : "right"}
+                  descendantCount={descendantCounts[node.id] || 0}
+                  chipSide={layout === "tree-down" ? "down" : layoutResult.sideByNodeId[node.id] || "right"}
                   dragging={dragDelta?.nodeId === node.id}
                   highlighted={highlightedNodeId === node.id}
                   focused={focusedNodeId === node.id}
@@ -744,7 +749,13 @@ export function MindmapView({ searchTarget = null, onAddCategory, onAddGroup, on
           <span className="wc-mindmap-empty-kicker">导图为空</span>
           <h2>这个分项还没有分类或网页</h2>
           <p>先新建分类，或切回经典模式添加网页；数据会继续走现有保存和同步流程。</p>
-          <button type="button" className="wc-mindmap-empty-action" onClick={onAddCategory}>新建分类</button>
+          <button
+            type="button"
+            className="wc-mindmap-empty-action"
+            onClick={(event) => onAddCategory(event.currentTarget)}
+          >
+            新建分类
+          </button>
         </div>
       )}
 
@@ -769,6 +780,17 @@ export function MindmapView({ searchTarget = null, onAddCategory, onAddGroup, on
             <span className="wc-mindmap-layout-tip">{item.label}</span>
           </button>
         ))}
+        <div className="wc-mindmap-rail-separator" aria-hidden="true" />
+        <button
+          type="button"
+          className="wc-mindmap-reset-button"
+          aria-label="重置当前布局的手动摆放"
+          title="重置布局"
+          disabled={!canResetCurrentLayout}
+          onClick={handleResetLayout}
+        >
+          <RotateCcw aria-hidden="true" />
+        </button>
       </div>
 
       <div className="wc-mindmap-legend" aria-hidden="true">
