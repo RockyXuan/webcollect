@@ -11,6 +11,9 @@ function readRepositoryFile(path: string): string {
 const migrationSql = readRepositoryFile(
   "supabase/migrations/20260717131605_bookmark_search_embeddings.sql",
 );
+const dualSourceMigrationSql = readRepositoryFile(
+  "supabase/migrations/20260717230752_bookmark_search_dual_sources.sql",
+);
 const bootstrapSql = readRepositoryFile("src/storage/database/supabase-init.sql");
 const drizzleSchemaSource = readRepositoryFile("src/storage/database/shared/schema.ts");
 const bootstrapMarker = "-- V1.3.0 derived smart-search index.";
@@ -41,14 +44,14 @@ function expectAdditiveSmartSearchSql(sql: string): void {
   expect(sql).toMatch(/create extension if not exists vector with schema extensions/i);
   expect(sql).toMatch(/create table if not exists public\.bookmark_search_embeddings/i);
   expect(sql).toMatch(/embedding\s+extensions\.vector\(1536\)\s+not null/i);
-  expect(sql).toMatch(/primary key\s*\(user_id,\s*card_id\)/i);
+  expect(sql).toMatch(/primary key\s*\(user_id,\s*card_id(?:,\s*document_source)?\)/i);
   expect(sql).toMatch(/model\s+text\s+not null\s+check\s*\(model\s*=\s*'text-embedding-3-small'\)/i);
 
   expect(sql).toMatch(/alter table public\.bookmark_search_embeddings enable row level security/i);
   expect(sql).toMatch(/using\s*\(\(select auth\.uid\(\)\)\s*=\s*user_id\)/i);
   expect(sql).toMatch(/with check\s*\([\s\S]*?auth\.uid\(\)[\s\S]*?from public\.cards[\s\S]*?public\.cards\.id\s*=\s*public\.bookmark_search_embeddings\.card_id[\s\S]*?public\.cards\.user_id\s*=\s*\(select auth\.uid\(\)\)/i);
   expect(sql).toMatch(/security invoker[\s\S]*?indexed\.user_id\s*=\s*\(select auth\.uid\(\)\)/i);
-  expect(sql).toMatch(/revoke all on public\.bookmark_search_embeddings from anon/i);
+  expect(sql).toMatch(/revoke all on(?: table)? public\.bookmark_search_embeddings[\s\S]*?from(?: public,)? anon/i);
 
   expect(sql).not.toMatch(new RegExp(
     `\\b(?:insert\\s+into|update|delete\\s+from|truncate\\s+table)\\s+public\\.(?:${businessTableAlternation})\\b`,
@@ -65,7 +68,26 @@ describe("V1.3 smart-search SQL data boundary", () => {
   it("keeps the generated TypeScript schema aware of the derived vector table", () => {
     expect(drizzleSchemaSource).toMatch(/bookmarkSearchEmbeddings\s*=\s*pgTable\("bookmark_search_embeddings"/);
     expect(drizzleSchemaSource).toMatch(/embedding:\s*vector\(\{\s*dimensions:\s*1536\s*\}\)/);
-    expect(drizzleSchemaSource).toMatch(/primaryKey\(\{\s*columns:\s*\[table\.userId,\s*table\.cardId\]/);
+    expect(drizzleSchemaSource).toMatch(/documentSource:\s*text\("document_source"\)\.default\('saved-fields'\)\.notNull\(\)/);
+    expect(drizzleSchemaSource).toMatch(/primaryKey\(\{\s*columns:\s*\[table\.userId,\s*table\.cardId,\s*table\.documentSource\]/);
+    expect(drizzleSchemaSource).toMatch(/index\("bookmark_search_embeddings_card_id_idx"\)\.on\(table\.cardId\)/);
+  });
+
+  it("migrates the derived table to independent public and saved-field vectors", () => {
+    expect(dualSourceMigrationSql).toMatch(/add column if not exists document_source text/i);
+    expect(dualSourceMigrationSql).toMatch(/check \(document_source in \('public-html', 'saved-fields'\)\)[\s\S]*?not valid/i);
+    expect(dualSourceMigrationSql).toMatch(/validate constraint bookmark_search_embeddings_document_source_check/i);
+    expect(dualSourceMigrationSql).toMatch(/primary key \(user_id, card_id, document_source\)/i);
+    expect(dualSourceMigrationSql).toMatch(/bookmark_search_embeddings_card_id_idx[\s\S]*?\(card_id\)/i);
+    expect(dualSourceMigrationSql).toMatch(/enable row level security/i);
+    expect(dualSourceMigrationSql).toMatch(/revoke all on table public\.bookmark_search_embeddings[\s\S]*?from public, anon, authenticated/i);
+    expect(dualSourceMigrationSql).toMatch(/grant select, insert, update, delete on table public\.bookmark_search_embeddings[\s\S]*?to authenticated/i);
+    expect(dualSourceMigrationSql).toMatch(/select distinct on \(candidates\.card_id\)[\s\S]*?candidates\.similarity desc[\s\S]*?when 'saved-fields' then 0/i);
+    expect(dualSourceMigrationSql).toMatch(/notify pgrst, 'reload schema'/i);
+    expect(dualSourceMigrationSql).not.toMatch(new RegExp(
+      `\\b(?:insert\\s+into|update|delete\\s+from|truncate\\s+table)\\s+public\\.(?:${businessTableAlternation})\\b`,
+      "i",
+    ));
   });
 
   it("keeps the migration additive and owner-scoped", () => {
@@ -96,11 +118,12 @@ describe("V1.3 smart-search SQL data boundary", () => {
       expect(migrationSql).toContain(contractName);
     }
 
-    const migrationBlock = migrationSql
-      .slice(migrationSql.indexOf(bootstrapMarker), migrationSql.lastIndexOf("commit;"))
-      .trim();
-    const normalizeSqlFormatting = (value: string) => value.replace(/\s+/g, "");
-    expect(normalizeSqlFormatting(bootstrapSmartSearchSql)).toBe(normalizeSqlFormatting(migrationBlock));
+    expect(bootstrapSmartSearchSql).toMatch(/document_source text not null default 'saved-fields'/i);
+    expect(bootstrapSmartSearchSql).toMatch(/primary key \(user_id, card_id, document_source\)/i);
+    expect(bootstrapSmartSearchSql).toMatch(/bookmark_search_embeddings_card_id_idx[\s\S]*?\(card_id\)/i);
+    expect(bootstrapSmartSearchSql).toMatch(/select distinct on \(candidates\.card_id\)/i);
+    expect(bootstrapSmartSearchSql).toMatch(/when 'saved-fields' then 0/i);
+    expect(dualSourceMigrationSql).toContain("bookmark_search_embeddings_document_source_check");
   });
 
   it("stores no webpage text or query text in the embedding table", () => {
@@ -163,7 +186,18 @@ describe("V1.3 bookmark-search Edge Function secret and logging boundary", () =>
   it("charges Unicode character units and refreshes stale model versions", () => {
     expect(edgeFunctionSources).toMatch(/quotaUnitsForRequest\(body\)/);
     expect(edgeFunctionSources).toMatch(/requested_units:\s*requestedUnits/);
-    expect(edgeFunctionSources).toMatch(/select\("card_id,content_hash,model,index_version,indexed_at"\)/);
+    expect(edgeFunctionSources).toMatch(/\.select\(\s*"card_id,document_source,content_hash,model,index_version,indexed_at"\s*,?\s*\)/);
+    expect(edgeFunctionSources).toMatch(/onConflict:\s*"user_id,card_id,document_source"/);
     expect(edgeFunctionSources).toMatch(/needsEmbeddingRefresh\(/);
+    expect(edgeFunctionSources).toMatch(/select\("card_id,document_source,content_hash,indexed_at"\)/);
+    expect(edgeFunctionSources).toMatch(/contentHash:\s*item\.contentHash/);
+  });
+
+  it("bounds the raw JSON body before parsing and maps malformed JSON to a stable code", () => {
+    expect(edgeFunctionSources).toMatch(/MAX_REQUEST_BODY_BYTES\s*=\s*1_048_576/);
+    expect(edgeFunctionSources).toMatch(/assertBookmarkSearchContentLength\(request\)/);
+    expect(edgeFunctionSources).toMatch(/byteLength\s*>\s*MAX_REQUEST_BODY_BYTES/);
+    expect(edgeFunctionSources).toMatch(/RequestValidationError\("invalid-json"\)/);
+    expect(edgeFunctionSources).not.toMatch(/await request\.json\(\)/);
   });
 });

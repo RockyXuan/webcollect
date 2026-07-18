@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createOpenAiEmbeddings, EmbeddingProviderError } from "./openai.ts";
 import {
+  assertBookmarkSearchContentLength,
   type BookmarkSearchRequest,
   EMBEDDING_INDEX_VERSION,
   EMBEDDING_MODEL,
@@ -8,6 +9,7 @@ import {
   needsEmbeddingRefresh,
   parseBookmarkSearchRequest,
   quotaUnitsForRequest,
+  readBookmarkSearchJson,
   RequestValidationError,
 } from "./validation.ts";
 
@@ -43,6 +45,10 @@ function bearerToken(request: Request): string {
     ?.trim() ?? "";
 }
 
+function embeddingKey(cardId: string, source: string): string {
+  return `${cardId}:${source}`;
+}
+
 async function consumeQuota(
   client: SupabaseClient,
   action: BookmarkSearchRequest["action"],
@@ -62,7 +68,7 @@ async function indexDocuments(
   items: IndexRequestItem[],
   apiKey: string,
 ): Promise<Response> {
-  const cardIds = items.map((item) => item.cardId);
+  const cardIds = [...new Set(items.map((item) => item.cardId))];
   const { data: ownedCards, error: ownershipError } = await client.from("cards")
     .select("id").in("id", cardIds);
   if (ownershipError) {
@@ -75,14 +81,22 @@ async function indexDocuments(
 
   const { data: existing, error: existingError } = await client
     .from("bookmark_search_embeddings")
-    .select("card_id,content_hash,model,index_version,indexed_at")
+    .select(
+      "card_id,document_source,content_hash,model,index_version,indexed_at",
+    )
     .in("card_id", cardIds);
   if (existingError) return json({ error: "index-read-failed" }, 503);
   const existingById = new Map(
-    (existing ?? []).map((row) => [String(row.card_id), row]),
+    (existing ?? []).map((row) => [
+      embeddingKey(String(row.card_id), String(row.document_source)),
+      row,
+    ]),
   );
   const changed = items.filter((item) =>
-    needsEmbeddingRefresh(existingById.get(item.cardId), item)
+    needsEmbeddingRefresh(
+      existingById.get(embeddingKey(item.cardId, item.source)),
+      item,
+    )
   );
 
   if (changed.length > 0) {
@@ -94,6 +108,7 @@ async function indexDocuments(
     const rows = changed.map((item, index) => ({
       user_id: userId,
       card_id: item.cardId,
+      document_source: item.source,
       content_hash: item.contentHash,
       model: EMBEDDING_MODEL,
       embedding: embeddings[index],
@@ -102,20 +117,41 @@ async function indexDocuments(
     }));
     const { error: upsertError } = await client
       .from("bookmark_search_embeddings")
-      .upsert(rows, { onConflict: "user_id,card_id" });
+      .upsert(rows, { onConflict: "user_id,card_id,document_source" });
     if (upsertError) return json({ error: "index-write-failed" }, 503);
   }
 
   const { data: indexedRows, error: indexedError } = await client
     .from("bookmark_search_embeddings")
-    .select("card_id,indexed_at")
+    .select("card_id,document_source,content_hash,indexed_at")
     .in("card_id", cardIds);
   if (indexedError) return json({ error: "index-read-failed" }, 503);
-  return json({
-    indexed: (indexedRows ?? []).map((row) => ({
-      cardId: String(row.card_id),
+  const indexedByKey = new Map(
+    (indexedRows ?? []).map((row) => [
+      embeddingKey(String(row.card_id), String(row.document_source)),
+      row,
+    ]),
+  );
+  const indexed = items.map((item) => {
+    const row = indexedByKey.get(embeddingKey(item.cardId, item.source));
+    if (
+      !row || String(row.content_hash) !== item.contentHash ||
+      !Number.isFinite(new Date(String(row.indexed_at)).getTime())
+    ) {
+      return null;
+    }
+    return {
+      cardId: item.cardId,
+      contentHash: item.contentHash,
+      source: item.source,
       indexedAt: new Date(String(row.indexed_at)).getTime(),
-    })),
+    };
+  });
+  if (indexed.some((item) => item === null)) {
+    return json({ error: "index-receipt-mismatch" }, 503);
+  }
+  return json({
+    indexed,
   });
 }
 
@@ -149,6 +185,18 @@ Deno.serve(async (request) => {
     return json({ error: "method-not-allowed" }, 405);
   }
 
+  try {
+    assertBookmarkSearchContentLength(request);
+  } catch (error) {
+    if (error instanceof RequestValidationError) {
+      return json(
+        { error: error.code },
+        error.code === "request-too-large" ? 413 : 400,
+      );
+    }
+    return json({ error: "invalid-request" }, 400);
+  }
+
   const token = bearerToken(request);
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const anonKey = publishableKey();
@@ -170,7 +218,9 @@ Deno.serve(async (request) => {
   }
 
   try {
-    const body = parseBookmarkSearchRequest(await request.json());
+    const body = parseBookmarkSearchRequest(
+      await readBookmarkSearchJson(request),
+    );
     if (
       !(await consumeQuota(client, body.action, quotaUnitsForRequest(body)))
     ) {
@@ -182,7 +232,10 @@ Deno.serve(async (request) => {
       : await semanticSearch(client, body.query, body.limit, apiKey);
   } catch (error) {
     if (error instanceof RequestValidationError) {
-      return json({ error: error.code }, 400);
+      return json(
+        { error: error.code },
+        error.code === "request-too-large" ? 413 : 400,
+      );
     }
     if (error instanceof EmbeddingProviderError) {
       const status = error.code === "embedding-rate-limited"

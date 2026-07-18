@@ -10,6 +10,7 @@ import {
 } from "@/lib/mindmap-view-state";
 import { openWebCollectUrl } from "@/lib/platform";
 import { useAppStore } from "@/lib/store";
+import type { CategorySearchTarget } from "@/lib/category-search-target";
 import { buildMindmapTree, fitCamera, layoutMindmap } from "./layout-engine";
 import { MindmapNode } from "./mindmap-node";
 import { NodeHoverPreview, type MindmapPreviewTarget } from "./node-hover-preview";
@@ -35,11 +36,7 @@ const VIRTUALIZE_NODE_THRESHOLD = 300;
 const VIRTUALIZE_OVERSCAN = 240;
 const FOCUS_VIEW_MARGIN = 96;
 
-export interface MindmapSearchTarget {
-  sectionId: string;
-  categoryId: string;
-  requestId: number;
-}
+export type MindmapSearchTarget = CategorySearchTarget;
 
 interface MindmapViewProps {
   searchTarget?: MindmapSearchTarget | null;

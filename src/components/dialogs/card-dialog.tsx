@@ -258,7 +258,7 @@ export function CardDialog({ open, onOpenChange, editingCard, defaultCategoryId 
                   <Label className="wc-field-label">分类</Label>
                   {currentCategoryId ? (
                     <Select value={currentCategoryId} onValueChange={setCategoryId}>
-                      <SelectTrigger className="wc-input h-11 w-full">
+                      <SelectTrigger className="wc-input h-11 w-full" aria-label="分类">
                         <SelectValue placeholder="选择分类" />
                       </SelectTrigger>
                       <SelectContent>

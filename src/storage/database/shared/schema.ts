@@ -135,13 +135,14 @@ export const cards = pgTable("cards", {
 export const bookmarkSearchEmbeddings = pgTable("bookmark_search_embeddings", {
 	userId: uuid("user_id").notNull(),
 	cardId: uuid("card_id").notNull(),
+	documentSource: text("document_source").default('saved-fields').notNull(),
 	contentHash: text("content_hash").notNull(),
 	model: text().notNull(),
 	embedding: vector({ dimensions: 1536 }).notNull(),
 	indexedAt: timestamp("indexed_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	indexVersion: integer("index_version").default(1).notNull(),
 }, (table) => [
-	primaryKey({ columns: [table.userId, table.cardId] }),
+	primaryKey({ columns: [table.userId, table.cardId, table.documentSource] }),
 	foreignKey({
 		columns: [table.userId],
 		foreignColumns: [users.id],
@@ -153,7 +154,9 @@ export const bookmarkSearchEmbeddings = pgTable("bookmark_search_embeddings", {
 		name: "bookmark_search_embeddings_card_id_cards_id_fk"
 	}).onDelete("cascade"),
 	index("bookmark_search_embeddings_user_id_idx").on(table.userId),
+	index("bookmark_search_embeddings_card_id_idx").on(table.cardId),
 	check("bookmark_search_embeddings_content_hash_check", sql`${table.contentHash} ~ '^[0-9a-f]{64}$'`),
+	check("bookmark_search_embeddings_document_source_check", sql`${table.documentSource} in ('public-html', 'saved-fields')`),
 	check("bookmark_search_embeddings_model_check", sql`${table.model} = 'text-embedding-3-small'`),
 	check("bookmark_search_embeddings_index_version_check", sql`${table.indexVersion} > 0`),
 ]);

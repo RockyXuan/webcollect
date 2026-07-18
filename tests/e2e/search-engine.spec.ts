@@ -5,7 +5,7 @@ test("a freshly selected search engine still handles a quick Enter", async ({ pa
   await page.goto("/");
   await openCollection(page);
 
-  const searchInput = page.getByRole("textbox", { name: "搜索网站" });
+  const searchInput = page.getByRole("combobox", { name: "搜索收藏或使用外部搜索引擎" });
   const engineSelect = page.getByRole("combobox", { name: "选择搜索引擎" });
 
   await engineSelect.selectOption("baidu");

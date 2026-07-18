@@ -42,15 +42,26 @@ export interface SemanticKnowledgeResult {
   similarity: number;
 }
 
+export type KnowledgeDocumentSource = "public-html" | "saved-fields";
+
 export interface KnowledgeIndexItem {
   cardId: string;
   contentHash: string;
   text: string;
+  source: KnowledgeDocumentSource;
 }
 
 export interface KnowledgeIndexResult {
   cardId: string;
+  contentHash: string;
   indexedAt: number;
+  source: KnowledgeDocumentSource;
+}
+
+export interface KnowledgeEmbeddingState {
+  cardId: string;
+  contentHash: string;
+  source: KnowledgeDocumentSource;
 }
 
 export interface PublicKnowledgeResult {
@@ -60,14 +71,18 @@ export interface PublicKnowledgeResult {
   segmentCount: number;
 }
 
-export interface SemanticSearchKnowledgeOptions {
-  limit?: number;
+export interface KnowledgeRequestOptions {
   signal?: AbortSignal;
+  expectedUserId?: string;
+}
+
+export interface SemanticSearchKnowledgeOptions extends KnowledgeRequestOptions {
+  limit?: number;
   allowedCardIds?: ReadonlySet<string> | readonly string[];
 }
 
-export interface KnowledgeRequestOptions {
-  signal?: AbortSignal;
+export interface RemoveKnowledgeEmbeddingOptions extends KnowledgeRequestOptions {
+  source?: KnowledgeDocumentSource;
 }
 
 interface KnowledgeClientDependencies {
@@ -108,6 +123,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function characterLength(value: string): number {
   return Array.from(value).length;
+}
+
+function isKnowledgeDocumentSource(value: unknown): value is KnowledgeDocumentSource {
+  return value === "public-html" || value === "saved-fields";
+}
+
+function indexItemKey(cardId: string, source: KnowledgeDocumentSource): string {
+  return `${cardId}:${source}`;
 }
 
 function assertNotAborted(signal?: AbortSignal): void {
@@ -165,11 +188,17 @@ async function serviceFailure(
   return new KnowledgeClientError(mapServiceCode(rawCode, response?.status ?? 0, fallback));
 }
 
-async function authenticatedContext(signal?: AbortSignal): Promise<{
+async function authenticatedContext(options: KnowledgeRequestOptions = {}): Promise<{
   client: SupabaseClient;
   accessToken: string;
+  userId: string;
 }> {
+  const { signal } = options;
   assertNotAborted(signal);
+  const expectedUserId = options.expectedUserId?.trim();
+  if (options.expectedUserId !== undefined && !expectedUserId) {
+    throw new KnowledgeClientError("invalid-request");
+  }
   const deps = dependencies();
   let configured = false;
   try {
@@ -185,8 +214,15 @@ async function authenticatedContext(signal?: AbortSignal): Promise<{
     const { data, error } = await client.auth.getSession();
     assertNotAborted(signal);
     const accessToken = data.session?.access_token?.trim() ?? "";
-    if (error || !accessToken) throw new KnowledgeClientError("authentication-required");
-    return { client, accessToken };
+    const userId = data.session?.user?.id?.trim() ?? "";
+    if (
+      error
+      || !accessToken
+      || (expectedUserId !== undefined && userId !== expectedUserId)
+    ) {
+      throw new KnowledgeClientError("authentication-required");
+    }
+    return { client, accessToken, userId };
   } catch (error) {
     throw normalizedFailure(error, "authentication-required", signal);
   }
@@ -242,21 +278,27 @@ function normalizedIndexItems(items: readonly KnowledgeIndexItem[]): KnowledgeIn
     const cardId = item.cardId.trim();
     const contentHash = item.contentHash.trim().toLowerCase();
     const text = item.text.trim();
+    const source = item.source;
+    const itemKey = isKnowledgeDocumentSource(source) ? indexItemKey(cardId, source) : "";
     if (
       !cardId
-      || seen.has(cardId)
+      || !itemKey
+      || seen.has(itemKey)
       || !CONTENT_HASH_PATTERN.test(contentHash)
       || !text
       || characterLength(text) > MAX_DOCUMENT_CHARACTERS
     ) {
       throw new KnowledgeClientError("invalid-request");
     }
-    seen.add(cardId);
-    return { cardId, contentHash, text };
+    seen.add(itemKey);
+    return { cardId, contentHash, text, source };
   });
 }
 
-function validateIndexResults(data: unknown, requestedCardIds: ReadonlySet<string>): KnowledgeIndexResult[] {
+function validateIndexResults(
+  data: unknown,
+  requestedItems: ReadonlyMap<string, string>,
+): KnowledgeIndexResult[] {
   if (!isRecord(data) || !Array.isArray(data.indexed)) {
     throw new KnowledgeClientError("invalid-response");
   }
@@ -265,13 +307,29 @@ function validateIndexResults(data: unknown, requestedCardIds: ReadonlySet<strin
   for (const value of data.indexed) {
     if (!isRecord(value)) throw new KnowledgeClientError("invalid-response");
     const cardId = typeof value.cardId === "string" ? value.cardId.trim() : "";
+    const contentHash = typeof value.contentHash === "string"
+      ? value.contentHash.trim().toLowerCase()
+      : "";
+    const source = value.source;
     const indexedAt = value.indexedAt;
-    if (!cardId || typeof indexedAt !== "number" || !Number.isFinite(indexedAt) || indexedAt <= 0) {
+    if (
+      !cardId
+      || !CONTENT_HASH_PATTERN.test(contentHash)
+      || !isKnowledgeDocumentSource(source)
+      || typeof indexedAt !== "number"
+      || !Number.isFinite(indexedAt)
+      || indexedAt <= 0
+    ) {
       throw new KnowledgeClientError("invalid-response");
     }
-    if (!requestedCardIds.has(cardId) || seen.has(cardId)) continue;
-    seen.add(cardId);
-    results.push({ cardId, indexedAt });
+    const itemKey = indexItemKey(cardId, source);
+    const requestedHash = requestedItems.get(itemKey);
+    if (!requestedHash) continue;
+    if (contentHash !== requestedHash || seen.has(itemKey)) {
+      throw new KnowledgeClientError("invalid-response");
+    }
+    seen.add(itemKey);
+    results.push({ cardId, contentHash, indexedAt, source });
   }
   return results;
 }
@@ -287,7 +345,7 @@ export async function semanticSearchKnowledge(
   const limit = Number.isFinite(options.limit)
     ? Math.max(1, Math.min(20, Math.floor(options.limit ?? 20)))
     : 20;
-  const { client, accessToken } = await authenticatedContext(options.signal);
+  const { client, accessToken } = await authenticatedContext(options);
   try {
     const { data, error, response } = await client.functions.invoke<unknown>(BOOKMARK_SEARCH_FUNCTION, {
       body: { action: "search", query: normalizedQuery, limit },
@@ -306,7 +364,7 @@ export async function indexKnowledge(
   options: KnowledgeRequestOptions = {},
 ): Promise<KnowledgeIndexResult[]> {
   const normalizedItems = normalizedIndexItems(items);
-  const { client, accessToken } = await authenticatedContext(options.signal);
+  const { client, accessToken } = await authenticatedContext(options);
   try {
     const { data, error, response } = await client.functions.invoke<unknown>(BOOKMARK_SEARCH_FUNCTION, {
       body: { action: "index", items: normalizedItems },
@@ -314,7 +372,13 @@ export async function indexKnowledge(
       signal: options.signal,
     });
     if (error) throw await serviceFailure(response, "index-failed", options.signal);
-    return validateIndexResults(data, new Set(normalizedItems.map((item) => item.cardId)));
+    return validateIndexResults(
+      data,
+      new Map(normalizedItems.map((item) => [
+        indexItemKey(item.cardId, item.source),
+        item.contentHash,
+      ])),
+    );
   } catch (error) {
     throw normalizedFailure(error, "index-failed", options.signal);
   }
@@ -322,16 +386,22 @@ export async function indexKnowledge(
 
 export async function removeKnowledgeEmbedding(
   cardId: string,
-  options: KnowledgeRequestOptions = {},
+  options: RemoveKnowledgeEmbeddingOptions = {},
 ): Promise<void> {
   const normalizedCardId = cardId.trim();
-  if (!normalizedCardId) throw new KnowledgeClientError("invalid-request");
-  const { client } = await authenticatedContext(options.signal);
+  if (!normalizedCardId) {
+    throw new KnowledgeClientError("invalid-request");
+  }
+  if (options.source !== undefined && !isKnowledgeDocumentSource(options.source)) {
+    throw new KnowledgeClientError("invalid-request");
+  }
+  const { client } = await authenticatedContext(options);
   try {
     let request = client
       .from("bookmark_search_embeddings")
       .delete()
       .eq("card_id", normalizedCardId);
+    if (options.source) request = request.eq("document_source", options.source);
     if (options.signal) request = request.abortSignal(options.signal);
     const { error } = await request;
     if (error) throw new KnowledgeClientError("remove-failed");
@@ -339,6 +409,63 @@ export async function removeKnowledgeEmbedding(
     throw normalizedFailure(error, "remove-failed", options.signal);
   }
 }
+
+export async function listKnowledgeEmbeddingStates(
+  cardIds: readonly string[],
+  options: KnowledgeRequestOptions = {},
+): Promise<KnowledgeEmbeddingState[]> {
+  const normalizedCardIds = [...new Set(cardIds.map((cardId) => cardId.trim()))];
+  if (normalizedCardIds.some((cardId) => !cardId)) {
+    throw new KnowledgeClientError("invalid-request");
+  }
+  if (normalizedCardIds.length === 0) return [];
+
+  const { client } = await authenticatedContext(options);
+  const results: KnowledgeEmbeddingState[] = [];
+  const seen = new Set<string>();
+
+  try {
+    for (let start = 0; start < normalizedCardIds.length; start += 100) {
+      assertNotAborted(options.signal);
+      const batch = normalizedCardIds.slice(start, start + 100);
+      const requestedInBatch = new Set(batch);
+      let request = client
+        .from("bookmark_search_embeddings")
+        .select("card_id,document_source,content_hash")
+        .in("card_id", batch);
+      if (options.signal) request = request.abortSignal(options.signal);
+      const { data, error } = await request;
+      if (error) throw new KnowledgeClientError("service-unavailable");
+
+      for (const value of data ?? []) {
+        if (!isRecord(value)) throw new KnowledgeClientError("invalid-response");
+        const cardId = typeof value.card_id === "string" ? value.card_id.trim() : "";
+        const source = value.document_source;
+        const contentHash = typeof value.content_hash === "string"
+          ? value.content_hash.trim().toLowerCase()
+          : "";
+        if (
+          !requestedInBatch.has(cardId)
+          || !isKnowledgeDocumentSource(source)
+          || !CONTENT_HASH_PATTERN.test(contentHash)
+        ) {
+          throw new KnowledgeClientError("invalid-response");
+        }
+        const key = indexItemKey(cardId, source);
+        if (seen.has(key)) throw new KnowledgeClientError("invalid-response");
+        seen.add(key);
+        results.push({ cardId, source, contentHash });
+      }
+    }
+    return results;
+  } catch (error) {
+    throw normalizedFailure(error, "service-unavailable", options.signal);
+  }
+}
+
+// Kept as a short, explicit alias for the extension coordinator. Both names
+// share the same RLS-scoped implementation and account guard.
+export const listEmbeddingStates = listKnowledgeEmbeddingStates;
 
 function validatePublicKnowledge(data: unknown): PublicKnowledgeResult {
   if (!isRecord(data)) throw new KnowledgeClientError("invalid-response");
@@ -383,7 +510,7 @@ export async function fetchPublicKnowledge(
     throw normalizedFailure(error, "invalid-request", options.signal);
   }
 
-  const { accessToken } = await authenticatedContext(options.signal);
+  const { accessToken } = await authenticatedContext(options);
   try {
     const response = await dependencies().fetch("/api/knowledge/fetch", {
       method: "POST",

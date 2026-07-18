@@ -282,20 +282,26 @@ create extension if not exists vector with schema extensions;
 create table if not exists public.bookmark_search_embeddings (
   user_id uuid not null references public.users(id) on delete cascade,
   card_id uuid not null references public.cards(id) on delete cascade,
+  document_source text not null default 'saved-fields'
+    check (document_source in ('public-html', 'saved-fields')),
   content_hash text not null check (content_hash ~ '^[0-9a-f]{64}$'),
   model text not null check (model = 'text-embedding-3-small'),
   embedding extensions.vector(1536) not null,
   indexed_at timestamptz not null default now(),
   index_version integer not null default 1 check (index_version > 0),
-  primary key (user_id, card_id)
+  primary key (user_id, card_id, document_source)
 );
 
 create index if not exists bookmark_search_embeddings_user_id_idx
   on public.bookmark_search_embeddings(user_id);
 
+create index if not exists bookmark_search_embeddings_card_id_idx
+  on public.bookmark_search_embeddings(card_id);
+
 alter table public.bookmark_search_embeddings enable row level security;
+revoke all on table public.bookmark_search_embeddings
+  from public, anon, authenticated;
 grant select, insert, update, delete on public.bookmark_search_embeddings to authenticated;
-revoke all on public.bookmark_search_embeddings from anon;
 
 drop policy if exists bookmark_search_embeddings_select_own on public.bookmark_search_embeddings;
 create policy bookmark_search_embeddings_select_own
@@ -343,19 +349,42 @@ stable
 security invoker
 set search_path = ''
 as $$
+  with candidates as (
+    select
+      indexed.card_id,
+      indexed.content_hash,
+      indexed.document_source,
+      1 - (indexed.embedding OPERATOR(extensions.<=>) query_embedding) as similarity
+    from public.bookmark_search_embeddings as indexed
+    where indexed.user_id = (select auth.uid())
+  ),
+  best_per_card as (
+    select distinct on (candidates.card_id)
+      candidates.card_id,
+      candidates.content_hash,
+      candidates.similarity
+    from candidates
+    where candidates.similarity >= greatest(0, least(match_threshold, 1))
+    order by
+      candidates.card_id,
+      candidates.similarity desc,
+      case candidates.document_source
+        when 'saved-fields' then 0
+        else 1
+      end,
+      candidates.content_hash
+  )
   select
-    indexed.card_id,
-    indexed.content_hash,
-    1 - (indexed.embedding OPERATOR(extensions.<=>) query_embedding) as similarity
-  from public.bookmark_search_embeddings as indexed
-  where indexed.user_id = (select auth.uid())
-    and 1 - (indexed.embedding OPERATOR(extensions.<=>) query_embedding) >= greatest(0, least(match_threshold, 1))
-  order by indexed.embedding OPERATOR(extensions.<=>) query_embedding
+    best_per_card.card_id,
+    best_per_card.content_hash,
+    best_per_card.similarity
+  from best_per_card
+  order by best_per_card.similarity desc, best_per_card.card_id
   limit greatest(1, least(match_count, 20));
 $$;
 
 revoke all on function public.match_bookmark_search_embeddings(extensions.vector, double precision, integer)
-  from public, anon;
+  from public, anon, authenticated;
 grant execute on function public.match_bookmark_search_embeddings(extensions.vector, double precision, integer)
   to authenticated;
 

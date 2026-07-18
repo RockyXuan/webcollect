@@ -21,6 +21,13 @@ export interface KnowledgeCacheEntry {
   sourceUrl: string;
   resolvedUrl: string;
   contentHash: string;
+  /**
+   * A cache marker for the complete derived document set. `contentHash` is not
+   * the hash of either cloud row; these source-specific hashes are the only
+   * values that may be compared with embedding state returned by Supabase.
+   */
+  savedFieldsHash?: string;
+  publicHtmlHash?: string;
   documentText: string;
   extractedText: string;
   extraction: KnowledgeExtractionSource;
@@ -55,6 +62,15 @@ export interface KnowledgeDocumentInput {
   card: WebCard;
   pathLabels: string[];
   extractedText?: string;
+}
+
+export interface KnowledgeSourceDocumentText {
+  source: KnowledgeExtractionSource;
+  text: string;
+}
+
+export interface HashedKnowledgeSourceDocument extends KnowledgeSourceDocumentText {
+  contentHash: string;
 }
 
 const MAX_KNOWLEDGE_DOCUMENT_CHARACTERS = 6_000;
@@ -99,7 +115,7 @@ function truncateKnowledgeDocument(value: string): string {
   return truncated.trimEnd();
 }
 
-export function buildKnowledgeDocument({ card, pathLabels, extractedText = "" }: KnowledgeDocumentInput): string {
+export function buildSavedFieldsKnowledgeDocument({ card, pathLabels }: KnowledgeDocumentInput): string {
   const lines = [
     ["标题", card.title],
     ["域名", cardDomain(card.url)],
@@ -108,7 +124,6 @@ export function buildKnowledgeDocument({ card, pathLabels, extractedText = "" }:
     ["简介", card.shortDesc],
     ["详细介绍", card.fullDesc],
     ["备注", card.note],
-    ["公开网页正文", extractedText],
   ];
 
   const documentText = lines
@@ -119,10 +134,68 @@ export function buildKnowledgeDocument({ card, pathLabels, extractedText = "" }:
   return truncateKnowledgeDocument(documentText);
 }
 
+export function buildPublicHtmlKnowledgeDocument(extractedText: string): string {
+  const normalizedText = normalizeLine(extractedText);
+  if (!normalizedText) return "";
+  return truncateKnowledgeDocument(`公开网页正文: ${normalizedText}`);
+}
+
+/**
+ * Builds the two privacy-separated documents used by semantic indexing.
+ * User-saved fields never enter the public HTML row, and public text never
+ * enters the saved-fields row.
+ */
+export function buildKnowledgeSourceDocumentTexts(
+  input: KnowledgeDocumentInput,
+): KnowledgeSourceDocumentText[] {
+  const savedFields = buildSavedFieldsKnowledgeDocument(input);
+  const publicHtml = buildPublicHtmlKnowledgeDocument(input.extractedText ?? "");
+  return [
+    { source: "saved-fields", text: savedFields },
+    ...(publicHtml ? [{ source: "public-html" as const, text: publicHtml }] : []),
+  ];
+}
+
+/**
+ * Backwards-compatible name for callers that need the authoritative
+ * saved-fields document. Public HTML must be built as its own source via
+ * `buildKnowledgeSourceDocumentTexts`.
+ */
+export function buildKnowledgeDocument(input: KnowledgeDocumentInput): string {
+  return buildSavedFieldsKnowledgeDocument(input);
+}
+
 export async function hashKnowledgeDocument(documentText: string): Promise<string> {
   const bytes = new TextEncoder().encode(documentText);
   const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
   return Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, "0")).join("");
+}
+
+export async function hashKnowledgeSourceDocuments(
+  documents: readonly KnowledgeSourceDocumentText[],
+): Promise<HashedKnowledgeSourceDocument[]> {
+  return Promise.all(documents.map(async (document) => ({
+    ...document,
+    contentHash: await hashKnowledgeDocument(document.text),
+  })));
+}
+
+export async function hashKnowledgeDocumentSet(
+  documents: readonly Pick<HashedKnowledgeSourceDocument, "source" | "contentHash">[],
+): Promise<string> {
+  const markerInput = [...documents]
+    .sort((left, right) => left.source.localeCompare(right.source))
+    .map((document) => `${document.source}:${document.contentHash}`)
+    .join("\n");
+  return hashKnowledgeDocument(`knowledge-document-set-v1\n${markerInput}`);
+}
+
+export function getKnowledgeCacheSourceHash(
+  entry: KnowledgeCacheEntry | null | undefined,
+  source: KnowledgeExtractionSource,
+): string | null {
+  const value = source === "saved-fields" ? entry?.savedFieldsHash : entry?.publicHtmlHash;
+  return typeof value === "string" && /^[a-f0-9]{64}$/i.test(value) ? value.toLowerCase() : null;
 }
 
 export async function getKnowledgeCacheEntry(

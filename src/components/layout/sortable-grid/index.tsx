@@ -16,6 +16,7 @@ import {
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { Pencil, PencilOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { CategorySearchTarget } from "@/lib/category-search-target";
 import { useAppStore } from "@/lib/store";
 import type { Category, WebCard } from "@/lib/types";
 import { SortableCategoryBlock } from "./category-block";
@@ -44,6 +45,7 @@ export interface SortableGridProps {
   onUpdateCard?: (card: WebCard) => void;
   onShipCategory?: (category: Category) => void;
   onShipCard?: (card: WebCard) => void;
+  searchTarget?: CategorySearchTarget | null;
 }
 
 export function SortableGrid({
@@ -55,6 +57,7 @@ export function SortableGrid({
   onUpdateCard,
   onShipCategory,
   onShipCard,
+  searchTarget = null,
 }: SortableGridProps) {
   const {
     cards,
@@ -74,6 +77,11 @@ export function SortableGrid({
   const [hoveredParentId, setHoveredParentId] = useState<string | null>(null);
   const [lockedHint, setLockedHint] = useState<LockedLayoutHint | null>(null);
   const lockedHintTimerRef = useRef<number | null>(null);
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const searchFrameRef = useRef<number | null>(null);
+  const searchHighlightTimerRef = useRef<number | null>(null);
+  const highlightedSearchTargetRef = useRef<HTMLElement | null>(null);
+  const lastSearchRequestRef = useRef(0);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -108,6 +116,64 @@ export function SortableGrid({
   const visibleCategories = useMemo(() => {
     return categories.filter((c) => (c.sectionId || "section-default") === activeSectionId);
   }, [categories, activeSectionId]);
+
+  useEffect(() => {
+    if (!searchTarget || searchTarget.sectionId !== activeSectionId) return undefined;
+    if (lastSearchRequestRef.current === searchTarget.requestId) return undefined;
+
+    if (searchFrameRef.current !== null) {
+      window.cancelAnimationFrame(searchFrameRef.current);
+    }
+    searchFrameRef.current = window.requestAnimationFrame(() => {
+      searchFrameRef.current = null;
+      const target = Array.from(
+        gridRef.current?.querySelectorAll<HTMLElement>("[data-wc-category-id]") || []
+      ).find((element) => element.dataset.wcCategoryId === searchTarget.categoryId);
+      if (!target) return;
+
+      lastSearchRequestRef.current = searchTarget.requestId;
+      const previousTarget = highlightedSearchTargetRef.current;
+      previousTarget?.classList.remove("wc-search-highlight");
+      if (previousTarget) delete previousTarget.dataset.wcSearchRequestId;
+      if (searchHighlightTimerRef.current !== null) {
+        window.clearTimeout(searchHighlightTimerRef.current);
+      }
+
+      target.dataset.wcSearchRequestId = String(searchTarget.requestId);
+      const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+      target.scrollIntoView({
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+        block: "center",
+        inline: "center",
+      });
+      target.classList.add("wc-search-highlight");
+      highlightedSearchTargetRef.current = target;
+      searchHighlightTimerRef.current = window.setTimeout(() => {
+        target.classList.remove("wc-search-highlight");
+        delete target.dataset.wcSearchRequestId;
+        if (highlightedSearchTargetRef.current === target) {
+          highlightedSearchTargetRef.current = null;
+        }
+        searchHighlightTimerRef.current = null;
+      }, 1600);
+    });
+
+    return () => {
+      if (searchFrameRef.current !== null) {
+        window.cancelAnimationFrame(searchFrameRef.current);
+        searchFrameRef.current = null;
+      }
+    };
+  }, [activeSectionId, searchTarget, visibleCategories]);
+
+  useEffect(() => () => {
+    if (searchFrameRef.current !== null) window.cancelAnimationFrame(searchFrameRef.current);
+    if (searchHighlightTimerRef.current !== null) window.clearTimeout(searchHighlightTimerRef.current);
+    highlightedSearchTargetRef.current?.classList.remove("wc-search-highlight");
+    if (highlightedSearchTargetRef.current) {
+      delete highlightedSearchTargetRef.current.dataset.wcSearchRequestId;
+    }
+  }, []);
 
   // Build hierarchy
   // Parent categories: explicitly marked isParent OR has sub-groups
@@ -409,7 +475,7 @@ export function SortableGrid({
   };
 
   return (
-    <div onDoubleClick={handleDoubleClick}>
+    <div ref={gridRef} onDoubleClick={handleDoubleClick} data-wc-classic-grid-section-id={activeSectionId}>
     <DndContext
       sensors={sensors}
       collisionDetection={collisionDetection}

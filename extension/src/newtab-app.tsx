@@ -33,6 +33,7 @@ import { MindmapView, type MindmapSearchTarget } from "@/components/mindmap/mind
 import type { CollectionViewMode } from "@/components/mindmap/types";
 import { writeCollectionViewMode } from "@/lib/collection-view-mode";
 import { restoreDialogTriggerFocus } from "@/lib/dialog-trigger-focus";
+import type { CategorySearchTarget } from "@/lib/category-search-target";
 import { WallpaperShell } from "@/components/wallpaper/wallpaper-shell";
 import { useWallpaperStore } from "@/lib/wallpaper-store";
 import {
@@ -71,10 +72,12 @@ export function NewTabApp({ initialCollectionViewMode = "classic" }: NewTabAppPr
   const [requestedViewMode, setRequestedViewMode] = useState<CollectionViewMode>(initialCollectionViewMode);
   const [viewTransitionPhase, setViewTransitionPhase] = useState<"idle" | "exiting" | "entering">("idle");
   const [mindmapSearchTarget, setMindmapSearchTarget] = useState<MindmapSearchTarget | null>(null);
+  const [classicSearchTarget, setClassicSearchTarget] = useState<CategorySearchTarget | null>(null);
   const viewTransitionTokenRef = useRef(0);
   const viewTransitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const viewTransitionFrameRef = useRef<number | null>(null);
   const mindmapSearchRequestRef = useRef(0);
+  const classicSearchRequestRef = useRef(0);
   const cardDialogTriggerRef = useRef<HTMLButtonElement | null>(null);
   const categoryDialogTriggerRef = useRef<HTMLButtonElement | null>(null);
   const wallpaperMode = useWallpaperStore((state) => state.mode);
@@ -291,6 +294,10 @@ export function NewTabApp({ initialCollectionViewMode = "classic" }: NewTabAppPr
     setMindmapSearchTarget({ ...target, requestId: ++mindmapSearchRequestRef.current });
   }, []);
 
+  const handleRevealClassicCategory = useCallback((target: { sectionId: string; categoryId: string }) => {
+    setClassicSearchTarget({ ...target, requestId: ++classicSearchRequestRef.current });
+  }, []);
+
   useEffect(() => () => {
     if (viewTransitionTimerRef.current) clearTimeout(viewTransitionTimerRef.current);
     if (viewTransitionFrameRef.current !== null) cancelAnimationFrame(viewTransitionFrameRef.current);
@@ -356,6 +363,7 @@ export function NewTabApp({ initialCollectionViewMode = "classic" }: NewTabAppPr
             collectionViewMode={requestedViewMode}
             onCollectionViewModeChange={handleCollectionViewModeChange}
             onRevealMindmapCategory={handleRevealMindmapCategory}
+            onRevealClassicCategory={handleRevealClassicCategory}
           />
 
           {collectionViewMode === "classic" && <div className={`wc-collection-view is-${viewTransitionPhase}`} data-testid="collection-view-classic">
@@ -376,6 +384,7 @@ export function NewTabApp({ initialCollectionViewMode = "classic" }: NewTabAppPr
                   setSectionShipItem({ type: "card", card });
                   setSectionShipOpen(true);
                 }}
+                searchTarget={classicSearchTarget}
               />
             </ErrorBoundary>
 

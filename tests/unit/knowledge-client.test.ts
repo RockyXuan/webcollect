@@ -7,6 +7,7 @@ import {
   indexKnowledge,
   KnowledgeClientError,
   type KnowledgeClientErrorCode,
+  listKnowledgeEmbeddingStates,
   removeKnowledgeEmbedding,
   semanticSearchKnowledge,
 } from "@/lib/knowledge-client";
@@ -17,11 +18,14 @@ const HASH_B = "b".repeat(64);
 
 interface FakeClientOptions {
   session?: string | null;
+  sessionUserId?: string | null;
   sessionError?: boolean;
   invokeData?: unknown;
   invokeError?: unknown;
   invokeResponse?: Response;
   deleteError?: unknown;
+  embeddingRows?: unknown[];
+  selectError?: unknown;
 }
 
 function createFakeClient(options: FakeClientOptions = {}) {
@@ -34,16 +38,33 @@ function createFakeClient(options: FakeClientOptions = {}) {
     Promise.resolve({ error: options.deleteError ?? null }),
     {
       abortSignal: vi.fn(() => Promise.resolve({ error: options.deleteError ?? null })),
+      eq: vi.fn(),
     },
   );
-  const eq = vi.fn(() => deletion);
+  const eq = deletion.eq.mockImplementation(() => deletion);
   const deleteRows = vi.fn(() => ({ eq }));
-  const from = vi.fn(() => ({ delete: deleteRows }));
+  const selection = Object.assign(
+    Promise.resolve({
+      data: options.embeddingRows ?? [],
+      error: options.selectError ?? null,
+    }),
+    {
+      abortSignal: vi.fn(() => selection),
+      in: vi.fn(() => selection),
+    },
+  );
+  const select = vi.fn(() => selection);
+  const from = vi.fn(() => ({ delete: deleteRows, select }));
   const getSession = vi.fn(async () => ({
     data: {
       session: options.session === null
         ? null
-        : { access_token: options.session ?? TOKEN },
+        : {
+            access_token: options.session ?? TOKEN,
+            user: options.sessionUserId === null
+              ? undefined
+              : { id: options.sessionUserId ?? "user-a" },
+          },
     },
     error: options.sessionError ? { message: "session failed" } : null,
   }));
@@ -52,7 +73,17 @@ function createFakeClient(options: FakeClientOptions = {}) {
     functions: { invoke },
     from,
   } as unknown as SupabaseClient;
-  return { client, invoke, from, deleteRows, eq, deletion, getSession };
+  return {
+    client,
+    invoke,
+    from,
+    deleteRows,
+    eq,
+    deletion,
+    select,
+    selection,
+    getSession,
+  };
 }
 
 function installClient(client: SupabaseClient, overrides: {
@@ -128,6 +159,19 @@ describe("knowledge client", () => {
     expect(fake.invoke).not.toHaveBeenCalled();
   });
 
+  it("fails closed before cloud I/O when the session user changed", async () => {
+    const fake = createFakeClient({ sessionUserId: "user-b" });
+    const deps = installClient(fake.client);
+
+    await expectCode(semanticSearchKnowledge("github", {
+      expectedUserId: "user-a",
+    }), "authentication-required");
+
+    expect(deps.initSupabase).toHaveBeenCalledTimes(1);
+    expect(fake.invoke).not.toHaveBeenCalled();
+    expect(fake.from).not.toHaveBeenCalled();
+  });
+
   it("normalizes function failures without exposing provider details", async () => {
     const fake = createFakeClient({
       invokeError: new Error("secret upstream detail"),
@@ -151,26 +195,107 @@ describe("knowledge client", () => {
     const fake = createFakeClient({
       invokeData: {
         indexed: [
-          { cardId: "card-a", indexedAt: 1_700_000_000_000 },
-          { cardId: "unrequested", indexedAt: 1_700_000_000_001 },
+          { cardId: "card-a", contentHash: HASH_A, indexedAt: 1_700_000_000_000, source: "public-html" },
+          { cardId: "unrequested", contentHash: HASH_B, indexedAt: 1_700_000_000_001, source: "saved-fields" },
         ],
       },
     });
     installClient(fake.client);
 
     await expect(indexKnowledge([
-      { cardId: " card-a ", contentHash: HASH_A.toUpperCase(), text: "  document text  " },
-    ])).resolves.toEqual([{ cardId: "card-a", indexedAt: 1_700_000_000_000 }]);
+      {
+        cardId: " card-a ",
+        contentHash: HASH_A.toUpperCase(),
+        text: "  document text  ",
+        source: "public-html",
+      },
+    ])).resolves.toEqual([{
+      cardId: "card-a",
+      contentHash: HASH_A,
+      indexedAt: 1_700_000_000_000,
+      source: "public-html",
+    }]);
     expect(fake.invoke).toHaveBeenCalledWith("bookmark-search", expect.objectContaining({
       body: {
         action: "index",
-        items: [{ cardId: "card-a", contentHash: HASH_A, text: "document text" }],
+        items: [{
+          cardId: "card-a",
+          contentHash: HASH_A,
+          text: "document text",
+          source: "public-html",
+        }],
       },
       headers: { Authorization: `Bearer ${TOKEN}` },
     }));
   });
 
-  it("deletes only the requested embedding row through the RLS client", async () => {
+  it("allows independent public and saved-field vectors for the same card", async () => {
+    const fake = createFakeClient({
+      invokeData: {
+        indexed: [
+          { cardId: "card-a", contentHash: HASH_A, indexedAt: 1_700_000_000_010, source: "saved-fields" },
+          { cardId: "card-a", contentHash: HASH_B, indexedAt: 1_700_000_000_011, source: "public-html" },
+        ],
+      },
+    });
+    installClient(fake.client);
+
+    await expect(indexKnowledge([
+      { cardId: "card-a", contentHash: HASH_A, text: "saved text", source: "saved-fields" },
+      { cardId: "card-a", contentHash: HASH_B, text: "public text", source: "public-html" },
+    ])).resolves.toEqual([
+      { cardId: "card-a", contentHash: HASH_A, indexedAt: 1_700_000_000_010, source: "saved-fields" },
+      { cardId: "card-a", contentHash: HASH_B, indexedAt: 1_700_000_000_011, source: "public-html" },
+    ]);
+
+    expect(fake.invoke).toHaveBeenCalledWith("bookmark-search", expect.objectContaining({
+      body: {
+        action: "index",
+        items: [
+          { cardId: "card-a", contentHash: HASH_A, text: "saved text", source: "saved-fields" },
+          { cardId: "card-a", contentHash: HASH_B, text: "public text", source: "public-html" },
+        ],
+      },
+    }));
+  });
+
+  it("rejects an index receipt whose content hash does not match the request", async () => {
+    const fake = createFakeClient({
+      invokeData: {
+        indexed: [{
+          cardId: "card-a",
+          contentHash: HASH_B,
+          indexedAt: 1_700_000_000_020,
+          source: "saved-fields",
+        }],
+      },
+    });
+    installClient(fake.client);
+
+    await expectCode(indexKnowledge([{
+      cardId: "card-a",
+      contentHash: HASH_A,
+      text: "saved text",
+      source: "saved-fields",
+    }]), "invalid-response");
+  });
+
+  it("rejects an unknown document source before auth or indexing", async () => {
+    const fake = createFakeClient();
+    const deps = installClient(fake.client);
+
+    await expectCode(indexKnowledge([{
+      cardId: "card-a",
+      contentHash: HASH_A,
+      text: "document",
+      source: "browser-cache" as "saved-fields",
+    }]), "invalid-request");
+
+    expect(deps.initSupabase).not.toHaveBeenCalled();
+    expect(fake.invoke).not.toHaveBeenCalled();
+  });
+
+  it("deletes every source for the requested card through the RLS client", async () => {
     const fake = createFakeClient();
     installClient(fake.client);
     const controller = new AbortController();
@@ -180,7 +305,70 @@ describe("knowledge client", () => {
     expect(fake.from).toHaveBeenCalledWith("bookmark_search_embeddings");
     expect(fake.deleteRows).toHaveBeenCalledTimes(1);
     expect(fake.eq).toHaveBeenCalledWith("card_id", "card-a");
+    expect(fake.eq).toHaveBeenCalledTimes(1);
     expect(fake.deletion.abortSignal).toHaveBeenCalledWith(controller.signal);
+  });
+
+  it("can delete exactly one source without affecting the other source", async () => {
+    const fake = createFakeClient();
+    installClient(fake.client);
+
+    await removeKnowledgeEmbedding("card-a", {
+      expectedUserId: "user-a",
+      source: "public-html",
+    });
+
+    expect(fake.eq).toHaveBeenNthCalledWith(1, "card_id", "card-a");
+    expect(fake.eq).toHaveBeenNthCalledWith(2, "document_source", "public-html");
+  });
+
+  it("lists only validated embedding state in batches of at most 100", async () => {
+    const fake = createFakeClient({
+      embeddingRows: [{
+        card_id: "card-a",
+        document_source: "saved-fields",
+        content_hash: HASH_A,
+      }],
+    });
+    installClient(fake.client);
+
+    await expect(listKnowledgeEmbeddingStates(["card-a"], {
+      expectedUserId: "user-a",
+    })).resolves.toEqual([{
+      cardId: "card-a",
+      source: "saved-fields",
+      contentHash: HASH_A,
+    }]);
+    expect(fake.select).toHaveBeenCalledWith("card_id,document_source,content_hash");
+    expect(fake.selection.in).toHaveBeenCalledWith("card_id", ["card-a"]);
+
+    const empty = createFakeClient();
+    installClient(empty.client);
+    await listKnowledgeEmbeddingStates(
+      Array.from({ length: 201 }, (_, index) => `card-${index}`),
+    );
+    expect(empty.selection.in).toHaveBeenCalledTimes(3);
+    expect(empty.selection.in).toHaveBeenNthCalledWith(
+      1,
+      "card_id",
+      Array.from({ length: 100 }, (_, index) => `card-${index}`),
+    );
+    expect(empty.selection.in).toHaveBeenNthCalledWith(
+      2,
+      "card_id",
+      Array.from({ length: 100 }, (_, index) => `card-${index + 100}`),
+    );
+    expect(empty.selection.in).toHaveBeenNthCalledWith(3, "card_id", ["card-200"]);
+  });
+
+  it("rejects an empty card id before auth or deletion", async () => {
+    const fake = createFakeClient();
+    const deps = installClient(fake.client);
+
+    await expectCode(removeKnowledgeEmbedding("   "), "invalid-request");
+
+    expect(deps.initSupabase).not.toHaveBeenCalled();
+    expect(fake.from).not.toHaveBeenCalled();
   });
 
   it("blocks public-page extraction inside the extension before auth or network access", async () => {

@@ -14,6 +14,7 @@ import { MindmapView, type MindmapSearchTarget } from "@/components/mindmap/mind
 import type { CollectionViewMode } from "@/components/mindmap/types";
 import { readCollectionViewMode, writeCollectionViewMode } from "@/lib/collection-view-mode";
 import { restoreDialogTriggerFocus } from "@/lib/dialog-trigger-focus";
+import type { CategorySearchTarget } from "@/lib/category-search-target";
 import { useAppStore } from "@/lib/store";
 import { useAuthStore } from "@/lib/auth-store";
 import { saveCards, saveCategories, setInitialized, withoutLocalChangeEvents } from "@/lib/db";
@@ -71,10 +72,12 @@ export default function HomePage() {
   const [collectionViewModeReady, setCollectionViewModeReady] = useState(false);
   const [viewTransitionPhase, setViewTransitionPhase] = useState<"idle" | "exiting" | "entering">("idle");
   const [mindmapSearchTarget, setMindmapSearchTarget] = useState<MindmapSearchTarget | null>(null);
+  const [classicSearchTarget, setClassicSearchTarget] = useState<CategorySearchTarget | null>(null);
   const viewTransitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const viewTransitionFrameRef = useRef<number | null>(null);
   const viewTransitionTokenRef = useRef(0);
   const mindmapSearchRequestRef = useRef(0);
+  const classicSearchRequestRef = useRef(0);
   const cardDialogTriggerRef = useRef<HTMLButtonElement | null>(null);
   const categoryDialogTriggerRef = useRef<HTMLButtonElement | null>(null);
 
@@ -225,6 +228,10 @@ export default function HomePage() {
     setMindmapSearchTarget({ ...target, requestId: ++mindmapSearchRequestRef.current });
   }, []);
 
+  const handleRevealClassicCategory = useCallback((target: { sectionId: string; categoryId: string }) => {
+    setClassicSearchTarget({ ...target, requestId: ++classicSearchRequestRef.current });
+  }, []);
+
   useEffect(() => () => {
     if (viewTransitionTimerRef.current) clearTimeout(viewTransitionTimerRef.current);
     if (viewTransitionFrameRef.current !== null) cancelAnimationFrame(viewTransitionFrameRef.current);
@@ -285,6 +292,7 @@ export default function HomePage() {
         collectionViewMode={collectionViewModeReady ? requestedViewMode : undefined}
         onCollectionViewModeChange={handleCollectionViewModeChange}
         onRevealMindmapCategory={handleRevealMindmapCategory}
+        onRevealClassicCategory={handleRevealClassicCategory}
       />
 
       {!collectionViewModeReady && (
@@ -309,6 +317,7 @@ export default function HomePage() {
               setSectionShipItem({ type: "card", card });
               setSectionShipOpen(true);
             }}
+            searchTarget={classicSearchTarget}
           />
         </ErrorBoundary>
 

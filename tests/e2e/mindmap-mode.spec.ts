@@ -671,7 +671,7 @@ test("rapid mode changes keep one view and category search focuses the right sec
 
   const search = page.getByPlaceholder("搜索网站、分组或分类...");
   await search.fill("资料分类");
-  await page.getByRole("button", { name: /^资料分类 资料 \/ 资料分类/ }).click();
+  await page.getByRole("option", { name: /^资料分类 资料 \/ 资料分类/ }).click();
   await expect(page.getByRole("button", { name: "资料", exact: true })).toHaveClass(/wc-section-tab-active/);
   await expect(page.locator('[data-mindmap-node="cat:cat-research"]')).toHaveClass(/is-search-highlight/);
   const stage = await page.getByTestId("mindmap-stage").boundingBox();
@@ -682,6 +682,58 @@ test("rapid mode changes keep one view and category search focuses the right sec
     expect(Math.abs(target.y + target.height / 2 - (stage.y + stage.height / 2))).toBeLessThanOrEqual(2);
   }
   expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(1080);
+});
+
+test("classic category search waits for the destination section render before revealing", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/");
+  await openCollection(page);
+  await writeIsolatedMindmapFixture(page);
+  await page.reload();
+  await openCollection(page);
+
+  const search = page.getByPlaceholder("搜索网站、分组或分类...");
+  await search.fill("资料分类");
+  await page.getByRole("option", { name: /^资料分类 资料 \/ 资料分类/ }).click();
+
+  await expect(page.getByRole("button", { name: "资料", exact: true })).toHaveClass(/wc-section-tab-active/);
+  await expect(page.locator('[data-wc-classic-grid-section-id="section-research"]')).toBeVisible();
+  const target = page.locator('[data-wc-category-id="cat-research"]');
+  await expect(target).toHaveClass(/wc-search-highlight/);
+  await expect(target).toHaveAttribute("data-wc-search-request-id", "1");
+});
+
+test("classic category search disables smooth scrolling and pulse when reduced motion is requested", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/");
+  await openCollection(page);
+  await writeIsolatedMindmapFixture(page);
+  await page.reload();
+  await openCollection(page);
+
+  await page.evaluate(() => {
+    const testWindow = window as typeof window & { __wcSearchScrollBehavior?: ScrollBehavior };
+    Element.prototype.scrollIntoView = function scrollIntoView(options?: boolean | ScrollIntoViewOptions) {
+      if (typeof options === "object") testWindow.__wcSearchScrollBehavior = options.behavior;
+    };
+  });
+
+  const search = page.getByPlaceholder("搜索网站、分组或分类...");
+  await search.fill("资料分类");
+  await page.getByRole("option", { name: /^资料分类 资料 \/ 资料分类/ }).click();
+
+  const target = page.locator('[data-wc-category-id="cat-research"]');
+  await expect(target).toHaveClass(/wc-search-highlight/);
+  const reducedMotionState = await target.evaluate((element) => ({
+    animationName: getComputedStyle(element).animationName,
+    scrollBehavior: (window as typeof window & { __wcSearchScrollBehavior?: ScrollBehavior })
+      .__wcSearchScrollBehavior,
+  }));
+  expect(reducedMotionState).toEqual({
+    animationName: "none",
+    scrollBehavior: "auto",
+  });
 });
 
 test("mindmap additions reuse the existing dialogs and collection write path", async ({ page }) => {
@@ -735,7 +787,7 @@ test("mindmap additions reuse the existing dialogs and collection write path", a
   const commonAddButton = commonGroup.getByRole("button", { name: "在“常用”中添加网站" });
   await commonAddButton.click();
   await expect(page.getByRole("heading", { name: "添加网站" })).toBeVisible();
-  await expect(page.getByRole("combobox")).toContainText("常用");
+  await expect(page.getByRole("combobox", { name: "分类" })).toContainText("常用");
   await page.getByLabel("网页链接").fill("https://mindmap-added.example.com");
   await page.getByLabel("网站名称").fill("导图新增网页");
   await page.getByRole("button", { name: "添加", exact: true }).click();
@@ -765,7 +817,7 @@ test("classic collection additions, edits, and soft deletes rebuild the mindmap"
   await openCollection(page);
 
   await page.getByRole("button", { name: "网页", exact: true }).click();
-  await page.getByRole("combobox").click();
+  await page.getByRole("combobox", { name: "分类" }).click();
   await page.getByRole("option", { name: "常用" }).click();
   await page.getByLabel("网页链接").fill("https://example.com/classic-added-target");
   await page.getByLabel("网站名称").fill("经典新增网页");

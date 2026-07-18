@@ -1,7 +1,9 @@
 import type { Category, CollectionSection, WebCard } from "./types";
 
 const DEFAULT_SECTION_ID = "section-default";
-const MAX_RESULTS_PER_GROUP = 8;
+const MAX_CARD_RESULTS = 20;
+const MAX_STRUCTURE_RESULTS = 8;
+export const MAX_SEARCH_QUERY_CHARACTERS = 200;
 const CJK_STOP_WORDS = new Set(["的", "了", "和", "与", "及", "或", "在", "为", "是"]);
 const MATCH_REASON_ORDER: WorkspaceSearchMatchReason[] = ["title", "url", "path", "description", "fuzzy"];
 
@@ -114,8 +116,30 @@ export function normalizeSearchText(value: string | null | undefined): string {
     .trim();
 }
 
+/**
+ * Bounds user-entered search work before normalization. Iterating only until
+ * the limit avoids scanning an arbitrarily long pasted query, while counting
+ * astral symbols as one Unicode code point instead of two UTF-16 code units.
+ */
+export function limitSearchQuery(query: string): string {
+  let codeUnitEnd = 0;
+  let characterCount = 0;
+
+  for (const character of query) {
+    if (characterCount >= MAX_SEARCH_QUERY_CHARACTERS) break;
+    codeUnitEnd += character.length;
+    characterCount += 1;
+  }
+
+  return codeUnitEnd === query.length ? query : query.slice(0, codeUnitEnd);
+}
+
+export function normalizeSearchQuery(query: string): string {
+  return normalizeSearchText(limitSearchQuery(query));
+}
+
 export function tokenizeSearchQuery(query: string): string[] {
-  const normalized = normalizeSearchText(query);
+  const normalized = normalizeSearchQuery(query);
   if (!normalized) return [];
 
   const tokens = new Set<string>();
@@ -237,17 +261,18 @@ export function searchWorkspace(input: WorkspaceSearchInput, query: string): Wor
 }
 
 export function searchWorkspaceIndex(index: WorkspaceSearchIndex, query: string): WorkspaceSearchResults {
-  const tokens = tokenizeSearchQuery(query);
+  const limitedQuery = limitSearchQuery(query);
+  const tokens = tokenizeSearchQuery(limitedQuery);
   if (tokens.length === 0) {
-    return { query, tokens, cards: [], categories: [], sections: [], total: 0 };
+    return { query: limitedQuery, tokens, cards: [], categories: [], sections: [], total: 0 };
   }
 
-  const cards = scoreEntries(index.cardEntries, query, tokens).slice(0, MAX_RESULTS_PER_GROUP) as CardSearchResult[];
-  const categories = scoreEntries(index.categoryEntries, query, tokens).slice(0, MAX_RESULTS_PER_GROUP) as CategorySearchResult[];
-  const sections = scoreEntries(index.sectionEntries, query, tokens).slice(0, MAX_RESULTS_PER_GROUP) as SectionSearchResult[];
+  const cards = scoreEntries(index.cardEntries, limitedQuery, tokens).slice(0, MAX_CARD_RESULTS) as CardSearchResult[];
+  const categories = scoreEntries(index.categoryEntries, limitedQuery, tokens).slice(0, MAX_STRUCTURE_RESULTS) as CategorySearchResult[];
+  const sections = scoreEntries(index.sectionEntries, limitedQuery, tokens).slice(0, MAX_STRUCTURE_RESULTS) as SectionSearchResult[];
 
   return {
-    query,
+    query: limitedQuery,
     tokens,
     cards,
     categories,
