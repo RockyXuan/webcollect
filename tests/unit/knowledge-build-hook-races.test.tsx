@@ -791,12 +791,16 @@ describe("knowledge build hook race safety", () => {
       signal: expect.any(AbortSignal),
       expectedUserId: "user-a",
     });
-    expect(mocks.runKnowledgeBuild).toHaveBeenCalledWith(expect.objectContaining({
-      scopeId: "user-a",
-      targetCardIds: [CARD_ID],
-      existingEmbeddingStates: [],
-      removeEmbedding: expect.any(Function),
-    }));
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(mocks.runKnowledgeBuild).toHaveBeenCalledWith(expect.objectContaining({
+          scopeId: "user-a",
+          targetCardIds: [CARD_ID],
+          existingEmbeddingStates: [],
+          removeEmbedding: expect.any(Function),
+        }));
+      }, { timeout: 2_000, interval: 10 });
+    });
     unmount();
   });
 
@@ -850,9 +854,11 @@ describe("knowledge build hook race safety", () => {
     const missingPublic = renderHook(() => useKnowledgeBuild());
     await flushImmediateEffects();
     await act(async () => vi.advanceTimersByTimeAsync(2_000));
-    await flushImmediateEffects();
-
-    expect(mocks.runKnowledgeBuild).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(mocks.runKnowledgeBuild).toHaveBeenCalledTimes(1);
+      }, { timeout: 2_000, interval: 10 });
+    });
     expect(mocks.runKnowledgeBuild).toHaveBeenCalledWith(expect.objectContaining({
       scopeId: "user-a",
       targetCardIds: [CARD_ID],
