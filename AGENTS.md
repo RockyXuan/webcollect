@@ -1,6 +1,10 @@
 # WebCollect — 个人网页收藏墙
 
-## 2026-07-17 current V1.2.2 release entry
+## 2026-07-18 current V1.3.0 smart-search release entry
+
+Read `AGD.md` and `docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md` first. V1.3.0 keeps Google / 百度 / Bing external search and adds local fuzzy workspace retrieval plus an opt-in Supabase/OpenAI semantic layer. Business collection tables, IndexedDB data, Chrome storage, sync, dirty sets, snapshots, and seed data are unchanged. Rebuildable local knowledge state is isolated in `WebCollectSearch/knowledge_index`; cloud `bookmark_search_embeddings` stores only user/card/source identifiers, hashes, metadata, and dual-source vectors (`saved-fields | public-html`), never raw page text. `OPENAI_API_KEY` may exist only as a Supabase Edge Function secret. The target tag is `webcollect-2026-07-18-v1.3.0` and the target asset is `WebCollect-Chrome-Extension-v1.3.0-2026-07-18.zip`; consult the closeout before claiming CI, Release, official-zip, or final primary-Chrome evidence, because those fields remain TODO until publication completes.
+
+## 2026-07-17 previous V1.2.2 release entry
 
 Read `AGD.md` and `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md` first. V1.2.2 fixes two top-header responsive defects without changing business behavior: the Google sign-in label is forced to one line, and intermediate desktop widths move the complete action toolbar to a dedicated row before a real sync badge can overlap the search-engine selector. The Web and extension CSS stay aligned. No storage key, schema, collection action, sync path, snapshot path, permission, or extension ID changed.
 

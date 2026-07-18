@@ -9,10 +9,10 @@ function readRepositoryFile(path: string): string {
 }
 
 const migrationSql = readRepositoryFile(
-  "supabase/migrations/20260717131605_bookmark_search_embeddings.sql",
+  "supabase/migrations/20260718035443_bookmark_search_embeddings.sql",
 );
 const dualSourceMigrationSql = readRepositoryFile(
-  "supabase/migrations/20260717230752_bookmark_search_dual_sources.sql",
+  "supabase/migrations/20260718035513_bookmark_search_dual_sources.sql",
 );
 const bootstrapSql = readRepositoryFile("src/storage/database/supabase-init.sql");
 const drizzleSchemaSource = readRepositoryFile("src/storage/database/shared/schema.ts");

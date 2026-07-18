@@ -2,6 +2,21 @@
 
 > **2026-07-15 current workflow rule:** this repository has retired Superpowers (including `superpowers:*` / `using-superpowers`), `goal-zzx` / `zzx-goal`, and `andrej-karpathy-coding`. Do not install, enable, invoke, or imitate them. Any older instruction below that requires `tasks/todo.md`, `tasks/lessons.md`, `CODEX_GO_MODE_STATUS.md`, fixed phase counts, strict TDD, worktrees, subagents, or duplicate reviews is historical and superseded by `AGENTS.md`.
 
+## 2026-07-18 V1.3.0 Smart Search Release Preparation
+
+This section supersedes the V1.2.2 development status. Publication evidence remains explicitly pending until the real CI/Release/download/Chrome steps finish.
+
+- Target version/date: `V1.3.0 / 2026年7月18日`; tag `webcollect-2026-07-18-v1.3.0`; asset `WebCollect-Chrome-Extension-v1.3.0-2026-07-18.zip`.
+- Closeout: `docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`.
+- Scope: retain Google / 百度 / Bing external search, add immediate local fuzzy retrieval across cards/categories/groups/sections, and asynchronously merge opt-in semantic matches without blocking or reordering an active keyboard selection.
+- Knowledge sources are deliberately separate: `saved-fields` contains title/domain/descriptions/note/path; `public-html` contains only unauthenticated public-page extraction. Web can build both; the extension does not fetch public page bodies.
+- Local derived records exist only in `WebCollectSearch/knowledge_index`. Cloud `bookmark_search_embeddings` stores identifiers, source, hashes, model/index metadata, timestamp, and vectors—not raw text. `OPENAI_API_KEY` is a Supabase Edge Function secret only.
+- Business cards/categories/sections/preferences/recycle bin, `WebCollect/webcollect_data`, Chrome storage, dirty sets, tombstones, snapshots, workspace revisions, seed data, and collection sync are unchanged.
+- Live Supabase evidence: both smart-search migrations and the JWT-protected `bookmark-search` Edge Function are deployed; RLS/ownership boundaries and anonymous HTTP 401 are verified. The intentionally accepted `authenticated_security_definer_function_executable` advisor warning belongs to the authenticated, `auth.uid()`-scoped atomic quota counter and grants no business-table access.
+- Completed gates: 45 files / 342 Vitest tests, 31/31 legacy scripts, 18/18 Edge tests, 43/43 Playwright, TypeScript, ESLint, Web/extension production builds, extension artifacts, and the 17.2 MiB size gate.
+- Residual P2: an extension cloud vector deletion can commit immediately before a workspace-change fence fires. The later stale writes/ledger update stop; saved-fields retries automatically, while public-html may wait for the next Web rebuild. This affects disposable semantic recall only and cannot mutate collection/business data.
+- TODO before declaring publication complete: main CI, final tag/Release workflow, official zip manifest/tree/size/SHA-256 audit, and a read-only in-place reload in the existing signed-in primary Chrome profile's auxiliary WebCollect window. The follow-up evidence commit is documentation-only, not a new app version.
+
 ## 2026-07-17 V1.2.2 Header Layout Release
 
 This section supersedes the V1.2.1 development status once tag `webcollect-2026-07-17-v1.2.2` is published.
@@ -69,10 +84,10 @@ This section supersedes older development status. The user explicitly waived the
 
 ## Next Major Feature Thread
 
-- Start the next large feature in a new thread. This handoff closes the header-layout patch at the verified V1.2.2 boundary.
-- Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, and the V1.2.2 closeout before changing code.
+- Start the next large feature in a new thread only after the V1.3.0 publication TODO is closed. Until then, continue this release from the exact closeout checklist instead of starting unrelated work.
+- Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, and the V1.3.0 closeout before changing code.
 - Ask for or read the user's new feature description, then inspect only the relevant implementation paths before choosing scope, tests, version bump, and release plan.
-- Preserve the V1.2.2 data and sync guarantees. Do not reset IndexedDB, Supabase, extension storage, categories, cards, preferences, snapshots, local view state, mode preference, or the two documented empty inbox artifacts.
+- Preserve the V1.3.0 data and sync guarantees. Do not reset IndexedDB, Supabase, extension storage, categories, cards, preferences, snapshots, local view state, mode preference, knowledge consent/cache, derived vectors, or the two documented empty inbox artifacts.
 - Decide the next version only after understanding the feature's actual breadth. Use the real completion date and keep package, manifest, UI version, tag, Release, and zip identity aligned.
 - The copy-paste startup prompt is maintained in `NEXT_THREAD_PROMPT.md`. Older sections below are historical evidence only.
 

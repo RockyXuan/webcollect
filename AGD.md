@@ -1,15 +1,25 @@
 # WebCollect 全项目体检入口
 
-更新时间：2026-07-17
+更新时间：2026-07-18
 面向对象：Claude / Codex / 后续任何接手 WebCollect 的开发 agent
 当前主目录：`/Users/rockyx/vibe coding/Web Collect 0628`
 远端仓库：`https://github.com/RockyXuan/webcollect`
 主分支：`main`
-当前最新发布身份：`V1.2.2 / 2026年7月17日`
-正式发布 tag：`webcollect-2026-07-17-v1.2.2`；Release `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-17-v1.2.2`；zip `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-17-v1.2.2/WebCollect-Chrome-Extension-v1.2.2-2026-07-17.zip`。
-V1.2.2 closeout：`docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`。应用提交 `b2a2063cb986574ffdf6e0c13c3988da6c02a26a`；main CI `29566934939`、Release workflow `29567324457` 均通过；正式 zip 为 `16,957,068` bytes，SHA-256 `80ed3d0ad969d0ad3eb2485cc9a77729565a7dda0f05dcc4926f3245ec40c998`。官方包与本地/现有安装源的 41 文件树完全一致，并已在主 Chrome profile 保持原 ID 原位重载；后续纯文档证据提交不是新的应用版本。
-上一稳定边界：`V1.2.1 / 2026年7月17日`，发布提交及 tag `6320578baab4ca24b368fb5c05e77b0c0fd5e54a` / `webcollect-2026-07-17-v1.2.1`，zip SHA-256 `28ff22082b527b59ccf4f3d1f3e50d374b813bd3f1fd07d0ec95a8dc4b0138d3`。
-当前主线：V1.2.2 只修复顶栏中等桌面宽度的 Google 登录换行与搜索/同步控件重叠。V1.2.1 的导图功能、模式记忆、数据与同步边界保持不变。
+当前候选发布身份：`V1.3.0 / 2026年7月18日`；目标 tag `webcollect-2026-07-18-v1.3.0`；目标 zip `WebCollect-Chrome-Extension-v1.3.0-2026-07-18.zip`。
+V1.3.0 closeout：`docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`。本地功能和验证、Supabase migrations / Edge Function / RLS / 401 门禁已完成；main CI、正式 tag/Release、官方 zip 下载审计和现有主 Chrome profile 最终只读验收仍以 closeout 的 TODO 为准，完成前不得冒充正式发布证据。
+当前已发布稳定边界仍是 `V1.2.2 / 2026年7月17日`：tag `webcollect-2026-07-17-v1.2.2`，应用提交 `b2a2063cb986574ffdf6e0c13c3988da6c02a26a`，zip SHA-256 `80ed3d0ad969d0ad3eb2485cc9a77729565a7dda0f05dcc4926f3245ec40c998`。V1.2.2 的导图、模式记忆、顶栏修复和数据边界继续保留。
+
+## 2026-07-18 V1.3.0 智能搜索与个人知识库入口
+
+- 实施收口：`docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`。
+- 现有 Google / 百度 / Bing 普通搜索不变；输入时先返回本地模糊匹配，再异步合并经用户明确同意的 AI 语义结果。失败、离线、未登录或未配置时无感降级为本地搜索。
+- 本地检索覆盖网页、分类、分组和分项，支持中文二元词组、英文前缀/编辑距离、路径权重、完整匹配置顶、键盘/IME/读屏和经典/导图定位。
+- 本地派生知识缓存只在 `WebCollectSearch/knowledge_index`；不写入业务 IndexedDB、Chrome storage、快照、dirty sets 或同步。
+- 云端 `bookmark_search_embeddings` 只保存用户/卡片/来源标识、SHA-256 哈希、模型/版本/时间和 1536 维向量，不保存网页原文；`saved-fields` 与 `public-html` 双来源独立，RLS 与卡片所有权检查只允许本人访问。
+- `OPENAI_API_KEY` 只能配置在 Supabase Edge Function secret；不得进入 Web、扩展、仓库、日志或任何浏览器存储。
+- 当前验证：342 Vitest、31 legacy、18 Edge、43 Playwright、Web/扩展生产构建和 17.2 MiB 体积门禁通过；live migrations、JWT Edge Function、RLS 和匿名 401 已验证。
+- 已知 P2 仅涉及可重建派生向量的短暂最终一致性窗口，不会改变或删除收藏/分类/分项/偏好/快照/同步状态；详见 closeout。
+- Supabase Advisor 的 `authenticated_security_definer_function_executable` 警告为有意保留的原子配额 RPC：只允许 authenticated、强制 `auth.uid()`、仅增加调用者自己的 search/index 配额计数且无业务表权限。两个 `unused_index` INFO 来自刚部署、尚无真实查询统计的索引；`card_id` 明确保留给外键级联/按卡片协调，`user_id` 是否精简留待真实负载证据，不作为发布阻断。
 
 ## 2026-07-17 V1.2.2 顶栏响应式修复入口
 
@@ -89,16 +99,18 @@ V1.2.2 closeout：`docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-1
 
 这个文件是 WebCollect 的“全身体检交接入口”。后续 agent 不需要让用户重新复述需求，先读：
 
-0. `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`（**当前正式版最新**：Fable 审查打磨、模式记忆、数据边界与发布证据）
-0.1 `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md`（上一稳定版：M0→M7 导图实现与发布）
-0.2 `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`（真实 OAuth、并发收集、RC7 主 Chrome 验收及 Profile B 门槛豁免）
-0.3 `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`（CI 冷启动与单一 Release 发布链路收口）
-0.4 `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`（PM 分库核验、WebCollect 云端迁移、备份校验和全项目审计）
-0.5 `docs/audit/gpt56-full-audit-execution-2026-07-10.md`（V1.1 测试先行执行日志与历史红绿证据）
-0.6 `docs/audit/claude-fable-followup-plan-2026-07-07.md`（Fable 第二轮审查结论 + R1-R4 历史方案）
-0.7 `docs/audit/claude-fable-code-review-2026-07-07.md`（Claude Fable 5 第一轮全量代码审查结论）
-0.8 `docs/audit/claude-fable-remediation-plan-2026-07-07.md`（第一轮整改执行方案）
-0.9 `docs/audit/remediation-execution-log-2026-07-07.md`（第一轮 Codex 执行日志）
+0. `docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`（**当前候选版最新**：智能搜索、知识库、数据边界、验证与发布 TODO）
+0.1 `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`（当前已发布稳定版：顶栏响应式修复与正式发布证据）
+0.2 `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`（上一稳定版：Fable 审查打磨与模式记忆）
+0.3 `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md`（M0→M7 导图实现与发布）
+0.4 `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`（真实 OAuth、并发收集、RC7 主 Chrome 验收及 Profile B 门槛豁免）
+0.5 `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`（CI 冷启动与单一 Release 发布链路收口）
+0.6 `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`（PM 分库核验、WebCollect 云端迁移、备份校验和全项目审计）
+0.7 `docs/audit/gpt56-full-audit-execution-2026-07-10.md`（V1.1 测试先行执行日志与历史红绿证据）
+0.8 `docs/audit/claude-fable-followup-plan-2026-07-07.md`（Fable 第二轮审查结论 + R1-R4 历史方案）
+0.9 `docs/audit/claude-fable-code-review-2026-07-07.md`（Claude Fable 5 第一轮全量代码审查结论）
+0.10 `docs/audit/claude-fable-remediation-plan-2026-07-07.md`（第一轮整改执行方案）
+0.11 `docs/audit/remediation-execution-log-2026-07-07.md`（第一轮 Codex 执行日志）
 1. `AGD.md`
 2. `docs/audit/claude-code-review-handoff-2026-07-07.md`
 3. `docs/audit/webcollect-full-audit-brief-2026-07-07.md`
@@ -107,7 +119,7 @@ V1.2.2 closeout：`docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-1
 6. `HANDOFF.md`
 7. `AGENTS.md`
 
-如果这些文件和旧文档冲突，以 `AGD.md` 和当前 V1.2.1 closeout 为准；旧文档中的独立 Profile B 发布门槛已经退役。
+如果这些文件和旧文档冲突，以 `AGD.md` 和当前 V1.3.0 closeout 为准；旧文档中的独立 Profile B 发布门槛已经退役。
 
 ## 产品一句话
 
