@@ -6,28 +6,29 @@
 
 1. `AGENTS.md`
 2. `AGD.md`
-3. `docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`
-4. `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`
-5. `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`
-6. `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md`
-7. `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`
-8. `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`
-9. `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`
-10. `docs/audit/claude-code-review-handoff-2026-07-07.md`
-11. `PROJECT_SUMMARY.md`
-12. `HANDOFF.md`
+3. `docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`
+4. `docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`
+5. `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`
+6. `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`
+7. `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md`
+8. `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`
+9. `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`
+10. `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`
+11. `docs/audit/claude-code-review-handoff-2026-07-07.md`
+12. `PROJECT_SUMMARY.md`
+13. `HANDOFF.md`
 
 项目已于 2026-07-15 退役 Superpowers、`goal-zzx` / `zzx-goal` 和 `andrej-karpathy-coding` 工作流。`tasks/todo.md`、`tasks/lessons.md`、`CODEX_GO_MODE_STATUS.md` 与 `docs/superpowers/` 只保留历史事实，不是新任务的必读、必写或执行入口。
 
 当前固定开发目录：`/Users/rockyx/vibe coding/Web Collect 0628`。
-当前候选功能版本：`V1.3.0 / 2026年7月19日`。
-目标 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-19-v1.3.0`。
-目标扩展 zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-19-v1.3.0/WebCollect-Chrome-Extension-v1.3.0-2026-07-19.zip`。
-当前已发布稳定版：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-17-v1.2.2`。V1.3.0 的 main CI、tag/Release、官方 zip 和最终主 Chrome 证据仍以 closeout TODO 为准。
+当前候选功能版本：`V1.3.1 / 2026年7月19日`。
+目标 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-19-v1.3.1`。
+目标扩展 zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-19-v1.3.1/WebCollect-Chrome-Extension-v1.3.1-2026-07-19.zip`。
+当前已发布稳定版：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-19-v1.3.0`。V1.3.1 的 main CI、tag/Release、官方 zip 和最终主 Chrome 证据仍以 closeout TODO 为准。
 历史 RC7：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-15-v1.1.2-rc.7`。
 如果旧说明和 `AGD.md` 冲突，以 `AGD.md` 为准。
 
-V1.3.0 保留 Google / 百度 / Bing 普通搜索，并在同一搜索框加入完全本地运行的模糊检索、拼音、错字容错、意图别名、加权全文排序和可选公开网页正文知识库。它不调用 OpenAI、DeepSeek 或其他 AI API，也不捆绑本地大模型；派生缓存只在 `WebCollectSearch/knowledge_index`，业务收藏、同步和快照 Schema 不变。
+V1.3.1 统一并收窄了 Web/扩展顶栏：普通栏目采用同一套轻框，`+ 网页` 是唯一蓝色主操作，同步状态只给图标着色，搜索引擎文字默认中性灰。V1.3.0 的纯本地智能搜索及全部数据边界保持不变。
 
 这是一个基于 [Next.js 16](https://nextjs.org) + [shadcn/ui](https://ui.shadcn.com) 的全栈应用项目，由扣子编程 CLI 创建。
 

@@ -5,9 +5,18 @@
 当前主目录：`/Users/rockyx/vibe coding/Web Collect 0628`
 远端仓库：`https://github.com/RockyXuan/webcollect`
 主分支：`main`
-当前候选发布身份：`V1.3.0 / 2026年7月19日`；目标 tag `webcollect-2026-07-19-v1.3.0`；目标 zip `WebCollect-Chrome-Extension-v1.3.0-2026-07-19.zip`。
-V1.3.0 closeout：`docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`。纯本地功能、自动化与隔离浏览器验收已完成；main CI、正式 tag/Release、官方 zip 下载审计和现有主 Chrome profile 最终只读验收仍以 closeout 的 TODO 为准，完成前不得冒充正式发布证据。
-当前已发布稳定边界仍是 `V1.2.2 / 2026年7月17日`：tag `webcollect-2026-07-17-v1.2.2`，应用提交 `b2a2063cb986574ffdf6e0c13c3988da6c02a26a`，zip SHA-256 `80ed3d0ad969d0ad3eb2485cc9a77729565a7dda0f05dcc4926f3245ec40c998`。V1.2.2 的导图、模式记忆、顶栏修复和数据边界继续保留。
+当前候选发布身份：`V1.3.1 / 2026年7月19日`；目标 tag `webcollect-2026-07-19-v1.3.1`；目标 zip `WebCollect-Chrome-Extension-v1.3.1-2026-07-19.zip`。
+V1.3.1 closeout：`docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`。功能、局部自动化与隔离浏览器验收已完成；完整本地门禁、main CI、正式 tag/Release、官方 zip 下载审计和现有主 Chrome profile 最终只读验收仍以 closeout 的 TODO 为准，完成前不得冒充正式发布证据。
+当前已发布稳定边界是 `V1.3.0 / 2026年7月19日`：tag `webcollect-2026-07-19-v1.3.0`，应用提交 `65033a67631095ec492470bce1e2f9b1b2ca0911`，main CI `29681646688` 与 Release workflow `29681869535` 均成功。V1.3.0 的本地智能搜索、导图、同步和数据边界继续保留。
+
+## 2026-07-19 V1.3.1 顶栏 UI 统一入口
+
+- 实施收口：`docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`。
+- Google / 百度 / Bing 默认使用中性灰；保存、刷新、壁纸、分组、分类、回收站、仓库统一为 38px × 14px 圆角轻框，`+ 网页` 是唯一蓝色主操作。
+- 同步成功、同步中和失败只给图标着色，容器保持中性；账户与经典/导图切换和同排控件对齐。
+- 1181–1799px 保留独立工具栏行，390px 使用 36px 紧凑控件；Web 与扩展视觉参数保持一致。
+- 不新增存储 key，不改变搜索、业务操作、IndexedDB、Supabase、Chrome storage、dirty sets、快照、同步、权限、扩展 ID 或 seed。
+- 当前本地门禁：372 Vitest、31 legacy、44 Playwright、Web/扩展构建、17.4 MiB 扩展体积与 208 个生产依赖零漏洞审计通过；seed SHA 保持不变。
 
 ## 2026-07-19 V1.3.0 本地智能搜索与个人知识库入口
 
@@ -97,18 +106,19 @@ V1.3.0 closeout：`docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18
 
 这个文件是 WebCollect 的“全身体检交接入口”。后续 agent 不需要让用户重新复述需求，先读：
 
-0. `docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`（**当前候选版最新**：智能搜索、知识库、数据边界、验证与发布 TODO）
-0.1 `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`（当前已发布稳定版：顶栏响应式修复与正式发布证据）
-0.2 `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`（上一稳定版：Fable 审查打磨与模式记忆）
-0.3 `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md`（M0→M7 导图实现与发布）
-0.4 `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`（真实 OAuth、并发收集、RC7 主 Chrome 验收及 Profile B 门槛豁免）
-0.5 `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`（CI 冷启动与单一 Release 发布链路收口）
-0.6 `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`（PM 分库核验、WebCollect 云端迁移、备份校验和全项目审计）
-0.7 `docs/audit/gpt56-full-audit-execution-2026-07-10.md`（V1.1 测试先行执行日志与历史红绿证据）
-0.8 `docs/audit/claude-fable-followup-plan-2026-07-07.md`（Fable 第二轮审查结论 + R1-R4 历史方案）
-0.9 `docs/audit/claude-fable-code-review-2026-07-07.md`（Claude Fable 5 第一轮全量代码审查结论）
-0.10 `docs/audit/claude-fable-remediation-plan-2026-07-07.md`（第一轮整改执行方案）
-0.11 `docs/audit/remediation-execution-log-2026-07-07.md`（第一轮 Codex 执行日志）
+0. `docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`（**当前候选版最新**：顶栏统一、数据边界、验证与发布 TODO）
+0.1 `docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`（本地智能搜索、知识库与数据边界）
+0.2 `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`（顶栏响应式修复与正式发布证据）
+0.3 `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`（Fable 审查打磨与模式记忆）
+0.4 `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md`（M0→M7 导图实现与发布）
+0.5 `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`（真实 OAuth、并发收集、RC7 主 Chrome 验收及 Profile B 门槛豁免）
+0.6 `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`（CI 冷启动与单一 Release 发布链路收口）
+0.7 `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`（PM 分库核验、WebCollect 云端迁移、备份校验和全项目审计）
+0.8 `docs/audit/gpt56-full-audit-execution-2026-07-10.md`（V1.1 测试先行执行日志与历史红绿证据）
+0.9 `docs/audit/claude-fable-followup-plan-2026-07-07.md`（Fable 第二轮审查结论 + R1-R4 历史方案）
+0.10 `docs/audit/claude-fable-code-review-2026-07-07.md`（Claude Fable 5 第一轮全量代码审查结论）
+0.11 `docs/audit/claude-fable-remediation-plan-2026-07-07.md`（第一轮整改执行方案）
+0.12 `docs/audit/remediation-execution-log-2026-07-07.md`（第一轮 Codex 执行日志）
 1. `AGD.md`
 2. `docs/audit/claude-code-review-handoff-2026-07-07.md`
 3. `docs/audit/webcollect-full-audit-brief-2026-07-07.md`
@@ -117,7 +127,7 @@ V1.3.0 closeout：`docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18
 6. `HANDOFF.md`
 7. `AGENTS.md`
 
-如果这些文件和旧文档冲突，以 `AGD.md` 和当前 V1.3.0 closeout 为准；旧文档中的独立 Profile B 发布门槛已经退役。
+如果这些文件和旧文档冲突，以 `AGD.md` 和当前 V1.3.1 closeout 为准；旧文档中的独立 Profile B 发布门槛已经退役。
 
 ## 产品一句话
 

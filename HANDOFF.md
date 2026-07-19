@@ -2,9 +2,21 @@
 
 > **2026-07-15 current workflow rule:** this repository has retired Superpowers (including `superpowers:*` / `using-superpowers`), `goal-zzx` / `zzx-goal`, and `andrej-karpathy-coding`. Do not install, enable, invoke, or imitate them. Any older instruction below that requires `tasks/todo.md`, `tasks/lessons.md`, `CODEX_GO_MODE_STATUS.md`, fixed phase counts, strict TDD, worktrees, subagents, or duplicate reviews is historical and superseded by `AGENTS.md`.
 
-## 2026-07-19 V1.3.0 Local Smart Search Release Preparation
+## 2026-07-19 V1.3.1 Header UI Release Preparation
 
-This section supersedes the V1.2.2 development status. Publication evidence remains explicitly pending until the real CI/Release/download/Chrome steps finish.
+This section supersedes the V1.3.0 development status. Publication evidence remains explicitly pending until the real CI/Release/download/Chrome steps finish.
+
+- Target version/date: `V1.3.1 / 2026年7月19日`; tag `webcollect-2026-07-19-v1.3.1`; asset `WebCollect-Chrome-Extension-v1.3.1-2026-07-19.zip`.
+- Closeout: `docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`.
+- Scope: compact and unify the top toolbar across Web and extension. Neutral controls share a 38px desktop / 36px mobile light frame; `+ 网页` remains the only blue primary action; engine labels are neutral; sync color is icon-only; account and mode controls align to the shared geometry.
+- Existing 1800px single-row, 1181–1799px second-row, and 390px compact behavior remains. Search, sync, wallpaper, add, recycle, warehouse, and view-mode interactions are unchanged.
+- No storage key, data schema, collection action, extension permission, stable key/ID input, or sync/snapshot path changed. The seed SHA remains `0e48761b595d8303dd71c4f7a8d216424301abdec2d87b2e13533c82c58c2621`.
+- Full local gates passed: 48 files / 372 Vitest, 31/31 legacy scripts, 44/44 Playwright, TypeScript, ESLint, Web/extension builds, artifact checks, the 17.4 MiB size gate, and a 208-package production audit with zero findings. Browser acceptance covered Web/extension CSS parity, all sync states, 2048/1366/390 geometry, classic/mindmap switching, no overflow, and no console error.
+- TODO before declaring publication complete: main CI, final tag/Release workflow, official zip manifest/tree/size/SHA-256 audit, and read-only in-place reload in the existing signed-in primary Chrome profile's auxiliary WebCollect window. The follow-up evidence commit is documentation-only, not a new app version.
+
+## 2026-07-19 V1.3.0 Local Smart Search Release
+
+This section records the previous V1.3.0 search contract and published tag.
 
 - Target version/date: `V1.3.0 / 2026年7月19日`; tag `webcollect-2026-07-19-v1.3.0`; asset `WebCollect-Chrome-Extension-v1.3.0-2026-07-19.zip`.
 - Closeout: `docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`.
@@ -14,7 +26,7 @@ This section supersedes the V1.2.2 development status. Publication evidence rema
 - Business cards/categories/sections/preferences/recycle bin, `WebCollect/webcollect_data`, Chrome storage, dirty sets, tombstones, snapshots, workspace revisions, seed data, and collection sync are unchanged.
 - Completed gates: 46 files / 348 Vitest tests, 31/31 legacy scripts, 44/44 Playwright, TypeScript, ESLint, Web/extension production builds, extension artifacts, the 17.4 MiB size gate, and a 208-package production audit with zero findings.
 - Browser acceptance reused one stable in-app Browser context and confirmed external-engine fallback, local-only status, Escape/focus behavior, 390px bounds, no horizontal overflow, and zero console errors. The smart-search E2E observed zero requests to OpenAI, embeddings, or the dormant Supabase function.
-- TODO before declaring publication complete: main CI, final tag/Release workflow, official zip manifest/tree/size/SHA-256 audit, and a read-only in-place reload in the existing signed-in primary Chrome profile's auxiliary WebCollect window. The follow-up evidence commit is documentation-only, not a new app version.
+- Published application commit `65033a67631095ec492470bce1e2f9b1b2ca0911`; main CI `29681646688` and Release workflow `29681869535` succeeded. The formal Release is `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-19-v1.3.0`.
 
 ## 2026-07-17 V1.2.2 Header Layout Release
 
@@ -83,8 +95,8 @@ This section supersedes older development status. The user explicitly waived the
 
 ## Next Major Feature Thread
 
-- Start the next large feature in a new thread only after the V1.3.0 publication TODO is closed. Until then, continue this release from the exact closeout checklist instead of starting unrelated work.
-- Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, and the V1.3.0 closeout before changing code.
+- Start the next large feature in a new thread only after the V1.3.1 publication checklist is closed. Until then, continue this release from the exact closeout checklist instead of starting unrelated work.
+- Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, and the V1.3.1 closeout before changing code.
 - Ask for or read the user's new feature description, then inspect only the relevant implementation paths before choosing scope, tests, version bump, and release plan.
 - Preserve the V1.3.0 data and sync guarantees. Do not reset IndexedDB, Supabase, extension storage, categories, cards, preferences, snapshots, local view state, mode preference, knowledge consent/cache, derived vectors, or the two documented empty inbox artifacts.
 - Decide the next version only after understanding the feature's actual breadth. Use the real completion date and keep package, manifest, UI version, tag, Release, and zip identity aligned.

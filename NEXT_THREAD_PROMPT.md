@@ -4,10 +4,11 @@
 
 ## 先确认当前基线
 
-- 当前候选版：`V1.3.0 / 2026年7月19日`；目标 tag `webcollect-2026-07-19-v1.3.0`；目标资产 `WebCollect-Chrome-Extension-v1.3.0-2026-07-19.zip`。
-- V1.3.0 closeout：`docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`。先看其中 Publication TODO；main CI、tag/Release、官方 zip 和最终主 Chrome 证据未填写前，不要把目标链接当成已验证发布。
-- 当前已发布稳定版仍是 `V1.2.2 / 2026年7月17日`，tag `webcollect-2026-07-17-v1.2.2`，zip SHA-256 `80ed3d0ad969d0ad3eb2485cc9a77729565a7dda0f05dcc4926f3245ec40c998`。
+- 当前候选版：`V1.3.1 / 2026年7月19日`；目标 tag `webcollect-2026-07-19-v1.3.1`；目标资产 `WebCollect-Chrome-Extension-v1.3.1-2026-07-19.zip`。
+- V1.3.1 closeout：`docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`。先看其中 Publication checklist；main CI、tag/Release、官方 zip 和最终主 Chrome 证据未填写前，不要把目标链接当成已验证发布。
+- 当前已发布稳定版是 `V1.3.0 / 2026年7月19日`，tag `webcollect-2026-07-19-v1.3.0`；main CI `29681646688` 与 Release workflow `29681869535` 均成功。
 - V1.3.0 保留 Google / 百度 / Bing，新增纯本地模糊检索、拼音、错字容错、意图别名、加权全文排序和 opt-in 公开网页知识缓存；不调用 AI API，也不捆绑本地模型。348 unit、31 legacy、44 E2E、Web/扩展构建、17.4 MiB 门禁和 208 个生产依赖零漏洞审计已完成。
+- V1.3.1 只统一紧凑顶栏视觉，不新增存储 key，也不改变搜索、收藏、同步、快照、权限或数据。
 
 ## 第一件事
 
@@ -16,13 +17,14 @@
 1. `AGENTS.md`
 2. `AGD.md`
 3. `HANDOFF.md`
-4. `docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`
-5. `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`
-6. `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`
-7. `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md`
-8. `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`
-9. `PROJECT_SUMMARY.md`
-10. 本文件
+4. `docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`
+5. `docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`
+6. `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`
+7. `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`
+8. `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md`
+9. `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`
+10. `PROJECT_SUMMARY.md`
+11. 本文件
 
 然后运行并用中文简要汇报：
 
@@ -31,7 +33,7 @@ pwd
 git status -sb
 git log --oneline --decorate -8
 git remote -v
-git tag --list 'webcollect-2026-07-19-v1.3.0' --points-at HEAD
+git tag --list 'webcollect-2026-07-19-v1.3.1' --points-at HEAD
 ```
 
 不要使用旧目录 `/Users/rockyx/Documents/webcollect`，也不要从旧分支、旧 RC 或旧交接目标继续开发。
