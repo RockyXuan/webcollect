@@ -59,17 +59,17 @@ export function SyncStatusBadge() {
         ? AlertCircle
         : RefreshCw;
   const tone = syncStatus === "error"
-    ? "border-rose-200 bg-rose-50/90 text-rose-600"
+    ? "is-error"
     : syncStatus === "syncing" || syncStatus === "queued"
-      ? "border-blue-200 bg-blue-50/90 text-blue-600"
-      : "border-emerald-200 bg-white/80 text-slate-600";
+      ? "is-syncing"
+      : "is-success";
 
   return (
     <button
       type="button"
       disabled={syncStatus === "syncing"}
       onClick={() => void manualSync()}
-      className={`wc-sync-status-badge hidden rounded-2xl border px-3 text-xs shadow-sm shadow-blue-100/50 backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:bg-white disabled:cursor-wait disabled:opacity-80 lg:flex ${tone}`}
+      className={`wc-sync-status-badge hidden lg:flex ${tone}`}
       title={
         syncStatus === "error" && error
           ? `${error}\n\u70b9\u51fb\u91cd\u8bd5\u4e91\u7aef\u540c\u6b65`
@@ -77,13 +77,13 @@ export function SyncStatusBadge() {
       }
     >
       {showLocalText && (
-        <span className="wc-sync-status-line text-[11px] leading-none text-emerald-600">
-          <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+        <span className="wc-sync-status-line">
+          <Check className="wc-sync-status-icon h-3.5 w-3.5 shrink-0 is-success" />
           <span className="truncate">{localText}</span>
         </span>
       )}
       <span className="wc-sync-status-line">
-        <Icon className={`h-3.5 w-3.5 shrink-0 ${syncStatus === "syncing" ? "animate-spin" : ""}`} />
+        <Icon className={`wc-sync-status-icon h-3.5 w-3.5 shrink-0 ${tone} ${syncStatus === "syncing" ? "animate-spin" : ""}`} />
         <span className="truncate">{cloudText}</span>
       </span>
     </button>
@@ -444,16 +444,16 @@ export function UserMenu() {
       <button
         onClick={() => setMenuOpen(!menuOpen)}
         aria-label="打开账户设置"
-        className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--wc-primary-gradient)] p-1 text-white shadow-[0_14px_32px_rgba(37,99,235,0.32)] transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(79,70,229,0.36)]"
+        className="wc-account-button"
       >
         {user?.avatarUrl ? (
           <img
             src={user.avatarUrl}
             alt={user.displayName || user.email}
-            className="h-9 w-9 rounded-full object-cover ring-2 ring-white/80"
+            className="h-8 w-8 rounded-full object-cover ring-2 ring-white/80"
           />
         ) : (
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15">
             <User className="h-4 w-4 text-white" />
           </div>
         )}

@@ -304,16 +304,46 @@
 }
 
 .wc-sync-status-badge {
-  width: 152px;
-  height: 40px;
-  min-width: 152px;
+  width: 148px;
+  height: 38px;
+  min-width: 148px;
   flex-shrink: 0;
   flex-direction: column;
   align-items: stretch;
   justify-content: center;
-  gap: 3px;
+  gap: 2px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
   border-radius: 14px;
   padding-inline: 10px;
+  background: rgba(255, 255, 255, 0.68);
+  color: #475569;
+  box-shadow: var(--wc-shadow-xs);
+  backdrop-filter: blur(14px);
+  transition: transform 0.18s ease, border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.wc-sync-status-badge:hover {
+  border-color: rgba(96, 165, 250, 0.34);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--wc-shadow-sm);
+  transform: translateY(-1px);
+}
+
+.wc-sync-status-badge:disabled {
+  cursor: wait;
+  opacity: 0.8;
+}
+
+.wc-sync-status-icon.is-success {
+  color: #10b981;
+}
+
+.wc-sync-status-icon.is-syncing {
+  color: #3b82f6;
+}
+
+.wc-sync-status-icon.is-error {
+  color: #f43f5e;
 }
 
 .wc-sync-status-line {
@@ -321,6 +351,7 @@
   min-width: 0;
   align-items: center;
   gap: 5px;
+  color: #475569;
   font-size: 10.5px;
   line-height: 1;
 }
@@ -328,14 +359,14 @@
 .wc-header-tool,
 .wc-header-primary {
   display: inline-flex;
-  height: 44px;
+  height: 38px;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
   gap: 7px;
-  border-radius: 16px;
-  padding: 0 13px;
-  font-size: 0.88rem;
+  border-radius: 14px;
+  padding: 0 11px;
+  font-size: 0.82rem;
   font-weight: 760;
   line-height: 1;
   text-decoration: none;
@@ -343,9 +374,9 @@
 }
 
 .wc-header-tool {
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  background: rgba(255, 255, 255, 0.70);
-  color: #1e293b;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(255, 255, 255, 0.68);
+  color: #475569;
   box-shadow: var(--wc-shadow-xs);
   backdrop-filter: blur(14px);
 }
@@ -359,25 +390,27 @@
 }
 
 .wc-header-save {
-  color: #1d4ed8;
+  color: #475569;
 }
 
 .wc-header-tool-quiet {
-  background: transparent;
-  border-color: transparent;
-  box-shadow: none;
+  background: rgba(255, 255, 255, 0.68);
+  border-color: rgba(148, 163, 184, 0.24);
+  box-shadow: var(--wc-shadow-xs);
 }
 
 .wc-wallpaper-quick-control {
   display: inline-flex;
-  height: 44px;
+  height: 38px;
   flex: 0 0 auto;
   align-items: stretch;
   overflow: hidden;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.70);
-  color: #1e293b;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.68);
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 760;
   box-shadow: var(--wc-shadow-xs);
   backdrop-filter: blur(14px);
   transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
@@ -407,7 +440,7 @@
 
 .wc-wallpaper-quick-open {
   gap: 7px;
-  padding: 0 10px 0 12px;
+  padding: 0 9px 0 11px;
 }
 
 .wc-wallpaper-quick-open:hover {
@@ -416,7 +449,7 @@
 
 .wc-wallpaper-quick-toggle {
   gap: 5px;
-  padding: 0 8px;
+  padding: 0 7px;
   border-left: 1px solid rgba(148, 163, 184, 0.20);
 }
 
@@ -1520,19 +1553,22 @@
 
 .wc-login-button {
   display: inline-flex;
+  height: 38px;
   flex: 0 0 auto;
   align-items: center;
   gap: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.78);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.78);
-  color: #1e293b;
-  padding: 8px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.68);
+  color: #475569;
+  padding: 0 11px;
   font-size: 0.78rem;
+  font-weight: 760;
   line-height: 1;
   white-space: nowrap;
-  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.10);
-  backdrop-filter: blur(16px);
+  box-shadow: var(--wc-shadow-xs);
+  backdrop-filter: blur(14px);
+  transition: transform 0.18s ease, border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
 }
 
 .wc-user-menu {
@@ -1544,25 +1580,50 @@
 }
 
 .wc-login-button:hover {
-  background: white;
+  border-color: rgba(96, 165, 250, 0.34);
+  background: rgba(255, 255, 255, 0.9);
   color: #2563eb;
+  box-shadow: var(--wc-shadow-sm);
+  transform: translateY(-1px);
+}
+
+.wc-account-button {
+  display: inline-flex;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 999px;
+  background: var(--wc-primary-gradient);
+  padding: 2px;
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.24);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.wc-account-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 30px rgba(79, 70, 229, 0.3);
 }
 
 .wc-round-tool {
   display: inline-flex;
-  height: 36px;
-  width: 36px;
+  height: 38px;
+  width: 38px;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.24);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.68);
   color: #64748b;
-  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.08);
+  box-shadow: var(--wc-shadow-xs);
 }
 
 .wc-round-tool:hover {
-  background: white;
+  border-color: rgba(96, 165, 250, 0.34);
+  background: rgba(255, 255, 255, 0.9);
   color: #2563eb;
 }
 
@@ -1744,7 +1805,7 @@
 
   .wc-header-tool,
   .wc-header-primary {
-    padding-inline: 12px;
+    padding-inline: 10px;
   }
 
   .wc-header-tool-quiet {
@@ -1816,7 +1877,7 @@
   .wc-header-primary {
     height: 38px;
     border-radius: 14px;
-    padding-inline: 12px;
+    padding-inline: 10px;
     font-size: 0.8rem;
   }
 
@@ -1896,6 +1957,18 @@
   .wc-wallpaper-quick-control {
     height: 36px;
     border-radius: 13px;
+  }
+
+  .wc-login-button {
+    height: 36px;
+    border-radius: 13px;
+    padding-inline: 10px;
+  }
+
+  .wc-account-button,
+  .wc-round-tool {
+    width: 36px;
+    height: 36px;
   }
 
   .wc-section-tab {
@@ -1984,11 +2057,11 @@
 
 .wc-resolution-canvas .wc-header-tool,
 .wc-resolution-canvas .wc-header-primary {
-  height: 44px;
+  height: 38px;
   min-width: 0;
-  border-radius: 16px;
-  padding-inline: 13px;
-  font-size: 0.88rem;
+  border-radius: 14px;
+  padding-inline: 11px;
+  font-size: 0.82rem;
 }
 
 .wc-resolution-canvas .wc-section-tabs {
