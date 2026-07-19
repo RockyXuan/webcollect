@@ -4,9 +4,9 @@
 
 ## 先确认当前基线
 
-- 当前候选版：`V1.3.1 / 2026年7月19日`；目标 tag `webcollect-2026-07-19-v1.3.1`；目标资产 `WebCollect-Chrome-Extension-v1.3.1-2026-07-19.zip`。
-- V1.3.1 closeout：`docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`。先看其中 Publication checklist；main CI、tag/Release、官方 zip 和最终主 Chrome 证据未填写前，不要把目标链接当成已验证发布。
-- 当前已发布稳定版是 `V1.3.0 / 2026年7月19日`，tag `webcollect-2026-07-19-v1.3.0`；main CI `29681646688` 与 Release workflow `29681869535` 均成功。
+- 当前已发布稳定版：`V1.3.1 / 2026年7月19日`；tag `webcollect-2026-07-19-v1.3.1`；正式资产 `WebCollect-Chrome-Extension-v1.3.1-2026-07-19.zip`。
+- V1.3.1 closeout：`docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`。应用提交 `1ef16416f58e1ab81caa1e0dd714f9fe9e3fa126`，main CI `29685287664` 与 Release workflow `29685512533` 均成功；官方 zip 审计与现有已登录主 Chrome Profile 最终只读验收已经完成。
+- 正式 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-19-v1.3.1`；zip 直链：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-19-v1.3.1/WebCollect-Chrome-Extension-v1.3.1-2026-07-19.zip`。
 - V1.3.0 保留 Google / 百度 / Bing，新增纯本地模糊检索、拼音、错字容错、意图别名、加权全文排序和 opt-in 公开网页知识缓存；不调用 AI API，也不捆绑本地模型。348 unit、31 legacy、44 E2E、Web/扩展构建、17.4 MiB 门禁和 208 个生产依赖零漏洞审计已完成。
 - V1.3.1 只统一紧凑顶栏视觉，不新增存储 key，也不改变搜索、收藏、同步、快照、权限或数据。
 

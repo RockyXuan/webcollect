@@ -2,9 +2,9 @@
 
 > **2026-07-15 current workflow rule:** this repository has retired Superpowers (including `superpowers:*` / `using-superpowers`), `goal-zzx` / `zzx-goal`, and `andrej-karpathy-coding`. Do not install, enable, invoke, or imitate them. Any older instruction below that requires `tasks/todo.md`, `tasks/lessons.md`, `CODEX_GO_MODE_STATUS.md`, fixed phase counts, strict TDD, worktrees, subagents, or duplicate reviews is historical and superseded by `AGENTS.md`.
 
-## 2026-07-19 V1.3.1 Header UI Release Preparation
+## 2026-07-19 V1.3.1 Header UI Release
 
-This section supersedes the V1.3.0 development status. Publication evidence remains explicitly pending until the real CI/Release/download/Chrome steps finish.
+This section supersedes the V1.3.0 development status. V1.3.1 is the current published stable application version.
 
 - Target version/date: `V1.3.1 / 2026年7月19日`; tag `webcollect-2026-07-19-v1.3.1`; asset `WebCollect-Chrome-Extension-v1.3.1-2026-07-19.zip`.
 - Closeout: `docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`.
@@ -12,7 +12,9 @@ This section supersedes the V1.3.0 development status. Publication evidence rema
 - Existing 1800px single-row, 1181–1799px second-row, and 390px compact behavior remains. Search, sync, wallpaper, add, recycle, warehouse, and view-mode interactions are unchanged.
 - No storage key, data schema, collection action, extension permission, stable key/ID input, or sync/snapshot path changed. The seed SHA remains `0e48761b595d8303dd71c4f7a8d216424301abdec2d87b2e13533c82c58c2621`.
 - Full local gates passed: 48 files / 372 Vitest, 31/31 legacy scripts, 44/44 Playwright, TypeScript, ESLint, Web/extension builds, artifact checks, the 17.4 MiB size gate, and a 208-package production audit with zero findings. Browser acceptance covered Web/extension CSS parity, all sync states, 2048/1366/390 geometry, classic/mindmap switching, no overflow, and no console error.
-- TODO before declaring publication complete: main CI, final tag/Release workflow, official zip manifest/tree/size/SHA-256 audit, and read-only in-place reload in the existing signed-in primary Chrome profile's auxiliary WebCollect window. The follow-up evidence commit is documentation-only, not a new app version.
+- Published application commit `1ef16416f58e1ab81caa1e0dd714f9fe9e3fa126`; main CI `29685287664` and Release workflow `29685512533` succeeded. The formal Release is `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-19-v1.3.1` and the direct asset is `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-19-v1.3.1/WebCollect-Chrome-Extension-v1.3.1-2026-07-19.zip`.
+- The official zip is `17,113,523` bytes with SHA-256 `cae9e8e5118916e3495bfda2b5e6a86259000a6fe7924abb5f25de57a8a2dc01`. Its Manifest V3 version, stable key hash, unchanged permissions, 41-file tree, unique entries, and byte-for-byte local-build equality passed.
+- The existing primary-profile source was backed up append-only, synchronized without deletion to the official package, and reloaded in place. Chrome showed WebCollect `1.3.1` with stable ID `immpcmhmabobllnopedaoflcjneigbko`; the signed-in real new tab retained `X rocky`, `云端已同步`, sections, bookmark bar, recycle count, and the mindmap collection tree. The follow-up evidence commit is documentation-only, not a new app version.
 
 ## 2026-07-19 V1.3.0 Local Smart Search Release
 
@@ -95,7 +97,7 @@ This section supersedes older development status. The user explicitly waived the
 
 ## Next Major Feature Thread
 
-- Start the next large feature in a new thread only after the V1.3.1 publication checklist is closed. Until then, continue this release from the exact closeout checklist instead of starting unrelated work.
+- V1.3.1 is fully published and its checklist is closed. Start the next large feature in a new thread after reading the current closeout and handoff.
 - Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, and the V1.3.1 closeout before changing code.
 - Ask for or read the user's new feature description, then inspect only the relevant implementation paths before choosing scope, tests, version bump, and release plan.
 - Preserve the V1.3.0 data and sync guarantees. Do not reset IndexedDB, Supabase, extension storage, categories, cards, preferences, snapshots, local view state, mode preference, knowledge consent/cache, derived vectors, or the two documented empty inbox artifacts.

@@ -2,7 +2,7 @@
 
 ## 2026-07-19 current V1.3.1 header UI release entry
 
-Read `AGD.md` and `docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md` first. V1.3.1 unifies the top toolbar with compact light-frame controls, neutral Google / 百度 / Bing labels, icon-only sync-state color, a single blue `+ 网页` primary action, and aligned account/mode controls across Web and the Chrome extension. It changes no TopNav behavior, search flow, collection action, storage key, IndexedDB or Supabase schema, Chrome storage, sync path, dirty set, snapshot, permission, extension ID, or seed data. The target tag is `webcollect-2026-07-19-v1.3.1` and the target asset is `WebCollect-Chrome-Extension-v1.3.1-2026-07-19.zip`; consult the closeout before claiming CI, Release, official-zip, or final primary-Chrome evidence.
+Read `AGD.md` and `docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md` first. V1.3.1 unifies the top toolbar with compact light-frame controls, neutral Google / 百度 / Bing labels, icon-only sync-state color, a single blue `+ 网页` primary action, and aligned account/mode controls across Web and the Chrome extension. It changes no TopNav behavior, search flow, collection action, storage key, IndexedDB or Supabase schema, Chrome storage, sync path, dirty set, snapshot, permission, extension ID, or seed data. The published tag is `webcollect-2026-07-19-v1.3.1` and the official asset is `WebCollect-Chrome-Extension-v1.3.1-2026-07-19.zip`; main CI, Release workflow, official-zip audit, and the signed-in primary-Chrome read-only check are complete in the closeout.
 
 ## 2026-07-19 previous V1.3.0 smart-search release entry
 

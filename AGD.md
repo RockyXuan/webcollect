@@ -5,9 +5,9 @@
 当前主目录：`/Users/rockyx/vibe coding/Web Collect 0628`
 远端仓库：`https://github.com/RockyXuan/webcollect`
 主分支：`main`
-当前候选发布身份：`V1.3.1 / 2026年7月19日`；目标 tag `webcollect-2026-07-19-v1.3.1`；目标 zip `WebCollect-Chrome-Extension-v1.3.1-2026-07-19.zip`。
-V1.3.1 closeout：`docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`。功能、局部自动化与隔离浏览器验收已完成；完整本地门禁、main CI、正式 tag/Release、官方 zip 下载审计和现有主 Chrome profile 最终只读验收仍以 closeout 的 TODO 为准，完成前不得冒充正式发布证据。
-当前已发布稳定边界是 `V1.3.0 / 2026年7月19日`：tag `webcollect-2026-07-19-v1.3.0`，应用提交 `65033a67631095ec492470bce1e2f9b1b2ca0911`，main CI `29681646688` 与 Release workflow `29681869535` 均成功。V1.3.0 的本地智能搜索、导图、同步和数据边界继续保留。
+当前已发布稳定身份：`V1.3.1 / 2026年7月19日`；tag `webcollect-2026-07-19-v1.3.1`；正式 zip `WebCollect-Chrome-Extension-v1.3.1-2026-07-19.zip`。
+V1.3.1 closeout：`docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`。应用提交 `1ef16416f58e1ab81caa1e0dd714f9fe9e3fa126`，main CI `29685287664` 与 Release workflow `29685512533` 均成功；官方 zip 下载审计和现有已登录主 Chrome profile 最终只读验收已经完成。
+V1.3.0 的本地智能搜索、导图、同步和数据边界继续完整保留。
 
 ## 2026-07-19 V1.3.1 顶栏 UI 统一入口
 
@@ -16,7 +16,7 @@ V1.3.1 closeout：`docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md
 - 同步成功、同步中和失败只给图标着色，容器保持中性；账户与经典/导图切换和同排控件对齐。
 - 1181–1799px 保留独立工具栏行，390px 使用 36px 紧凑控件；Web 与扩展视觉参数保持一致。
 - 不新增存储 key，不改变搜索、业务操作、IndexedDB、Supabase、Chrome storage、dirty sets、快照、同步、权限、扩展 ID 或 seed。
-- 当前本地门禁：372 Vitest、31 legacy、44 Playwright、Web/扩展构建、17.4 MiB 扩展体积与 208 个生产依赖零漏洞审计通过；seed SHA 保持不变。
+- 完整发布门禁：372 Vitest、31 legacy、44 Playwright、Web/扩展构建、17.4 MiB 扩展体积与 208 个生产依赖零漏洞审计通过；main CI、Release workflow、官方 zip 审计和真实主 Chrome 只读验收完成；seed SHA 保持不变。
 
 ## 2026-07-19 V1.3.0 本地智能搜索与个人知识库入口
 
@@ -106,7 +106,7 @@ V1.3.1 closeout：`docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md
 
 这个文件是 WebCollect 的“全身体检交接入口”。后续 agent 不需要让用户重新复述需求，先读：
 
-0. `docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`（**当前候选版最新**：顶栏统一、数据边界、验证与发布 TODO）
+0. `docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`（**当前稳定版最新**：顶栏统一、数据边界与完整发布证据）
 0.1 `docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`（本地智能搜索、知识库与数据边界）
 0.2 `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`（顶栏响应式修复与正式发布证据）
 0.3 `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`（Fable 审查打磨与模式记忆）
