@@ -4,10 +4,10 @@
 
 ## 先确认当前基线
 
-- 当前候选版：`V1.3.0 / 2026年7月18日`；目标 tag `webcollect-2026-07-18-v1.3.0`；目标资产 `WebCollect-Chrome-Extension-v1.3.0-2026-07-18.zip`。
+- 当前候选版：`V1.3.0 / 2026年7月19日`；目标 tag `webcollect-2026-07-19-v1.3.0`；目标资产 `WebCollect-Chrome-Extension-v1.3.0-2026-07-19.zip`。
 - V1.3.0 closeout：`docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`。先看其中 Publication TODO；main CI、tag/Release、官方 zip 和最终主 Chrome 证据未填写前，不要把目标链接当成已验证发布。
 - 当前已发布稳定版仍是 `V1.2.2 / 2026年7月17日`，tag `webcollect-2026-07-17-v1.2.2`，zip SHA-256 `80ed3d0ad969d0ad3eb2485cc9a77729565a7dda0f05dcc4926f3245ec40c998`。
-- V1.3.0 保留 Google / 百度 / Bing，新增本地模糊检索和 opt-in 云端语义匹配。342 unit、31 legacy、18 Edge、43 E2E、Web/扩展构建、17.2 MiB 门禁，以及 live migrations / Edge Function / RLS / 401 已完成。
+- V1.3.0 保留 Google / 百度 / Bing，新增纯本地模糊检索、拼音、错字容错、意图别名、加权全文排序和 opt-in 公开网页知识缓存；不调用 AI API，也不捆绑本地模型。348 unit、31 legacy、44 E2E、Web/扩展构建、17.4 MiB 门禁和 208 个生产依赖零漏洞审计已完成。
 
 ## 第一件事
 
@@ -31,7 +31,7 @@ pwd
 git status -sb
 git log --oneline --decorate -8
 git remote -v
-git tag --list 'webcollect-2026-07-18-v1.3.0' --points-at HEAD
+git tag --list 'webcollect-2026-07-19-v1.3.0' --points-at HEAD
 ```
 
 不要使用旧目录 `/Users/rockyx/Documents/webcollect`，也不要从旧分支、旧 RC 或旧交接目标继续开发。
@@ -52,8 +52,8 @@ git tag --list 'webcollect-2026-07-18-v1.3.0' --points-at HEAD
 - 不得用 `seed.ts` 覆盖真实用户数据；未经明确授权，不删除 closeout 中记录的两条空收集箱。
 - 保留 V1.1.2 已修复的同步修订、tombstone、canonical 收集箱、并发浮窗队列、OAuth、启动壁纸零闪烁和发布门槛。
 - 保留 V1.2.2 数据边界：导图视图状态只存 `mindmapViewState:<sectionId>`，模式只存 localStorage `webcollect_collection_view_mode`；不得把它们加入同步、快照、Chrome storage 或云 schema。
-- 保留 V1.3.0 搜索边界：`WebCollectSearch/knowledge_index` 只装可重建派生缓存/同意/进度/ledger；`bookmark_search_embeddings` 只装 `saved-fields | public-html` 双来源向量、哈希和标识，不存原文；`OPENAI_API_KEY` 只能放 Supabase Edge Function secret。
-- 已知 P2 只影响扩展派生向量删除后的短暂最终一致性：不得把它误报成收藏数据丢失，也不得用清空业务数据的方式“修复”。
+- 保留 V1.3.0 搜索边界：`WebCollectSearch/knowledge_index` 只装可重建本地派生缓存、同意和进度；它不进入业务 IndexedDB、Chrome storage、快照、dirty sets、Supabase 或同步。历史向量表/Edge Function 不在运行路径中，不要重新接回，也不要破坏性删除。
+- 不要给 V1.3.0 增加 OpenAI、DeepSeek、其他 AI API 或本地大模型；当前产品决策是纯本地脚本检索。
 - 保留搜索引擎选择、壁纸模式开关、顶部分项编辑、分类轻量编辑、翻译、目标分类、小松鼠品牌和半脸悬停浮窗。
 - 新功能若触及同步或迁移，必须先用隔离数据和快照验证；任何真实云端破坏性操作仍需在执行前说明。
 

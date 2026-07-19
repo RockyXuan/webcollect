@@ -28,14 +28,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Setup Deno
-        uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.8.2
-
-      - name: Verify smart-search Edge Function
-        run: pnpm check:edge
-
       - name: Audit production dependencies
         run: pnpm audit:prod
 
@@ -89,10 +81,10 @@ jobs:
             "WebCollect Chrome extension ${VERSION_LABEL}."
             ""
             "- Adds immediate local fuzzy matching for bookmarks, categories, groups, and sections while preserving Google, Baidu, and Bing search."
-            "- Adds an opt-in personal knowledge index with public-page extraction and OpenAI embedding search through a protected Supabase Edge Function."
-            "- Stores only derived text locally and vectors, hashes, and identifiers in the dedicated cloud embedding table; original collection data is unchanged."
-            "- Falls back to local search without blocking input when offline, signed out, or when semantic search is unavailable."
-            "- Verified by unit, legacy, Edge, Playwright, Web build, extension artifact, size, RLS, authentication, and production dependency checks."
+            "- Adds Chinese pinyin, typo tolerance, curated intent aliases, weighted full-text ranking, and an opt-in public-page knowledge cache."
+            "- Runs search and ranking entirely in the browser without OpenAI, DeepSeek, another AI API, or a bundled local language model."
+            "- Keeps all derived text in the isolated local knowledge cache; original collection, sync, and snapshot data remain unchanged."
+            "- Verified by unit, legacy, Playwright, Web build, extension artifact, size, data-isolation, and production dependency checks."
           )
           printf '%s\n' "${notes[@]}" > release-notes.md
 

@@ -1,3 +1,4 @@
+import { pinyin } from "pinyin-pro";
 import type { Category, CollectionSection, WebCard } from "./types";
 
 const DEFAULT_SECTION_ID = "section-default";
@@ -5,9 +6,42 @@ const MAX_CARD_RESULTS = 20;
 const MAX_STRUCTURE_RESULTS = 8;
 export const MAX_SEARCH_QUERY_CHARACTERS = 200;
 const CJK_STOP_WORDS = new Set(["的", "了", "和", "与", "及", "或", "在", "为", "是"]);
-const MATCH_REASON_ORDER: WorkspaceSearchMatchReason[] = ["title", "url", "path", "description", "fuzzy"];
+const GENERIC_ALIAS_TOKENS = new Set(["ai", "代码", "工具", "网站", "网页", "设计", "视频", "搜索", "管理"]);
+const MATCH_REASON_ORDER: WorkspaceSearchMatchReason[] = [
+  "title",
+  "url",
+  "path",
+  "description",
+  "knowledge",
+  "alias",
+  "pinyin",
+  "fuzzy",
+];
+const BM25_K = 1.2;
+const BM25_B = 0.75;
 
-export type WorkspaceSearchMatchReason = "title" | "url" | "path" | "description" | "fuzzy";
+const SEARCH_ALIAS_GROUPS: readonly (readonly string[])[] = [
+  ["思维导图", "脑图", "心智图", "概念图", "mindmap", "mind map", "导图工具", "知识图谱", "白板", "流程图"],
+  ["下载视频", "视频下载", "保存视频", "视频解析", "下载器", "yt dlp", "ytdlp", "video downloader"],
+  ["ai 写代码", "ai编程", "智能编程", "代码助手", "编程助手", "coding assistant", "copilot", "写程序"],
+  ["画图", "绘图", "图片生成", "生成图片", "ai绘画", "图像生成", "设计图片"],
+  ["记笔记", "笔记", "知识管理", "文档管理", "第二大脑", "notetaking", "notes"],
+  ["部署网站", "网站部署", "发布网站", "前端部署", "托管网站", "hosting", "deploy"],
+  ["代码仓库", "代码托管", "版本控制", "git 仓库", "git repository", "源码管理"],
+  ["邮件", "邮箱", "电子邮件", "email", "mail"],
+  ["搜索引擎", "网页搜索", "查资料", "找资料", "search engine"],
+  ["设计灵感", "设计参考", "创意灵感", "作品集", "design inspiration"],
+] as const;
+
+export type WorkspaceSearchMatchReason =
+  | "title"
+  | "url"
+  | "path"
+  | "description"
+  | "knowledge"
+  | "alias"
+  | "pinyin"
+  | "fuzzy";
 export type WorkspaceSearchMatchKind = "exact" | "lexical" | "fuzzy";
 
 export type WorkspaceSearchResultType = "card" | "category" | "section";
@@ -16,6 +50,12 @@ export interface WorkspaceSearchInput {
   cards: WebCard[];
   categories: Category[];
   sections: CollectionSection[];
+  knowledgeDocuments?: readonly KnowledgeSearchDocument[];
+}
+
+export interface KnowledgeSearchDocument {
+  cardId: string;
+  text: string;
 }
 
 export interface WorkspaceSearchContext {
@@ -30,6 +70,7 @@ interface SearchFields {
   url: string[];
   context: string[];
   description: string[];
+  knowledge: string[];
 }
 
 interface NormalizedSearchFields {
@@ -37,6 +78,12 @@ interface NormalizedSearchFields {
   url: string;
   context: string;
   description: string;
+  knowledge: string;
+}
+
+interface PinyinSearchFields {
+  full: string;
+  initials: string;
 }
 
 interface SearchEntryBase extends WorkspaceSearchContext {
@@ -45,12 +92,16 @@ interface SearchEntryBase extends WorkspaceSearchContext {
   label: string;
   fields: SearchFields;
   normalizedFields: NormalizedSearchFields;
+  pinyinFields: PinyinSearchFields;
   searchableText: string;
 }
 
 export interface CardSearchEntry extends SearchEntryBase {
   type: "card";
   card: WebCard;
+  knowledgeText: string;
+  documentLength: number;
+  termFrequency: ReadonlyMap<string, number>;
 }
 
 export interface CategorySearchEntry extends SearchEntryBase {
@@ -94,6 +145,8 @@ export interface WorkspaceSearchIndex {
   categoryEntries: CategorySearchEntry[];
   sectionEntries: SectionSearchEntry[];
   allEntries: WorkspaceSearchEntry[];
+  cardDocumentFrequency: ReadonlyMap<string, number>;
+  averageCardDocumentLength: number;
 }
 
 export interface WorkspaceSearchResults {
@@ -142,35 +195,44 @@ export function tokenizeSearchQuery(query: string): string[] {
   const normalized = normalizeSearchQuery(query);
   if (!normalized) return [];
 
-  const tokens = new Set<string>();
+  return Array.from(new Set(tokenizeNormalizedSearchText(normalized)));
+}
+
+function tokenizeNormalizedSearchText(normalized: string): string[] {
+  const tokens: string[] = [];
   for (const part of normalized.split(/\s+/)) {
     const chunks = part.match(/[a-z0-9]+|[\u3400-\u9fff]+/giu) ?? [];
     for (const chunk of chunks) {
       if (/^[a-z0-9]+$/i.test(chunk)) {
-        tokens.add(chunk);
+        tokens.push(chunk);
         continue;
       }
 
       const chars = Array.from(chunk).filter((char) => !CJK_STOP_WORDS.has(char));
       if (chars.length <= 2) {
         const token = chars.join("");
-        if (token) tokens.add(token);
+        if (token) tokens.push(token);
         continue;
       }
 
       for (let index = 0; index < chars.length - 1; index += 1) {
-        tokens.add(chars.slice(index, index + 2).join(""));
+        tokens.push(chars.slice(index, index + 2).join(""));
       }
     }
   }
 
-  return Array.from(tokens);
+  return tokens;
 }
 
 export function buildWorkspaceSearchIndex(input: WorkspaceSearchInput): WorkspaceSearchIndex {
   const sections = normalizeSections(input.sections);
   const sectionById = new Map(sections.map((section) => [section.id, section]));
   const categoryById = new Map(input.categories.map((category) => [category.id, category]));
+  const knowledgeByCardId = new Map(
+    (input.knowledgeDocuments ?? [])
+      .filter((document) => document.cardId && document.text.trim())
+      .map((document) => [document.cardId, document.text] as const),
+  );
 
   const resolveCategoryContext = (category: Category): WorkspaceSearchContext => {
     const parentCategory = category.parentId ? categoryById.get(category.parentId) : undefined;
@@ -187,6 +249,7 @@ export function buildWorkspaceSearchIndex(input: WorkspaceSearchInput): Workspac
       url: [],
       context: context.pathLabels,
       description: [category.icon, category.color],
+      knowledge: [],
     };
     return {
       id: category.id,
@@ -196,6 +259,7 @@ export function buildWorkspaceSearchIndex(input: WorkspaceSearchInput): Workspac
       ...context,
       fields,
       normalizedFields: normalizeSearchFields(fields),
+      pinyinFields: buildPinyinSearchFields(fields),
       searchableText: buildSearchableText(fields),
     };
   });
@@ -211,12 +275,16 @@ export function buildWorkspaceSearchIndex(input: WorkspaceSearchInput): Workspac
           pathLabels: [sectionById.get(DEFAULT_SECTION_ID)?.name || "主页"],
         };
     const domain = getUrlDomain(card.url);
+    const knowledgeText = knowledgeByCardId.get(card.id) ?? "";
     const fields: SearchFields = {
       name: [card.title, card.abbreviation],
       url: [card.url, domain],
       context: context.pathLabels,
       description: [card.shortDesc, card.fullDesc, card.note],
+      knowledge: [knowledgeText],
     };
+    const searchableText = buildSearchableText(fields);
+    const termFrequency = buildTermFrequency(searchableText);
     return {
       id: card.id,
       type: "card",
@@ -225,7 +293,11 @@ export function buildWorkspaceSearchIndex(input: WorkspaceSearchInput): Workspac
       ...context,
       fields,
       normalizedFields: normalizeSearchFields(fields),
-      searchableText: buildSearchableText(fields),
+      pinyinFields: buildPinyinSearchFields(fields),
+      searchableText,
+      knowledgeText,
+      documentLength: sumTermFrequency(termFrequency),
+      termFrequency,
     };
   });
 
@@ -235,6 +307,7 @@ export function buildWorkspaceSearchIndex(input: WorkspaceSearchInput): Workspac
       url: [],
       context: [section.name],
       description: [],
+      knowledge: [],
     };
     return {
       id: section.id,
@@ -244,15 +317,23 @@ export function buildWorkspaceSearchIndex(input: WorkspaceSearchInput): Workspac
       pathLabels: [section.name],
       fields,
       normalizedFields: normalizeSearchFields(fields),
+      pinyinFields: buildPinyinSearchFields(fields),
       searchableText: buildSearchableText(fields),
     };
   });
+
+  const cardDocumentFrequency = buildDocumentFrequency(cardEntries);
+  const averageCardDocumentLength = cardEntries.length === 0
+    ? 0
+    : cardEntries.reduce((total, entry) => total + entry.documentLength, 0) / cardEntries.length;
 
   return {
     cardEntries,
     categoryEntries,
     sectionEntries,
     allEntries: [...cardEntries, ...categoryEntries, ...sectionEntries],
+    cardDocumentFrequency,
+    averageCardDocumentLength,
   };
 }
 
@@ -267,9 +348,26 @@ export function searchWorkspaceIndex(index: WorkspaceSearchIndex, query: string)
     return { query: limitedQuery, tokens, cards: [], categories: [], sections: [], total: 0 };
   }
 
-  const cards = scoreEntries(index.cardEntries, limitedQuery, tokens).slice(0, MAX_CARD_RESULTS) as CardSearchResult[];
-  const categories = scoreEntries(index.categoryEntries, limitedQuery, tokens).slice(0, MAX_STRUCTURE_RESULTS) as CategorySearchResult[];
-  const sections = scoreEntries(index.sectionEntries, limitedQuery, tokens).slice(0, MAX_STRUCTURE_RESULTS) as SectionSearchResult[];
+  const expandedTokens = expandSearchTokens(limitedQuery, tokens);
+  const cards = scoreEntries(
+    index.cardEntries,
+    limitedQuery,
+    tokens,
+    expandedTokens,
+    index,
+  ).slice(0, MAX_CARD_RESULTS) as CardSearchResult[];
+  const categories = scoreEntries(
+    index.categoryEntries,
+    limitedQuery,
+    tokens,
+    expandedTokens,
+  ).slice(0, MAX_STRUCTURE_RESULTS) as CategorySearchResult[];
+  const sections = scoreEntries(
+    index.sectionEntries,
+    limitedQuery,
+    tokens,
+    expandedTokens,
+  ).slice(0, MAX_STRUCTURE_RESULTS) as SectionSearchResult[];
 
   return {
     query: limitedQuery,
@@ -309,7 +407,7 @@ function normalizeSections(sections: CollectionSection[]): CollectionSection[] {
 
 function buildSearchableText(fields: SearchFields): string {
   return normalizeSearchText(
-    [...fields.name, ...fields.url, ...fields.context, ...fields.description]
+    [...fields.name, ...fields.url, ...fields.context, ...fields.description, ...fields.knowledge]
       .filter(Boolean)
       .join(" "),
   );
@@ -321,7 +419,85 @@ function normalizeSearchFields(fields: SearchFields): NormalizedSearchFields {
     url: normalizeSearchText(fields.url.filter(Boolean).join(" ")),
     context: normalizeSearchText(fields.context.filter(Boolean).join(" ")),
     description: normalizeSearchText(fields.description.filter(Boolean).join(" ")),
+    knowledge: normalizeSearchText(fields.knowledge.filter(Boolean).join(" ")),
   };
+}
+
+function buildPinyinSearchFields(fields: SearchFields): PinyinSearchFields {
+  const source = [...fields.name, ...fields.context, ...fields.description]
+    .filter(Boolean)
+    .join(" ");
+  if (!/[\u3400-\u9fff]/u.test(source)) return { full: "", initials: "" };
+
+  try {
+    const fullParts = pinyin(source, {
+      toneType: "none",
+      type: "array",
+      nonZh: "removed",
+      v: true,
+    });
+    const initialParts = pinyin(source, {
+      toneType: "none",
+      pattern: "first",
+      type: "array",
+      nonZh: "removed",
+      v: true,
+    });
+    return {
+      full: normalizeSearchText(`${fullParts.join("")} ${fullParts.join(" ")}`),
+      initials: normalizeSearchText(initialParts.join("")),
+    };
+  } catch {
+    return { full: "", initials: "" };
+  }
+}
+
+function buildTermFrequency(searchableText: string): ReadonlyMap<string, number> {
+  const frequency = new Map<string, number>();
+  for (const token of tokenizeNormalizedSearchText(searchableText)) {
+    frequency.set(token, (frequency.get(token) ?? 0) + 1);
+  }
+  return frequency;
+}
+
+function sumTermFrequency(frequency: ReadonlyMap<string, number>): number {
+  let total = 0;
+  for (const count of frequency.values()) total += count;
+  return total;
+}
+
+function buildDocumentFrequency(entries: readonly CardSearchEntry[]): ReadonlyMap<string, number> {
+  const frequency = new Map<string, number>();
+  for (const entry of entries) {
+    for (const token of entry.termFrequency.keys()) {
+      frequency.set(token, (frequency.get(token) ?? 0) + 1);
+    }
+  }
+  return frequency;
+}
+
+function expandSearchTokens(query: string, directTokens: readonly string[]): string[] {
+  const normalizedQuery = normalizeSearchQuery(query);
+  const expanded = new Set<string>();
+  const direct = new Set(directTokens);
+
+  for (const group of SEARCH_ALIAS_GROUPS) {
+    const groupMatches = group.some((alias) => {
+      const normalizedAlias = normalizeSearchQuery(alias);
+      return normalizedAlias.length > 0 && (
+        normalizedQuery.includes(normalizedAlias)
+        || normalizedAlias.includes(normalizedQuery)
+      );
+    });
+    if (!groupMatches) continue;
+    for (const alias of group) {
+      for (const token of tokenizeSearchQuery(alias)) {
+        if (!direct.has(token)) expanded.add(token);
+      }
+    }
+  }
+
+  return Array.from(expanded).slice(0, 32);
 }
 
 function getUrlDomain(url: string): string {
@@ -333,9 +509,11 @@ function getUrlDomain(url: string): string {
 }
 
 function scoreEntries<T extends WorkspaceSearchEntry>(
-  entries: T[],
+  entries: readonly T[],
   query: string,
-  tokens: string[],
+  tokens: readonly string[],
+  expandedTokens: readonly string[] = [],
+  searchIndex?: WorkspaceSearchIndex,
 ): Array<T & {
   score: number;
   matchedTokens: string[];
@@ -345,7 +523,7 @@ function scoreEntries<T extends WorkspaceSearchEntry>(
 }> {
   return entries
     .map((entry) => {
-      const match = scoreEntry(entry, query, tokens);
+      const match = scoreEntry(entry, query, tokens, expandedTokens, searchIndex);
       return match ? { ...entry, ...match } : null;
     })
     .filter((entry): entry is T & {
@@ -374,27 +552,66 @@ interface EntryScore {
   exactMatch: boolean;
 }
 
-function scoreEntry(entry: WorkspaceSearchEntry, query: string, tokens: string[]): EntryScore | null {
+function scoreEntry(
+  entry: WorkspaceSearchEntry,
+  query: string,
+  tokens: readonly string[],
+  expandedTokens: readonly string[],
+  searchIndex?: WorkspaceSearchIndex,
+): EntryScore | null {
   const phrase = normalizeSearchText(query);
   let score = 0;
   let fuzzyMatched = false;
+  let pinyinMatches = 0;
+  let aliasMatches = 0;
+  let aliasEvidenceMatches = 0;
   const matchedTokens: string[] = [];
   const reasons = new Set<WorkspaceSearchMatchReason>();
 
   for (const token of tokens) {
     const tokenScore = scoreToken(entry, token);
-    if (!tokenScore) continue;
-    score += tokenScore.score;
-    matchedTokens.push(token);
-    reasons.add(tokenScore.reason);
-    if (tokenScore.fuzzy) {
-      fuzzyMatched = true;
-      reasons.add("fuzzy");
+    if (tokenScore) {
+      score += tokenScore.score;
+      matchedTokens.push(token);
+      reasons.add(tokenScore.reason);
+      if (tokenScore.fuzzy) {
+        fuzzyMatched = true;
+        reasons.add("fuzzy");
+      }
+      continue;
+    }
+
+    const pinyinScore = scorePinyinToken(entry, token);
+    if (pinyinScore > 0) {
+      score += pinyinScore;
+      pinyinMatches += 1;
+      matchedTokens.push(token);
+      reasons.add("pinyin");
     }
   }
 
   const minimumMatches = tokens.length <= 2 ? tokens.length : Math.ceil(tokens.length * 0.6);
-  if (matchedTokens.length < minimumMatches) return null;
+
+  for (const token of expandedTokens) {
+    const tokenScore = scoreToken(entry, token);
+    if (!tokenScore) continue;
+    score += Math.round(tokenScore.score * 0.35);
+    aliasMatches += 1;
+    if (!GENERIC_ALIAS_TOKENS.has(token)) aliasEvidenceMatches += 1;
+    reasons.add("alias");
+  }
+
+  const hasEnoughDirectMatches = matchedTokens.length >= minimumMatches;
+  const hasEnoughPinyinMatches = pinyinMatches > 0 && matchedTokens.length >= minimumMatches;
+  const hasAliasIntentMatch = expandedTokens.length > 0
+    && aliasMatches > 0
+    && aliasEvidenceMatches > 0;
+  if (!hasEnoughDirectMatches && !hasEnoughPinyinMatches && !hasAliasIntentMatch) return null;
+
+  if (entry.type === "card" && searchIndex) {
+    score += Math.round(bm25Score(entry, tokens, searchIndex) * 90);
+    score += Math.round(bm25Score(entry, expandedTokens, searchIndex) * 22);
+  }
 
   const { name } = entry.normalizedFields;
   const exactMatch = entry.fields.name.some((value) => normalizeSearchText(value) === phrase)
@@ -417,7 +634,7 @@ function scoreEntry(entry: WorkspaceSearchEntry, query: string, tokens: string[]
 }
 
 function scoreToken(entry: WorkspaceSearchEntry, token: string): TokenScore | null {
-  const { name, url, context, description } = entry.normalizedFields;
+  const { name, url, context, description, knowledge } = entry.normalizedFields;
 
   if (name === token) return { score: 1200, reason: "title", fuzzy: false };
   if (name.startsWith(token)) return { score: 950, reason: "title", fuzzy: false };
@@ -427,6 +644,7 @@ function scoreToken(entry: WorkspaceSearchEntry, token: string): TokenScore | nu
   if (context === token) return { score: 560, reason: "path", fuzzy: false };
   if (context.includes(token)) return { score: 440, reason: "path", fuzzy: false };
   if (description.includes(token)) return { score: 260, reason: "description", fuzzy: false };
+  if (knowledge.includes(token)) return { score: 210, reason: "knowledge", fuzzy: false };
 
   if (!/^[a-z0-9]+$/i.test(token) || token.length < 4) return null;
 
@@ -435,6 +653,7 @@ function scoreToken(entry: WorkspaceSearchEntry, token: string): TokenScore | nu
     { value: url, score: 400, reason: "url" },
     { value: context, score: 300, reason: "path" },
     { value: description, score: 180, reason: "description" },
+    { value: knowledge, score: 150, reason: "knowledge" },
   ];
 
   let best: TokenScore | null = null;
@@ -449,6 +668,47 @@ function scoreToken(entry: WorkspaceSearchEntry, token: string): TokenScore | nu
     if (!best || next.score > best.score) best = next;
   }
   return best;
+}
+
+function scorePinyinToken(entry: WorkspaceSearchEntry, token: string): number {
+  if (!/^[a-z]+$/i.test(token) || token.length < 2) return 0;
+  const normalizedToken = normalizeSearchText(token).replace(/\s+/g, "");
+  if (!normalizedToken) return 0;
+
+  if (entry.pinyinFields.initials === normalizedToken) return 720;
+  if (entry.pinyinFields.initials.includes(normalizedToken)) return 610;
+
+  const compactFull = entry.pinyinFields.full.replace(/\s+/g, "");
+  if (compactFull === normalizedToken) return 680;
+  if (compactFull.includes(normalizedToken)) return 560;
+  return 0;
+}
+
+function bm25Score(
+  entry: CardSearchEntry,
+  tokens: readonly string[],
+  index: WorkspaceSearchIndex,
+): number {
+  if (tokens.length === 0 || index.cardEntries.length === 0) return 0;
+  const averageLength = Math.max(1, index.averageCardDocumentLength);
+  let score = 0;
+
+  for (const token of new Set(tokens)) {
+    const termFrequency = entry.termFrequency.get(token) ?? 0;
+    if (termFrequency === 0) continue;
+    const documentFrequency = index.cardDocumentFrequency.get(token) ?? 0;
+    const inverseDocumentFrequency = Math.log(
+      1 + (index.cardEntries.length - documentFrequency + 0.5) / (documentFrequency + 0.5),
+    );
+    const lengthNormalization = BM25_K * (
+      1 - BM25_B + BM25_B * entry.documentLength / averageLength
+    );
+    score += inverseDocumentFrequency
+      * (termFrequency * (BM25_K + 1))
+      / (termFrequency + lengthNormalization);
+  }
+
+  return Number.isFinite(score) ? score : 0;
 }
 
 function bestLatinWordSimilarity(token: string, field: string): number {

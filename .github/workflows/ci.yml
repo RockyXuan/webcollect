@@ -53,14 +53,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --registry=https://registry.npmjs.org
 
-      - name: Setup Deno
-        uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.8.2
-
-      - name: Verify smart-search Edge Function
-        run: pnpm check:edge
-
       - name: Type check
         run: pnpm ts-check
 

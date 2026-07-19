@@ -10,7 +10,7 @@
  * Chrome Service Workers do not support TS type annotations.
  */
 
-import { extractMetadataFromHtml } from '../shared/metadata-extractor.js';
+import { extractKnowledgeText, extractMetadataFromHtml } from '../shared/metadata-extractor.js';
 import { assertSafeRemoteUrl } from '../shared/remote-url-policy.js';
 
 const CAPTURE_QUEUE_KEY = 'webcollect.capture.queue';
@@ -71,6 +71,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .then(result => sendResponse({ success: true, data: result }))
       .catch(err => sendResponse({ success: false, error: err.message }));
     return true; // Keep the message channel open for async response
+  }
+
+  if (message.type === 'FETCH_KNOWLEDGE') {
+    handleFetchKnowledge(message.url)
+      .then(result => sendResponse({ success: true, data: result }))
+      .catch(err => sendResponse({ success: false, error: err.message }));
+    return true;
   }
 
   if (message.type === 'CHECK_SAFETY') {
@@ -146,6 +153,25 @@ async function handleFetchMeta(url) {
   } catch (e) {
     return { title: '', description: '', image: '', favicon: '' };
   }
+}
+
+/**
+ * Fetch public page text for the rebuildable on-device search index.
+ * The request never carries cookies and uses the same SSRF/redirect/size
+ * protections as metadata fetching.
+ */
+async function handleFetchKnowledge(url) {
+  const { response, text: html, url: resolvedUrl } = await fetchExtensionRemoteText(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml;q=0.9',
+    },
+    timeoutMs: 8000,
+    maxRedirects: 4,
+    maxBytes: 1500000,
+  });
+  if (!response.ok) throw new Error(`upstream-${response.status}`);
+  return { resolvedUrl, ...extractKnowledgeText(html, { maxChars: 6000 }) };
 }
 
 async function readExtensionResponseText(response, maxBytes) {

@@ -90,17 +90,20 @@ function installClient(client: SupabaseClient, overrides: {
   configured?: boolean;
   fetch?: typeof globalThis.fetch;
   isExtension?: boolean;
+  sendExtensionMessage?: (message: unknown) => Promise<unknown>;
 } = {}) {
   const initSupabase = vi.fn(async () => overrides.configured ?? true);
   const getSupabaseClient = vi.fn(() => client);
   const fetchMock = overrides.fetch ?? vi.fn();
+  const sendExtensionMessage = vi.fn(overrides.sendExtensionMessage ?? (async () => null));
   __setKnowledgeClientDependenciesForTest({
     initSupabase,
     getSupabaseClient,
     fetch: fetchMock,
     isExtension: () => overrides.isExtension ?? false,
+    sendExtensionMessage,
   });
-  return { initSupabase, getSupabaseClient, fetchMock };
+  return { initSupabase, getSupabaseClient, fetchMock, sendExtensionMessage };
 }
 
 async function expectCode(promise: Promise<unknown>, code: KnowledgeClientErrorCode) {
@@ -371,13 +374,33 @@ describe("knowledge client", () => {
     expect(fake.from).not.toHaveBeenCalled();
   });
 
-  it("blocks public-page extraction inside the extension before auth or network access", async () => {
+  it("fetches public-page text through the extension worker without Supabase auth", async () => {
     const fake = createFakeClient();
-    const deps = installClient(fake.client, { isExtension: true });
+    const deps = installClient(fake.client, {
+      isExtension: true,
+      sendExtensionMessage: async () => ({
+        success: true,
+        data: {
+          resolvedUrl: "https://example.com/final",
+          text: "Public article text",
+          truncated: false,
+          segmentCount: 1,
+        },
+      }),
+    });
 
-    await expectCode(fetchPublicKnowledge("https://example.com"), "extension-public-fetch-disabled");
+    await expect(fetchPublicKnowledge("https://example.com")).resolves.toEqual({
+      resolvedUrl: "https://example.com/final",
+      text: "Public article text",
+      truncated: false,
+      segmentCount: 1,
+    });
     expect(deps.initSupabase).not.toHaveBeenCalled();
     expect(deps.fetchMock).not.toHaveBeenCalled();
+    expect(deps.sendExtensionMessage).toHaveBeenCalledWith({
+      type: "FETCH_KNOWLEDGE",
+      url: "https://example.com/",
+    });
   });
 
   it("fetches public knowledge on Web with bearer auth and validates the result", async () => {

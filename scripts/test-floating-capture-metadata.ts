@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
-import { extractMetadataFromHtml } from "../shared/metadata-extractor.js";
+import { extractKnowledgeText, extractMetadataFromHtml } from "../shared/metadata-extractor.js";
 import { assertSafeRemoteUrl } from "../shared/remote-url-policy.js";
 
 const backgroundSource = readFileSync("extension/background.js", "utf8")
-  .replace(/^import \{ extractMetadataFromHtml \} from '\.\.\/shared\/metadata-extractor\.js';\s*/m, "")
+  .replace(/^import \{ extractKnowledgeText, extractMetadataFromHtml \} from '\.\.\/shared\/metadata-extractor\.js';\s*/m, "")
   .replace(/^import \{ assertSafeRemoteUrl \} from '\.\.\/shared\/remote-url-policy\.js';\s*/m, "");
 
 const listeners: Record<string, unknown[]> = {};
@@ -15,6 +15,7 @@ const context = {
   AbortSignal,
   TextDecoder,
   Uint8Array,
+  extractKnowledgeText,
   extractMetadataFromHtml,
   assertSafeRemoteUrl,
   chrome: {
@@ -48,6 +49,7 @@ vm.runInContext(backgroundSource, context, { filename: "extension/background.js"
 
 type BackgroundContext = typeof context & {
   handleFetchMeta: (url: string) => Promise<{ title: string; description: string; image: string; favicon: string }>;
+  handleFetchKnowledge: (url: string) => Promise<{ resolvedUrl: string; text: string; truncated: boolean; segmentCount: number }>;
 };
 
 const bg = context as BackgroundContext;
@@ -97,6 +99,15 @@ async function main() {
 
   assert.equal(fetched.title, "Docu.md");
   assert.equal(fetched.description, "AI writes it. docu.md does the rest.");
+
+  const knowledge = await bg.handleFetchKnowledge("https://docu.md/");
+  assert.equal(knowledge.resolvedUrl, "https://docu.md/");
+  assert.match(knowledge.text, /AI writes it/);
+  assert.ok(knowledge.segmentCount > 0);
+
+  const beforeBlockedKnowledge = requestCount;
+  await assert.rejects(() => bg.handleFetchKnowledge("http://127.0.0.1/private"));
+  assert.equal(requestCount, beforeBlockedKnowledge, "knowledge fetch must reject private targets before network access");
 
   console.log("floating capture metadata tests passed");
 }

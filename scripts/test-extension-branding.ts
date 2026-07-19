@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 
 const EXPECTED_VERSION = "1.3.0";
-const EXPECTED_RELEASE_DATE = "2026-07-18";
-const EXPECTED_RELEASE_DATE_DISPLAY = "2026年7月18日";
+const EXPECTED_RELEASE_DATE = "2026-07-19";
+const EXPECTED_RELEASE_DATE_DISPLAY = "2026年7月19日";
 
 function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(path, "utf8")) as T;

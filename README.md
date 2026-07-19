@@ -20,14 +20,14 @@
 项目已于 2026-07-15 退役 Superpowers、`goal-zzx` / `zzx-goal` 和 `andrej-karpathy-coding` 工作流。`tasks/todo.md`、`tasks/lessons.md`、`CODEX_GO_MODE_STATUS.md` 与 `docs/superpowers/` 只保留历史事实，不是新任务的必读、必写或执行入口。
 
 当前固定开发目录：`/Users/rockyx/vibe coding/Web Collect 0628`。
-当前候选功能版本：`V1.3.0 / 2026年7月18日`。
-目标 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-18-v1.3.0`。
-目标扩展 zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-18-v1.3.0/WebCollect-Chrome-Extension-v1.3.0-2026-07-18.zip`。
+当前候选功能版本：`V1.3.0 / 2026年7月19日`。
+目标 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-19-v1.3.0`。
+目标扩展 zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-19-v1.3.0/WebCollect-Chrome-Extension-v1.3.0-2026-07-19.zip`。
 当前已发布稳定版：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-17-v1.2.2`。V1.3.0 的 main CI、tag/Release、官方 zip 和最终主 Chrome 证据仍以 closeout TODO 为准。
 历史 RC7：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-15-v1.1.2-rc.7`。
 如果旧说明和 `AGD.md` 冲突，以 `AGD.md` 为准。
 
-V1.3.0 保留 Google / 百度 / Bing 普通搜索，并在同一搜索框加入本地模糊检索与用户明确同意后才启用的云端语义匹配。业务收藏、同步和快照 Schema 不变；本地派生缓存隔离在 `WebCollectSearch/knowledge_index`，云端 `bookmark_search_embeddings` 只保存双来源向量/哈希/标识，`OPENAI_API_KEY` 只允许作为 Supabase secret。
+V1.3.0 保留 Google / 百度 / Bing 普通搜索，并在同一搜索框加入完全本地运行的模糊检索、拼音、错字容错、意图别名、加权全文排序和可选公开网页正文知识库。它不调用 OpenAI、DeepSeek 或其他 AI API，也不捆绑本地大模型；派生缓存只在 `WebCollectSearch/knowledge_index`，业务收藏、同步和快照 Schema 不变。
 
 这是一个基于 [Next.js 16](https://nextjs.org) + [shadcn/ui](https://ui.shadcn.com) 的全栈应用项目，由扣子编程 CLI 创建。
 

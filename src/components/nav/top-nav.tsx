@@ -25,7 +25,6 @@ import {
   GripVertical,
   Home,
   Layers,
-  LoaderCircle,
   Pencil,
   Plus,
   RefreshCw,
@@ -56,8 +55,8 @@ import { PlatformLink } from "@/components/ui/platform-link";
 import { useAuthStore } from "@/lib/auth-store";
 import { saveCloudWorkspaceSnapshot } from "@/lib/cloud-snapshots";
 import { createLocalDataSnapshot } from "@/lib/local-snapshots";
-import { useHybridWorkspaceSearch } from "@/hooks/use-hybrid-workspace-search";
-import { useKnowledgeBuild } from "@/hooks/use-knowledge-build";
+import { useLocalKnowledgeBuild } from "@/hooks/use-local-knowledge-build";
+import { useLocalWorkspaceSearch } from "@/hooks/use-local-workspace-search";
 import type { HybridCardSearchResult } from "@/lib/hybrid-workspace-search";
 import { openWebCollectUrl } from "@/lib/platform";
 import {
@@ -131,8 +130,11 @@ function matchReasonLabel(reason: HybridCardSearchResult["matchReasons"][number]
     case "url": return "网址匹配";
     case "path": return "分类路径";
     case "description": return "简介匹配";
+    case "knowledge": return "正文匹配";
+    case "alias": return "意图匹配";
+    case "pinyin": return "拼音匹配";
     case "fuzzy": return "模糊匹配";
-    case "semantic": return "AI 语义";
+    case "semantic": return "语义匹配";
   }
 }
 
@@ -163,8 +165,7 @@ function rebuildCardResult(
 function getVisibleMatchReasons(
   reasons: HybridCardSearchResult["matchReasons"],
 ): HybridCardSearchResult["matchReasons"] {
-  if (!reasons.includes("semantic")) return reasons.slice(0, 3);
-  return ["semantic", ...reasons.filter((reason) => reason !== "semantic").slice(0, 2)];
+  return reasons.slice(0, 3);
 }
 
 function matchesSearchEvidence(value: string, query: string, tokens: readonly string[]): boolean {
@@ -172,6 +173,21 @@ function matchesSearchEvidence(value: string, query: string, tokens: readonly st
   if (!normalizedValue) return false;
   if (query && normalizedValue.includes(query)) return true;
   return tokens.some((token) => token && normalizedValue.includes(token));
+}
+
+function knowledgeMatchSnippet(value: string, query: string, tokens: readonly string[]): string {
+  const compact = value.replace(/\s+/g, " ").trim();
+  if (!compact) return "";
+  const normalized = normalizeSearchText(compact);
+  const needles = [query, ...tokens].filter(Boolean);
+  const matchIndex = needles.reduce((best, needle) => {
+    const index = normalized.indexOf(needle);
+    if (index < 0) return best;
+    return best < 0 ? index : Math.min(best, index);
+  }, -1);
+  const start = Math.max(0, matchIndex < 0 ? 0 : matchIndex - 42);
+  const end = Math.min(compact.length, start + 150);
+  return `${start > 0 ? "…" : ""}${compact.slice(start, end)}${end < compact.length ? "…" : ""}`;
 }
 
 function getCardResultSnippet(result: HybridCardSearchResult, rawQuery: string): string {
@@ -185,6 +201,11 @@ function getCardResultSnippet(result: HybridCardSearchResult, rawQuery: string):
 
   if (matchReasons.includes("description")) {
     return matchedDescription || descriptions[0] || card.url;
+  }
+  if (matchReasons.includes("knowledge")) {
+    return knowledgeMatchSnippet(result.knowledgeText, normalizedQuery, normalizedTokens)
+      || descriptions[0]
+      || card.url;
   }
   if (matchReasons.includes("url")) return card.url;
   if (matchReasons.includes("path")) return pathLabels.join(" / ");
@@ -334,7 +355,6 @@ export function TopNav({
     setSearchEngine,
   } = useAppStore();
   const recycleBinCount = useAppStore((s) => s.recycleBin.length);
-  const user = useAuthStore((s) => s.user);
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const syncStatus = useAuthStore((s) => s.syncStatus);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -395,26 +415,26 @@ export function TopNav({
     });
   }, [isKnowledgeConsentOpen, trimmedSearchQuery]);
 
+  const knowledgeBuild = useLocalKnowledgeBuild();
   const workspaceSearchIndex = useMemo(
-    () => buildWorkspaceSearchIndex({ cards, categories, sections }),
-    [cards, categories, sections],
+    () => buildWorkspaceSearchIndex({
+      cards,
+      categories,
+      sections,
+      knowledgeDocuments: knowledgeBuild.knowledgeDocuments,
+    }),
+    [cards, categories, knowledgeBuild.knowledgeDocuments, sections],
   );
   const cardEntryById = useMemo(
     () => new Map(workspaceSearchIndex.cardEntries.map((entry) => [entry.card.id, entry])),
     [workspaceSearchIndex],
   );
-  const knowledgeBuild = useKnowledgeBuild();
-  const hybridSearch = useHybridWorkspaceSearch({
-    query: trimmedSearchQuery,
-    index: workspaceSearchIndex,
-    semanticEnabled: knowledgeBuild.consentReady && knowledgeBuild.consented,
-    userId: user?.id,
-  });
+  const localSearch = useLocalWorkspaceSearch(trimmedSearchQuery, workspaceSearchIndex);
   const externalSearchKey = `search:${searchEngine}`;
   const currentStructureKeys = useMemo(() => new Set([
-    ...hybridSearch.localResults.categories.map((result) => `category:${result.category.id}`),
-    ...hybridSearch.localResults.sections.map((result) => `section:${result.section.id}`),
-  ]), [hybridSearch.localResults.categories, hybridSearch.localResults.sections]);
+    ...localSearch.localResults.categories.map((result) => `category:${result.category.id}`),
+    ...localSearch.localResults.sections.map((result) => `section:${result.section.id}`),
+  ]), [localSearch.localResults.categories, localSearch.localResults.sections]);
 
   useEffect(() => {
     if (!retainedKeyboardSelection || retainedKeyboardSelection.query !== trimmedSearchQuery) return;
@@ -425,7 +445,7 @@ export function TopNav({
   }, [cardEntryById, currentStructureKeys, retainedKeyboardSelection, trimmedSearchQuery]);
 
   const visibleCardResults = useMemo(() => {
-    const results = [...hybridSearch.cards];
+    const results = [...localSearch.cards];
     if (
       !retainedKeyboardSelection
       || retainedKeyboardSelection.query !== trimmedSearchQuery
@@ -446,7 +466,7 @@ export function TopNav({
     const slot = Math.min(retainedKeyboardSelection.slot, nextResults.length);
     nextResults.splice(slot, 0, retainedResult);
     return nextResults.slice(0, 5);
-  }, [cardEntryById, hybridSearch.cards, retainedKeyboardSelection, trimmedSearchQuery]);
+  }, [cardEntryById, localSearch.cards, retainedKeyboardSelection, trimmedSearchQuery]);
 
   const searchItems = useMemo<SearchPanelItem[]>(() => {
     if (!trimmedSearchQuery) return [];
@@ -477,7 +497,7 @@ export function TopNav({
       });
     });
 
-    for (const result of hybridSearch.localResults.categories) {
+    for (const result of localSearch.localResults.categories) {
       items.push({
         key: `category:${result.category.id}`,
         type: "category",
@@ -489,7 +509,7 @@ export function TopNav({
       });
     }
 
-    for (const result of hybridSearch.localResults.sections) {
+    for (const result of localSearch.localResults.sections) {
       items.push({
         key: `section:${result.section.id}`,
         type: "section",
@@ -501,7 +521,7 @@ export function TopNav({
     }
 
     return items;
-  }, [hybridSearch.localResults.categories, hybridSearch.localResults.sections, searchEngine, trimmedSearchQuery, visibleCardResults]);
+  }, [localSearch.localResults.categories, localSearch.localResults.sections, searchEngine, trimmedSearchQuery, visibleCardResults]);
 
   const activeSearchIndex = searchItems.findIndex((item) => item.key === activeSearchKey);
   const activeSearchItem = searchItems[activeSearchIndex >= 0 ? activeSearchIndex : 0];
@@ -727,54 +747,36 @@ export function TopNav({
   };
 
   const knowledgeJobTotal = knowledgeBuild.buildState?.jobs.length ?? knowledgeBuild.totalCards;
-  const knowledgeStatusText = !knowledgeBuild.consentReady
+  const knowledgeStatusText = !knowledgeBuild.ready
     ? "正在读取知识库状态…"
-    : !user
-      ? "本地智能搜索已开启；登录后可启用 AI 语义匹配"
-      : knowledgeBuild.error === "sync-required"
-        ? "请先完成一次同步，再构建知识库；原收藏不会被改动"
-        : knowledgeBuild.error === "authentication-required"
-          ? "登录状态已失效；本地智能搜索仍可使用"
-          : knowledgeBuild.error === "build-failed"
-            ? "知识库更新暂时失败；本地智能搜索仍可使用"
-            : !knowledgeBuild.consented
-              ? knowledgeBuild.buildSupported
-                ? "本地智能搜索已开启；AI 建库需要你的明确同意"
-                : "本地智能搜索已开启；AI 语义匹配需要你的明确同意"
-              : knowledgeBuild.incrementalSupported
-                ? knowledgeBuild.incrementalStatus === "waiting-workspace"
-                  ? "AI 匹配已启用；等待账号同步完成后建立扩展增量基线"
-                  : knowledgeBuild.isBuilding
-                    ? "正在更新扩展端的新增与修改"
-                    : "AI 匹配已启用；扩展新增和修改会自动更新，公开正文由 Web 版维护"
-                : knowledgeBuild.isBuilding
-                ? `正在构建知识库 ${knowledgeBuild.completedJobs}/${knowledgeJobTotal}`
-                : knowledgeBuild.buildState?.status === "paused"
-                  ? `知识库已暂停 ${knowledgeBuild.completedJobs}/${knowledgeJobTotal}`
-                  : knowledgeBuild.buildState?.status === "complete-with-errors"
-                    ? `已索引 ${knowledgeBuild.indexedCount}/${knowledgeBuild.totalCards}，${knowledgeBuild.failedJobs} 项可重试`
-                    : knowledgeBuild.buildState?.status === "complete"
-                      ? `知识库已就绪 ${knowledgeBuild.indexedCount}/${knowledgeBuild.totalCards}`
-                      : knowledgeBuild.buildSupported
-                        ? "已允许 AI 语义匹配，可以开始构建知识库"
-                        : "AI 语义匹配已启用；请在 Web 版构建或更新知识库";
+    : knowledgeBuild.error === "build-failed"
+      ? "本地知识库更新暂时失败；普通搜索仍可使用"
+      : !knowledgeBuild.publicFetchSupported
+        ? "本地智能搜索已开启；登录后可补充公开网页正文"
+        : !knowledgeBuild.consented
+          ? "本地智能搜索已开启；可选择构建公开正文知识库"
+          : knowledgeBuild.isBuilding
+            ? `正在本机更新知识库 ${knowledgeBuild.completedJobs}/${knowledgeJobTotal}`
+            : knowledgeBuild.buildState?.status === "paused"
+              ? `本地知识库已暂停 ${knowledgeBuild.completedJobs}/${knowledgeJobTotal}`
+              : knowledgeBuild.buildState?.status === "complete-with-errors"
+                ? `本地知识库已更新，${knowledgeBuild.failedJobs} 个网页读取失败并已回退`
+                : knowledgeBuild.buildState?.status === "complete"
+                  ? `本地知识库已就绪 ${knowledgeBuild.indexedCount}/${knowledgeBuild.totalCards}，含 ${knowledgeBuild.publicTextCount} 个公开网页正文`
+                  : "本地智能搜索已开启；不使用任何 AI API";
 
-  const knowledgeActionLabel = !knowledgeBuild.consentReady
-    || !user
-    || knowledgeBuild.error === "sync-required"
-    || knowledgeBuild.error === "authentication-required"
+  const knowledgeActionLabel = !knowledgeBuild.ready
+    || !knowledgeBuild.publicFetchSupported
     ? null
     : !knowledgeBuild.consented
-      ? knowledgeBuild.buildSupported ? "构建知识库" : "启用 AI 匹配"
+      ? "构建知识库"
       : knowledgeBuild.isBuilding
         ? "暂停"
         : knowledgeBuild.error === "build-failed"
           || knowledgeBuild.buildState?.status === "paused"
           || knowledgeBuild.buildState?.status === "complete-with-errors"
           ? "重试"
-          : knowledgeBuild.buildSupported
-            ? knowledgeBuild.buildState?.status === "complete" ? "更新知识库" : "开始构建"
-            : null;
+          : knowledgeBuild.buildState?.status === "complete" ? "更新知识库" : "开始构建";
 
   const handleKnowledgeAction = () => {
     knowledgeBuild.clearError();
@@ -794,30 +796,14 @@ export function TopNav({
       void knowledgeBuild.retry();
       return;
     }
-    if (knowledgeBuild.buildSupported) void knowledgeBuild.startInitialBuild();
+    void knowledgeBuild.update();
   };
 
-  const hasVisibleSemanticResult = visibleCardResults.some((result) => (
-    result.matchReasons.includes("semantic")
-  ));
-  const semanticStatusText = hybridSearch.semanticStatus === "loading"
-    ? "AI 匹配中"
-    : hybridSearch.semanticStatus === "fallback"
-      ? "AI 暂不可用，已保留本地结果"
-      : hybridSearch.semanticStatus === "ready" && hasVisibleSemanticResult
-        ? "已合并 AI 语义结果"
-        : "本地即时匹配";
+  const localSearchStatusText = "本地即时匹配";
   const externalSearchItem = searchItems.find((item) => item.type === "search");
   const cardSearchItems = searchItems.filter((item) => item.type === "card");
   const structureSearchItems = searchItems.filter((item) => item.type === "category" || item.type === "section");
-  const showCardSmartSection = cardSearchItems.length > 0
-    || hybridSearch.semanticStatus === "loading"
-    || hybridSearch.semanticStatus === "fallback";
-  const emptyCardStatusText = hybridSearch.semanticStatus === "loading"
-    ? "本地暂无匹配，正在等待 AI 语义结果…"
-    : hybridSearch.semanticStatus === "fallback"
-      ? "本地暂无匹配，AI 暂不可用；仍可使用外部搜索"
-      : "";
+  const showCardSmartSection = cardSearchItems.length > 0;
 
   const renderSearchItem = (item: SearchPanelItem) => {
     const active = item.key === (activeSearchItem?.key ?? externalSearchKey);
@@ -884,7 +870,7 @@ export function TopNav({
                 <span
                   key={reason}
                   className="wc-smart-reason-chip"
-                  data-kind={reason === "semantic" ? "semantic" : "local"}
+                  data-kind="local"
                 >
                   {matchReasonLabel(reason)}
                 </span>
@@ -1002,21 +988,10 @@ export function TopNav({
                           智能匹配
                         </span>
                         <span className="wc-smart-status">
-                          {hybridSearch.semanticStatus === "loading" && (
-                            <LoaderCircle
-                              className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
-                              aria-hidden="true"
-                            />
-                          )}
-                          {semanticStatusText}
+                          {localSearchStatusText}
                         </span>
                       </div>
                       {cardSearchItems.map(renderSearchItem)}
-                      {cardSearchItems.length === 0 && emptyCardStatusText && (
-                        <div className="wc-smart-section-empty" role="status">
-                          {emptyCardStatusText}
-                        </div>
-                      )}
                     </div>
                   )}
 
@@ -1055,7 +1030,7 @@ export function TopNav({
                   )}
                 </div>
                 <span className="sr-only" role="status" aria-live="polite">
-                  {semanticStatusText}。{knowledgeStatusText}
+                  {localSearchStatusText}。{knowledgeStatusText}
                 </span>
               </div>
             )}
@@ -1241,14 +1216,10 @@ export function TopNav({
       <BookmarkBar />
       <KnowledgeConsentAlert
         open={isKnowledgeConsentOpen}
-        mode={knowledgeBuild.buildSupported ? "build" : "semantic-only"}
+        mode="local"
         onOpenChange={setIsKnowledgeConsentOpen}
         onConfirm={() => {
-          if (knowledgeBuild.buildSupported) {
-            void knowledgeBuild.startInitialBuild();
-          } else {
-            void knowledgeBuild.enableSemanticOnly();
-          }
+          void knowledgeBuild.startInitialBuild();
         }}
       />
       <AlertDialog

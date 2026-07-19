@@ -78,6 +78,34 @@ const cards: WebCard[] = [
     createdAt: now,
     updatedAt: now,
   },
+  {
+    id: "card-mindmap",
+    title: "思维导图工作台",
+    url: "https://mind.example.com",
+    shortDesc: "白板、脑图和流程图工具",
+    fullDesc: "整理想法、知识结构与项目关系。",
+    note: "头脑风暴",
+    abbreviation: "MM",
+    imageUrl: "",
+    categoryId: "cat-code",
+    order: 2,
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: "card-cursor",
+    title: "Cursor",
+    url: "https://cursor.com",
+    shortDesc: "AI 编程助手",
+    fullDesc: "通过自然语言辅助编写和理解代码。",
+    note: "智能写程序",
+    abbreviation: "CU",
+    imageUrl: "",
+    categoryId: "cat-code",
+    order: 3,
+    createdAt: now,
+    updatedAt: now,
+  },
 ];
 
 const input = { cards, categories, sections };
@@ -112,6 +140,42 @@ describe("workspace fuzzy search", () => {
     expect(result.cards[0]?.card.id).toBe("card-github");
     expect(result.cards[0]?.exactMatch).toBe(true);
     expect(result.cards[0]?.matchKind).toBe("exact");
+  });
+
+  it("finds public-page knowledge text without changing the saved card", () => {
+    const before = structuredClone(input);
+    const result = searchWorkspace({
+      ...input,
+      knowledgeDocuments: [{
+        cardId: "card-mindmap",
+        text: "支持鱼骨图、概念关系梳理和团队头脑风暴",
+      }],
+    }, "鱼骨图");
+
+    expect(result.cards[0]?.card.id).toBe("card-mindmap");
+    expect(result.cards[0]?.matchReasons).toContain("knowledge");
+    expect(input).toEqual(before);
+  });
+
+  it("understands common Chinese intent aliases without a remote model", () => {
+    const mindmap = searchWorkspace(input, "做思维导图的工具");
+    const video = searchWorkspace(input, "保存视频的网站");
+    const coding = searchWorkspace(input, "AI 写代码");
+
+    expect(mindmap.cards[0]?.card.id).toBe("card-mindmap");
+    expect(mindmap.cards[0]?.matchReasons).toContain("alias");
+    expect(video.cards[0]?.card.id).toBe("card-downloader");
+    expect(coding.cards[0]?.card.id).toBe("card-cursor");
+  });
+
+  it("finds Chinese titles by full pinyin and initials", () => {
+    const fullPinyin = searchWorkspace(input, "siweidaotu");
+    const initials = searchWorkspace(input, "swdt");
+
+    expect(fullPinyin.cards[0]?.card.id).toBe("card-mindmap");
+    expect(fullPinyin.cards[0]?.matchReasons).toContain("pinyin");
+    expect(initials.cards[0]?.card.id).toBe("card-mindmap");
+    expect(initials.cards[0]?.matchReasons).toContain("pinyin");
   });
 
   it("reuses a prebuilt index without mutating source data", () => {

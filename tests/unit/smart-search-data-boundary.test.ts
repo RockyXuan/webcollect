@@ -23,6 +23,10 @@ const knowledgeIndexSource = readRepositoryFile("src/lib/knowledge-index.ts");
 const knowledgeBuilderSource = readRepositoryFile("src/lib/knowledge-builder.ts");
 const derivedCacheSources = `${knowledgeIndexSource}\n${knowledgeBuilderSource}`;
 const knowledgeFetchRouteSource = readRepositoryFile("src/app/api/knowledge/fetch/route.ts");
+const localKnowledgeHookSource = readRepositoryFile("src/hooks/use-local-knowledge-build.ts");
+const localSearchHookSource = readRepositoryFile("src/hooks/use-local-workspace-search.ts");
+const topNavSource = readRepositoryFile("src/components/nav/top-nav.tsx");
+const extensionBackgroundSource = readRepositoryFile("extension/background.js");
 
 const edgeFunctionSources = [
   "supabase/functions/bookmark-search/index.ts",
@@ -160,6 +164,27 @@ describe("V1.3 derived-cache isolation", () => {
     expect(knowledgeFetchRouteSource).toMatch(/maxBytes:\s*1_500_000/);
     expect(knowledgeFetchRouteSource).toMatch(/allowedContentTypes:\s*\["text\/html",\s*"application\/xhtml\+xml"\]/);
     expect(knowledgeFetchRouteSource).not.toMatch(/\b(?:cookie|credentials)\b/i);
+  });
+
+  it("keeps the released search path local and leaves the semantic client dormant", () => {
+    expect(topNavSource).toMatch(/useLocalKnowledgeBuild/);
+    expect(topNavSource).toMatch(/useLocalWorkspaceSearch/);
+    expect(topNavSource).not.toMatch(/useHybridWorkspaceSearch|useKnowledgeBuild/);
+    expect(`${localKnowledgeHookSource}\n${localSearchHookSource}`).not.toMatch(
+      /semanticSearchKnowledge|indexKnowledge|removeKnowledgeEmbedding|bookmark-search|OPENAI_API_KEY/i,
+    );
+    expect(localKnowledgeHookSource).not.toMatch(/chrome\.storage|clear\s*\(|removeKnowledgeCacheEntry/);
+    expect(localKnowledgeHookSource).not.toMatch(
+      /\b(?:addCard|updateCard|softDeleteCard|restoreCard|markCardDirty|markCategoryDirty|createSnapshot|pushToCloud)\s*\(/,
+    );
+  });
+
+  it("uses the extension worker for public HTML without adding permissions or cookies", () => {
+    expect(extensionBackgroundSource).toMatch(/message\.type === 'FETCH_KNOWLEDGE'/);
+    expect(extensionBackgroundSource).toMatch(/extractKnowledgeText\(html, \{ maxChars: 6000 \}\)/);
+    expect(extensionBackgroundSource).toMatch(/timeoutMs:\s*8000/);
+    expect(extensionBackgroundSource).toMatch(/maxBytes:\s*1500000/);
+    expect(extensionBackgroundSource).not.toMatch(/credentials:\s*['"]include['"]/);
   });
 });
 

@@ -1,25 +1,23 @@
 # WebCollect 全项目体检入口
 
-更新时间：2026-07-18
+更新时间：2026-07-19
 面向对象：Claude / Codex / 后续任何接手 WebCollect 的开发 agent
 当前主目录：`/Users/rockyx/vibe coding/Web Collect 0628`
 远端仓库：`https://github.com/RockyXuan/webcollect`
 主分支：`main`
-当前候选发布身份：`V1.3.0 / 2026年7月18日`；目标 tag `webcollect-2026-07-18-v1.3.0`；目标 zip `WebCollect-Chrome-Extension-v1.3.0-2026-07-18.zip`。
-V1.3.0 closeout：`docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`。本地功能和验证、Supabase migrations / Edge Function / RLS / 401 门禁已完成；main CI、正式 tag/Release、官方 zip 下载审计和现有主 Chrome profile 最终只读验收仍以 closeout 的 TODO 为准，完成前不得冒充正式发布证据。
+当前候选发布身份：`V1.3.0 / 2026年7月19日`；目标 tag `webcollect-2026-07-19-v1.3.0`；目标 zip `WebCollect-Chrome-Extension-v1.3.0-2026-07-19.zip`。
+V1.3.0 closeout：`docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`。纯本地功能、自动化与隔离浏览器验收已完成；main CI、正式 tag/Release、官方 zip 下载审计和现有主 Chrome profile 最终只读验收仍以 closeout 的 TODO 为准，完成前不得冒充正式发布证据。
 当前已发布稳定边界仍是 `V1.2.2 / 2026年7月17日`：tag `webcollect-2026-07-17-v1.2.2`，应用提交 `b2a2063cb986574ffdf6e0c13c3988da6c02a26a`，zip SHA-256 `80ed3d0ad969d0ad3eb2485cc9a77729565a7dda0f05dcc4926f3245ec40c998`。V1.2.2 的导图、模式记忆、顶栏修复和数据边界继续保留。
 
-## 2026-07-18 V1.3.0 智能搜索与个人知识库入口
+## 2026-07-19 V1.3.0 本地智能搜索与个人知识库入口
 
 - 实施收口：`docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`。
-- 现有 Google / 百度 / Bing 普通搜索不变；输入时先返回本地模糊匹配，再异步合并经用户明确同意的 AI 语义结果。失败、离线、未登录或未配置时无感降级为本地搜索。
-- 本地检索覆盖网页、分类、分组和分项，支持中文二元词组、英文前缀/编辑距离、路径权重、完整匹配置顶、键盘/IME/读屏和经典/导图定位。
+- 现有 Google / 百度 / Bing 普通搜索不变；输入时完全在浏览器本地检索，不调用 OpenAI、DeepSeek 或其他 AI API，也不捆绑或下载本地语言模型。
+- 本地检索覆盖网页、分类、分组和分项，支持中文二元词组、拼音全拼/首字母、英文前缀/编辑距离、意图别名、BM25 加权、路径权重、完整匹配置顶、键盘/IME/读屏和经典/导图定位。
 - 本地派生知识缓存只在 `WebCollectSearch/knowledge_index`；不写入业务 IndexedDB、Chrome storage、快照、dirty sets 或同步。
-- 云端 `bookmark_search_embeddings` 只保存用户/卡片/来源标识、SHA-256 哈希、模型/版本/时间和 1536 维向量，不保存网页原文；`saved-fields` 与 `public-html` 双来源独立，RLS 与卡片所有权检查只允许本人访问。
-- `OPENAI_API_KEY` 只能配置在 Supabase Edge Function secret；不得进入 Web、扩展、仓库、日志或任何浏览器存储。
-- 当前验证：342 Vitest、31 legacy、18 Edge、43 Playwright、Web/扩展生产构建和 17.2 MiB 体积门禁通过；live migrations、JWT Edge Function、RLS 和匿名 401 已验证。
-- 已知 P2 仅涉及可重建派生向量的短暂最终一致性窗口，不会改变或删除收藏/分类/分项/偏好/快照/同步状态；详见 closeout。
-- Supabase Advisor 的 `authenticated_security_definer_function_executable` 警告为有意保留的原子配额 RPC：只允许 authenticated、强制 `auth.uid()`、仅增加调用者自己的 search/index 配额计数且无业务表权限。两个 `unused_index` INFO 来自刚部署、尚无真实查询统计的索引；`card_id` 明确保留给外键级联/按卡片协调，`user_id` 是否精简留待真实负载证据，不作为发布阻断。
+- 公开网页正文建库仅在用户主动确认后执行，最多保存 6000 字符派生文本；不带 Cookie、不读取登录态或私网内容，失败时回退已有标题/简介。
+- 历史 Supabase 向量迁移与 Edge Function 仅作审计档案保留，不在 V1.3.0 搜索运行路径中；不得把它们重新接回 UI，也不得为了清理而破坏性删除外部表或迁移历史。
+- 当前验证：348 Vitest、31 legacy、44 Playwright、Web/扩展生产构建、17.4 MiB 体积门禁和 208 个生产依赖零漏洞审计通过；扩展产物不含 AI 端点、模型名或云端语义函数名。
 
 ## 2026-07-17 V1.2.2 顶栏响应式修复入口
 

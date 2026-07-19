@@ -8,43 +8,7 @@ afterEach(() => {
 });
 
 describe("KnowledgeConsentAlert", () => {
-  it.each([
-    {
-      mode: "build" as const,
-      title: "构建你的个人网页知识库？",
-      cancelLabel: "暂不构建",
-      confirmLabel: "同意并开始构建",
-      includedCopy: [
-        "公开可访问的网页正文",
-        "收藏标题、网站域名、简称、简介、详细介绍、备注和分类路径",
-        "搜索词也会发送给 OpenAI",
-        "云端只保存向量、内容哈希和网页标识，不保存网页原文",
-        "不会携带 Cookie",
-      ],
-      excludedCopy: "扩展不会批量读取网页正文",
-    },
-    {
-      mode: "semantic-only" as const,
-      title: "启用 AI 语义匹配？",
-      cancelLabel: "暂不启用",
-      confirmLabel: "同意并启用",
-      includedCopy: [
-        "搜索词会发送给 OpenAI",
-        "新增或修改收藏时",
-        "标题、网站域名、简称、简介、详细介绍、备注和分类路径也会自动增量发送给 OpenAI",
-        "扩展不会读取或上传公开网页正文",
-        "公开正文只由 Web 版手动构建",
-      ],
-      excludedCopy: "WebCollect 会读取收藏中公开可访问的网页正文",
-    },
-  ])("renders the $mode disclosure and keeps cancel confirmation-free", async ({
-    mode,
-    title,
-    cancelLabel,
-    confirmLabel,
-    includedCopy,
-    excludedCopy,
-  }) => {
+  it("explains the local-only boundary and keeps cancel confirmation-free", async () => {
     const user = userEvent.setup();
     const onConfirm = vi.fn();
     const onOpenChange = vi.fn();
@@ -52,19 +16,25 @@ describe("KnowledgeConsentAlert", () => {
     render(
       <KnowledgeConsentAlert
         open
-        mode={mode}
+        mode="local"
         onOpenChange={onOpenChange}
         onConfirm={onConfirm}
       />,
     );
 
-    expect(screen.getByRole("alertdialog", { name: title })).toBeInTheDocument();
-    for (const copy of includedCopy) {
+    expect(screen.getByRole("alertdialog", { name: "构建本地个人网页知识库？" })).toBeInTheDocument();
+    for (const copy of [
+      "公开可访问的网页正文",
+      "完全在当前浏览器中运行",
+      "不使用 OpenAI、DeepSeek 或其他 AI API",
+      "不会上传你的搜索词和网页正文",
+      "不会携带 Cookie",
+      "原收藏、分类、偏好、快照和同步数据不会被修改",
+    ]) {
       expect(screen.getByText((text) => text.includes(copy))).toBeInTheDocument();
     }
-    expect(screen.queryByText((text) => text.includes(excludedCopy))).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: cancelLabel }));
+    await user.click(screen.getByRole("button", { name: "暂不构建" }));
 
     expect(onConfirm).not.toHaveBeenCalled();
     expect(onOpenChange).toHaveBeenCalledTimes(1);
@@ -76,13 +46,13 @@ describe("KnowledgeConsentAlert", () => {
     render(
       <KnowledgeConsentAlert
         open
-        mode={mode}
+        mode="local"
         onOpenChange={onOpenChange}
         onConfirm={onConfirm}
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: confirmLabel }));
+    await user.click(screen.getByRole("button", { name: "同意并开始构建" }));
 
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });

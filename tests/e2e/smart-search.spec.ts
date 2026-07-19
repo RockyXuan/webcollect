@@ -99,6 +99,34 @@ const fixtureCards: WebCard[] = [
     createdAt: 10,
     updatedAt: 10,
   },
+  {
+    id: "mindmap",
+    url: "https://mind.example.com/",
+    title: "思维导图工作台",
+    shortDesc: "白板、脑图和流程图工具",
+    fullDesc: "整理想法与知识结构",
+    note: "头脑风暴",
+    abbreviation: "MM",
+    imageUrl: "/assets/mascots/chipmunk-head.png",
+    categoryId: "group-code",
+    order: 1,
+    createdAt: 11,
+    updatedAt: 11,
+  },
+  {
+    id: "cursor",
+    url: "https://cursor.com/",
+    title: "Cursor",
+    shortDesc: "AI 编程助手",
+    fullDesc: "通过自然语言辅助编写和理解代码",
+    note: "智能写程序",
+    abbreviation: "CU",
+    imageUrl: "/assets/mascots/chipmunk-head.png",
+    categoryId: "group-code",
+    order: 2,
+    createdAt: 12,
+    updatedAt: 12,
+  },
 ];
 
 async function writeIsolatedSearchFixture(page: Page): Promise<void> {
@@ -145,6 +173,40 @@ async function writeIsolatedSearchFixture(page: Page): Promise<void> {
     localSnapshotUpdatedAt: 101,
     localSnapshotSyncedAt: 99,
     initialized: true,
+  });
+
+  await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("WebCollectSearch");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      if (!database.objectStoreNames.contains("knowledge_index")) return;
+      const transaction = database.transaction("knowledge_index", "readwrite");
+      transaction.objectStore("knowledge_index").put({
+        schemaVersion: 1,
+        scopeId: "local",
+        cardId: "mindmap",
+        sourceUrl: "https://mind.example.com/",
+        resolvedUrl: "https://mind.example.com/",
+        contentHash: "a".repeat(64),
+        savedFieldsHash: "b".repeat(64),
+        publicHtmlHash: "c".repeat(64),
+        documentText: "saved fields",
+        extractedText: "支持鱼骨图、概念关系梳理和团队头脑风暴",
+        extraction: "public-html",
+        fetchedAt: 100,
+        indexedAt: 100,
+      }, "entry:v1:local:mindmap");
+      await new Promise<void>((resolve, reject) => {
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(transaction.error);
+      });
+    } finally {
+      database.close();
+    }
   });
 }
 
@@ -230,6 +292,39 @@ test("local fuzzy results, keyboard selection, and Escape preserve collection st
   await searchInput.press("Enter");
   await expect.poll(() => readOpenedUrls(page)).toEqual(["/smart-search-target"]);
 
+  expect(await readProtectedCollectionState(page)).toEqual(before);
+});
+
+test("pinyin, intent aliases, and cached page text stay fully local", async ({ page }) => {
+  const remoteSemanticRequests: string[] = [];
+  page.on("request", (request) => {
+    if (/bookmark-search|api\.openai\.com|embeddings/i.test(request.url())) {
+      remoteSemanticRequests.push(request.url());
+    }
+  });
+  await loadFixture(page);
+  const before = await readProtectedCollectionState(page);
+  const searchInput = page.getByRole("combobox", { name: "搜索收藏或使用外部搜索引擎" });
+
+  await searchInput.fill("swdt");
+  const pinyinResult = page.getByRole("option", { name: /思维导图工作台/ });
+  await expect(pinyinResult).toBeVisible();
+  await expect(pinyinResult.getByLabel("匹配原因")).toContainText("拼音匹配");
+
+  await searchInput.fill("做思维导图的工具");
+  const intentResult = page.getByRole("option", { name: /思维导图工作台/ });
+  await expect(intentResult).toBeVisible();
+  await expect(intentResult.getByLabel("匹配原因")).toContainText("意图匹配");
+
+  await searchInput.fill("鱼骨图");
+  const knowledgeResult = page.getByRole("option", { name: /思维导图工作台/ });
+  await expect(knowledgeResult).toContainText("支持鱼骨图、概念关系梳理和团队头脑风暴");
+  await expect(knowledgeResult.getByLabel("匹配原因")).toContainText("正文匹配");
+
+  await searchInput.fill("AI 写代码");
+  await expect(page.getByRole("option", { name: /Cursor/ })).toBeVisible();
+  await expect(page.getByText("本地即时匹配", { exact: true })).toBeVisible();
+  expect(remoteSemanticRequests).toEqual([]);
   expect(await readProtectedCollectionState(page)).toEqual(before);
 });
 

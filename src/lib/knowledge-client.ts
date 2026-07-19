@@ -90,6 +90,7 @@ interface KnowledgeClientDependencies {
   getSupabaseClient: () => SupabaseClient;
   fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
   isExtension: () => boolean;
+  sendExtensionMessage: (message: unknown) => Promise<unknown>;
 }
 
 const defaultDependencies: KnowledgeClientDependencies = {
@@ -97,6 +98,7 @@ const defaultDependencies: KnowledgeClientDependencies = {
   getSupabaseClient: getBrowserSupabaseClient,
   fetch: (input, init) => globalThis.fetch(input, init),
   isExtension: isChromeExtension,
+  sendExtensionMessage: (message) => chrome.runtime.sendMessage(message),
 };
 
 let testDependencies: Partial<KnowledgeClientDependencies> | null = null;
@@ -496,9 +498,6 @@ export async function fetchPublicKnowledge(
   url: string,
   options: KnowledgeRequestOptions = {},
 ): Promise<PublicKnowledgeResult> {
-  if (dependencies().isExtension()) {
-    throw new KnowledgeClientError("extension-public-fetch-disabled");
-  }
   let normalizedUrl = "";
   try {
     const parsed = new URL(url);
@@ -508,6 +507,23 @@ export async function fetchPublicKnowledge(
     normalizedUrl = parsed.toString();
   } catch (error) {
     throw normalizedFailure(error, "invalid-request", options.signal);
+  }
+
+  if (dependencies().isExtension()) {
+    assertNotAborted(options.signal);
+    try {
+      const response = await dependencies().sendExtensionMessage({
+        type: "FETCH_KNOWLEDGE",
+        url: normalizedUrl,
+      });
+      assertNotAborted(options.signal);
+      if (!isRecord(response) || response.success !== true) {
+        throw new KnowledgeClientError("public-fetch-failed");
+      }
+      return validatePublicKnowledge(response.data);
+    } catch (error) {
+      throw normalizedFailure(error, "public-fetch-failed", options.signal);
+    }
   }
 
   const { accessToken } = await authenticatedContext(options);

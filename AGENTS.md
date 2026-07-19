@@ -1,8 +1,8 @@
 # WebCollect — 个人网页收藏墙
 
-## 2026-07-18 current V1.3.0 smart-search release entry
+## 2026-07-19 current V1.3.0 smart-search release entry
 
-Read `AGD.md` and `docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md` first. V1.3.0 keeps Google / 百度 / Bing external search and adds local fuzzy workspace retrieval plus an opt-in Supabase/OpenAI semantic layer. Business collection tables, IndexedDB data, Chrome storage, sync, dirty sets, snapshots, and seed data are unchanged. Rebuildable local knowledge state is isolated in `WebCollectSearch/knowledge_index`; cloud `bookmark_search_embeddings` stores only user/card/source identifiers, hashes, metadata, and dual-source vectors (`saved-fields | public-html`), never raw page text. `OPENAI_API_KEY` may exist only as a Supabase Edge Function secret. The target tag is `webcollect-2026-07-18-v1.3.0` and the target asset is `WebCollect-Chrome-Extension-v1.3.0-2026-07-18.zip`; consult the closeout before claiming CI, Release, official-zip, or final primary-Chrome evidence, because those fields remain TODO until publication completes.
+Read `AGD.md` and `docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md` first. V1.3.0 keeps Google / 百度 / Bing external search and adds fully local fuzzy workspace retrieval, Chinese pinyin, typo tolerance, intent aliases, weighted full-text ranking, and an opt-in public-page knowledge cache. It calls no OpenAI, DeepSeek, or other AI API and bundles no local language model. Business collection tables, IndexedDB data, Chrome storage, sync, dirty sets, snapshots, and seed data are unchanged. Rebuildable knowledge state is isolated in `WebCollectSearch/knowledge_index`. Historical Supabase vector/Edge artifacts are dormant and must not be reconnected or destructively removed during routine work. The target tag is `webcollect-2026-07-19-v1.3.0` and the target asset is `WebCollect-Chrome-Extension-v1.3.0-2026-07-19.zip`; consult the closeout before claiming CI, Release, official-zip, or final primary-Chrome evidence, because those fields remain TODO until publication completes.
 
 ## 2026-07-17 previous V1.2.2 release entry
 

@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { HybridWorkspaceSearchState } from "@/hooks/use-hybrid-workspace-search";
-import type { KnowledgeBuildSummary } from "@/hooks/use-knowledge-build";
+import type { LocalKnowledgeBuildSummary } from "@/hooks/use-local-knowledge-build";
 import type { HybridCardSearchResult } from "@/lib/hybrid-workspace-search";
 import type { Category, CollectionSection, WebCard } from "@/lib/types";
 import { buildWorkspaceSearchIndex } from "@/lib/workspace-search";
@@ -37,7 +37,7 @@ const harness = vi.hoisted(() => ({
   store: {} as StoreHarness,
   auth: {} as AuthHarness,
   hybrid: {} as HybridWorkspaceSearchState,
-  knowledge: {} as KnowledgeBuildSummary,
+  knowledge: {} as LocalKnowledgeBuildSummary,
   openUrl: vi.fn(),
 }));
 
@@ -57,12 +57,12 @@ vi.mock("@/lib/auth-store", () => {
   return { useAuthStore };
 });
 
-vi.mock("@/hooks/use-hybrid-workspace-search", () => ({
-  useHybridWorkspaceSearch: () => harness.hybrid,
+vi.mock("@/hooks/use-local-workspace-search", () => ({
+  useLocalWorkspaceSearch: () => harness.hybrid,
 }));
 
-vi.mock("@/hooks/use-knowledge-build", () => ({
-  useKnowledgeBuild: () => harness.knowledge,
+vi.mock("@/hooks/use-local-knowledge-build", () => ({
+  useLocalKnowledgeBuild: () => harness.knowledge,
 }));
 
 vi.mock("@/lib/platform", () => ({
@@ -296,11 +296,9 @@ beforeEach(() => {
     semanticResultCount: 0,
   };
   harness.knowledge = {
-    consentReady: true,
+    ready: true,
     consented: true,
-    buildSupported: true,
-    incrementalSupported: false,
-    incrementalStatus: "disabled" as const,
+    publicFetchSupported: true,
     isBuilding: false,
     buildState: null,
     indexedCount: 0,
@@ -309,8 +307,9 @@ beforeEach(() => {
     completedJobs: 0,
     failedJobs: 0,
     error: null,
+    knowledgeDocuments: [],
     startInitialBuild: vi.fn().mockResolvedValue(undefined),
-    enableSemanticOnly: vi.fn().mockResolvedValue(undefined),
+    update: vi.fn().mockResolvedValue(undefined),
     pause: vi.fn(),
     retry: vi.fn().mockResolvedValue(undefined),
     clearError: vi.fn(),
@@ -376,7 +375,7 @@ describe("TopNav smart search accessibility and keyboard behavior", () => {
     expect(externalOption).toHaveAttribute("aria-selected", "false");
   });
 
-  it("keeps the keyboard-selected result active when later AI results replace the visible top five", () => {
+  it("keeps the keyboard-selected result active when the local index refreshes", () => {
     const { rerender } = render(<TopNav />);
     const input = screen.getByRole("combobox", { name: "搜索收藏或使用外部搜索引擎" });
     fireEvent.focus(input);
@@ -422,7 +421,7 @@ describe("TopNav smart search accessibility and keyboard behavior", () => {
         total: 1,
       }),
     },
-  ])("keeps a keyboard-selected $label in the same visual slot while AI results merge", ({
+  ])("keeps a keyboard-selected $label in the same visual slot while local results refresh", ({
     optionName,
     optionId,
     localResults,
@@ -456,8 +455,8 @@ describe("TopNav smart search accessibility and keyboard behavior", () => {
     harness.hybrid = {
       localResults: localResults(),
       cards: cards.slice(1).map((card) => makeHybridResult(card, {
-        matchReasons: ["semantic"],
-        matchKind: "semantic",
+        matchReasons: ["alias"],
+        matchKind: "lexical",
       })),
       semanticStatus: "ready",
       semanticResultCount: 5,
@@ -553,7 +552,7 @@ describe("TopNav smart search accessibility and keyboard behavior", () => {
     expect(harness.openUrl).not.toHaveBeenCalledWith(cards[0].url, expect.anything());
   });
 
-  it("shows the actual matched description and keeps AI semantic evidence in the accessible reason list", () => {
+  it("shows the actual matched description and local evidence in the accessible reason list", () => {
     const evidenceCard = {
       ...cards[0],
       title: "Alpha",
@@ -566,7 +565,7 @@ describe("TopNav smart search accessibility and keyboard behavior", () => {
       localResults: emptyLocalResults(),
       cards: [makeHybridResult(evidenceCard, {
         matchedTokens: ["tool"],
-        matchReasons: ["title", "url", "path", "description", "semantic"],
+        matchReasons: ["title", "url", "description", "alias"],
       })],
       semanticStatus: "ready",
       semanticResultCount: 1,
@@ -576,12 +575,12 @@ describe("TopNav smart search accessibility and keyboard behavior", () => {
     fireEvent.focus(screen.getByRole("combobox", { name: "搜索收藏或使用外部搜索引擎" }));
 
     expect(screen.getByText("tool 只记录在这条用户备注里")).toBeInTheDocument();
-    const reasons = screen.getByLabelText("匹配原因：AI 语义、标题匹配、网址匹配");
-    expect(within(reasons).getByText("AI 语义")).toHaveAttribute("data-kind", "semantic");
-    expect(within(reasons).queryByText("分类路径")).not.toBeInTheDocument();
+    const reasons = screen.getByLabelText("匹配原因：标题匹配、网址匹配、简介匹配");
+    expect(within(reasons).getByText("简介匹配")).toHaveAttribute("data-kind", "local");
+    expect(within(reasons).queryByText("意图匹配")).not.toBeInTheDocument();
   });
 
-  it("announces AI merging only when a visible result contains semantic evidence", () => {
+  it("announces that matching is local and does not mention an AI service", () => {
     harness.hybrid = {
       localResults: emptyLocalResults(),
       cards: [makeHybridResult(cards[0])],
@@ -589,43 +588,25 @@ describe("TopNav smart search accessibility and keyboard behavior", () => {
       semanticResultCount: 5,
     };
 
-    const { rerender } = render(<TopNav />);
+    render(<TopNav />);
     fireEvent.focus(screen.getByRole("combobox", { name: "搜索收藏或使用外部搜索引擎" }));
-    expect(screen.queryByText("已合并 AI 语义结果")).not.toBeInTheDocument();
     expect(screen.getByText("本地即时匹配")).toBeInTheDocument();
-
-    harness.hybrid = {
-      ...harness.hybrid,
-      cards: [makeHybridResult(cards[0], {
-        matchReasons: ["semantic"],
-        matchKind: "semantic",
-      })],
-    };
-    rerender(<TopNav />);
-
-    expect(screen.getByText("已合并 AI 语义结果")).toBeInTheDocument();
+    expect(screen.queryByText(/OpenAI|DeepSeek|AI 语义/)).not.toBeInTheDocument();
   });
 
-  it.each([
-    ["loading" as const, "本地暂无匹配，正在等待 AI 语义结果…"],
-    ["fallback" as const, "本地暂无匹配，AI 暂不可用；仍可使用外部搜索"],
-  ])("keeps an explicit smart-match state when local results are empty and semantic status is %s", (
-    semanticStatus,
-    expectedEmptyText,
-  ) => {
+  it("keeps external search available when the local index has no result", () => {
     harness.hybrid = {
       localResults: emptyLocalResults(),
       cards: [],
-      semanticStatus,
+      semanticStatus: "disabled",
       semanticResultCount: 0,
     };
 
     render(<TopNav />);
     fireEvent.focus(screen.getByRole("combobox", { name: "搜索收藏或使用外部搜索引擎" }));
 
-    const smartGroup = screen.getByRole("group", { name: "智能匹配网页" });
-    expect(within(smartGroup).getByText(expectedEmptyText)).toBeInTheDocument();
-    expect(screen.queryByText(/^WebCollect 内暂无匹配/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "智能匹配网页" })).not.toBeInTheDocument();
+    expect(screen.getByText(/^WebCollect 内暂无匹配/)).toBeInTheDocument();
   });
 
   it("scrolls only keyboard-activated options into the search panel viewport", () => {
