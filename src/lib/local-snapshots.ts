@@ -413,7 +413,7 @@ export function assessLocalDataSnapshot(snapshot: LocalSnapshotEntry): LocalSnap
   };
 }
 
-async function readCurrentSnapshotData(): Promise<LocalSnapshotData> {
+export async function readCurrentSnapshotData(): Promise<LocalSnapshotData> {
   const [wallpaper, syncTombstones, syncPreferenceRevisions, extensionCapture] = await Promise.all([
     readWallpaperSnapshot(),
     getSyncTombstones(),

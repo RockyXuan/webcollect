@@ -45,6 +45,22 @@ export async function getWarehouseUpdatedAt(): Promise<number> {
   return typeof value === "number" ? value : 0;
 }
 
+export async function restoreWarehouseSyncData(input: {
+  cards: WarehouseCard[];
+  categories: WarehouseCategory[];
+  batches: ImportBatch[];
+  updatedAt: number;
+}): Promise<void> {
+  await withStorageLock("warehouse:sync-restore", async () => {
+    await Promise.all([
+      localforage.setItem(WH_CARDS_KEY, input.cards),
+      localforage.setItem(WH_CATEGORIES_KEY, input.categories),
+      localforage.setItem(WH_BATCHES_KEY, input.batches),
+      localforage.setItem(WH_UPDATED_AT_KEY, Math.max(0, input.updatedAt)),
+    ]);
+  });
+}
+
 /* ── Import Batch Type ── */
 export interface ImportBatch {
   id: string;              // e.g. "batch-1706000000000"

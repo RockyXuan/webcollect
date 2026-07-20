@@ -112,6 +112,33 @@ function createSyncDeviceId(): string {
   return `device-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+export async function getOrCreateSyncDeviceId(): Promise<string> {
+  return withStorageLock("sync-device-id", async () => {
+    const existing = await localforage.getItem<string>(SYNC_DEVICE_ID_KEY);
+    if (typeof existing === "string" && existing.length > 0) return existing;
+    const deviceId = createSyncDeviceId();
+    await localforage.setItem(SYNC_DEVICE_ID_KEY, deviceId);
+    return deviceId;
+  });
+}
+
+export async function rotateSyncDeviceId(observedRevision = 0): Promise<string> {
+  return withStorageLock("sync-device-id", async () => {
+    const deviceId = createSyncDeviceId();
+    const currentCounter = normalizeSyncRevision(
+      await localforage.getItem<number>(SYNC_LAMPORT_COUNTER_KEY) || 0
+    );
+    await Promise.all([
+      localforage.setItem(SYNC_DEVICE_ID_KEY, deviceId),
+      localforage.setItem(
+        SYNC_LAMPORT_COUNTER_KEY,
+        Math.max(currentCounter, normalizeSyncRevision(observedRevision))
+      ),
+    ]);
+    return deviceId;
+  });
+}
+
 function normalizeSyncPreferenceRevisions(value: unknown): SyncPreferenceRevisions {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   const revisions: SyncPreferenceRevisions = {};
@@ -142,11 +169,7 @@ export async function saveSyncPreferenceRevisions(revisions: SyncPreferenceRevis
 export async function markSyncPreferenceChanged(key: string): Promise<SyncVersionStamp | null> {
   if (localChangeSilenceDepth > 0) return null;
   return withStorageLock("sync-revisions", async () => {
-    let deviceId = await localforage.getItem<string>(SYNC_DEVICE_ID_KEY);
-    if (!deviceId) {
-      deviceId = createSyncDeviceId();
-      await localforage.setItem(SYNC_DEVICE_ID_KEY, deviceId);
-    }
+    const deviceId = await getOrCreateSyncDeviceId();
     const revisions = normalizeSyncPreferenceRevisions(
       await localforage.getItem<unknown>(SYNC_PREFERENCE_REVISIONS_KEY)
     );
@@ -209,11 +232,7 @@ async function prepareSyncEntitiesForLocalSave<T extends SyncableEntity>(
   if (localChangeSilenceDepth > 0) return next;
 
   return withStorageLock("sync-revisions", async () => {
-    let deviceId = await localforage.getItem<string>(SYNC_DEVICE_ID_KEY);
-    if (!deviceId) {
-      deviceId = createSyncDeviceId();
-      await localforage.setItem(SYNC_DEVICE_ID_KEY, deviceId);
-    }
+    const deviceId = await getOrCreateSyncDeviceId();
     let counter = normalizeSyncRevision(await localforage.getItem<number>(SYNC_LAMPORT_COUNTER_KEY) || 0);
     const tombstones = normalizeSyncTombstones(await localforage.getItem<unknown>(SYNC_TOMBSTONES_KEY));
     const tombstoneById = new Map(
