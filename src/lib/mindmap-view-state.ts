@@ -15,9 +15,15 @@ const mindmapViewDb = localforage.createInstance({
 const LAYOUTS: MindmapLayoutId[] = ["logic-right", "bilateral", "tree-down", "indent"];
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 2;
+const MINDMAP_VIEW_STATE_PREFIX = "mindmapViewState:";
+
+export interface MindmapViewStateRecord {
+  sectionId: string;
+  state: MindmapViewState;
+}
 
 export function mindmapViewStateKey(sectionId: string): string {
-  return `mindmapViewState:${sectionId}`;
+  return `${MINDMAP_VIEW_STATE_PREFIX}${sectionId}`;
 }
 
 export function clearMindmapLayoutOffsets(
@@ -101,4 +107,22 @@ export async function saveMindmapViewState(sectionId: string, state: MindmapView
   const key = mindmapViewStateKey(sectionId);
   const safeState = normalizeMindmapViewState(state);
   await withStorageLock(key, () => mindmapViewDb.setItem(key, safeState).then(() => undefined));
+}
+
+export async function listMindmapViewStates(): Promise<MindmapViewStateRecord[]> {
+  const records: MindmapViewStateRecord[] = [];
+  await mindmapViewDb.iterate<unknown, void>((value, key) => {
+    if (!key.startsWith(MINDMAP_VIEW_STATE_PREFIX)) return;
+    const sectionId = key.slice(MINDMAP_VIEW_STATE_PREFIX.length);
+    if (!sectionId) return;
+    records.push({ sectionId, state: normalizeMindmapViewState(value) });
+  });
+  return records.sort((left, right) => left.sectionId.localeCompare(right.sectionId));
+}
+
+export async function restoreMindmapViewStates(records: MindmapViewStateRecord[]): Promise<void> {
+  for (const record of records) {
+    if (!record || typeof record.sectionId !== "string" || !record.sectionId) continue;
+    await saveMindmapViewState(record.sectionId, record.state);
+  }
 }

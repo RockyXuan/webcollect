@@ -578,6 +578,27 @@ export async function getLocalDataSnapshots(): Promise<LocalSnapshotEntry[]> {
   return pruned;
 }
 
+export async function mergeImportedLocalDataSnapshots(
+  importedSnapshots: LocalSnapshotEntry[]
+): Promise<LocalSnapshotEntry[]> {
+  const currentSnapshots = await getLocalDataSnapshots();
+  const byId = new Map(currentSnapshots.map((snapshot) => [snapshot.id, snapshot]));
+
+  for (const snapshot of importedSnapshots) {
+    if (!snapshot || typeof snapshot.id !== "string" || !snapshot.id) continue;
+    if (!Number.isFinite(snapshot.createdAt) || !snapshot.data) continue;
+    if (!assessLocalDataSnapshot(snapshot).recoverable) continue;
+    const current = byId.get(snapshot.id);
+    if (!current || snapshot.createdAt > current.createdAt) {
+      byId.set(snapshot.id, snapshot);
+    }
+  }
+
+  const merged = pruneLocalSnapshots([...byId.values()]);
+  await localforage.setItem(SNAPSHOT_HISTORY_KEY, merged);
+  return merged;
+}
+
 export function isManualLocalDataSnapshot(snapshot: LocalSnapshotEntry): boolean {
   return snapshot.reason === "manual-snapshot";
 }
