@@ -1,22 +1,29 @@
 # projects
 
+## WebCollect V1.4.0 Google Drive 发布候选
+
+V1.4.0 把可选云同步迁移到每位用户自己的 Google Drive 隐藏应用目录，只申请 `drive.appdata`；所有修改仍先保存在本机 IndexedDB，没有 Google 账号也能完整使用。设置中新增普通可读的完整 JSON 导出、校验预览和确认恢复。
+
+目标 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-21-v1.4.0`。正式发布完成前，请继续使用下方 V1.3.1 稳定包。实施与真实迁移证据见 `docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md`。
+
 ## WebCollect 当前接手入口
 
 如果你是后续接手 WebCollect 的 Claude / Codex / 其他 agent，请先读：
 
 1. `AGENTS.md`
 2. `AGD.md`
-3. `docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`
-4. `docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`
-5. `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`
-6. `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`
-7. `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md`
-8. `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`
-9. `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`
-10. `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`
-11. `docs/audit/claude-code-review-handoff-2026-07-07.md`
-12. `PROJECT_SUMMARY.md`
-13. `HANDOFF.md`
+3. `docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md`
+4. `docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`
+5. `docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`
+6. `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`
+7. `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`
+8. `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md`
+9. `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`
+10. `docs/audit/webcollect-v1.1.1-ci-closeout-2026-07-12.md`
+11. `docs/audit/webcollect-v1.1.0-closeout-2026-07-12.md`
+12. `docs/audit/claude-code-review-handoff-2026-07-07.md`
+13. `PROJECT_SUMMARY.md`
+14. `HANDOFF.md`
 
 项目已于 2026-07-15 退役 Superpowers、`goal-zzx` / `zzx-goal` 和 `andrej-karpathy-coding` 工作流。`tasks/todo.md`、`tasks/lessons.md`、`CODEX_GO_MODE_STATUS.md` 与 `docs/superpowers/` 只保留历史事实，不是新任务的必读、必写或执行入口。
 

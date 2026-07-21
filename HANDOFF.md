@@ -2,6 +2,18 @@
 
 > **2026-07-15 current workflow rule:** this repository has retired Superpowers (including `superpowers:*` / `using-superpowers`), `goal-zzx` / `zzx-goal`, and `andrej-karpathy-coding`. Do not install, enable, invoke, or imitate them. Any older instruction below that requires `tasks/todo.md`, `tasks/lessons.md`, `CODEX_GO_MODE_STATUS.md`, fixed phase counts, strict TDD, worktrees, subagents, or duplicate reviews is historical and superseded by `AGENTS.md`.
 
+## 2026-07-21 V1.4.0 Google Drive Migration Release Candidate
+
+This section supersedes the development state below. V1.3.1 remains the latest published stable version until the V1.4.0 GitHub Release is verified.
+
+- Target version/date: `V1.4.0 / 2026年7月21日`; tag `webcollect-2026-07-21-v1.4.0`; asset `WebCollect-Chrome-Extension-v1.4.0-2026-07-21.zip`.
+- Closeout: `docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md`.
+- Formal cloud sync is local-first Google Drive `appDataFolder`, opt-in, and limited to `drive.appdata`. The Web build stays local-only until a future Web OAuth client exists.
+- Complete JSON export/preview/restore covers workspace, recycle bin, warehouse, wallpaper, mindmap state, local/Drive history, capture settings/queue, revisions, and tombstones while excluding credentials, tokens, device identity, dirty sets, temporary state, and derived knowledge text.
+- Supabase is absent from the production dependency/runtime path. Old remote data and legacy local keys remain untouched for 30 days and require a new explicit authorization before any later cleanup.
+- Rocky's existing primary Chrome profile completed OAuth, idempotent migration, file-by-file schema/hash readback, manual Drive sync, new-tab restart, and a post-migration complete backup. Verified live counts were 7 sections, 135 categories/groups, 372 cards, 15 recycle entries, and 69 Drive snapshots.
+- Local gates currently passed: zero-warning type/lint, 395 Vitest, 31 legacy scripts, Web/extension builds, artifact/runtime scan, and 17.2 MiB size gate. Playwright, audit, GitHub CI/Release, official asset audit, and final read-only Chrome verification remain on the closeout checklist.
+
 ## 2026-07-19 V1.3.1 Header UI Release
 
 This section supersedes the V1.3.0 development status. V1.3.1 is the current published stable application version.

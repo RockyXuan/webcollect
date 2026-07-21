@@ -1,5 +1,14 @@
 # WebCollect 下一大型功能线程提示词
 
+## 2026-07-21 V1.4.0 发布候选状态
+
+- 目标版本：`V1.4.0 / 2026年7月21日`；tag `webcollect-2026-07-21-v1.4.0`；资产 `WebCollect-Chrome-Extension-v1.4.0-2026-07-21.zip`。
+- 最新 closeout：`docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md`。在 GitHub Release 完成前，V1.3.1 仍是已发布稳定版。
+- Google Drive `appDataFolder` 已成为正式同步路径，只申请 `drive.appdata`；本地 IndexedDB 永远先写，无账号/离线继续可用。
+- Rocky 真实数据已经完成迁移、逐文件回读、手动同步、重启和完整 JSON 复核；旧 Supabase 数据保持不动 30 天。
+- 正式运行时不含 Supabase 依赖或请求；历史代码/SQL/会话 key 只作回退档案，不得破坏性清理。
+- 继续任务时先完成 closeout 中尚未勾选的 Playwright、审计、main CI、tag/Release、官方 zip 和真实 Chrome 只读验收，不要重新迁移或让用户重复授权。
+
 这是一个新的 Codex 线程。请在固定工作区 `/Users/rockyx/vibe coding/Web Collect 0628` 接手 `RockyXuan/webcollect`，并在我随后描述需求后实现一个新的大型功能。
 
 ## 先确认当前基线
@@ -17,14 +26,15 @@
 1. `AGENTS.md`
 2. `AGD.md`
 3. `HANDOFF.md`
-4. `docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`
-5. `docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`
-6. `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`
-7. `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`
-8. `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md`
-9. `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`
-10. `PROJECT_SUMMARY.md`
-11. 本文件
+4. `docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md`
+5. `docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`
+6. `docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`
+7. `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`
+8. `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`
+9. `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md`
+10. `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`
+11. `PROJECT_SUMMARY.md`
+12. 本文件
 
 然后运行并用中文简要汇报：
 

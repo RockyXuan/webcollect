@@ -80,12 +80,12 @@ jobs:
           notes=(
             "WebCollect Chrome extension ${VERSION_LABEL}."
             ""
-            "- Unifies the top toolbar with compact 38px light-frame controls and a single blue primary add-page action."
-            "- Makes Google, Baidu, and Bing labels neutral by default while preserving subtle hover and keyboard-focus feedback."
-            "- Keeps sync state color on its icon instead of tinting the whole status control."
-            "- Aligns the login/account and classic/mindmap controls with the same height, radius, border, and responsive behavior."
-            "- Changes no search, collection, sync, snapshot, storage, permission, or data behavior."
-            "- Verified by unit, legacy, Playwright, Web build, extension artifact, size, data-isolation, and production dependency checks."
+            "- Stores optional cloud sync data in each user's own Google Drive appDataFolder with the minimal drive.appdata scope."
+            "- Keeps IndexedDB local-first and fully usable when Drive is disconnected, unavailable, or unsupported."
+            "- Adds readable complete JSON export, validation, preview, safety snapshot, and confirmed restore."
+            "- Preserves multi-device revisions, tombstones, snapshots, hierarchy protection, and the stable extension identity."
+            "- Removes Supabase from the formal production runtime while retaining old remote data untouched for the 30-day safety period."
+            "- Verified by unit, legacy, Playwright, Web build, extension artifact, size, data-isolation, OAuth, migration, and production dependency checks."
           )
           printf '%s\n' "${notes[@]}" > release-notes.md
 
