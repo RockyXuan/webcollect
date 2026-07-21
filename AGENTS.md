@@ -2,7 +2,7 @@
 
 ## 2026-07-21 current V1.4.1 floating-capture keyboard release entry
 
-Read `AGD.md` and `docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md` first. V1.4.1 prevents keyboard events originating inside the open Shadow DOM floating-capture panel from reaching host-page shortcuts. It preserves lowercase/uppercase typing, Chinese IME composition, Tab navigation, copy/paste, and normal page shortcuts outside WebCollect. It adds no storage key, permission, dependency, data migration, collection write, Drive change, snapshot change, or seed change. V1.4.0 remains the data/sync baseline.
+Read `AGD.md` and `docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md` first. V1.4.1 prevents keyboard events originating inside the open Shadow DOM floating-capture panel from reaching host-page shortcuts. It preserves lowercase/uppercase typing, Chinese IME composition, Tab navigation, copy/paste, and normal page shortcuts outside WebCollect. It adds no storage key, permission, dependency, data migration, collection write, Drive change, snapshot change, or seed change. V1.4.0 remains the data/sync baseline. The published tag is `webcollect-2026-07-21-v1.4.1`, the official asset is `WebCollect-Chrome-Extension-v1.4.1-2026-07-21.zip`, and main CI, Release workflow, official-zip audit, and existing-primary-Chrome GitHub acceptance all passed.
 
 ## 2026-07-21 previous V1.4.0 Google Drive migration release entry
 

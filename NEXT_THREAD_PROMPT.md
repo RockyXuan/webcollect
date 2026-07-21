@@ -2,10 +2,11 @@
 
 ## 2026-07-21 V1.4.1 浮窗快捷键修复状态
 
-- 当前应用版本：`V1.4.1 / 2026年7月21日`；目标 tag `webcollect-2026-07-21-v1.4.1`；资产 `WebCollect-Chrome-Extension-v1.4.1-2026-07-21.zip`。
-- 最新 closeout：`docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md`。V1.4.1 只修复浮窗键盘事件穿透；发布后应以该 closeout 的真实 CI、Release 和官方 zip 证据为准。
+- 当前正式应用版本：`V1.4.1 / 2026年7月21日`；tag `webcollect-2026-07-21-v1.4.1`；资产 `WebCollect-Chrome-Extension-v1.4.1-2026-07-21.zip`。
+- 最新 closeout：`docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md`。V1.4.1 只修复浮窗键盘事件穿透；应用提交 `8af01d34bc5d095d7961e658558e8fa7c5c16ff0`，main CI `29842309751` 与 Release workflow `29842892835` 均成功，官方 zip 和真实 Chrome 验收已完成。
 - 浮窗内输入 `s` / `S`、中文 IME、Tab 或复制粘贴不会再触发 GitHub 等宿主网页的快捷键；浮窗外的网页快捷键仍正常。
 - V1.4.1 不新增存储 key、权限或依赖，不修改业务数据、Drive、Chrome storage、快照、seed 或同步协议。
+- 官方 zip 为单一资产，`17,056,539` bytes，SHA-256 `abccc041f9e32c87535a6d38fa8072edb011477af6eea3da8442eda87a59e084`；现有主 Chrome Profile 已原位更新到 V1.4.1 并在报告问题的 GitHub 页面通过输入与浮窗外快捷键回归，未保存收藏。
 - Google Drive `appDataFolder` 已成为正式同步路径，只申请 `drive.appdata`；本地 IndexedDB 永远先写，无账号/离线继续可用。
 - Rocky 真实数据已经完成迁移、逐文件回读、手动同步、重启和完整 JSON 复核；旧 Supabase 数据保持不动 30 天。
 - 正式运行时不含 Supabase 依赖或请求；历史代码/SQL/会话 key 只作回退档案，不得破坏性清理。
@@ -17,7 +18,8 @@
 
 - 当前应用版本：`V1.4.1 / 2026年7月21日`；tag `webcollect-2026-07-21-v1.4.1`；正式资产 `WebCollect-Chrome-Extension-v1.4.1-2026-07-21.zip`。
 - V1.4.1 closeout：`docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md`。
-- V1.4.0 closeout：`docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md`。应用提交 `c09859986439fef83b4c2cda2131b22f91f5481e`，main CI `29821265795` 与 Release workflow `29821729530` 均成功；官方 zip 审计与现有已登录主 Chrome Profile 最终只读验收已经完成。
+- V1.4.1 应用提交 `8af01d34bc5d095d7961e658558e8fa7c5c16ff0`，main CI `29842309751` 与 Release workflow `29842892835` 均成功；官方 zip 审计与现有已登录主 Chrome Profile 验收已经完成。
+- V1.4.0 closeout：`docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md`。它继续是 Google Drive、完整 JSON、真实迁移与 30 天 Supabase 保险期的数据基线。
 - 正式 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-21-v1.4.1`；zip 直链：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-21-v1.4.1/WebCollect-Chrome-Extension-v1.4.1-2026-07-21.zip`。
 - V1.3.0 保留 Google / 百度 / Bing，新增纯本地模糊检索、拼音、错字容错、意图别名、加权全文排序和 opt-in 公开网页知识缓存；不调用 AI API，也不捆绑本地模型。348 unit、31 legacy、44 E2E、Web/扩展构建、17.4 MiB 门禁和 208 个生产依赖零漏洞审计已完成。
 - V1.4.0 将正式云同步切换为用户自己的 Google Drive 隐藏应用目录，并增加完整 JSON 备份/恢复；本地 IndexedDB 仍是第一写入目标，V1.3.1 顶栏与 V1.3.0 本地搜索行为保持不变。

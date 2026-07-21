@@ -4,18 +4,20 @@
 
 ## 2026-07-21 V1.4.1 Floating Capture Keyboard Fix
 
-This section supersedes the development state below. V1.4.1 is the current application version; V1.4.0 remains the cloud/data contract baseline.
+This section supersedes the development state below. V1.4.1 is the current published application version; V1.4.0 remains the cloud/data contract baseline.
 
-- Version/date: `V1.4.1 / 2026年7月21日`; target tag `webcollect-2026-07-21-v1.4.1`; asset `WebCollect-Chrome-Extension-v1.4.1-2026-07-21.zip`.
+- Published version/date: `V1.4.1 / 2026年7月21日`; tag `webcollect-2026-07-21-v1.4.1`; asset `WebCollect-Chrome-Extension-v1.4.1-2026-07-21.zip`.
 - Closeout: `docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md`.
 - Keyboard events from the floating capture Shadow DOM are stopped before host-page shortcut listeners. GitHub-style `s` search no longer opens while typing in WebCollect.
 - The guard does not prevent browser defaults: lowercase/uppercase input, Chinese IME, Tab, copy/paste, and focus movement remain functional; shortcuts outside the panel continue to reach the page.
 - No storage key, permission, dependency, schema, collection action, Drive contract, snapshot, Chrome storage, Supabase archive, extension identity, or seed changed.
 - Local gates passed: TypeScript, lint, 395 Vitest, 31 legacy scripts, 44 Playwright, Web/extension builds, artifact/size checks, real-extension keyboard verification, and a 200-package zero-finding production audit.
+- Application commit `8af01d34bc5d095d7961e658558e8fa7c5c16ff0`, main CI `29842309751`, and Release workflow `29842892835` passed. The single official asset is `17,056,539` bytes with SHA-256 `abccc041f9e32c87535a6d38fa8072edb011477af6eea3da8442eda87a59e084` and exactly matches the local release build.
+- The existing primary-profile extension was backed up append-only, updated without uninstalling, and reloaded in place. Chrome showed WebCollect `1.4.1` with the stable ID. On the reported GitHub page, real `sS` and pinyin key sequences stayed inside the floating field; Tab moved normally; cancelling wrote no card; and the page's own `s` shortcut still worked after close.
 
 ## 2026-07-21 V1.4.0 Google Drive Migration Release
 
-This section supersedes the development state below. V1.4.0 is the current published stable application version.
+This section records the V1.4.0 cloud/data baseline beneath the current V1.4.1 published patch.
 
 - Published version/date: `V1.4.0 / 2026年7月21日`; tag `webcollect-2026-07-21-v1.4.0`; asset `WebCollect-Chrome-Extension-v1.4.0-2026-07-21.zip`.
 - Closeout: `docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md`.
@@ -120,8 +122,8 @@ This section supersedes older development status. The user explicitly waived the
 
 ## Next Major Feature Thread
 
-- V1.4.0 is fully published and its checklist is closed. Start the next large feature in a new thread after reading the current closeout and handoff.
-- Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, and the V1.4.0 closeout before changing code.
+- V1.4.1 is fully published and its checklist is closed. Start the next large feature in a new thread after reading the current closeout and handoff.
+- Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, the V1.4.1 closeout, and the V1.4.0 data-baseline closeout before changing code.
 - Ask for or read the user's new feature description, then inspect only the relevant implementation paths before choosing scope, tests, version bump, and release plan.
 - Preserve the V1.4.0 local-first Drive, backup, data, and migration guarantees. Do not reset IndexedDB, old Supabase data, extension storage, categories, cards, preferences, snapshots, local view state, mode preference, knowledge consent/cache, derived vectors, or the two documented empty inbox artifacts.
 - Decide the next version only after understanding the feature's actual breadth. Use the real completion date and keep package, manifest, UI version, tag, Release, and zip identity aligned.

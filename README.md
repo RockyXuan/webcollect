@@ -4,7 +4,7 @@
 
 V1.4.1 修复网页浮窗输入框与宿主网站快捷键冲突：在名称、地址、简介或新建目标名称中输入 `s` / `S`、使用中文输入法、Tab 或复制粘贴时，按键只作用于 WebCollect，不再触发 GitHub 等网页的全局搜索。浮窗外的网页快捷键保持正常。
 
-正式 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-21-v1.4.1`。扩展 zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-21-v1.4.1/WebCollect-Chrome-Extension-v1.4.1-2026-07-21.zip`。实施与发布证据见 `docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md`。
+正式 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-21-v1.4.1`。扩展 zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-21-v1.4.1/WebCollect-Chrome-Extension-v1.4.1-2026-07-21.zip`；SHA-256：`abccc041f9e32c87535a6d38fa8072edb011477af6eea3da8442eda87a59e084`。实施与发布证据见 `docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md`。
 
 ## WebCollect 当前接手入口
 

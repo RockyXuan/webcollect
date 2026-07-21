@@ -8,7 +8,7 @@ Release: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-0
 
 Asset: `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-21-v1.4.1/WebCollect-Chrome-Extension-v1.4.1-2026-07-21.zip`
 
-Publication status: local implementation and verification complete; GitHub and official-package evidence will be appended after publication.
+Publication status: complete. The application commit, main CI, formal tag, Release workflow, single official asset, official-package audit, and existing-primary-Chrome acceptance all passed. The follow-up closeout update is documentation-only and is not a new application version.
 
 ## Root cause and fix
 
@@ -37,22 +37,34 @@ Publication status: local implementation and verification complete; GitHub and o
 - Web and Chrome-extension production builds passed.
 - Extension background/mindmap artifact checks and the 17.2 MiB size gate passed.
 - Production dependency audit covered 200 packages with zero info, low, moderate, high, or critical findings.
+- Main CI run `29842309751` passed both `verify` and `audit-production`, including the new real-extension regression and all 44 Playwright cases: `https://github.com/RockyXuan/webcollect/actions/runs/29842309751`.
+- The existing signed-in primary Chrome profile was updated in place without uninstalling or creating another profile. Chrome reported WebCollect `1.4.1`, stable ID `immpcmhmabobllnopedaoflcjneigbko`, and the active service worker. The exact GitHub page from the user report was reused: typing real `sS` and `sS sousuo` key sequences in the floating title field did not open GitHub search; Tab moved focus to the URL field; the panel was cancelled without saving; after the panel closed, pressing `s` in the page still opened GitHub search. No unrelated personal tab was operated.
+- Before replacing the installed files, the active V1.4.0 source was copied append-only to `/private/tmp/webcollect-installed-extension-backups/v1.4.0-before-v1.4.1-20260721-02`. The installed source, local release build, and downloaded official package subsequently matched exactly.
+
+## Formal publication and official-package audit
+
+- Tagged application commit: `8af01d34bc5d095d7961e658558e8fa7c5c16ff0`.
+- Release workflow `29842892835` passed and published the formal Release: `https://github.com/RockyXuan/webcollect/actions/runs/29842892835`.
+- The Release contains exactly one asset, `WebCollect-Chrome-Extension-v1.4.1-2026-07-21.zip`, at `17,056,539` bytes.
+- Official asset SHA-256: `abccc041f9e32c87535a6d38fa8072edb011477af6eea3da8442eda87a59e084`; it matches the GitHub asset digest.
+- Zip integrity, unique entry names, the 41-file unpacked tree, byte-for-byte equality with `extension/dist`, manifest version `1.4.1`, stable extension ID, and content-script uniqueness passed.
+- Permissions remain `storage`, `activeTab`, `identity`, and `contextMenus`; the only OAuth scope remains `https://www.googleapis.com/auth/drive.appdata`. The official package contains no Google client secret, Supabase credential, OpenAI/DeepSeek key, or new permission.
 
 ## Commits and publication checklist
 
 - Implementation commit: `2617ccd` (`fix(extension): isolate floating capture shortcuts`).
-- Release commit: pending.
-- Main CI: pending.
-- Release workflow: pending.
-- Official zip audit: pending.
-- Existing signed-in primary-Chrome read-only verification: pending.
+- Release commit: `8af01d34bc5d095d7961e658558e8fa7c5c16ff0` (`release: prepare WebCollect v1.4.1 shortcut fix`).
+- Main CI: `29842309751`, successful.
+- Release workflow: `29842892835`, successful.
+- Official zip audit: successful; one asset, `17,056,539` bytes, SHA-256 `abccc041f9e32c87535a6d38fa8072edb011477af6eea3da8442eda87a59e084`.
+- Existing signed-in primary-Chrome verification: successful on the reported GitHub page, with no card saved.
 
 - [x] Validate a complete readable backup before code changes.
 - [x] Reproduce the leak with a real built extension and host-page capture/bubble listeners.
 - [x] Implement minimal keyboard isolation without preventing browser defaults.
 - [x] Pass local unit, legacy, real-extension, Playwright, Web/extension build, artifact, size, seed, and production-audit gates.
-- [ ] Reload the existing primary-profile installation in place and verify GitHub without saving a card.
-- [ ] Push the V1.4.1 application commit to `main` and wait for main CI.
-- [ ] Push the formal tag and wait for the Release workflow.
-- [ ] Download and audit the single official asset.
-- [ ] Append real publication evidence in a documentation-only commit; it is not a new application version.
+- [x] Reload the existing primary-profile installation in place and verify GitHub without saving a card.
+- [x] Push the V1.4.1 application commit to `main` and wait for main CI.
+- [x] Push the formal tag and wait for the Release workflow.
+- [x] Download and audit the single official asset.
+- [x] Append real publication evidence in a documentation-only commit; it is not a new application version.
