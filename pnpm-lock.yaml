@@ -103,9 +103,6 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.2.8
         version: 1.2.8(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@supabase/supabase-js':
-        specifier: 2.109.0
-        version: 2.109.0
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -179,6 +176,9 @@ importers:
         specifier: ^5.0.12
         version: 5.0.12(@types/react@19.2.10)(immer@9.0.21)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7))
     devDependencies:
+      '@supabase/supabase-js':
+        specifier: 2.109.0
+        version: 2.109.0
       '@playwright/test':
         specifier: ^1.61.1
         version: 1.61.1

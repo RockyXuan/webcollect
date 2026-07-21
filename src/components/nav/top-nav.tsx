@@ -53,7 +53,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { PlatformLink } from "@/components/ui/platform-link";
 import { useAuthStore } from "@/lib/auth-store";
-import { saveCloudWorkspaceSnapshot } from "@/lib/cloud-snapshots";
+import { googleDriveSyncProvider } from "@/lib/google-drive-sync";
 import { createLocalDataSnapshot } from "@/lib/local-snapshots";
 import { useLocalKnowledgeBuild } from "@/hooks/use-local-knowledge-build";
 import { useLocalWorkspaceSearch } from "@/hooks/use-local-workspace-search";
@@ -726,14 +726,17 @@ export function TopNav({
         throw new Error("当前没有可保存的 WebCollect 数据。");
       }
       localSaved = true;
-      const user = useAuthStore.getState().user;
-      if (user) {
-        await saveCloudWorkspaceSnapshot(user.id, snapshot, {
+      const auth = useAuthStore.getState();
+      if (auth.user) {
+        await googleDriveSyncProvider.saveSnapshot({
+          snapshot,
           kind: "manual",
           source: "header-save",
+          dayKey: null,
+          cloudUpdatedAt: Date.now(),
         });
       } else {
-        setHeaderNotice("未登录：当前版本已保存到本地。登录后，手动版本会保存到云端并跟随账号。");
+        setHeaderNotice("未连接 Google Drive：当前版本已保存到本地，也可以在“数据与完整备份”中导出 JSON。");
       }
       setSaveFeedback("saved");
       window.setTimeout(() => setSaveFeedback("idle"), 1400);

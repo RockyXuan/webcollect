@@ -3,11 +3,12 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useRef, useState } from "react";
-import { AlertCircle, Check, History, Loader2, LogOut, RefreshCw, Settings, Trash2, Type, User, Wrench } from "lucide-react";
+import { AlertCircle, Check, Download, History, Loader2, LogOut, RefreshCw, Settings, Trash2, Type, User, Wrench } from "lucide-react";
 import { APP_RELEASE_DATE_DISPLAY, APP_VERSION } from "@/lib/app-version";
 import { useAuthStore } from "@/lib/auth-store";
 import type { LinkOpenMode } from "@/lib/types";
 import { LocalSnapshotDialog } from "@/components/dialogs/local-snapshot-dialog";
+import { DataBackupDialog } from "@/components/dialogs/data-backup-dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,9 +21,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { restoreStructureFromBestLocalSnapshot, saveVersionAndClearLocalData } from "@/lib/local-snapshots";
 import { isChromeExtension } from "@/lib/platform";
-import { DEFAULT_EXTENSION_CONFIG, EXTENSION_STORAGE_KEYS, setSupabaseConfig } from "@/lib/supabase-browser";
+import { getPortableBackupReminder } from "@/lib/portable-backup";
 import { useAppStore } from "@/lib/store";
-import { pushLocalSnapshotToCloud } from "@/lib/sync";
 import {
   DEFAULT_FLOATING_CAPTURE_PREFS,
   getFloatingCapturePrefs,
@@ -102,13 +102,11 @@ export function UserMenu() {
     logout,
     manualSync,
     setSyncMode,
-    clearError,
   } = useAuthStore();
   const [menuOpen, setMenuOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
-  const [supabaseUrl, setSupabaseUrl] = useState("");
-  const [supabaseAnonKey, setSupabaseAnonKey] = useState("");
-  const [configSaved, setConfigSaved] = useState(false);
+  const [backupOpen, setBackupOpen] = useState(false);
+  const [backupReminderDue, setBackupReminderDue] = useState(false);
   const [snapshotOpen, setSnapshotOpen] = useState(false);
   const [repairingLayout, setRepairingLayout] = useState(false);
   const [repairMessage, setRepairMessage] = useState("");
@@ -139,54 +137,13 @@ export function UserMenu() {
   }, [menuOpen, configOpen, error]);
 
   useEffect(() => {
-    if (!isChromeExtension() || !chrome.storage?.local) return;
-    chrome.storage.local.get(
-      [EXTENSION_STORAGE_KEYS.url, EXTENSION_STORAGE_KEYS.anonKey],
-      (result) => {
-        const storedUrl = String(result[EXTENSION_STORAGE_KEYS.url] || "");
-        const storedAnonKey = String(result[EXTENSION_STORAGE_KEYS.anonKey] || "");
-        const shouldUseDefault =
-          !storedUrl
-          || !storedAnonKey
-          || (storedUrl === DEFAULT_EXTENSION_CONFIG.url && storedAnonKey !== DEFAULT_EXTENSION_CONFIG.anonKey);
-        const config = shouldUseDefault
-          ? DEFAULT_EXTENSION_CONFIG
-          : { url: storedUrl, anonKey: storedAnonKey };
-
-        setSupabaseUrl(config.url);
-        setSupabaseAnonKey(config.anonKey);
-
-        if (shouldUseDefault) {
-          chrome.storage.local.set({
-            [EXTENSION_STORAGE_KEYS.url]: config.url,
-            [EXTENSION_STORAGE_KEYS.anonKey]: config.anonKey,
-          });
-        }
-      }
-    );
-  }, []);
+    setBackupReminderDue(getPortableBackupReminder().due);
+  }, [backupOpen]);
 
   useEffect(() => {
     if (!isChromeExtension()) return;
     void getFloatingCapturePrefs().then(setCapturePrefs);
   }, []);
-
-  const saveExtensionConfig = async () => {
-    if (!isChromeExtension() || !chrome.storage?.local) return;
-    const config = {
-      url: supabaseUrl.trim(),
-      anonKey: supabaseAnonKey.trim(),
-    };
-    await chrome.storage.local.set({
-      [EXTENSION_STORAGE_KEYS.url]: config.url,
-      [EXTENSION_STORAGE_KEYS.anonKey]: config.anonKey,
-    });
-    if (config.url && config.anonKey) {
-      setSupabaseConfig(config);
-    }
-    clearError();
-    setConfigSaved(true);
-  };
 
   if (isLoading) {
     return (
@@ -198,10 +155,13 @@ export function UserMenu() {
 
   if (!isLoggedIn) {
     return (
+      <>
+      <DataBackupDialog open={backupOpen} onOpenChange={setBackupOpen} />
       <div className="wc-user-menu relative flex items-center gap-1.5" ref={menuRef}>
         <button
           onClick={loginWithGoogle}
           className="wc-login-button"
+          title={isChromeExtension() ? "连接你自己的 Google Drive 隐藏应用目录" : "网页版暂不支持 Google Drive 连接"}
         >
           <svg className="h-3.5 w-3.5" viewBox="0 0 24 24">
             <path
@@ -221,21 +181,18 @@ export function UserMenu() {
               d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
             />
           </svg>
-          Google 登录
+          连接 Google Drive
         </button>
-        {isChromeExtension() && (
-          <button
-            type="button"
-            onClick={() => {
-              setConfigOpen((open) => !open);
-              setConfigSaved(false);
-            }}
-            className="wc-round-tool"
-            title="登录配置"
-          >
-            <Settings className="h-3.5 w-3.5" />
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setConfigOpen((open) => !open)}
+          className="wc-round-tool relative"
+          title="本地数据与备份"
+          aria-label="打开本地数据与备份"
+        >
+          <Settings className="h-3.5 w-3.5" />
+          {backupReminderDue && <span className="absolute right-0 top-0 h-2 w-2 rounded-full bg-amber-400" />}
+        </button>
         {(error || configOpen) && (
           <div className="wc-config-popover absolute right-0 top-full z-50 mt-3 w-96 max-w-[calc(100vw-24px)] p-4">
             {error && (
@@ -244,38 +201,32 @@ export function UserMenu() {
                 <span className="max-h-24 overflow-y-auto break-words">{error}</span>
               </div>
             )}
-            {isChromeExtension() && (
+            {configOpen && (
               <div className="space-y-3">
-                <p className="text-sm font-semibold text-slate-900">扩展登录配置</p>
-                <input
-                  value={supabaseUrl}
-                  onChange={(e) => setSupabaseUrl(e.target.value)}
-                  placeholder="https://your-project.supabase.co"
-                  className="wc-input h-9 w-full rounded-2xl px-3 text-xs text-slate-900 outline-none"
-                />
-                <input
-                  value={supabaseAnonKey}
-                  onChange={(e) => setSupabaseAnonKey(e.target.value)}
-                  placeholder="Supabase anon public key"
-                  className="wc-input h-9 w-full rounded-2xl px-3 text-xs text-slate-900 outline-none"
-                />
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] leading-relaxed text-slate-500">
-                    {configSaved ? "已保存，刷新页面后再登录。" : "在 Supabase Project Settings > API 中查看。"}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={saveExtensionConfig}
-                    className="wc-action-primary h-8 rounded-xl px-3 text-xs"
-                  >
-                    保存
-                  </button>
-                </div>
+                <p className="text-sm font-semibold text-slate-900">本地数据与备份</p>
+                <p className="text-xs leading-relaxed text-slate-500">
+                  未连接云盘也能完整使用，数据保存在当前浏览器。删除扩展可能会清除本机数据，建议定期下载 JSON。
+                </p>
+                {backupReminderDue && (
+                  <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">超过 30 天未导出完整备份，建议现在保存一份。</div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfigOpen(false);
+                    setBackupOpen(true);
+                  }}
+                  className="wc-panel-action w-full"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  数据与完整备份
+                </button>
               </div>
             )}
           </div>
         )}
       </div>
+      </>
     );
   }
 
@@ -303,17 +254,13 @@ export function UserMenu() {
       await useAppStore.getState().loadData();
 
       if (user?.id) {
-        useAuthStore.setState({ syncStatus: "syncing", error: null });
         try {
-          await pushLocalSnapshotToCloud(user.id, { allowDestructiveClear: true });
-          await useAppStore.getState().loadData();
-          useAuthStore.setState({ syncStatus: "success", lastSyncAt: Date.now(), error: null });
+          await manualSync({ reloadView: true, throwOnError: true });
           setClearMessage(`\u5df2\u4fdd\u5b58\u7248\u672c\u5e76\u6e05\u7a7a\uff0c\u672c\u5730\u548c\u4e91\u7aef\u5df2\u540c\u6b65\u3002\u7248\u672c\u65f6\u95f4\uff1a${formatSyncTime(snapshot.createdAt)}`);
         } catch (cloudError) {
           await useAppStore.getState().loadData();
           const message = cloudError instanceof Error ? cloudError.message : "\u4e91\u7aef\u540c\u6b65\u5931\u8d25";
-          useAuthStore.setState({ syncStatus: "error", error: message });
-          setClearMessage("\u5df2\u4fdd\u5b58\u7248\u672c\u5e76\u6e05\u7a7a\u672c\u5730\uff0c\u4f46\u4e91\u7aef\u6e05\u7a7a\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u624b\u52a8\u540c\u6b65\u3002");
+          setClearMessage(`\u5df2\u4fdd\u5b58\u7248\u672c\u5e76\u6e05\u7a7a\u672c\u5730\uff0c\u4f46 Google Drive \u540c\u6b65\u5931\u8d25\uff1a${message}`);
         }
       } else {
         setClearMessage(`\u5df2\u4fdd\u5b58\u7248\u672c\u5e76\u6e05\u7a7a\u672c\u5730\u6570\u636e\u3002\u7248\u672c\u65f6\u95f4\uff1a${formatSyncTime(snapshot.createdAt)}`);
@@ -374,6 +321,7 @@ export function UserMenu() {
   return (
     <div className="wc-user-menu relative" ref={menuRef}>
       <LocalSnapshotDialog open={snapshotOpen} onOpenChange={setSnapshotOpen} />
+      <DataBackupDialog open={backupOpen} onOpenChange={setBackupOpen} />
       <AlertDialog open={allLinksDialogOpen} onOpenChange={setAllLinksDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -489,7 +437,7 @@ export function UserMenu() {
 
           <div className="wc-settings-card mb-3 flex items-center gap-3 px-4 py-3 text-sm text-slate-600">
             <SyncIcon className={`h-3.5 w-3.5 ${syncStatus === "syncing" ? "animate-spin" : ""}`} />
-            <span>{syncLabel[syncStatus]}</span>
+            <span>{`Google Drive · ${syncLabel[syncStatus]}`}</span>
             {lastSyncAt && syncStatus !== "syncing" && (
               <span className="ml-auto text-xs">
                 {formatSyncTime(lastSyncAt)}
@@ -498,7 +446,7 @@ export function UserMenu() {
           </div>
 
           <div className="wc-settings-card mb-3 space-y-3 p-3">
-            <div className="wc-settings-label px-1">同步</div>
+            <div className="wc-settings-label px-1">Google Drive 同步</div>
             <button
               type="button"
               disabled={syncStatus === "syncing"}
@@ -740,6 +688,17 @@ export function UserMenu() {
               type="button"
               onClick={() => {
                 setMenuOpen(false);
+                setBackupOpen(true);
+              }}
+              className="wc-panel-action"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {"数据与完整备份"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
                 setSnapshotOpen(true);
               }}
               className="wc-panel-action"
@@ -796,9 +755,10 @@ export function UserMenu() {
               logout();
             }}
             className="wc-panel-action mt-3 justify-center"
+            title="只停止当前设备同步，不删除本地或 Google Drive 数据"
           >
             <LogOut className="h-3.5 w-3.5" />
-            {"退出登录"}
+            {"断开 Google Drive"}
           </button>
         </div>
       )}

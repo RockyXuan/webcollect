@@ -26,6 +26,7 @@ import {
 } from "@/lib/portable-backup";
 import { readCollectionViewMode, writeCollectionViewMode } from "@/lib/collection-view-mode";
 import type { Category, CollectionSection, WebCard } from "@/lib/types";
+import type { CloudSnapshotRecord } from "@/lib/cloud-sync-types";
 
 const now = 1_777_500_000_000;
 const section: CollectionSection = {
@@ -105,6 +106,69 @@ describe("PortableBackupV1", () => {
 
     await expect(validatePortableBackup(modified)).rejects.toThrow(/SHA-256/);
     expect((await getCards())[0]?.title).toBe(card.title);
+  });
+
+  it("preserves an immutable historical version with legacy reference issues", async () => {
+    const base = await createPortableBackup({ cloudStatus: "not-connected" });
+    const legacyData = {
+      ...base.workspace,
+      cards: [{ ...card, categoryId: "missing-legacy-category" }],
+    } as Partial<typeof base.workspace>;
+    delete legacyData.pinnedBookmarkItems;
+    const historicalSnapshot = {
+      id: "snapshot-legacy-orphan",
+      createdAt: now - 1,
+      reason: "legacy-cloud-version",
+      label: "旧云端版本",
+      counts: {
+        sections: 1,
+        categories: 1,
+        cards: 1,
+        recycleBin: 0,
+        warehouseCategories: 0,
+        warehouseCards: 0,
+        warehouseBatches: 0,
+      },
+      sectionNames: [section.name],
+      sampleCategoryNames: [category.name],
+      sampleCardTitles: [card.title],
+      data: legacyData as typeof base.workspace,
+    };
+    const driveRecord: CloudSnapshotRecord = {
+      snapshot: historicalSnapshot,
+      kind: "system",
+      source: "supabase-system",
+      dayKey: "2026-07-01",
+      cloudUpdatedAt: now - 1,
+    };
+
+    const backup = await createPortableBackup({
+      cloudStatus: "included",
+      driveSnapshots: [driveRecord],
+    });
+    const validated = await validatePortableBackup(backup);
+
+    expect(validated.preview.counts.driveSnapshots).toBe(1);
+    expect(validated.backup.driveSnapshots[0]?.snapshot.data.cards[0]?.categoryId)
+      .toBe("missing-legacy-category");
+  });
+
+  it("still rejects reference issues in the active workspace", async () => {
+    await saveCards([{ ...card, categoryId: "missing-current-category" }]);
+    const backup = await createPortableBackup({ cloudStatus: "not-connected" });
+
+    await expect(validatePortableBackup(backup)).rejects.toThrow(/不存在的分类/);
+  });
+
+  it("rejects an unsupported schema and a restore without explicit confirmation", async () => {
+    const backup = await createPortableBackup({ cloudStatus: "not-connected" });
+    await expect(validatePortableBackup({ ...backup, schemaVersion: 99 })).rejects.toThrow(/不支持/);
+
+    await saveCards([{ ...card, title: "确认前保持不变", updatedAt: now + 1 }]);
+    await expect(restorePortableBackup(backup, {
+      confirmed: false as true,
+    })).rejects.toThrow(/明确确认/);
+    expect((await getCards())[0]?.title).toBe("确认前保持不变");
   });
 
   it("creates a safety version, restores data, preserves unrelated view keys and rotates device identity", async () => {

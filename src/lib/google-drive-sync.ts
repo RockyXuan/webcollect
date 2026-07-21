@@ -49,8 +49,10 @@ import {
   restoreWarehouseSyncData,
 } from "@/lib/db-warehouse";
 import {
+  DRIVE_RECEIPT_SCHEMA_VERSION,
   DRIVE_SNAPSHOT_SCHEMA_VERSION,
   DRIVE_WORKSPACE_SCHEMA_VERSION,
+  type DriveMigrationReceiptV1,
   type DriveSnapshotEnvelopeV1,
   type DriveWorkspaceEnvelopeV1,
   type DriveWorkspacePayloadV1,
@@ -65,9 +67,11 @@ import {
 } from "@/lib/google-drive-auth";
 import { getWallpaperPrefs, saveSyncedWallpaperPrefs, toWallpaperSyncedSettings } from "@/lib/wallpaper-db";
 import { withStorageLock } from "@/lib/storage-lock";
+import { isPortableBackupRestoreInProgress } from "@/lib/portable-backup";
 
 const WORKSPACE_PREFIX = "webcollect-workspace-v1-";
 const SNAPSHOT_PREFIX = "webcollect-snapshot-v1-";
+const MIGRATION_RECEIPT_NAME = "webcollect-migration-receipt-v1-supabase.json";
 
 function withoutContentHash<T extends { contentHash: string }>(document: T): Omit<T, "contentHash"> {
   const body = { ...document } as Partial<T>;
@@ -77,6 +81,10 @@ function withoutContentHash<T extends { contentHash: string }>(document: T): Omi
 
 export async function hashDriveDocument<T extends { contentHash: string }>(document: T): Promise<string> {
   return sha256Hex(withoutContentHash(document));
+}
+
+export function driveSnapshotFileName(snapshotId: string): string {
+  return `${SNAPSHOT_PREFIX}${snapshotId}.json`;
 }
 
 export async function readCurrentDrivePayload(): Promise<DriveWorkspacePayloadV1> {
@@ -235,6 +243,9 @@ export class GoogleDriveSyncProvider implements CloudSyncProvider {
   }
 
   async sync(): Promise<CloudSyncResult> {
+    if (isPortableBackupRestoreInProgress()) {
+      throw new Error("完整备份正在恢复，Google Drive 同步已暂停。");
+    }
     return withStorageLock("google-drive-sync", async () => {
       const connection = await getDriveConnectionRecord();
       if (!connection.enabled) throw new Error("请先连接 Google Drive。");
@@ -250,20 +261,30 @@ export class GoogleDriveSyncProvider implements CloudSyncProvider {
         const expectedDeviceId = file.name.slice(WORKSPACE_PREFIX.length).replace(/\.json$/, "");
         remoteEnvelopes.push(await validateDriveWorkspaceEnvelope(downloaded.value, expectedDeviceId));
       }
+      if (await getLocalSnapshotUpdatedAt() !== localPayload.localSnapshotUpdatedAt) {
+        throw new Error("Google Drive 读取期间本机数据发生了变化，已停止本轮合并，请重新同步。");
+      }
       const merged = mergeDriveWorkspaceEnvelopes([localEnvelope, ...remoteEnvelopes]);
       const changedLocal = stableJsonStringify(merged) !== stableJsonStringify(localPayload);
       if (changedLocal) await applyDrivePayload(merged);
+      if (await getLocalSnapshotUpdatedAt() !== localPayload.localSnapshotUpdatedAt) {
+        throw new Error("Google Drive 合并期间本机数据发生了变化，已停止上传，请重新同步。");
+      }
       const refreshed = changedLocal ? await readCurrentDrivePayload() : merged;
       const uploadedEnvelope = await createDriveWorkspaceEnvelope(deviceId, refreshed);
       const name = `${WORKSPACE_PREFIX}${deviceId}.json`;
+      const currentDeviceFile = files.find((file) => file.name === name);
       const uploaded = await this.api.upsertJsonFile(name, {
         webcollectKind: "workspace",
         schemaVersion: "1",
         deviceId,
         contentHash: uploadedEnvelope.contentHash,
-      }, uploadedEnvelope);
+      }, uploadedEnvelope, { expectedVersion: currentDeviceFile?.version });
       const verified = await this.api.downloadJson<unknown>(uploaded.metadata);
       await validateDriveWorkspaceEnvelope(verified.value, deviceId);
+      if (await getLocalSnapshotUpdatedAt() !== refreshed.localSnapshotUpdatedAt) {
+        throw new Error("Google Drive 上传期间本机又有新修改；云端已保存上一版，本机新修改会在下次同步继续上传。");
+      }
       const syncedAt = Date.now();
       await Promise.all([
         clearSyncDirtySets(),
@@ -274,38 +295,84 @@ export class GoogleDriveSyncProvider implements CloudSyncProvider {
     });
   }
 
+  async stageMigrationWorkspace(payload: DriveWorkspacePayloadV1): Promise<string> {
+    return withStorageLock("google-drive-migration-workspace", async () => {
+      const connection = await getDriveConnectionRecord();
+      if (!connection.enabled) throw new Error("请先连接 Google Drive。");
+      const deviceId = await getOrCreateSyncDeviceId();
+      const envelope = await createDriveWorkspaceEnvelope(deviceId, payload);
+      const name = `${WORKSPACE_PREFIX}${deviceId}.json`;
+      const matches = await this.api.listAppDataFiles({ name });
+      if (matches.length > 1) {
+        throw new Error("Google Drive 中发现多个当前设备工作区文件，已停止迁移覆盖。");
+      }
+      if (matches[0]) {
+        const current = await this.api.downloadJson<unknown>(matches[0]);
+        await validateDriveWorkspaceEnvelope(current.value, deviceId);
+      }
+      const uploaded = await this.api.upsertJsonFile(name, {
+        webcollectKind: "workspace",
+        schemaVersion: "1",
+        deviceId,
+        contentHash: envelope.contentHash,
+      }, envelope, { expectedVersion: matches[0]?.version });
+      const verified = await this.api.downloadJson<unknown>(uploaded.metadata);
+      const verifiedEnvelope = await validateDriveWorkspaceEnvelope(verified.value, deviceId);
+      return sha256Hex(verifiedEnvelope.payload);
+    });
+  }
+
   async saveSnapshot(record: CloudSnapshotRecord): Promise<CloudSnapshotRecord> {
-    const partial = {
-      schemaVersion: DRIVE_SNAPSHOT_SCHEMA_VERSION,
-      kind: "snapshot" as const,
-      appVersion: APP_VERSION,
-      snapshotId: record.snapshot.id,
-      snapshotKind: record.kind,
-      source: record.source,
-      dayKey: record.dayKey,
-      updatedAt: record.cloudUpdatedAt || Date.now(),
-      snapshot: record.snapshot,
-    };
-    const envelope: DriveSnapshotEnvelopeV1 = {
-      ...partial,
-      contentHash: await sha256Hex(partial),
-    };
-    const stableSnapshotName = record.kind === "system" && record.dayKey
-      ? `system-${record.dayKey}`
-      : record.snapshot.id;
-    const name = `${SNAPSHOT_PREFIX}${stableSnapshotName}.json`;
-    const saved = await this.api.upsertJsonFile(name, {
-      webcollectKind: "snapshot",
-      schemaVersion: "1",
-      snapshotId: record.snapshot.id,
-      snapshotKind: record.kind,
-      contentHash: envelope.contentHash,
-    }, envelope);
-    const verified = await this.api.downloadJson<DriveSnapshotEnvelopeV1>(saved.metadata);
-    if (await hashDriveDocument(verified.value) !== verified.value.contentHash) {
-      throw new Error("Google Drive 版本文件回读校验失败。");
-    }
-    return { ...record, cloudUpdatedAt: envelope.updatedAt };
+    return withStorageLock("google-drive-snapshot", async () => {
+      const partial = {
+        schemaVersion: DRIVE_SNAPSHOT_SCHEMA_VERSION,
+        kind: "snapshot" as const,
+        appVersion: APP_VERSION,
+        snapshotId: record.snapshot.id,
+        snapshotKind: record.kind,
+        source: record.source,
+        dayKey: record.dayKey,
+        updatedAt: record.cloudUpdatedAt || Date.now(),
+        snapshot: record.snapshot,
+      };
+      const envelope: DriveSnapshotEnvelopeV1 = {
+        ...partial,
+        contentHash: await sha256Hex(partial),
+      };
+      const name = driveSnapshotFileName(record.snapshot.id);
+      const existing = await this.api.listAppDataFiles({ name });
+      if (existing.length > 1) {
+        throw new Error(`Google Drive 中发现多个同名 WebCollect 版本：${name}。已停止覆盖。`);
+      }
+      if (existing[0]) {
+        const downloaded = await this.api.downloadJson<DriveSnapshotEnvelopeV1>(existing[0]);
+        if (
+          downloaded.value?.snapshotId !== record.snapshot.id
+          || await hashDriveDocument(downloaded.value) !== downloaded.value.contentHash
+        ) {
+          throw new Error(`Google Drive 版本文件校验失败：${name}`);
+        }
+        if (downloaded.value.contentHash !== envelope.contentHash) {
+          throw new Error(`Google Drive 已存在相同版本 ID 但内容不同的文件：${record.snapshot.id}。已停止覆盖。`);
+        }
+        return { ...record, cloudUpdatedAt: downloaded.value.updatedAt };
+      }
+      const saved = await this.api.upsertJsonFile(name, {
+        webcollectKind: "snapshot",
+        schemaVersion: "1",
+        snapshotId: record.snapshot.id,
+        snapshotKind: record.kind,
+        contentHash: envelope.contentHash,
+      }, envelope);
+      const verified = await this.api.downloadJson<DriveSnapshotEnvelopeV1>(saved.metadata);
+      if (
+        verified.value?.snapshotId !== record.snapshot.id
+        || await hashDriveDocument(verified.value) !== verified.value.contentHash
+      ) {
+        throw new Error("Google Drive 版本文件回读校验失败。");
+      }
+      return { ...record, cloudUpdatedAt: envelope.updatedAt };
+    });
   }
 
   async listSnapshots(): Promise<CloudSnapshotRecord[]> {
@@ -330,6 +397,50 @@ export class GoogleDriveSyncProvider implements CloudSyncProvider {
       });
     }
     return records.sort((left, right) => right.snapshot.createdAt - left.snapshot.createdAt);
+  }
+
+  async saveMigrationReceipt(
+    receipt: Omit<DriveMigrationReceiptV1, "schemaVersion" | "kind" | "contentHash">,
+  ): Promise<DriveMigrationReceiptV1> {
+    const partial = {
+      schemaVersion: DRIVE_RECEIPT_SCHEMA_VERSION,
+      kind: "migration-receipt" as const,
+      ...receipt,
+    };
+    const document: DriveMigrationReceiptV1 = {
+      ...partial,
+      contentHash: await sha256Hex(partial),
+    };
+    const saved = await this.api.upsertJsonFile(MIGRATION_RECEIPT_NAME, {
+      webcollectKind: "migration-receipt",
+      schemaVersion: "1",
+      source: document.source,
+      contentHash: document.contentHash,
+    }, document);
+    const verified = await this.api.downloadJson<DriveMigrationReceiptV1>(saved.metadata);
+    if (
+      verified.value?.schemaVersion !== DRIVE_RECEIPT_SCHEMA_VERSION
+      || verified.value.kind !== "migration-receipt"
+      || await hashDriveDocument(verified.value) !== verified.value.contentHash
+    ) {
+      throw new Error("Google Drive 迁移回执回读校验失败。");
+    }
+    return verified.value;
+  }
+
+  async getMigrationReceipt(): Promise<DriveMigrationReceiptV1 | null> {
+    const files = await this.api.listAppDataFiles({ name: MIGRATION_RECEIPT_NAME });
+    if (files.length === 0) return null;
+    if (files.length > 1) throw new Error("Google Drive 中发现多个迁移回执，已停止自动判断。");
+    const { value } = await this.api.downloadJson<DriveMigrationReceiptV1>(files[0]);
+    if (
+      value?.schemaVersion !== DRIVE_RECEIPT_SCHEMA_VERSION
+      || value.kind !== "migration-receipt"
+      || await hashDriveDocument(value) !== value.contentHash
+    ) {
+      throw new Error("Google Drive 迁移回执校验失败。");
+    }
+    return value;
   }
 }
 

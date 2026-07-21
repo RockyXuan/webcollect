@@ -190,6 +190,25 @@ export function mergeDriveWorkspaceEnvelopes(
   envelopes: readonly DriveWorkspaceEnvelopeV1[]
 ): DriveWorkspacePayloadV1 {
   if (envelopes.length === 0) throw new Error("没有可合并的 Google Drive 工作区文件。");
+  const allPayloadsMatch = envelopes.every((envelope) =>
+    stableJsonStringify(envelope.payload) === stableJsonStringify(envelopes[0].payload)
+  );
+  if (allPayloadsMatch) {
+    const payload = envelopes[0].payload;
+    const categoryIds = new Set(payload.categories.map((item) => item.id));
+    const sectionIds = new Set(payload.sections.map((item) => item.id));
+    const orphanedCategory = payload.categories.find((item) =>
+      (item.parentId && !categoryIds.has(item.parentId))
+      || (item.sectionId && !sectionIds.has(item.sectionId))
+    );
+    const orphanedCard = payload.cards.find((item) => !categoryIds.has(item.categoryId));
+    if (orphanedCategory || orphanedCard) {
+      throw new Error("合并后的云端数据存在失效的分项、分类或网页引用。已停止写入本机。");
+    }
+    // A first device, or an exact readback of that same device, has no
+    // competing order to reconcile. Preserve the byte-stable source order.
+    return payload;
+  }
   const tombstones = newestTombstones(envelopes);
   const base = mergePreferences(envelopes, envelopes[0].payload);
   const categories = mergeEntities(envelopes, (payload) => payload.categories, tombstones, "category");
@@ -212,4 +231,3 @@ export function mergeDriveWorkspaceEnvelopes(
     localSnapshotUpdatedAt: Math.max(...envelopes.map((item) => item.payload.localSnapshotUpdatedAt)),
   };
 }
-

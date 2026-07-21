@@ -3,9 +3,11 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 const manifest = JSON.parse(readFileSync("extension/manifest.json", "utf8"));
+const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 const authStoreSource = readFileSync("src/lib/auth-store.ts", "utf8");
-const callbackSource = readFileSync("src/app/auth/callback/route.ts", "utf8");
+const driveAuthSource = readFileSync("src/lib/google-drive-auth.ts", "utf8");
 const EXPECTED_EXTENSION_ID = "immpcmhmabobllnopedaoflcjneigbko";
+const DRIVE_APPDATA_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
 
 function extensionIdFromManifestKey(key) {
   const publicKey = Buffer.from(key, "base64");
@@ -18,15 +20,22 @@ function extensionIdFromManifestKey(key) {
 assert.ok(Array.isArray(manifest.permissions) && manifest.permissions.includes("identity"), "manifest must keep identity permission");
 assert.equal(typeof manifest.key, "string", "manifest must include stable extension key");
 assert.equal(extensionIdFromManifestKey(manifest.key), EXPECTED_EXTENSION_ID, "manifest key must resolve to allowlisted extension ID");
-assert.ok(authStoreSource.includes('chrome.identity.getRedirectURL("auth")'), "extension login must derive redirect URL from installed extension");
-assert.ok(authStoreSource.includes("launchWebAuthFlow"), "extension login must use launchWebAuthFlow");
-assert.ok(authStoreSource.includes("skipBrowserRedirect: true"), "extension login must request Supabase OAuth URL");
-assert.ok(authStoreSource.includes("exchangeCodeForSession(code)"), "extension login must exchange returned code");
-assert.ok(authStoreSource.includes("client.auth.getUser()"), "startup must validate the user with Supabase");
-assert.equal(authStoreSource.includes("if (cached)"), false, "cached display identity must not establish login state");
-assert.ok(authStoreSource.includes('client.auth.signOut({ scope: "local" })'), "web and extension logout must revoke the current remote session");
-assert.ok(authStoreSource.includes("clearBrowserSupabaseSessionCache()"), "logout must clear the Supabase local token cache");
-assert.ok(callbackSource.includes('target.searchParams.set("code", code)'), "web callback must forward code to browser client");
-assert.equal(callbackSource.includes("exchangeCodeForSession"), false, "web callback must not exchange code server-side");
-assert.ok(callbackSource.includes("safeNext"), "web callback must sanitize next path");
+assert.equal(typeof manifest.oauth2?.client_id, "string", "manifest must include the Google OAuth client id");
+assert.match(
+  manifest.oauth2.client_id,
+  /^\d+-[a-z0-9-]+\.apps\.googleusercontent\.com$/,
+  "manifest OAuth client id must be a real Google client id",
+);
+assert.deepEqual(manifest.oauth2.scopes, [DRIVE_APPDATA_SCOPE], "manifest must request only drive.appdata");
+assert.equal(manifest.oauth2.client_secret, undefined, "manifest must never contain a Google client secret");
+assert.equal(
+  packageJson.dependencies?.["@supabase/supabase-js"],
+  undefined,
+  "formal V1.4 production dependencies must not include the retired Supabase runtime",
+);
+assert.ok(driveAuthSource.includes("chrome.identity.getAuthToken"), "Drive login must use chrome.identity.getAuthToken");
+assert.ok(driveAuthSource.includes("chrome.identity.removeCachedAuthToken"), "expired Drive tokens must be invalidated");
+assert.ok(driveAuthSource.includes(DRIVE_APPDATA_SCOPE), "Drive auth must request the app-data-only scope");
+assert.equal(driveAuthSource.includes("launchWebAuthFlow"), false, "Drive auth must not use a custom web auth flow");
+assert.equal(authStoreSource.includes("supabase"), false, "normal V1.4 auth state must not import or call Supabase");
 console.log("auth contract checks passed");

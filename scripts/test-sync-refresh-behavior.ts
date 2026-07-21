@@ -12,8 +12,8 @@ assert.ok(manualSyncStart >= 0 && setSyncModeStart > manualSyncStart, "auth stor
 const manualSyncBody = authStore.slice(manualSyncStart, setSyncModeStart);
 
 assert.ok(
-  manualSyncBody.includes("await syncData(user.id)"),
-  "manual sync should run the full bidirectional cloud sync so other-device changes are pulled"
+  manualSyncBody.includes("await googleDriveSyncProvider.sync()"),
+  "manual sync should run the full bidirectional Drive sync so other-device changes are pulled"
 );
 assert.equal(
   manualSyncBody.includes("localUpdatedAt <= localSyncedAt"),

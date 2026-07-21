@@ -2,81 +2,95 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   extension: false,
-  getUser: vi.fn(),
-  signInWithOAuth: vi.fn(),
-  signOut: vi.fn(),
-  startAutoRefresh: vi.fn(),
-  stopAutoRefresh: vi.fn(),
-  upsert: vi.fn(async () => ({ error: null })),
-  clearSupabaseCache: vi.fn(),
+  identity: null as null | {
+    id: string;
+    email: string;
+    displayName: string;
+    avatarUrl: string;
+  },
+  connection: {
+    version: 1 as const,
+    enabled: false,
+    connectedAt: 0,
+    lastSyncAt: 0,
+    migrationVerifiedAt: 0,
+  },
+  connect: vi.fn(),
+  disconnect: vi.fn(),
+  getIdentity: vi.fn(),
+  sync: vi.fn(),
+  saveSnapshot: vi.fn(),
+  listSnapshots: vi.fn(),
+  loadData: vi.fn(),
 }));
 
-vi.mock("@/lib/supabase-browser", () => ({
-  initBrowserSupabase: vi.fn(async () => true),
-  getBrowserSupabaseClient: vi.fn(() => ({
-    auth: {
-      getUser: mocks.getUser,
-      signInWithOAuth: mocks.signInWithOAuth,
-      signOut: mocks.signOut,
-      startAutoRefresh: mocks.startAutoRefresh,
-      stopAutoRefresh: mocks.stopAutoRefresh,
-    },
-    from: vi.fn(() => ({ upsert: mocks.upsert })),
-  })),
-  clearBrowserSupabaseSessionCache: mocks.clearSupabaseCache,
+vi.mock("@/lib/google-drive-sync", () => ({
+  googleDriveSyncProvider: {
+    id: "google-drive",
+    connect: mocks.connect,
+    disconnect: mocks.disconnect,
+    getIdentity: mocks.getIdentity,
+    sync: mocks.sync,
+    saveSnapshot: mocks.saveSnapshot,
+    listSnapshots: mocks.listSnapshots,
+  },
+}));
+
+vi.mock("@/lib/google-drive-auth", () => ({
+  getDriveConnectionRecord: vi.fn(async () => mocks.connection),
 }));
 
 vi.mock("@/lib/platform", () => ({
   isChromeExtension: () => mocks.extension,
 }));
 
-vi.mock("@/lib/cloud-snapshots", () => ({
-  saveCloudWorkspaceSnapshot: vi.fn(),
-}));
-
-vi.mock("@/lib/sync", () => ({
-  pushLocalSnapshotToCloud: vi.fn(),
-  syncData: vi.fn(),
-}));
-
 vi.mock("@/lib/store", () => ({
-  useAppStore: { getState: () => ({ loadData: vi.fn() }) },
+  useAppStore: { getState: () => ({ loadData: mocks.loadData }) },
 }));
 
 vi.mock("@/lib/db", () => ({
-  getLastSeenCloudSnapshotUpdatedAt: vi.fn(async () => 0),
+  CURRENT_SYNC_METADATA_VERSION: 2,
   getLocalSnapshotSyncedAt: vi.fn(async () => 0),
   getLocalSnapshotUpdatedAt: vi.fn(async () => 0),
-  getLastSeenCloudWorkspaceVersion: vi.fn(async () => 0),
-  saveLastSeenCloudWorkspaceVersion: vi.fn(),
 }));
 
 vi.mock("@/lib/local-snapshots", () => ({
   createLocalDataSnapshot: vi.fn(),
 }));
 
+vi.mock("@/lib/portable-backup", () => ({
+  isPortableBackupRestoreInProgress: vi.fn(() => false),
+}));
+
 import { useAuthStore } from "@/lib/auth-store";
 
-const cachedUser = {
-  id: "cached-user",
-  email: "cached@example.com",
-  displayName: "Cached",
-  avatarUrl: "",
+const driveUser = {
+  id: "drive-permission-id",
+  email: "rocky@example.com",
+  displayName: "Rocky",
+  avatarUrl: "https://example.com/avatar.png",
 };
 
 beforeEach(() => {
   localStorage.clear();
-  window.history.replaceState({}, "", "/");
   localStorage.setItem("webcollect_sync_mode", "manual");
   localStorage.setItem("webcollect_sync_mode_version", "2");
   mocks.extension = false;
-  mocks.getUser.mockReset();
-  mocks.signInWithOAuth.mockReset();
-  mocks.signOut.mockReset();
-  mocks.startAutoRefresh.mockClear();
-  mocks.stopAutoRefresh.mockClear();
-  mocks.upsert.mockClear();
-  mocks.clearSupabaseCache.mockClear();
+  mocks.identity = null;
+  mocks.connection = {
+    version: 1,
+    enabled: false,
+    connectedAt: 0,
+    lastSyncAt: 0,
+    migrationVerifiedAt: 0,
+  };
+  mocks.connect.mockReset();
+  mocks.disconnect.mockReset();
+  mocks.getIdentity.mockReset().mockImplementation(async () => mocks.identity);
+  mocks.sync.mockReset().mockResolvedValue({ syncedAt: 123, remoteFilesRead: 1, changedLocal: false });
+  mocks.saveSnapshot.mockReset();
+  mocks.listSnapshots.mockReset();
+  mocks.loadData.mockReset();
   useAuthStore.setState({
     user: null,
     isLoading: true,
@@ -89,96 +103,84 @@ beforeEach(() => {
   });
 });
 
-describe("validated auth session", () => {
-  it("does not trust a cached display identity without a verified Supabase user", async () => {
-    localStorage.setItem("webcollect_auth_session", JSON.stringify(cachedUser));
-    mocks.getUser.mockResolvedValue({
-      data: { user: null },
-      error: { message: "Auth session missing" },
-    });
+describe("Google Drive connection state", () => {
+  it("keeps the Web build local-only without asking for Drive identity", async () => {
+    await useAuthStore.getState().initialize();
+
+    expect(mocks.getIdentity).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().isLoggedIn).toBe(false);
+    expect(useAuthStore.getState().isLoading).toBe(false);
+  });
+
+  it("keeps an unconnected extension fully usable as a local workspace", async () => {
+    mocks.extension = true;
 
     await useAuthStore.getState().initialize();
 
-    expect(mocks.getUser).toHaveBeenCalledTimes(1);
+    expect(mocks.getIdentity).toHaveBeenCalledTimes(1);
     expect(useAuthStore.getState().isLoggedIn).toBe(false);
-    expect(useAuthStore.getState().user).toBeNull();
-    expect(localStorage.getItem("webcollect_auth_session")).toBeNull();
+    expect(useAuthStore.getState().error).toBeNull();
   });
 
-  it("uses the remotely verified user as the login authority", async () => {
-    localStorage.setItem("webcollect_auth_session", JSON.stringify(cachedUser));
-    mocks.getUser.mockResolvedValue({
-      data: {
-        user: {
-          id: "verified-user",
-          email: "verified@example.com",
-          user_metadata: { full_name: "Verified", avatar_url: "https://example.com/avatar.png" },
-        },
-      },
-      error: null,
-    });
+  it("keeps retired session keys untouched while using an already connected Drive account", async () => {
+    mocks.extension = true;
+    mocks.identity = driveUser;
+    mocks.connection.enabled = true;
+    localStorage.setItem("webcollect_auth_session", JSON.stringify({ id: "legacy" }));
 
     await useAuthStore.getState().initialize();
 
     expect(useAuthStore.getState().isLoggedIn).toBe(true);
-    expect(useAuthStore.getState().user?.id).toBe("verified-user");
-    expect(JSON.parse(localStorage.getItem("webcollect_auth_session") || "{}").id).toBe("verified-user");
-    expect(mocks.upsert).toHaveBeenCalledTimes(1);
+    expect(mocks.sync).not.toHaveBeenCalled();
+    expect(localStorage.getItem("webcollect_auth_session")).not.toBeNull();
   });
 
-  it("removes a consumed OAuth code without dropping unrelated query parameters", async () => {
-    window.history.replaceState({}, "", "/?code=one-time-code&view=collection");
-    mocks.getUser.mockResolvedValue({
-      data: {
-        user: {
-          id: "verified-user",
-          email: "verified@example.com",
-          user_metadata: { full_name: "Verified" },
-        },
-      },
-      error: null,
-    });
-
-    await useAuthStore.getState().initialize();
-
-    expect(window.location.search).toBe("?view=collection");
-  });
-
-  it("signs out the remote Supabase session without disabling browser-managed refresh", async () => {
+  it("connects Drive only after the user action and syncs when no migration is needed", async () => {
     mocks.extension = true;
-    mocks.signOut.mockResolvedValue({ error: null });
-    localStorage.setItem("webcollect_auth_session", JSON.stringify(cachedUser));
-    useAuthStore.setState({ user: cachedUser, isLoggedIn: true, isLoading: false });
-
-    await useAuthStore.getState().logout();
-
-    expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
-    expect(mocks.clearSupabaseCache).toHaveBeenCalledTimes(1);
-    expect(mocks.stopAutoRefresh).not.toHaveBeenCalled();
-    expect(localStorage.getItem("webcollect_auth_session")).toBeNull();
-    expect(useAuthStore.getState().isLoggedIn).toBe(false);
-  });
-
-  it("keeps Supabase browser visibility management when starting Google login", async () => {
-    mocks.signInWithOAuth.mockResolvedValue({ data: { url: "https://accounts.google.test" }, error: null });
+    mocks.connect.mockResolvedValue(driveUser);
 
     await useAuthStore.getState().loginWithGoogle();
 
-    expect(mocks.startAutoRefresh).not.toHaveBeenCalled();
-    expect(mocks.signInWithOAuth).toHaveBeenCalledWith(expect.objectContaining({ provider: "google" }));
+    expect(mocks.connect).toHaveBeenCalledTimes(1);
+    expect(mocks.sync).toHaveBeenCalledTimes(1);
+    expect(useAuthStore.getState().user).toEqual(driveUser);
+    expect(useAuthStore.getState().lastSyncAt).toBe(123);
   });
 
-  it("clears local auth state even when remote sign-out fails", async () => {
+  it("does not let a retired local session key block a new Drive connection", async () => {
     mocks.extension = true;
-    mocks.signOut.mockRejectedValue(new Error("network unavailable"));
-    localStorage.setItem("webcollect_auth_session", JSON.stringify(cachedUser));
-    useAuthStore.setState({ user: cachedUser, isLoggedIn: true, isLoading: false });
+    mocks.connect.mockResolvedValue(driveUser);
+    localStorage.setItem("webcollect_auth_session", JSON.stringify({ id: "legacy" }));
+
+    await useAuthStore.getState().loginWithGoogle();
+
+    expect(useAuthStore.getState().isLoggedIn).toBe(true);
+    expect(mocks.sync).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem("webcollect_auth_session")).not.toBeNull();
+  });
+
+  it("disconnects synchronization without clearing the legacy session or workspace", async () => {
+    mocks.extension = true;
+    localStorage.setItem("webcollect_auth_session", JSON.stringify({ id: "legacy" }));
+    useAuthStore.setState({ user: driveUser, isLoggedIn: true, isLoading: false });
 
     await useAuthStore.getState().logout();
 
-    expect(mocks.clearSupabaseCache).toHaveBeenCalledTimes(1);
-    expect(localStorage.getItem("webcollect_auth_session")).toBeNull();
+    expect(mocks.disconnect).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem("webcollect_auth_session")).not.toBeNull();
     expect(useAuthStore.getState().user).toBeNull();
-    expect(useAuthStore.getState().error).toMatch(/本地会话已清除/);
+    expect(useAuthStore.getState().isLoggedIn).toBe(false);
+  });
+
+  it("stops local sync state even when clearing the Chrome token cache fails", async () => {
+    mocks.extension = true;
+    mocks.disconnect.mockRejectedValue(new Error("token cache unavailable"));
+    useAuthStore.setState({ user: driveUser, isLoggedIn: true, isLoading: false });
+
+    await useAuthStore.getState().logout();
+
+    expect(useAuthStore.getState().user).toBeNull();
+    expect(useAuthStore.getState().isLoggedIn).toBe(false);
+    expect(useAuthStore.getState().error).toMatch(/已停止本机同步/);
   });
 });

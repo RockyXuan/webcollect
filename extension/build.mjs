@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -53,6 +53,20 @@ const contentScriptResult = spawnSync(
 
 if (contentScriptResult.status !== 0) {
   process.exit(contentScriptResult.status ?? 1);
+}
+
+const mainBundle = readFileSync(join(distDir, "assets", "main.js"), "utf8");
+const forbiddenRuntimeSignatures = [
+  "webcollect_supabase",
+  "bookmark-search",
+  ".supabase.co",
+  "SUPABASE_ANON_KEY",
+];
+for (const signature of forbiddenRuntimeSignatures) {
+  if (mainBundle.includes(signature)) {
+    console.error(`Retired Supabase runtime signature found in extension bundle: ${signature}`);
+    process.exit(1);
+  }
 }
 
 cpSync(join(extensionRoot, "manifest.json"), join(distDir, "manifest.json"));

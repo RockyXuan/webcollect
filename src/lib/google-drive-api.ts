@@ -29,6 +29,7 @@ export interface GoogleDriveApiOptions {
   fetchImpl?: typeof fetch;
   getToken?: (interactive: boolean) => Promise<string>;
   invalidateToken?: (token: string) => Promise<void>;
+  timeoutMs?: number;
 }
 
 function safeErrorMessage(value: string): string {
@@ -44,21 +45,50 @@ export class GoogleDriveApi {
   private readonly fetchImpl: typeof fetch;
   private readonly getToken: (interactive: boolean) => Promise<string>;
   private readonly invalidateToken: (token: string) => Promise<void>;
+  private readonly timeoutMs: number;
 
   constructor(options: GoogleDriveApiOptions = {}) {
-    this.fetchImpl = options.fetchImpl || fetch;
+    // Chromium's native fetch performs a brand check on its receiver. Keeping
+    // the bare method and later invoking it through this.fetchImpl can throw
+    // "Illegal invocation" in a real extension even though mocked tests pass.
+    this.fetchImpl = options.fetchImpl || globalThis.fetch.bind(globalThis);
     this.getToken = options.getToken || getGoogleDriveAccessToken;
     this.invalidateToken = options.invalidateToken || invalidateGoogleDriveAccessToken;
+    this.timeoutMs = options.timeoutMs || 12_000;
   }
 
-  private async request(url: string, init: RequestInit = {}, retryAuth = true): Promise<Response> {
+  private async request(
+    url: string,
+    init: RequestInit = {},
+    retryAuth = true,
+    transientRetries = 2,
+  ): Promise<Response> {
     const token = await this.getToken(false);
     const headers = new Headers(init.headers);
     headers.set("Authorization", `Bearer ${token}`);
-    const response = await this.fetchImpl(url, { ...init, headers });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    let response: Response;
+    try {
+      response = await this.fetchImpl(url, { ...init, headers, signal: controller.signal });
+    } catch (error) {
+      const isAbort = !!error && typeof error === "object" && "name" in error && error.name === "AbortError";
+      if (isAbort) throw new Error("Google Drive 请求超时，本机数据保持不变。");
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
     if (response.status === 401 && retryAuth) {
       await this.invalidateToken(token);
-      return this.request(url, init, false);
+      return this.request(url, init, false, transientRetries);
+    }
+    const method = (init.method || "GET").toUpperCase();
+    if (
+      transientRetries > 0
+      && (method === "GET" || method === "HEAD")
+      && (response.status === 408 || response.status === 429 || response.status >= 500)
+    ) {
+      return this.request(url, init, retryAuth, transientRetries - 1);
     }
     if (!response.ok) {
       const message = safeErrorMessage(await response.text());
@@ -77,9 +107,9 @@ export class GoogleDriveApi {
         fields: "nextPageToken,files(id,name,modifiedTime,version,size,appProperties)",
         orderBy: "modifiedTime desc",
       });
-      if (options.name) {
-        params.set("q", `name = '${escapeDriveQueryValue(options.name)}'`);
-      }
+      params.set("q", options.name
+        ? `trashed = false and name = '${escapeDriveQueryValue(options.name)}'`
+        : "trashed = false");
       if (pageToken) params.set("pageToken", pageToken);
       const response = await this.request(`${DRIVE_API_BASE}/files?${params.toString()}`);
       const result = await response.json() as DriveFileListResponse;
@@ -157,15 +187,22 @@ export class GoogleDriveApi {
   async upsertJsonFile<T>(
     name: string,
     appProperties: Record<string, string>,
-    value: T
+    value: T,
+    options: { expectedVersion?: string } = {},
   ): Promise<DriveJsonFile<T>> {
     const matches = await this.listAppDataFiles({ name });
     if (matches.length > 1) {
       throw new Error(`Google Drive 中发现多个同名 WebCollect 文件：${name}。已停止覆盖，请先检查迁移状态。`);
+    }
+    if (
+      matches[0]
+      && options.expectedVersion
+      && matches[0].version !== options.expectedVersion
+    ) {
+      throw new Error("Google Drive 文件在上传前已被另一窗口更新，请重新同步后再试。");
     }
     return matches[0]
       ? this.updateJsonFile(matches[0], appProperties, value)
       : this.createJsonFile(name, appProperties, value);
   }
 }
-

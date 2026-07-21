@@ -105,7 +105,7 @@ interface DriveAboutResponse {
 
 export async function fetchGoogleDriveIdentity(
   interactive: boolean,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = globalThis.fetch.bind(globalThis)
 ): Promise<CloudIdentity> {
   let token = await getGoogleDriveAccessToken(interactive);
   let response = await fetchImpl(
@@ -133,4 +133,3 @@ export async function fetchGoogleDriveIdentity(
     avatarUrl: user.photoLink || "",
   };
 }
-

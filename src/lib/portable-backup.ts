@@ -175,6 +175,31 @@ function assertWorkspaceShape(value: unknown): asserts value is LocalSnapshotDat
   }
 }
 
+function assertHistoricalWorkspaceShape(value: unknown, label: string): asserts value is LocalSnapshotData {
+  if (!isRecord(value)) throw new Error(`${label}中的工作区格式无效。`);
+
+  // Snapshot history spans older WebCollect releases. Cards and categories
+  // are the durable core; newer preference collections may be absent in an
+  // old immutable version and must not prevent that version being archived.
+  for (const key of ["cards", "categories"]) {
+    if (!Array.isArray(value[key])) throw new Error(`${label}缺少有效的 ${key} 列表。`);
+  }
+  for (const key of [
+    "hiddenSites",
+    "pinnedCategoryIds",
+    "pinnedBookmarkItems",
+    "sections",
+    "recycleBin",
+    "warehouseCards",
+    "warehouseCategories",
+    "warehouseImportBatches",
+  ]) {
+    if (key in value && !Array.isArray(value[key])) {
+      throw new Error(`${label}中的 ${key} 格式无效。`);
+    }
+  }
+}
+
 function assertSnapshotEntry(value: unknown, label: string): asserts value is LocalSnapshotEntry {
   if (!isRecord(value) || typeof value.id !== "string" || !value.id) {
     throw new Error(`${label}缺少有效 ID。`);
@@ -182,7 +207,11 @@ function assertSnapshotEntry(value: unknown, label: string): asserts value is Lo
   if (typeof value.createdAt !== "number" || !Number.isFinite(value.createdAt)) {
     throw new Error(`${label}缺少有效时间。`);
   }
-  assertWorkspaceShape(value.data);
+  // Historical versions are immutable evidence and can legitimately contain
+  // older schemas or reference issues that a later release repaired. Keep
+  // their complete data in the archive; recovery UI assesses them before any
+  // explicit restore instead of silently rewriting or dropping the version.
+  assertHistoricalWorkspaceShape(value.data, label);
 }
 
 function normalizeCloudStatus(value: unknown): PortableBackupCloudStatus {
@@ -369,6 +398,11 @@ export async function restorePortableBackup(
 ): Promise<RestorePortableBackupResult> {
   if (options.confirmed !== true) throw new Error("恢复已取消：需要明确确认后才能写入数据。");
   const { backup } = await validatePortableBackup(input);
+  const [originalTombstones, originalPreferenceRevisions, originalMindmapViewStates] = await Promise.all([
+    getSyncTombstones(),
+    getSyncPreferenceRevisions(),
+    listMindmapViewStates(),
+  ]);
 
   restoreDepth += 1;
   try {
@@ -378,36 +412,46 @@ export async function restorePortableBackup(
       { force: true },
     );
     if (!preImportSnapshot) throw new Error("无法创建导入前安全版本，恢复已取消。");
+    try {
+      await restoreSnapshotData(backup.workspace);
+      await Promise.all([
+        saveSyncTombstones(mergeTombstones(originalTombstones, backup.workspace.syncTombstones || [])),
+        saveSyncPreferenceRevisions(mergePreferenceRevisions(
+          originalPreferenceRevisions,
+          backup.workspace.syncPreferenceRevisions || {},
+        )),
+      ]);
 
-    await rotateSyncDeviceId(maxObservedRevision(backup.workspace));
-    await restoreSnapshotData(backup.workspace);
+      await mergeImportedLocalDataSnapshots([
+        preImportSnapshot,
+        ...backup.localSnapshots,
+        ...backup.driveSnapshots.map((record) => record.snapshot),
+      ]);
+      await restoreMindmapViewStates(backup.mindmapViewStates);
+      await rotateSyncDeviceId(maxObservedRevision(backup.workspace));
+      writeCollectionViewMode(backup.collectionViewMode);
+      if (backup.wallpaperStartupMode) writeWallpaperStartupMode(backup.wallpaperStartupMode);
 
-    const [currentTombstones, currentPreferenceRevisions] = await Promise.all([
-      getSyncTombstones(),
-      getSyncPreferenceRevisions(),
-    ]);
-    await Promise.all([
-      saveSyncTombstones(mergeTombstones(currentTombstones, backup.workspace.syncTombstones || [])),
-      saveSyncPreferenceRevisions(mergePreferenceRevisions(
-        currentPreferenceRevisions,
-        backup.workspace.syncPreferenceRevisions || {},
-      )),
-      restoreMindmapViewStates(backup.mindmapViewStates),
-    ]);
-
-    await mergeImportedLocalDataSnapshots([
-      preImportSnapshot,
-      ...backup.localSnapshots,
-      ...backup.driveSnapshots.map((record) => record.snapshot),
-    ]);
-    writeCollectionViewMode(backup.collectionViewMode);
-    if (backup.wallpaperStartupMode) writeWallpaperStartupMode(backup.wallpaperStartupMode);
-
-    return {
-      preImportSnapshotId: preImportSnapshot.id,
-      restoredCounts: backup.counts,
-      rotatedDeviceIdentity: true,
-    };
+      return {
+        preImportSnapshotId: preImportSnapshot.id,
+        restoredCounts: backup.counts,
+        rotatedDeviceIdentity: true,
+      };
+    } catch (restoreError) {
+      try {
+        await restoreSnapshotData(preImportSnapshot.data);
+        await Promise.all([
+          saveSyncTombstones(originalTombstones),
+          saveSyncPreferenceRevisions(originalPreferenceRevisions),
+          restoreMindmapViewStates(originalMindmapViewStates),
+        ]);
+      } catch (rollbackError) {
+        const rollbackMessage = rollbackError instanceof Error ? rollbackError.message : "未知错误";
+        throw new Error(`恢复中断，自动回退也失败：${rollbackMessage}。请保留当前页面并使用导入前安全版本。`);
+      }
+      const message = restoreError instanceof Error ? restoreError.message : "未知错误";
+      throw new Error(`恢复失败，已自动回到导入前状态：${message}`);
+    }
   } finally {
     restoreDepth = Math.max(0, restoreDepth - 1);
   }

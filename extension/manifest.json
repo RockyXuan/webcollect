@@ -10,6 +10,12 @@
     "identity",
     "contextMenus"
   ],
+  "oauth2": {
+    "client_id": "182989220530-5mjvao2h93sabqp5gunbtglpq1l9b26i.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/drive.appdata"
+    ]
+  },
   "host_permissions": [
     "<all_urls>"
   ],

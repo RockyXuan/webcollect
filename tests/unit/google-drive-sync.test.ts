@@ -3,6 +3,7 @@ import { sha256Hex, stableJsonStringify } from "@/lib/content-hash";
 import { mergeDriveWorkspaceEnvelopes } from "@/lib/drive-sync-engine";
 import {
   createDriveWorkspaceEnvelope,
+  driveSnapshotFileName,
   validateDriveWorkspaceEnvelope,
 } from "@/lib/google-drive-sync";
 import type { DriveWorkspaceEnvelopeV1, DriveWorkspacePayloadV1 } from "@/lib/drive-types";
@@ -125,6 +126,59 @@ describe("Google Drive workspace merge", () => {
     expect(merged.syncTombstones).toHaveLength(1);
   });
 
+  it("does not let an older offline preference replace the newer device choice", async () => {
+    const stale = payload("device-a");
+    stale.visualScale = 80;
+    stale.syncPreferenceRevisions.visualScale = { syncRevision: 4, syncDeviceId: "device-a" };
+
+    const current = payload("device-b");
+    current.visualScale = 120;
+    current.syncPreferenceRevisions.visualScale = { syncRevision: 5, syncDeviceId: "device-b" };
+
+    const merged = mergeDriveWorkspaceEnvelopes([
+      await envelope("device-a", stale),
+      await envelope("device-b", current),
+    ]);
+    expect(merged.visualScale).toBe(120);
+  });
+
+  it("stops instead of flattening a category or reviving an orphaned card", async () => {
+    const left = payload("device-a");
+    left.cards = [card("orphan-card", "missing-category", 3, "device-a")];
+    const leftEnvelope = await envelope("device-a", left);
+
+    expect(() => mergeDriveWorkspaceEnvelopes([
+      leftEnvelope,
+    ])).toThrow(/失效的分项、分类或网页引用/);
+  });
+
+  it("keeps the first device payload byte-stable when no remote device exists", async () => {
+    const firstDevice = payload("device-a");
+    firstDevice.categories = [
+      category("category-z", 2, "device-a"),
+      category("category-a", 1, "device-a"),
+    ];
+    firstDevice.cards = [
+      card("card-z", "category-z", 2, "device-a"),
+      card("card-a", "category-a", 1, "device-a"),
+    ];
+
+    const merged = mergeDriveWorkspaceEnvelopes([
+      await envelope("device-a", firstDevice),
+    ]);
+
+    expect(merged).toEqual(firstDevice);
+    expect(merged.categories.map((item) => item.id)).toEqual(["category-z", "category-a"]);
+    expect(merged.cards.map((item) => item.id)).toEqual(["card-z", "card-a"]);
+
+    const exactReadback = mergeDriveWorkspaceEnvelopes([
+      await envelope("device-a", firstDevice),
+      await envelope("device-a", structuredClone(firstDevice)),
+    ]);
+    expect(exactReadback).toEqual(firstDevice);
+    expect(exactReadback.categories.map((item) => item.id)).toEqual(["category-z", "category-a"]);
+  });
+
   it("stops on equal-version divergent content", async () => {
     const left = payload("device-a");
     left.categories = [category("category-a", 2, "device-a")];
@@ -152,5 +206,11 @@ describe("Google Drive workspace merge", () => {
   it("uses canonical JSON for portable content hashes", async () => {
     expect(stableJsonStringify({ b: 2, a: { d: 4, c: 3 } })).toBe('{"a":{"c":3,"d":4},"b":2}');
     await expect(sha256Hex({ a: 1, b: 2 })).resolves.toBe(await sha256Hex({ b: 2, a: 1 }));
+  });
+
+  it("keeps every snapshot on its immutable snapshot id", () => {
+    expect(driveSnapshotFileName("snapshot-123-abc")).toBe(
+      "webcollect-snapshot-v1-snapshot-123-abc.json",
+    );
   });
 });

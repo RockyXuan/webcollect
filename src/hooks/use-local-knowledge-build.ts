@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuthStore } from "@/lib/auth-store";
 import { runKnowledgeBuild, type KnowledgeIndexItem } from "@/lib/knowledge-builder";
-import { fetchPublicKnowledge } from "@/lib/knowledge-client";
+import { fetchPublicKnowledge } from "@/lib/local-knowledge-fetch";
 import {
   getKnowledgeBuildState,
   getKnowledgeConsent,
@@ -100,7 +100,7 @@ export function useLocalKnowledgeBuild(): LocalKnowledgeBuildSummary {
   const sections = useAppStore((state) => state.sections);
   const scopeId = user?.id || "local";
   const extensionRuntime = isChromeExtension();
-  const publicFetchSupported = extensionRuntime || Boolean(user);
+  const publicFetchSupported = extensionRuntime;
   const [ready, setReady] = useState(false);
   const [consented, setConsented] = useState(false);
   const [isBuilding, setIsBuilding] = useState(false);

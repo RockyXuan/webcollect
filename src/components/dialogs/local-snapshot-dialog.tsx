@@ -22,16 +22,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAuthStore } from "@/lib/auth-store";
-import {
-  listCloudWorkspaceSnapshots,
-  restoreCloudWorkspaceSnapshot,
-  restoreStructureFromCloudWorkspaceSnapshot,
-  type CloudWorkspaceSnapshotEntry,
-} from "@/lib/cloud-snapshots";
+import { googleDriveSyncProvider } from "@/lib/google-drive-sync";
 import {
   assessLocalDataSnapshot,
+  createLocalDataSnapshot,
   getLocalDataSnapshots,
   restoreLocalDataSnapshot,
+  restoreSnapshotData,
+  restoreStructureFromSnapshotEntry,
   restoreStructureFromLocalSnapshot,
   type LocalSnapshotEntry,
 } from "@/lib/local-snapshots";
@@ -42,14 +40,19 @@ interface LocalSnapshotDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type SnapshotLike = LocalSnapshotEntry | CloudWorkspaceSnapshotEntry;
+type DriveCloudSnapshotEntry = LocalSnapshotEntry & {
+  source: "google-drive";
+  kind: "manual" | "system";
+  cloudUpdatedAt: number;
+};
+type SnapshotLike = LocalSnapshotEntry | DriveCloudSnapshotEntry;
 type PendingRestoreAction = {
   mode: "full" | "structure";
   snapshot: SnapshotLike;
 };
 
-function isCloudSnapshot(snapshot: SnapshotLike): snapshot is CloudWorkspaceSnapshotEntry {
-  return (snapshot as CloudWorkspaceSnapshotEntry).source === "cloud";
+function isCloudSnapshot(snapshot: SnapshotLike): snapshot is DriveCloudSnapshotEntry {
+  return (snapshot as DriveCloudSnapshotEntry).source === "google-drive";
 }
 
 function snapshotKey(snapshot: SnapshotLike): string {
@@ -105,9 +108,9 @@ function filterByDate<T extends SnapshotLike>(snapshots: T[], selectedDate: stri
 }
 
 export function LocalSnapshotDialog({ open, onOpenChange }: LocalSnapshotDialogProps) {
-  const user = useAuthStore((state) => state.user);
+  const { user, manualSync } = useAuthStore();
   const [localSnapshots, setLocalSnapshots] = useState<LocalSnapshotEntry[]>([]);
-  const [cloudSnapshots, setCloudSnapshots] = useState<CloudWorkspaceSnapshotEntry[]>([]);
+  const [cloudSnapshots, setCloudSnapshots] = useState<DriveCloudSnapshotEntry[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
@@ -120,10 +123,15 @@ export function LocalSnapshotDialog({ open, onOpenChange }: LocalSnapshotDialogP
     setLoadError(null);
     try {
       const nextLocalSnapshots = await getLocalDataSnapshots();
-      let nextCloudSnapshots: CloudWorkspaceSnapshotEntry[] = [];
+      let nextCloudSnapshots: DriveCloudSnapshotEntry[] = [];
       if (user) {
         try {
-          nextCloudSnapshots = await listCloudWorkspaceSnapshots(user.id);
+          nextCloudSnapshots = (await googleDriveSyncProvider.listSnapshots()).map((record) => ({
+            ...record.snapshot,
+            source: "google-drive" as const,
+            kind: record.kind,
+            cloudUpdatedAt: record.cloudUpdatedAt,
+          }));
         } catch (error) {
           setLoadError(error instanceof Error ? error.message : "读取云端版本失败。");
         }
@@ -151,8 +159,10 @@ export function LocalSnapshotDialog({ open, onOpenChange }: LocalSnapshotDialogP
     setRestoringId(key);
     try {
       if (isCloudSnapshot(snapshot)) {
-        if (!user) throw new Error("请先登录后再恢复云端版本。");
-        await restoreCloudWorkspaceSnapshot(user.id, snapshot.id);
+        if (!user) throw new Error("请先连接 Google Drive。");
+        await createLocalDataSnapshot("before-cloud-rollback", "Google Drive 回档前自动备份", { force: true });
+        await restoreSnapshotData(snapshot.data);
+        await manualSync({ reloadView: false, throwOnError: true });
       } else {
         await restoreLocalDataSnapshot(snapshot.id);
       }
@@ -168,8 +178,9 @@ export function LocalSnapshotDialog({ open, onOpenChange }: LocalSnapshotDialogP
     setStructureRestoringId(key);
     try {
       if (isCloudSnapshot(snapshot)) {
-        if (!user) throw new Error("请先登录后再恢复云端结构。");
-        await restoreStructureFromCloudWorkspaceSnapshot(user.id, snapshot.id);
+        if (!user) throw new Error("请先连接 Google Drive。");
+        await restoreStructureFromSnapshotEntry(snapshot);
+        await manualSync({ reloadView: false, throwOnError: true });
       } else {
         await restoreStructureFromLocalSnapshot(snapshot.id);
       }
@@ -189,7 +200,7 @@ export function LocalSnapshotDialog({ open, onOpenChange }: LocalSnapshotDialogP
   const localFallbackSnapshots = visibleLocalSnapshots;
 
   const renderSnapshotCard = (snapshot: SnapshotLike) => {
-    const assessment = isCloudSnapshot(snapshot) ? snapshot.assessment : assessLocalDataSnapshot(snapshot);
+    const assessment = assessLocalDataSnapshot(snapshot);
     const key = snapshotKey(snapshot);
     return (
       <div key={key} className="rounded-md border border-border bg-card p-3">
@@ -287,7 +298,7 @@ export function LocalSnapshotDialog({ open, onOpenChange }: LocalSnapshotDialogP
         <DialogHeader>
           <DialogTitle>{"版本回档"}</DialogTitle>
           <DialogDescription>
-            {"这里显示账号云端版本和本地兜底备份。手动保存跟随账号；系统自动保存每天云端仅保留最新一版。"}
+            {"这里显示 Google Drive 版本和本地兜底备份。手动保存跟随云盘账号；每个云端版本都按快照 ID 独立校验，绝不静默覆盖。"}
           </DialogDescription>
         </DialogHeader>
 
@@ -327,26 +338,26 @@ export function LocalSnapshotDialog({ open, onOpenChange }: LocalSnapshotDialogP
           ) : allSnapshots.length === 0 ? (
             <div className="rounded-md border border-border p-4 text-sm text-muted-foreground">
               {user
-                ? "还没有找到任何云端或本地版本。点顶部“保存”后，手动版本会写入云端账号。"
-                : "还没有找到本地历史版本。登录后，手动版本会保存到云端并跟随账号。"}
+                ? "还没有找到任何 Google Drive 或本地版本。点顶部“保存”后，手动版本会写入你的云盘。"
+                : "还没有找到本地历史版本。连接 Google Drive 后，手动版本会保存到云盘并跟随账号。"}
             </div>
           ) : (
             <>
               {renderSection(
-                "云端手动保存",
-                user ? "暂无手动版本" : "未登录",
+                "Google Drive 手动保存",
+                user ? "暂无手动版本" : "未连接",
                 cloudManualSnapshots,
                 user
                   ? "顶部“保存”会把当前完整工作区永久保存到这里。"
-                  : "登录后才能读取账号级手动版本。"
+                  : "连接 Google Drive 后才能读取账号级手动版本。"
               )}
               {renderSection(
-                "云端每日自动保存",
-                user ? "每天仅保留最新一版" : "未登录",
+                "Google Drive 自动安全版本",
+                user ? "暂无自动安全版本" : "未连接",
                 cloudSystemSnapshots,
                 user
-                  ? "系统会按天覆盖同一天的自动备份，避免一分钟一个版本。"
-                  : "登录后才能读取账号级自动备份。"
+                  ? "系统只上传通过结构与哈希校验的自动安全版本。"
+                  : "连接 Google Drive 后才能读取账号级自动备份。"
               )}
               {renderSection(
                 "本地兜底备份",

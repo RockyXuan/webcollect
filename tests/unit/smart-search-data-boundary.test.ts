@@ -158,12 +158,10 @@ describe("V1.3 derived-cache isolation", () => {
     expect(derivedCacheSources).not.toMatch(/\b(?:dirtyCardIds|dirtyCategoryIds|workspaceSnapshots|chromeStorage)\b/);
   });
 
-  it("fetches only public HTML through the existing SSRF-safe server path", () => {
-    expect(knowledgeFetchRouteSource).toMatch(/fetchRemoteText\(url,/);
-    expect(knowledgeFetchRouteSource).toMatch(/timeoutMs:\s*8_000/);
-    expect(knowledgeFetchRouteSource).toMatch(/maxBytes:\s*1_500_000/);
-    expect(knowledgeFetchRouteSource).toMatch(/allowedContentTypes:\s*\["text\/html",\s*"application\/xhtml\+xml"\]/);
-    expect(knowledgeFetchRouteSource).not.toMatch(/\b(?:cookie|credentials)\b/i);
+  it("keeps Web public-page parsing disabled until a Web Google OAuth client exists", () => {
+    expect(knowledgeFetchRouteSource).toMatch(/web-google-drive-auth-unavailable/);
+    expect(knowledgeFetchRouteSource).toMatch(/status:\s*503/);
+    expect(knowledgeFetchRouteSource).not.toMatch(/fetchRemoteText|supabase|cookie|credentials/i);
   });
 
   it("keeps the released search path local and leaves the semantic client dormant", () => {
