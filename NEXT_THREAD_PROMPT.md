@@ -1,23 +1,23 @@
 # WebCollect 下一大型功能线程提示词
 
-## 2026-07-21 V1.4.0 发布候选状态
+## 2026-07-21 V1.4.0 正式发布状态
 
-- 目标版本：`V1.4.0 / 2026年7月21日`；tag `webcollect-2026-07-21-v1.4.0`；资产 `WebCollect-Chrome-Extension-v1.4.0-2026-07-21.zip`。
-- 最新 closeout：`docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md`。在 GitHub Release 完成前，V1.3.1 仍是已发布稳定版。
+- 当前稳定版：`V1.4.0 / 2026年7月21日`；tag `webcollect-2026-07-21-v1.4.0`；资产 `WebCollect-Chrome-Extension-v1.4.0-2026-07-21.zip`。
+- 最新 closeout：`docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md`。main CI、Release workflow、官方 zip 审计和真实 Chrome 只读验收均已完成。
 - Google Drive `appDataFolder` 已成为正式同步路径，只申请 `drive.appdata`；本地 IndexedDB 永远先写，无账号/离线继续可用。
 - Rocky 真实数据已经完成迁移、逐文件回读、手动同步、重启和完整 JSON 复核；旧 Supabase 数据保持不动 30 天。
 - 正式运行时不含 Supabase 依赖或请求；历史代码/SQL/会话 key 只作回退档案，不得破坏性清理。
-- 继续任务时先完成 closeout 中尚未勾选的 Playwright、审计、main CI、tag/Release、官方 zip 和真实 Chrome 只读验收，不要重新迁移或让用户重复授权。
+- 迁移和发布清单已经闭合；后续任务不要重新迁移、不要让用户重复授权，也不要清理 30 天保险期内的旧 Supabase 数据。
 
 这是一个新的 Codex 线程。请在固定工作区 `/Users/rockyx/vibe coding/Web Collect 0628` 接手 `RockyXuan/webcollect`，并在我随后描述需求后实现一个新的大型功能。
 
 ## 先确认当前基线
 
-- 当前已发布稳定版：`V1.3.1 / 2026年7月19日`；tag `webcollect-2026-07-19-v1.3.1`；正式资产 `WebCollect-Chrome-Extension-v1.3.1-2026-07-19.zip`。
-- V1.3.1 closeout：`docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`。应用提交 `1ef16416f58e1ab81caa1e0dd714f9fe9e3fa126`，main CI `29685287664` 与 Release workflow `29685512533` 均成功；官方 zip 审计与现有已登录主 Chrome Profile 最终只读验收已经完成。
-- 正式 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-19-v1.3.1`；zip 直链：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-19-v1.3.1/WebCollect-Chrome-Extension-v1.3.1-2026-07-19.zip`。
+- 当前已发布稳定版：`V1.4.0 / 2026年7月21日`；tag `webcollect-2026-07-21-v1.4.0`；正式资产 `WebCollect-Chrome-Extension-v1.4.0-2026-07-21.zip`。
+- V1.4.0 closeout：`docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md`。应用提交 `c09859986439fef83b4c2cda2131b22f91f5481e`，main CI `29821265795` 与 Release workflow `29821729530` 均成功；官方 zip 审计与现有已登录主 Chrome Profile 最终只读验收已经完成。
+- 正式 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-21-v1.4.0`；zip 直链：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-21-v1.4.0/WebCollect-Chrome-Extension-v1.4.0-2026-07-21.zip`。
 - V1.3.0 保留 Google / 百度 / Bing，新增纯本地模糊检索、拼音、错字容错、意图别名、加权全文排序和 opt-in 公开网页知识缓存；不调用 AI API，也不捆绑本地模型。348 unit、31 legacy、44 E2E、Web/扩展构建、17.4 MiB 门禁和 208 个生产依赖零漏洞审计已完成。
-- V1.3.1 只统一紧凑顶栏视觉，不新增存储 key，也不改变搜索、收藏、同步、快照、权限或数据。
+- V1.4.0 将正式云同步切换为用户自己的 Google Drive 隐藏应用目录，并增加完整 JSON 备份/恢复；本地 IndexedDB 仍是第一写入目标，V1.3.1 顶栏与 V1.3.0 本地搜索行为保持不变。
 
 ## 第一件事
 
@@ -43,7 +43,7 @@ pwd
 git status -sb
 git log --oneline --decorate -8
 git remote -v
-git tag --list 'webcollect-2026-07-19-v1.3.1' --points-at HEAD
+git tag --list 'webcollect-2026-07-21-v1.4.0' --points-at HEAD
 ```
 
 不要使用旧目录 `/Users/rockyx/Documents/webcollect`，也不要从旧分支、旧 RC 或旧交接目标继续开发。

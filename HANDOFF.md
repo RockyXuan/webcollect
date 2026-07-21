@@ -2,21 +2,21 @@
 
 > **2026-07-15 current workflow rule:** this repository has retired Superpowers (including `superpowers:*` / `using-superpowers`), `goal-zzx` / `zzx-goal`, and `andrej-karpathy-coding`. Do not install, enable, invoke, or imitate them. Any older instruction below that requires `tasks/todo.md`, `tasks/lessons.md`, `CODEX_GO_MODE_STATUS.md`, fixed phase counts, strict TDD, worktrees, subagents, or duplicate reviews is historical and superseded by `AGENTS.md`.
 
-## 2026-07-21 V1.4.0 Google Drive Migration Release Candidate
+## 2026-07-21 V1.4.0 Google Drive Migration Release
 
-This section supersedes the development state below. V1.3.1 remains the latest published stable version until the V1.4.0 GitHub Release is verified.
+This section supersedes the development state below. V1.4.0 is the current published stable application version.
 
-- Target version/date: `V1.4.0 / 2026年7月21日`; tag `webcollect-2026-07-21-v1.4.0`; asset `WebCollect-Chrome-Extension-v1.4.0-2026-07-21.zip`.
+- Published version/date: `V1.4.0 / 2026年7月21日`; tag `webcollect-2026-07-21-v1.4.0`; asset `WebCollect-Chrome-Extension-v1.4.0-2026-07-21.zip`.
 - Closeout: `docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md`.
 - Formal cloud sync is local-first Google Drive `appDataFolder`, opt-in, and limited to `drive.appdata`. The Web build stays local-only until a future Web OAuth client exists.
 - Complete JSON export/preview/restore covers workspace, recycle bin, warehouse, wallpaper, mindmap state, local/Drive history, capture settings/queue, revisions, and tombstones while excluding credentials, tokens, device identity, dirty sets, temporary state, and derived knowledge text.
 - Supabase is absent from the production dependency/runtime path. Old remote data and legacy local keys remain untouched for 30 days and require a new explicit authorization before any later cleanup.
 - Rocky's existing primary Chrome profile completed OAuth, idempotent migration, file-by-file schema/hash readback, manual Drive sync, new-tab restart, and a post-migration complete backup. Verified live counts were 7 sections, 135 categories/groups, 372 cards, 15 recycle entries, and 69 Drive snapshots.
-- Local gates currently passed: zero-warning type/lint, 395 Vitest, 31 legacy scripts, Web/extension builds, artifact/runtime scan, and 17.2 MiB size gate. Playwright, audit, GitHub CI/Release, official asset audit, and final read-only Chrome verification remain on the closeout checklist.
+- Full gates passed: zero-warning type/lint, 395 Vitest, 31 legacy scripts, 44 Playwright tests, Web/extension builds, artifact/runtime scan, 17.2 MiB size gate, and a 200-package production audit with zero findings. Application commit `c09859986439fef83b4c2cda2131b22f91f5481e`, main CI `29821265795`, and Release workflow `29821729530` passed. The official zip is `17,056,463` bytes with SHA-256 `bba2c2e537321b38567db3b71aaa8e5c724dde766e3b2089ebdf27749bb859ef`; it exactly matches the verified local build. The final primary-Chrome read-only check passed.
 
 ## 2026-07-19 V1.3.1 Header UI Release
 
-This section supersedes the V1.3.0 development status. V1.3.1 is the current published stable application version.
+This section records the previous V1.3.1 published release and its UI contract.
 
 - Target version/date: `V1.3.1 / 2026年7月19日`; tag `webcollect-2026-07-19-v1.3.1`; asset `WebCollect-Chrome-Extension-v1.3.1-2026-07-19.zip`.
 - Closeout: `docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`.
@@ -109,10 +109,10 @@ This section supersedes older development status. The user explicitly waived the
 
 ## Next Major Feature Thread
 
-- V1.3.1 is fully published and its checklist is closed. Start the next large feature in a new thread after reading the current closeout and handoff.
-- Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, and the V1.3.1 closeout before changing code.
+- V1.4.0 is fully published and its checklist is closed. Start the next large feature in a new thread after reading the current closeout and handoff.
+- Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, and the V1.4.0 closeout before changing code.
 - Ask for or read the user's new feature description, then inspect only the relevant implementation paths before choosing scope, tests, version bump, and release plan.
-- Preserve the V1.3.0 data and sync guarantees. Do not reset IndexedDB, Supabase, extension storage, categories, cards, preferences, snapshots, local view state, mode preference, knowledge consent/cache, derived vectors, or the two documented empty inbox artifacts.
+- Preserve the V1.4.0 local-first Drive, backup, data, and migration guarantees. Do not reset IndexedDB, old Supabase data, extension storage, categories, cards, preferences, snapshots, local view state, mode preference, knowledge consent/cache, derived vectors, or the two documented empty inbox artifacts.
 - Decide the next version only after understanding the feature's actual breadth. Use the real completion date and keep package, manifest, UI version, tag, Release, and zip identity aligned.
 - The copy-paste startup prompt is maintained in `NEXT_THREAD_PROMPT.md`. Older sections below are historical evidence only.
 

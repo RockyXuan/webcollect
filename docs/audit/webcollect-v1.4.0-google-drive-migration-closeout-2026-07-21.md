@@ -8,7 +8,7 @@ Release: `https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-0
 
 Asset: `https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-21-v1.4.0/WebCollect-Chrome-Extension-v1.4.0-2026-07-21.zip`
 
-Publication status: local implementation, real-account migration, and release-candidate verification are complete. Main CI, tag workflow, official-zip audit, and the final evidence-only commit are recorded below after they finish.
+Publication status: complete. The application release commit, main CI, tag workflow, official zip, real-account migration, and primary-Chrome read-only verification all passed. The follow-up closeout commit changes documentation only and is not a new application version.
 
 ## Product contract
 
@@ -50,13 +50,16 @@ Publication status: local implementation, real-account migration, and release-ca
 - Vitest: 52 files / 395 tests passed.
 - Legacy regression scripts: 31/31 passed.
 - Web and Chrome-extension production builds passed.
-- Extension background/mindmap artifact checks and the package-size gate passed; the unpacked release candidate is 17.2 MiB.
+- Extension background/mindmap artifact checks and the package-size gate passed; the unpacked release build is 17.2 MiB.
 - Auth/build contracts confirm the stable extension key, the allowlisted extension identity, a public OAuth client ID with no client secret, the sole `drive.appdata` scope, no Supabase production dependency, and no retired Supabase endpoint/key signature in the extension main bundle.
 - The protected seed SHA remains `0e48761b595d8303dd71c4f7a8d216424301abdec2d87b2e13533c82c58c2621`.
 - Playwright: 44/44 passed, including responsive, search, wallpaper, classic/mindmap, mutation-isolation, dialog, favicon, accessibility, keyboard, and 300+ node virtualization cases.
 - Production dependency audit covered 200 packages with zero info, low, moderate, high, or critical findings.
-- Final primary-Chrome RC check reused the existing `☁️ WebCollect Drive 迁移` task group and the existing signed-in profile. The installed source was backed up append-only, updated in place without deletion, and reloaded. Chrome displayed WebCollect `1.4.0`; a fresh `chrome://newtab` retained all seven sections, the existing wall and bookmark bar, recycle count `15`, the connected account, and `Google Drive · 已同步`. The “数据与完整备份” dialog opened with both export and validated-import entries. No business-data edit or destructive storage action was performed.
-- Main CI, tag/Release workflow, and official zip results are appended after completion.
+- Final primary-Chrome release check reused the existing `☁️ WebCollect Drive 迁移` task group and the existing signed-in profile. The installed source was backed up append-only, updated in place without deletion, and reloaded. Chrome displayed WebCollect `1.4.0`; a fresh `chrome://newtab` retained all seven sections, the existing wall and bookmark bar, recycle count `15`, the connected account, and `Google Drive · 已同步`. The “数据与完整备份” dialog opened with both export and validated-import entries. No business-data edit or destructive storage action was performed.
+- The tagged application commit is `c09859986439fef83b4c2cda2131b22f91f5481e`. Main CI run `29821265795` passed both production audit and verification jobs; its browser regression step passed all 44 tests.
+- Tag/Release workflow run `29821729530` passed the production audit, auth contract, extension build, artifact, size, packaging, and publication checks. The Release is public, non-draft, non-prerelease, and contains exactly one asset.
+- The official zip is `17,056,463` bytes with SHA-256 `bba2c2e537321b38567db3b71aaa8e5c724dde766e3b2089ebdf27749bb859ef`. Its archive has 46 unique entries and 41 actual files; decompression passed with no errors.
+- The downloaded manifest reports WebCollect `1.4.0`, resolves to the stable extension ID `immpcmhmabobllnopedaoflcjneigbko`, requests only `drive.appdata`, and contains no client secret. The package has no Supabase runtime endpoint/client, OpenAI/DeepSeek endpoint, or embedded secret signature. Its complete file tree and every file hash exactly match the locally verified release build.
 
 ## Publication checklist
 
@@ -64,8 +67,8 @@ Publication status: local implementation, real-account migration, and release-ca
 - [x] Complete real Google Drive OAuth, migration, per-file readback, manual sync, restart, and portable-backup evidence.
 - [x] Remove Supabase from the formal runtime and pass local type, lint, unit, legacy, Web, extension, artifact, and size gates.
 - [x] Pass full Playwright and production dependency audit on the V1.4.0 release commit.
-- [ ] Push the V1.4.0 application commit to `main` and wait for main CI.
-- [ ] Push `webcollect-2026-07-21-v1.4.0` and wait for the Release workflow.
-- [ ] Download and audit the single official asset, including manifest, stable key, OAuth scope, tree uniqueness, size, and SHA-256.
+- [x] Push the V1.4.0 application commit to `main` and wait for main CI.
+- [x] Push `webcollect-2026-07-21-v1.4.0` and wait for the Release workflow.
+- [x] Download and audit the single official asset, including manifest, stable key, OAuth scope, tree uniqueness, size, and SHA-256.
 - [x] Reload the final package in place and finish a read-only primary-Chrome smoke check.
-- [ ] Append real publication evidence in a documentation-only commit; it is not a new application version.
+- [x] Append real publication evidence in a documentation-only commit; it is not a new application version.
