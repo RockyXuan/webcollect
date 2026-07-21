@@ -67,6 +67,32 @@ assert.match(
   /window\.addEventListener\("pointerup",\s*finishPanelDrag,\s*true\)/,
   "floating capture panel drag should recover when pointerup happens outside the panel header"
 );
+const keyboardIsolationHandler = contentScript.match(
+  /const isolateFloatingCaptureKeyboardEvent = \(event: KeyboardEvent\) => \{([\s\S]*?)\n  \};/
+);
+assert.ok(keyboardIsolationHandler, "floating capture should isolate keyboard events from the host page");
+assert.match(
+  keyboardIsolationHandler[1],
+  /event\.composedPath\(\)\.includes\(host\)/,
+  "keyboard isolation should identify events through the open Shadow DOM composed path"
+);
+assert.match(
+  keyboardIsolationHandler[1],
+  /event\.stopImmediatePropagation\(\)/,
+  "floating capture keyboard events should stop before host-page shortcuts"
+);
+assert.doesNotMatch(
+  keyboardIsolationHandler[1],
+  /preventDefault/,
+  "keyboard isolation must preserve browser-default typing, IME, tab, and modifier behavior"
+);
+for (const eventType of ["keydown", "keypress", "keyup"]) {
+  assert.match(
+    contentScript,
+    new RegExp(`isolatedKeyboardEventTypes = \\[.*?"${eventType}"`, "s"),
+    `floating capture should isolate ${eventType}`
+  );
+}
 assert.match(
   contentScript,
   /applyPanelPosition\(\);\s*savePanelPosition\(\);/,

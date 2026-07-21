@@ -80,5 +80,8 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Verify floating capture keyboard isolation
+        run: xvfb-run --auto-servernum pnpm test:extension-peek
+
       - name: Run browser regression tests
         run: pnpm test:e2e

@@ -183,6 +183,15 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
   const shadow = host.attachShadow({ mode: "open" });
   document.documentElement.appendChild(host);
 
+  const isolatedKeyboardEventTypes = ["keydown", "keypress", "keyup"] as const;
+  const isolateFloatingCaptureKeyboardEvent = (event: KeyboardEvent) => {
+    if (!event.composedPath().includes(host)) return;
+    event.stopImmediatePropagation();
+  };
+  for (const eventType of isolatedKeyboardEventTypes) {
+    window.addEventListener(eventType, isolateFloatingCaptureKeyboardEvent, true);
+  }
+
   shadow.innerHTML = `
     <style>
       :host { color-scheme: light; }

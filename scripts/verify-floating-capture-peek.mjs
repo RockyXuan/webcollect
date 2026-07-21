@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
+import nodeAssert from "node:assert/strict";
 import { chromium } from "@playwright/test";
 
 const projectRoot = resolve(import.meta.dirname, "..");
@@ -20,6 +21,28 @@ const server = createServer((_request, response) => {
           <h1>WebCollect 浮窗验收页</h1>
           <p>验证收起时半脸偷看，悬停后完整展示。</p>
         </main>
+        <script>
+          window.__webcollectHostKeyboardEvents = [];
+          window.__resetWebCollectHostKeyboardEvents = () => {
+            window.__webcollectHostKeyboardEvents.length = 0;
+            document.documentElement.removeAttribute("data-host-shortcut-open");
+          };
+          const recordHostKeyboardEvent = (event) => {
+            window.__webcollectHostKeyboardEvents.push({
+              type: event.type,
+              key: event.key,
+              phase: event.eventPhase,
+              target: event.target instanceof Element ? event.target.tagName : "unknown",
+            });
+            if (String(event.key || "").toLowerCase() === "s") {
+              document.documentElement.setAttribute("data-host-shortcut-open", "true");
+            }
+          };
+          for (const type of ["keydown", "keypress", "keyup"]) {
+            document.addEventListener(type, recordHostKeyboardEvent, true);
+            document.addEventListener(type, recordHostKeyboardEvent, false);
+          }
+        </script>
       </body>
     </html>`);
 });
@@ -95,6 +118,131 @@ function assertRestingPeek(label, state) {
   assert(state.pillOpacity <= 0.05, `${label}: full pill should be hidden at rest`);
 }
 
+async function readHostKeyboardState(page) {
+  return page.evaluate(() => ({
+    events: Array.isArray(window.__webcollectHostKeyboardEvents)
+      ? [...window.__webcollectHostKeyboardEvents]
+      : [],
+    shortcutOpen: document.documentElement.getAttribute("data-host-shortcut-open") === "true",
+  }));
+}
+
+async function resetHostKeyboardState(page) {
+  await page.evaluate(() => window.__resetWebCollectHostKeyboardEvents?.());
+}
+
+async function verifyKeyboardIsolation(page) {
+  const host = page.locator("#webcollect-floating-capture-host");
+  const titleInput = host.locator('[data-field="title"]');
+  const urlInput = host.locator('[data-field="url"]');
+  const descriptionInput = host.locator('[data-field="description"]');
+  const sectionSelect = host.locator('[data-field="section"]');
+  const sectionCreateInput = host.locator('[data-create-field="section"]');
+  const closeButton = host.locator('.wc-icon-button[data-action="close"]');
+
+  await resetHostKeyboardState(page);
+  await titleInput.fill("归藏");
+  await titleInput.click();
+  await page.keyboard.type("sS");
+  nodeAssert.equal(await titleInput.inputValue(), "归藏sS", "lowercase and uppercase typing should stay in the title field");
+  nodeAssert.deepEqual(await readHostKeyboardState(page), { events: [], shortcutOpen: false }, "title typing must not reach the host page");
+
+  await resetHostKeyboardState(page);
+  await urlInput.fill("https://example.com/");
+  await urlInput.click();
+  await page.keyboard.type("s");
+  nodeAssert.equal(await urlInput.inputValue(), "https://example.com/s", "URL typing should remain functional");
+  nodeAssert.deepEqual(await readHostKeyboardState(page), { events: [], shortcutOpen: false }, "URL typing must not reach the host page");
+
+  await resetHostKeyboardState(page);
+  await descriptionInput.fill("简介");
+  await descriptionInput.click();
+  await page.keyboard.type("s");
+  nodeAssert.equal(await descriptionInput.inputValue(), "简介s", "description typing should remain functional");
+  nodeAssert.deepEqual(await readHostKeyboardState(page), { events: [], shortcutOpen: false }, "description typing must not reach the host page");
+
+  await sectionSelect.selectOption("__webcollect_create_section__");
+  await resetHostKeyboardState(page);
+  await sectionCreateInput.fill("新分项");
+  await sectionCreateInput.click();
+  await page.keyboard.type("s");
+  nodeAssert.equal(await sectionCreateInput.inputValue(), "新分项s", "create-name typing should remain functional");
+  nodeAssert.deepEqual(await readHostKeyboardState(page), { events: [], shortcutOpen: false }, "create-name typing must not reach the host page");
+
+  await resetHostKeyboardState(page);
+  const compositionResult = await titleInput.evaluate((input) => {
+    input.focus();
+    const start = new CompositionEvent("compositionstart", { bubbles: true, composed: true, data: "" });
+    input.dispatchEvent(start);
+    const down = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      code: "KeyS",
+      composed: true,
+      isComposing: true,
+      key: "s",
+    });
+    const notCanceled = input.dispatchEvent(down);
+    input.value = `${input.value}搜索`;
+    input.dispatchEvent(new InputEvent("input", {
+      bubbles: true,
+      composed: true,
+      data: "搜索",
+      inputType: "insertCompositionText",
+    }));
+    input.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, composed: true, data: "搜索" }));
+    input.dispatchEvent(new KeyboardEvent("keyup", {
+      bubbles: true,
+      cancelable: true,
+      code: "KeyS",
+      composed: true,
+      isComposing: false,
+      key: "s",
+    }));
+    return { notCanceled, value: input.value };
+  });
+  nodeAssert.equal(compositionResult.notCanceled, true, "IME key events must not be prevented");
+  nodeAssert.match(compositionResult.value, /搜索$/, "IME composition text should remain in the field");
+  nodeAssert.deepEqual(await readHostKeyboardState(page), { events: [], shortcutOpen: false }, "IME key events must not reach the host page");
+
+  await resetHostKeyboardState(page);
+  await titleInput.fill("copy-source");
+  await titleInput.click();
+  const modifier = process.platform === "darwin" ? "Meta" : "Control";
+  await page.keyboard.press(`${modifier}+A`);
+  await page.keyboard.press(`${modifier}+C`);
+  await titleInput.fill("");
+  await titleInput.click();
+  await page.keyboard.press(`${modifier}+V`);
+  nodeAssert.equal(await titleInput.inputValue(), "copy-source", "copy and paste should retain browser-default behavior");
+  nodeAssert.deepEqual(await readHostKeyboardState(page), { events: [], shortcutOpen: false }, "modifier shortcuts must not reach the host page");
+
+  await resetHostKeyboardState(page);
+  await titleInput.click();
+  await page.keyboard.press("Tab");
+  const activeField = await page.evaluate(() => {
+    const host = document.querySelector("#webcollect-floating-capture-host");
+    return host?.shadowRoot?.activeElement?.getAttribute("data-field") || null;
+  });
+  nodeAssert.equal(activeField, "url", "Tab should continue moving focus inside the floating panel");
+  nodeAssert.deepEqual(await readHostKeyboardState(page), { events: [], shortcutOpen: false }, "Tab must not reach the host page");
+
+  await closeButton.click();
+  await resetHostKeyboardState(page);
+  await page.locator("h1").click();
+  await page.keyboard.press("s");
+  const outsideState = await readHostKeyboardState(page);
+  nodeAssert.equal(outsideState.shortcutOpen, true, "host-page shortcuts should still work outside WebCollect");
+  nodeAssert.ok(outsideState.events.length > 0, "outside key events should still reach the host page");
+
+  return {
+    titleValue: compositionResult.value,
+    copyPasteValue: await titleInput.inputValue(),
+    activeFieldAfterTab: activeField,
+    outsideHostEventCount: outsideState.events.length,
+  };
+}
+
 const context = await chromium.launchPersistentContext(profileDir, {
   channel: "chromium",
   headless: false,
@@ -127,7 +275,8 @@ try {
   assertRestingPeek("right dock", rightRest);
   await page.screenshot({ path: restScreenshot, fullPage: false });
 
-  await page.mouse.move(rightRest.viewport.width - 8, (rightRest.button.top + rightRest.button.bottom) / 2);
+  const floatingButton = page.locator("#webcollect-floating-capture-host").locator(".wc-button");
+  await floatingButton.hover();
   await page.waitForTimeout(320);
   const hover = await readFloatingState(page);
   assert(hover, "Hover state is missing");
@@ -137,10 +286,11 @@ try {
   assert(hover.pillOpacity >= 0.95, "Hover should reveal the full WebCollect pill");
   await page.screenshot({ path: hoverScreenshot, fullPage: false });
 
-  await page.mouse.click(hover.viewport.width - 24, (hover.button.top + hover.button.bottom) / 2);
+  await floatingButton.click();
   await page.waitForTimeout(120);
   const clicked = await readFloatingState(page);
   assert(clicked?.panelOpen, "Clicking the revealed mascot should still open the capture panel");
+  const keyboardIsolation = await verifyKeyboardIsolation(page);
 
   await page.evaluate(() => {
     localStorage.setItem("webcollect.capture.dock", JSON.stringify({ side: "left", topRatio: 0.55 }));
@@ -160,6 +310,7 @@ try {
     rightRest,
     hover,
     clicked: { panelOpen: clicked.panelOpen },
+    keyboardIsolation,
     leftRest,
     consoleErrors,
     screenshots: [restScreenshot, hoverScreenshot],
