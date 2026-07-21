@@ -80,12 +80,12 @@ jobs:
           notes=(
             "WebCollect Chrome extension ${VERSION_LABEL}."
             ""
+            "- Prevents keyboard events typed inside the WebCollect floating capture panel from triggering host-page shortcuts such as GitHub search."
+            "- Preserves Chinese IME input, uppercase/lowercase typing, Tab navigation, copy/paste, and ordinary page shortcuts outside the panel."
             "- Stores optional cloud sync data in each user's own Google Drive appDataFolder with the minimal drive.appdata scope."
             "- Keeps IndexedDB local-first and fully usable when Drive is disconnected, unavailable, or unsupported."
-            "- Adds readable complete JSON export, validation, preview, safety snapshot, and confirmed restore."
-            "- Preserves multi-device revisions, tombstones, snapshots, hierarchy protection, and the stable extension identity."
-            "- Removes Supabase from the formal production runtime while retaining old remote data untouched for the 30-day safety period."
-            "- Verified by unit, legacy, Playwright, Web build, extension artifact, size, data-isolation, OAuth, migration, and production dependency checks."
+            "- Changes no storage key, permission, collection action, Drive contract, IndexedDB schema, snapshot, seed, or extension identity."
+            "- Verified by unit, legacy, Playwright, real-extension keyboard, Web build, extension artifact, size, data-isolation, and production dependency checks."
           )
           printf '%s\n' "${notes[@]}" > release-notes.md
 

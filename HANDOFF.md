@@ -2,6 +2,17 @@
 
 > **2026-07-15 current workflow rule:** this repository has retired Superpowers (including `superpowers:*` / `using-superpowers`), `goal-zzx` / `zzx-goal`, and `andrej-karpathy-coding`. Do not install, enable, invoke, or imitate them. Any older instruction below that requires `tasks/todo.md`, `tasks/lessons.md`, `CODEX_GO_MODE_STATUS.md`, fixed phase counts, strict TDD, worktrees, subagents, or duplicate reviews is historical and superseded by `AGENTS.md`.
 
+## 2026-07-21 V1.4.1 Floating Capture Keyboard Fix
+
+This section supersedes the development state below. V1.4.1 is the current application version; V1.4.0 remains the cloud/data contract baseline.
+
+- Version/date: `V1.4.1 / 2026年7月21日`; target tag `webcollect-2026-07-21-v1.4.1`; asset `WebCollect-Chrome-Extension-v1.4.1-2026-07-21.zip`.
+- Closeout: `docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md`.
+- Keyboard events from the floating capture Shadow DOM are stopped before host-page shortcut listeners. GitHub-style `s` search no longer opens while typing in WebCollect.
+- The guard does not prevent browser defaults: lowercase/uppercase input, Chinese IME, Tab, copy/paste, and focus movement remain functional; shortcuts outside the panel continue to reach the page.
+- No storage key, permission, dependency, schema, collection action, Drive contract, snapshot, Chrome storage, Supabase archive, extension identity, or seed changed.
+- Local gates passed: TypeScript, lint, 395 Vitest, 31 legacy scripts, 44 Playwright, Web/extension builds, artifact/size checks, real-extension keyboard verification, and a 200-package zero-finding production audit.
+
 ## 2026-07-21 V1.4.0 Google Drive Migration Release
 
 This section supersedes the development state below. V1.4.0 is the current published stable application version.

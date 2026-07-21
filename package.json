@@ -1,6 +1,6 @@
 {
   "name": "webcollect",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "private": true,
   "scripts": {
     "audit:prod": "node scripts/audit-production.mjs",

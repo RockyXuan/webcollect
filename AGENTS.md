@@ -1,6 +1,10 @@
 # WebCollect — 个人网页收藏墙
 
-## 2026-07-21 current V1.4.0 Google Drive migration release entry
+## 2026-07-21 current V1.4.1 floating-capture keyboard release entry
+
+Read `AGD.md` and `docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md` first. V1.4.1 prevents keyboard events originating inside the open Shadow DOM floating-capture panel from reaching host-page shortcuts. It preserves lowercase/uppercase typing, Chinese IME composition, Tab navigation, copy/paste, and normal page shortcuts outside WebCollect. It adds no storage key, permission, dependency, data migration, collection write, Drive change, snapshot change, or seed change. V1.4.0 remains the data/sync baseline.
+
+## 2026-07-21 previous V1.4.0 Google Drive migration release entry
 
 Read `AGD.md` and `docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md` first. V1.4.0 replaces the formal Supabase runtime with optional local-first Google Drive synchronization in each user's private `appDataFolder`, requesting only `drive.appdata`. It adds complete readable JSON export/preview/confirmed restore, preserves revisions, tombstones, hierarchy guards, snapshots, the stable extension identity, and the V1.3.1 UI/search behavior. Rocky's real workspace migration, per-file readback, post-migration backup, main CI, Release workflow, official-zip audit, and signed-in primary-Chrome read-only check all passed. Old Supabase data remains untouched for the 30-day safety period. The published tag is `webcollect-2026-07-21-v1.4.0` and the official asset is `WebCollect-Chrome-Extension-v1.4.0-2026-07-21.zip`.
 

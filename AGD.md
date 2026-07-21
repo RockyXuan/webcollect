@@ -5,9 +5,17 @@
 当前主目录：`/Users/rockyx/vibe coding/Web Collect 0628`
 远端仓库：`https://github.com/RockyXuan/webcollect`
 主分支：`main`
-当前已发布稳定身份：`V1.4.0 / 2026年7月21日`；tag `webcollect-2026-07-21-v1.4.0`；正式 zip `WebCollect-Chrome-Extension-v1.4.0-2026-07-21.zip`。
-V1.4.0 closeout：`docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md`。应用提交 `c09859986439fef83b4c2cda2131b22f91f5481e`，main CI `29821265795` 与 Release workflow `29821729530` 均成功；官方 zip 下载审计和现有已登录主 Chrome profile 最终只读验收已经完成。
+当前应用身份：`V1.4.1 / 2026年7月21日`；目标 tag `webcollect-2026-07-21-v1.4.1`；目标 zip `WebCollect-Chrome-Extension-v1.4.1-2026-07-21.zip`。
+V1.4.1 closeout：`docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md`。它只修复网页浮窗键盘事件穿透；正式发布证据将在 main CI、Release workflow、官方 zip 和真实 Chrome 验收完成后追加。
 V1.3.0 的本地智能搜索、导图、同步和数据边界继续完整保留。
+
+## 2026-07-21 V1.4.1 浮窗快捷键修复入口
+
+- 浮窗 Shadow DOM 内的 `keydown`、`keypress`、`keyup` 不再传播到宿主网页，因此输入 `s` / `S` 不会触发 GitHub 搜索。
+- 不调用 `preventDefault()`；中英文、IME、Tab、复制粘贴和其他输入默认行为保持正常，浮窗外网页快捷键不受影响。
+- 不新增存储 key、权限或依赖，不修改收藏、分类、分项、偏好、回收站、快照、Drive、旧 Supabase、Chrome storage 或 seed。
+- 专项真实扩展测试已覆盖宿主页面捕获/冒泡监听、大小写、IME、多个输入框、复制粘贴、Tab、浮窗外快捷键与控制台零错误。
+- 实施与发布证据：`docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md`。
 
 ## 2026-07-21 V1.4.0 Google Drive 迁移正式发布入口
 
