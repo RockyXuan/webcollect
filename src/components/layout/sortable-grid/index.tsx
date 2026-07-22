@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   DndContext,
   DragEndEvent,
+  DragMoveEvent,
   DragOverEvent,
   DragOverlay,
   DragStartEvent,
@@ -18,6 +19,8 @@ import { Pencil, PencilOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { CategorySearchTarget } from "@/lib/category-search-target";
 import { useAppStore } from "@/lib/store";
+import { requestCreateTabPackFromCard } from "@/lib/tab-pack-events";
+import { useTabPackStore } from "@/lib/tab-pack-store";
 import type { Category, WebCard } from "@/lib/types";
 import { SortableCategoryBlock } from "./category-block";
 import {
@@ -78,6 +81,7 @@ export function SortableGrid({
   const [lockedHint, setLockedHint] = useState<LockedLayoutHint | null>(null);
   const lockedHintTimerRef = useRef<number | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
+  const tabPackDropTargetRef = useRef<HTMLElement | null>(null);
   const searchFrameRef = useRef<number | null>(null);
   const searchHighlightTimerRef = useRef<number | null>(null);
   const highlightedSearchTargetRef = useRef<HTMLElement | null>(null);
@@ -240,7 +244,41 @@ export function SortableGrid({
   );
 
   const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(String(event.active.id));
+    const id = String(event.active.id);
+    setActiveId(id);
+    if (id.startsWith("card:")) document.documentElement.classList.add("wc-card-dragging-to-pack");
+  };
+
+  const clearTabPackDropTarget = () => {
+    tabPackDropTargetRef.current?.removeAttribute("data-drag-over");
+    tabPackDropTargetRef.current = null;
+    document.documentElement.classList.remove("wc-card-dragging-to-pack");
+  };
+
+  useEffect(() => () => {
+    tabPackDropTargetRef.current?.removeAttribute("data-drag-over");
+    document.documentElement.classList.remove("wc-card-dragging-to-pack");
+  }, []);
+
+  const findTabPackDropTarget = (event: Pick<DragMoveEvent, "active">): HTMLElement | null => {
+    if (!String(event.active.id).startsWith("card:")) return null;
+    const rect = event.active.rect.current.translated;
+    if (!rect) return null;
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    for (const element of document.elementsFromPoint(x, y)) {
+      const target = element.closest<HTMLElement>("[data-tab-pack-drop-id]");
+      if (target) return target;
+    }
+    return null;
+  };
+
+  const handleDragMove = (event: DragMoveEvent) => {
+    const target = findTabPackDropTarget(event);
+    if (target === tabPackDropTargetRef.current) return;
+    tabPackDropTargetRef.current?.removeAttribute("data-drag-over");
+    tabPackDropTargetRef.current = target;
+    target?.setAttribute("data-drag-over", "true");
   };
 
   const getContainingParentId = useCallback(
@@ -332,8 +370,17 @@ export function SortableGrid({
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
+    const tabPackTarget = findTabPackDropTarget(event);
     setActiveId(null);
     setHoveredParentId(null);
+    clearTabPackDropTarget();
+    if (tabPackTarget) {
+      const card = cards.find((item) => item.id === String(active.id).replace("card:", ""));
+      const packId = tabPackTarget.dataset.tabPackDropId;
+      if (card && packId === "__new__") requestCreateTabPackFromCard(card);
+      else if (card && packId) await useTabPackStore.getState().addCard(packId, card);
+      return;
+    }
     if (!over || active.id === over.id) return;
 
     const aid = String(active.id);
@@ -455,6 +502,7 @@ export function SortableGrid({
   const handleDragCancel = () => {
     setActiveId(null);
     setHoveredParentId(null);
+    clearTabPackDropTarget();
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
@@ -481,6 +529,7 @@ export function SortableGrid({
       collisionDetection={collisionDetection}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
+      onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >

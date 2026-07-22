@@ -17,9 +17,11 @@ import {
   getPinnedCategoryIds,
   getRecycleBin,
   getSearchEngine,
+  getSavedTabPacks,
   getSections,
   getSyncPreferenceRevisions,
   getSyncTombstones,
+  getTabPackOpenMode,
   getVisualScale,
   getWorkspaceResetAt,
   saveActiveSectionId,
@@ -34,9 +36,11 @@ import {
   savePinnedCategoryIds,
   saveRecycleBin,
   saveSearchEngine,
+  saveSavedTabPacks,
   saveSections,
   saveSyncPreferenceRevisions,
   saveSyncTombstones,
+  saveTabPackOpenMode,
   saveVisualScale,
   saveWorkspaceResetAt,
   withoutLocalChangeEvents,
@@ -68,6 +72,7 @@ import {
 import { getWallpaperPrefs, saveSyncedWallpaperPrefs, toWallpaperSyncedSettings } from "@/lib/wallpaper-db";
 import { withStorageLock } from "@/lib/storage-lock";
 import { isPortableBackupRestoreInProgress } from "@/lib/portable-backup";
+import { isTabPackOpenMode } from "@/lib/tab-packs";
 
 const WORKSPACE_PREFIX = "webcollect-workspace-v1-";
 const SNAPSHOT_PREFIX = "webcollect-snapshot-v1-";
@@ -95,6 +100,8 @@ export async function readCurrentDrivePayload(): Promise<DriveWorkspacePayloadV1
     pinnedCategoryIds,
     pinnedBookmarkItems,
     pinnedBookmarkItemsUpdatedAt,
+    savedTabPacks,
+    tabPackOpenMode,
     categoryWidths,
     categoryLayouts,
     visualScale,
@@ -114,7 +121,8 @@ export async function readCurrentDrivePayload(): Promise<DriveWorkspacePayloadV1
     syncPreferenceRevisions,
   ] = await Promise.all([
     getCards(), getCategories(), getHiddenSites(), getPinnedCategoryIds(), getPinnedBookmarkItems(),
-    getPinnedBookmarkItemsUpdatedAt(), getCategoryWidths(), getCategoryLayouts(), getVisualScale(),
+    getPinnedBookmarkItemsUpdatedAt(), getSavedTabPacks(), getTabPackOpenMode(),
+    getCategoryWidths(), getCategoryLayouts(), getVisualScale(),
     getLinkOpenMode(), getSearchEngine(), getSections(), getActiveSectionId(), getRecycleBin(),
     getWarehouseCards(), getWarehouseCategories(), getImportBatches(), getWarehouseUpdatedAt(),
     getWallpaperPrefs(), getWorkspaceResetAt(), getLocalSnapshotUpdatedAt(), getSyncTombstones(),
@@ -127,6 +135,8 @@ export async function readCurrentDrivePayload(): Promise<DriveWorkspacePayloadV1
     pinnedCategoryIds,
     pinnedBookmarkItems,
     pinnedBookmarkItemsUpdatedAt,
+    savedTabPacks,
+    tabPackOpenMode,
     categoryWidths,
     categoryLayouts,
     visualScale,
@@ -195,6 +205,8 @@ async function applyDrivePayload(payload: DriveWorkspacePayloadV1): Promise<void
     await saveHiddenSites(payload.hiddenSites);
     await savePinnedCategoryIds(payload.pinnedCategoryIds);
     await savePinnedBookmarkItems(payload.pinnedBookmarkItems, payload.pinnedBookmarkItemsUpdatedAt);
+    if (Array.isArray(payload.savedTabPacks)) await saveSavedTabPacks(payload.savedTabPacks);
+    if (isTabPackOpenMode(payload.tabPackOpenMode)) await saveTabPackOpenMode(payload.tabPackOpenMode);
     await saveCategoryWidths(payload.categoryWidths);
     await saveCategoryLayouts(payload.categoryLayouts);
     await saveVisualScale(payload.visualScale);

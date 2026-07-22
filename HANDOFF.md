@@ -2,6 +2,18 @@
 
 > **2026-07-15 current workflow rule:** this repository has retired Superpowers (including `superpowers:*` / `using-superpowers`), `goal-zzx` / `zzx-goal`, and `andrej-karpathy-coding`. Do not install, enable, invoke, or imitate them. Any older instruction below that requires `tasks/todo.md`, `tasks/lessons.md`, `CODEX_GO_MODE_STATUS.md`, fixed phase counts, strict TDD, worktrees, subagents, or duplicate reviews is historical and superseded by `AGENTS.md`.
 
+## 2026-07-22 V1.5.0 Saved Tab Packs and Favicon Recovery
+
+This section supersedes the development state below. V1.5.0 is the current code target; V1.4.0 remains the cloud migration baseline and V1.4.1 remains the previous published patch.
+
+- Target identity: `V1.5.0 / 2026年7月22日`; tag `webcollect-2026-07-22-v1.5.0`; asset `WebCollect-Chrome-Extension-v1.5.0-2026-07-22.zip`.
+- Closeout: `docs/audit/webcollect-v1.5.0-tab-packs-favicon-closeout-2026-07-22.md`.
+- Saved tab packs are global fixed URL snapshots, visible beside section tabs. Dragging copies a card; source cards, order, hierarchy, dirty sets, recycle bin, and snapshots are not changed. Mindmap uses the same manager through search.
+- Each pack is independently revisioned and soft-deleted in the existing Drive payload. Missing fields in legacy device files mean “unknown”, not “empty”, so they cannot erase packs.
+- Portable Backup V2 includes packs and open mode; Portable Backup V1 remains accepted. V1 restore keeps the current packs because the old format could not express them.
+- Favicon repair is render-first and non-destructive: immediate letter fallback, extension `_favicon`, metadata/site candidates, then a bounded rebuildable `WebCollectIcons/site_icons` cache. It does not write generic fallback URLs back to cards.
+- The only permission addition is Chrome `favicon`; there is no `tabs`, `tabGroups`, host-access expansion, dependency, OAuth-scope, seed, Supabase, or collection-schema change.
+
 ## 2026-07-21 V1.4.1 Floating Capture Keyboard Fix
 
 This section supersedes the development state below. V1.4.1 is the current published application version; V1.4.0 remains the cloud/data contract baseline.

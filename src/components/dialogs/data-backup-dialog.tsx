@@ -30,9 +30,10 @@ import {
   parsePortableBackup,
   restorePortableBackup,
   type PortableBackupPreview,
-  type PortableBackupV1,
+  type PortableBackup,
 } from "@/lib/portable-backup";
 import { useAppStore } from "@/lib/store";
+import { useTabPackStore } from "@/lib/tab-pack-store";
 
 interface DataBackupDialogProps {
   open: boolean;
@@ -61,7 +62,7 @@ export function DataBackupDialog({ open, onOpenChange }: DataBackupDialogProps) 
   const [busy, setBusy] = useState<"export" | "read" | "restore" | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [pendingBackup, setPendingBackup] = useState<PortableBackupV1 | null>(null);
+  const [pendingBackup, setPendingBackup] = useState<PortableBackup | null>(null);
   const [preview, setPreview] = useState<PortableBackupPreview | null>(null);
   const [confirmRestoreOpen, setConfirmRestoreOpen] = useState(false);
 
@@ -119,6 +120,7 @@ export function DataBackupDialog({ open, onOpenChange }: DataBackupDialogProps) 
     try {
       const result = await restorePortableBackup(pendingBackup, { confirmed: true });
       await useAppStore.getState().loadData();
+      await useTabPackStore.getState().loadData();
       if (isLoggedIn) {
         await manualSync({ reloadView: false });
       }
@@ -145,7 +147,7 @@ export function DataBackupDialog({ open, onOpenChange }: DataBackupDialogProps) 
               数据与完整备份
             </DialogTitle>
             <DialogDescription>
-              导出普通可读的 JSON，包含工作区、回收站、仓库、壁纸、导图视图、本地版本和可读取的云盘版本。
+              导出普通可读的 JSON，包含工作区、标签组、回收站、仓库、壁纸、导图视图、本地版本和可读取的云盘版本。
               文件不包含 Google 或 Supabase 凭证、访问令牌和临时同步状态。
             </DialogDescription>
           </DialogHeader>
@@ -204,6 +206,7 @@ export function DataBackupDialog({ open, onOpenChange }: DataBackupDialogProps) 
                 <span>网页：{preview.counts.cards}</span>
                 <span>分类分组：{preview.counts.categories}</span>
                 <span>分项：{preview.counts.sections}</span>
+                <span>标签组：{preview.counts.tabPacks}</span>
                 <span>回收站：{preview.counts.recycleBin}</span>
                 <span>仓库网页：{preview.counts.warehouseCards}</span>
                 <span>云盘版本：{preview.counts.driveSnapshots}</span>

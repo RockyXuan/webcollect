@@ -95,10 +95,10 @@ export function CardDialog({ open, onOpenChange, editingCard, defaultCategoryId 
         setShortDesc(data.description.slice(0, 48));
         setFullDesc(data.description);
       }
-      if (data.image && !imageUrl) {
-        setImageUrl(data.image);
-      } else if (data.favicon && !imageUrl) {
+      if (data.favicon && !imageUrl) {
         setImageUrl(data.favicon);
+      } else if (data.image && !imageUrl) {
+        setImageUrl(data.image);
       } else if (!imageUrl) {
         try {
           const hostname = new URL(url.trim()).hostname;

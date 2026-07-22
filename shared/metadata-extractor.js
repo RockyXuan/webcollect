@@ -298,14 +298,28 @@ function jsonLdImage(objects) {
 }
 
 function faviconHref(elements) {
-  for (const element of elements) {
+  const candidates = [];
+  for (const [index, element] of elements.entries()) {
     if (element.name !== "link") continue;
     const rel = attribute(element, "rel").toLowerCase().split(/\s+/);
     if (rel.includes("icon") || rel.includes("shortcut") || rel.includes("apple-touch-icon")) {
-      return attribute(element, "href");
+      const href = attribute(element, "href");
+      if (!href) continue;
+      const sizes = attribute(element, "sizes");
+      const largestSize = sizes.split(/\s+/).reduce((largest, size) => {
+        const match = size.match(/^(\d+)x(\d+)$/i);
+        return match ? Math.max(largest, Number(match[1]), Number(match[2])) : largest;
+      }, 0);
+      let score = Math.min(largestSize, 512);
+      if (rel.includes("icon")) score += 120;
+      if (rel.includes("apple-touch-icon")) score += 90;
+      if (/\.svg(?:$|[?#])/i.test(href) || attribute(element, "type") === "image/svg+xml") score += 60;
+      if (/\.ico(?:$|[?#])/i.test(href)) score += 20;
+      candidates.push({ href, score, index });
     }
   }
-  return "";
+  candidates.sort((left, right) => right.score - left.score || left.index - right.index);
+  return candidates[0]?.href || "";
 }
 
 function extractMetadataFromParsedPage(elements, structured, url) {

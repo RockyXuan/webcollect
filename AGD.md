@@ -1,13 +1,24 @@
 # WebCollect 全项目体检入口
 
-更新时间：2026-07-21
+更新时间：2026-07-22
 面向对象：Claude / Codex / 后续任何接手 WebCollect 的开发 agent
 当前主目录：`/Users/rockyx/vibe coding/Web Collect 0628`
 远端仓库：`https://github.com/RockyXuan/webcollect`
 主分支：`main`
-当前正式发布身份：`V1.4.1 / 2026年7月21日`；tag `webcollect-2026-07-21-v1.4.1`；zip `WebCollect-Chrome-Extension-v1.4.1-2026-07-21.zip`。
+当前代码发布目标：`V1.5.0 / 2026年7月22日`；tag `webcollect-2026-07-22-v1.5.0`；zip `WebCollect-Chrome-Extension-v1.5.0-2026-07-22.zip`。
+V1.5.0 closeout：`docs/audit/webcollect-v1.5.0-tab-packs-favicon-closeout-2026-07-22.md`。
 V1.4.1 closeout：`docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md`。它只修复网页浮窗键盘事件穿透；main CI、Release workflow、官方 zip 审计和真实 Chrome 验收均已完成。
 V1.3.0 的本地智能搜索、导图、同步和数据边界继续完整保留。
+
+## 2026-07-22 V1.5.0 标签组与 favicon 自愈入口
+
+- 顶部分项右侧新增全局标签组架；标签组是 URL 固定快照，不移动、删除或绑定原收藏。经典模式拖拽卡片手柄复制加入，导图模式在管理面板搜索加入。
+- 标签组最多 50 个去重 URL；超过 10 个打开前确认。默认全部后台打开，可改为首个激活。网页端与扩展端共用契约，扩展不申请 `tabs` 或 `tabGroups`。
+- 标签组按记录保存 `syncRevision + syncDeviceId` 与软 tombstone，通过既有 Google Drive 工作区同步；旧 Drive payload 未携带标签组字段时必须保留本地数据。
+- 完整 JSON 升级为 Portable Backup V2，包含标签组与打开方式；V1 备份继续可验证和恢复，并保留当前标签组。
+- favicon 始终先显示字母兜底，扩展优先使用 Chrome `_favicon`，再使用持久化元数据和站点候选。派生图标缓存只在 `WebCollectIcons/site_icons`，限制 8 MiB / 单项 256 KiB，不进入业务 IndexedDB、Drive、完整备份、dirty sets 或 seed。
+- 扩展唯一新增权限为 `favicon`。不新增大型依赖，不改变 Google Drive OAuth scope，不接 AI API，不修改 Supabase 保险档案。
+- 实施与验收证据见 `docs/audit/webcollect-v1.5.0-tab-packs-favicon-closeout-2026-07-22.md`。
 
 ## 2026-07-21 V1.4.1 浮窗快捷键修复入口
 

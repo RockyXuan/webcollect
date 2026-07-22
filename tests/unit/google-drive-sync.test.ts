@@ -7,7 +7,7 @@ import {
   validateDriveWorkspaceEnvelope,
 } from "@/lib/google-drive-sync";
 import type { DriveWorkspaceEnvelopeV1, DriveWorkspacePayloadV1 } from "@/lib/drive-types";
-import type { Category, WebCard } from "@/lib/types";
+import type { Category, SavedTabPack, WebCard } from "@/lib/types";
 import { DEFAULT_WALLPAPER_PREFS } from "@/lib/wallpaper-sources";
 import { toWallpaperSyncedSettings } from "@/lib/wallpaper-db";
 
@@ -80,6 +80,28 @@ async function envelope(deviceId: string, data: DriveWorkspacePayloadV1): Promis
   return createDriveWorkspaceEnvelope(deviceId, data);
 }
 
+function savedTabPack(id: string, revision: number, deviceId: string, deletedAt?: number): SavedTabPack {
+  return {
+    id,
+    name: id,
+    icon: "layers",
+    color: "#4A6FA5",
+    order: 0,
+    items: [{
+      id: `${id}-item`,
+      url: `https://example.com/${id}`,
+      title: id,
+      order: 0,
+      addedAt: 1,
+    }],
+    createdAt: 1,
+    updatedAt: deletedAt || revision,
+    ...(deletedAt ? { deletedAt } : {}),
+    syncRevision: revision,
+    syncDeviceId: deviceId,
+  };
+}
+
 describe("Google Drive workspace merge", () => {
   it("merges concurrent device additions and keeps the newest preference", async () => {
     const left = payload("device-a");
@@ -140,6 +162,47 @@ describe("Google Drive workspace merge", () => {
       await envelope("device-b", current),
     ]);
     expect(merged.visualScale).toBe(120);
+  });
+
+  it("keeps additive tag packs when merging with a legacy payload that has no tag-pack fields", async () => {
+    const legacy = payload("legacy-device");
+    const current = payload("current-device");
+    current.savedTabPacks = [savedTabPack("pack-current", 4, "current-device")];
+    current.tabPackOpenMode = "first-active";
+    current.syncPreferenceRevisions.savedTabPacks = { syncRevision: 4, syncDeviceId: "current-device" };
+    current.syncPreferenceRevisions.tabPackOpenMode = { syncRevision: 5, syncDeviceId: "current-device" };
+
+    const merged = mergeDriveWorkspaceEnvelopes([
+      await envelope("legacy-device", legacy),
+      await envelope("current-device", current),
+    ]);
+
+    expect(merged.savedTabPacks?.map((item) => item.id)).toEqual(["pack-current"]);
+    expect(merged.tabPackOpenMode).toBe("first-active");
+  });
+
+  it("combines concurrent tag-pack additions and keeps the newer soft deletion", async () => {
+    const left = payload("device-a");
+    left.savedTabPacks = [
+      savedTabPack("pack-a", 2, "device-a"),
+      savedTabPack("pack-delete", 2, "device-a"),
+    ];
+    left.syncPreferenceRevisions.savedTabPacks = { syncRevision: 2, syncDeviceId: "device-a" };
+
+    const right = payload("device-b");
+    right.savedTabPacks = [
+      savedTabPack("pack-b", 2, "device-b"),
+      savedTabPack("pack-delete", 3, "device-b", 50),
+    ];
+    right.syncPreferenceRevisions.savedTabPacks = { syncRevision: 3, syncDeviceId: "device-b" };
+
+    const merged = mergeDriveWorkspaceEnvelopes([
+      await envelope("device-a", left),
+      await envelope("device-b", right),
+    ]);
+
+    expect(merged.savedTabPacks?.map((item) => item.id)).toEqual(["pack-a", "pack-b", "pack-delete"]);
+    expect(merged.savedTabPacks?.find((item) => item.id === "pack-delete")?.deletedAt).toBe(50);
   });
 
   it("stops instead of flattening a category or reviving an orphaned card", async () => {

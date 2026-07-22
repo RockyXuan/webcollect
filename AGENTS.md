@@ -1,5 +1,9 @@
 # WebCollect — 个人网页收藏墙
 
+## 2026-07-22 current V1.5.0 tab-pack and favicon entry
+
+Read `AGD.md` and `docs/audit/webcollect-v1.5.0-tab-packs-favicon-closeout-2026-07-22.md` first. V1.5.0 adds globally visible saved tab packs: classic mode copies cards by dragging the existing card handle to a pack or the create target, mindmap mode uses the manager search, and opening a pack creates a normalized de-duplicated snapshot of up to 50 URLs without changing source cards. Packs use per-record revisions and soft tombstones in the existing Google Drive workspace payload; legacy payloads that omit the field preserve local packs. Portable Backup V2 includes packs and open mode while V1 remains accepted. Favicon rendering now has an immediate letter fallback, Chrome `_favicon` support, metadata/direct candidates, and a separate rebuildable `WebCollectIcons/site_icons` cache that is not business data, sync data, or backup data. The only new Chrome permission is `favicon`; do not add `tabs` or `tabGroups`. Never clear or overwrite real collection, Drive, Chrome storage, snapshots, or seed data.
+
 ## 2026-07-21 current V1.4.1 floating-capture keyboard release entry
 
 Read `AGD.md` and `docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md` first. V1.4.1 prevents keyboard events originating inside the open Shadow DOM floating-capture panel from reaching host-page shortcuts. It preserves lowercase/uppercase typing, Chinese IME composition, Tab navigation, copy/paste, and normal page shortcuts outside WebCollect. It adds no storage key, permission, dependency, data migration, collection write, Drive change, snapshot change, or seed change. V1.4.0 remains the data/sync baseline. The published tag is `webcollect-2026-07-21-v1.4.1`, the official asset is `WebCollect-Chrome-Extension-v1.4.1-2026-07-21.zip`, and main CI, Release workflow, official-zip audit, and existing-primary-Chrome GitHub acceptance all passed.

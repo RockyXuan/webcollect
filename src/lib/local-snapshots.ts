@@ -12,7 +12,9 @@ import {
   getPinnedCategoryIds,
   getRecycleBin,
   getSearchEngine,
+  getSavedTabPacks,
   getSections,
+  getTabPackOpenMode,
   getVisualScale,
   getWorkspaceResetAt,
   getSyncTombstones,
@@ -30,7 +32,9 @@ import {
   savePinnedCategoryIds,
   saveRecycleBin,
   saveSearchEngine,
+  saveSavedTabPacks,
   saveSections,
+  saveTabPackOpenMode,
   saveVisualScale,
   saveWorkspaceResetAt,
   setInitialized,
@@ -47,7 +51,8 @@ import {
   type WarehouseCard,
   type WarehouseCategory,
 } from "@/lib/db-warehouse";
-import type { Category, CategoryLayoutPreference, CollectionSection, HiddenSite, LinkOpenMode, PinnedBookmarkItem, RecycleBinItem, SyncPreferenceRevisions, SyncTombstone, WebCard } from "@/lib/types";
+import type { Category, CategoryLayoutPreference, CollectionSection, HiddenSite, LinkOpenMode, PinnedBookmarkItem, RecycleBinItem, SavedTabPack, SyncPreferenceRevisions, SyncTombstone, TabPackOpenMode, WebCard } from "@/lib/types";
+import { isTabPackOpenMode } from "@/lib/tab-packs";
 import { DEFAULT_SEARCH_ENGINE_ID, isSearchEngineId, type SearchEngineId } from "@/lib/search-engines";
 import type { WallpaperItem, WallpaperPrefs } from "@/lib/wallpaper-types";
 import {
@@ -82,6 +87,7 @@ export interface LocalSnapshotCounts {
   warehouseCategories: number;
   warehouseCards: number;
   warehouseBatches: number;
+  tabPacks?: number;
 }
 
 export interface LocalSnapshotData {
@@ -90,6 +96,8 @@ export interface LocalSnapshotData {
   hiddenSites: HiddenSite[];
   pinnedCategoryIds: string[];
   pinnedBookmarkItems: PinnedBookmarkItem[];
+  savedTabPacks?: SavedTabPack[];
+  tabPackOpenMode?: TabPackOpenMode;
   categoryWidths: Record<string, number>;
   categoryLayouts?: Record<string, CategoryLayoutPreference>;
   visualScale: number;
@@ -222,6 +230,7 @@ function countSnapshotData(data: LocalSnapshotData): LocalSnapshotCounts {
     warehouseCategories: data.warehouseCategories.length,
     warehouseCards: data.warehouseCards.length,
     warehouseBatches: data.warehouseImportBatches.length,
+    tabPacks: (data.savedTabPacks || []).filter((pack) => !pack.deletedAt).length,
   };
 }
 
@@ -248,6 +257,17 @@ function makeSnapshotSignature(entry: LocalSnapshotEntry): string {
       item.customLabel || "",
       item.updatedAt,
     ]),
+    savedTabPacks: (data.savedTabPacks || []).map((pack) => [
+      pack.id,
+      pack.name,
+      pack.icon,
+      pack.color,
+      pack.order,
+      pack.deletedAt || 0,
+      pack.updatedAt,
+      pack.items.map((item) => [item.id, item.url, item.title, item.iconUrl || "", item.order]),
+    ]),
+    tabPackOpenMode: data.tabPackOpenMode || "all-background",
     categories: data.categories.map((category) => [
       category.id,
       category.name,
@@ -426,6 +446,8 @@ export async function readCurrentSnapshotData(): Promise<LocalSnapshotData> {
     hiddenSites: await getHiddenSites(),
     pinnedCategoryIds: await getPinnedCategoryIds(),
     pinnedBookmarkItems: await getPinnedBookmarkItems(),
+    savedTabPacks: await getSavedTabPacks(),
+    tabPackOpenMode: await getTabPackOpenMode(),
     categoryWidths: await getCategoryWidths(),
     categoryLayouts: await getCategoryLayouts(),
     visualScale: await getVisualScale(),
@@ -718,6 +740,8 @@ export async function saveVersionAndClearLocalData(): Promise<LocalSnapshotEntry
   await saveHiddenSites([]);
   await savePinnedCategoryIds([]);
   await savePinnedBookmarkItems([]);
+  await saveSavedTabPacks([]);
+  await saveTabPackOpenMode("all-background");
   await saveCategoryWidths({});
   await saveCategoryLayouts({});
   await saveVisualScale(100);
@@ -743,6 +767,8 @@ export async function restoreSnapshotData(data: LocalSnapshotData): Promise<void
   await saveHiddenSites(data.hiddenSites);
   await savePinnedCategoryIds(data.pinnedCategoryIds);
   await savePinnedBookmarkItems(data.pinnedBookmarkItems || []);
+  if (Array.isArray(data.savedTabPacks)) await saveSavedTabPacks(data.savedTabPacks);
+  if (isTabPackOpenMode(data.tabPackOpenMode)) await saveTabPackOpenMode(data.tabPackOpenMode);
   await saveCategoryWidths(data.categoryWidths);
   await saveCategoryLayouts(data.categoryLayouts || {});
   await saveVisualScale(data.visualScale);

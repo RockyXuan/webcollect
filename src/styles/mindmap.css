@@ -359,6 +359,12 @@
 }
 
 .wc-mindmap-layered-icon {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
   isolation: isolate;
 }
 

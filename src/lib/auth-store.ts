@@ -10,6 +10,7 @@ import { googleDriveSyncProvider } from "@/lib/google-drive-sync";
 import { getDriveConnectionRecord } from "@/lib/google-drive-auth";
 import { isChromeExtension } from "@/lib/platform";
 import { useAppStore } from "@/lib/store";
+import { useTabPackStore } from "@/lib/tab-pack-store";
 import {
   CURRENT_SYNC_METADATA_VERSION,
   getLocalSnapshotSyncedAt,
@@ -259,7 +260,10 @@ async function runAutoSyncPush(): Promise<void> {
   try {
     const result = await googleDriveSyncProvider.sync();
     if (result.changedLocal) {
-      await useAppStore.getState().loadData({ showLoading: false, preserveOnCollapse: true });
+      await Promise.all([
+        useAppStore.getState().loadData({ showLoading: false, preserveOnCollapse: true }),
+        useTabPackStore.getState().loadData(),
+      ]);
     }
     useAuthStore.setState({ syncStatus: "success", lastSyncAt: result.syncedAt, error: null });
   } catch (error) {
@@ -284,7 +288,10 @@ export async function triggerSync(_userId?: string): Promise<void> {
   try {
     const result = await googleDriveSyncProvider.sync();
     if (result.changedLocal) {
-      await useAppStore.getState().loadData({ showLoading: false, preserveOnCollapse: true });
+      await Promise.all([
+        useAppStore.getState().loadData({ showLoading: false, preserveOnCollapse: true }),
+        useTabPackStore.getState().loadData(),
+      ]);
     }
     useAuthStore.setState({ syncStatus: "success", lastSyncAt: result.syncedAt, error: null });
     ensureAutoSyncInterval();
@@ -416,7 +423,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const result = await googleDriveSyncProvider.sync();
       if (options?.reloadView !== false || result.changedLocal) {
-        await useAppStore.getState().loadData({ showLoading: false, preserveOnCollapse: true });
+        await Promise.all([
+          useAppStore.getState().loadData({ showLoading: false, preserveOnCollapse: true }),
+          useTabPackStore.getState().loadData(),
+        ]);
       }
       set({ syncStatus: "success", lastSyncAt: result.syncedAt, localSavedAt: null, error: null });
       ensureAutoSyncInterval();

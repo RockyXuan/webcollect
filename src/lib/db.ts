@@ -1,5 +1,5 @@
 import localforage from "localforage";
-import type { WebCard, Category, HiddenSite, LinkOpenMode, RecycleBinItem, CollectionSection, PinnedBookmarkItem, CategoryLayoutPreference, SyncEntityType, SyncTombstone, SyncPreferenceRevisions, SyncVersionStamp } from "./types";
+import type { WebCard, Category, HiddenSite, LinkOpenMode, RecycleBinItem, CollectionSection, PinnedBookmarkItem, CategoryLayoutPreference, SyncEntityType, SyncTombstone, SyncPreferenceRevisions, SyncVersionStamp, SavedTabPack, TabPackOpenMode } from "./types";
 import { DEFAULT_SEARCH_ENGINE_ID, isSearchEngineId, type SearchEngineId } from "./search-engines";
 import {
   DEFAULT_VISUAL_SCALE,
@@ -9,6 +9,11 @@ import {
 } from "./visual-scale";
 import { withStorageLock } from "./storage-lock";
 import { normalizeSyncRevision } from "./sync-revisions";
+import {
+  DEFAULT_TAB_PACK_OPEN_MODE,
+  isTabPackOpenMode,
+  normalizeSavedTabPacks,
+} from "./tab-packs";
 
 localforage.config({
   name: "WebCollect",
@@ -590,6 +595,8 @@ export async function saveActiveSectionId(sectionId: string): Promise<void> {
 const PINNED_CATEGORIES_KEY = "pinnedCategoryIds";
 const PINNED_BOOKMARK_ITEMS_KEY = "pinnedBookmarkItems";
 const PINNED_BOOKMARK_ITEMS_UPDATED_AT_KEY = "pinnedBookmarkItemsUpdatedAt";
+const SAVED_TAB_PACKS_KEY = "savedTabPacks";
+const TAB_PACK_OPEN_MODE_KEY = "tabPackOpenMode";
 
 export async function getPinnedCategoryIds(): Promise<string[]> {
   return (await localforage.getItem<string[]>(PINNED_CATEGORIES_KEY)) || [];
@@ -612,6 +619,73 @@ export async function savePinnedBookmarkItems(items: PinnedBookmarkItem[], updat
     saveTrackedPreference(PINNED_BOOKMARK_ITEMS_KEY, "pinnedBookmarkItems", items),
     saveTrackedPreference(PINNED_BOOKMARK_ITEMS_UPDATED_AT_KEY, "pinnedBookmarkItemsUpdatedAt", updatedAt),
   ]);
+}
+
+export async function getSavedTabPacks(): Promise<SavedTabPack[]> {
+  return normalizeSavedTabPacks(await localforage.getItem<unknown>(SAVED_TAB_PACKS_KEY));
+}
+
+async function persistSavedTabPacks(
+  previous: SavedTabPack[],
+  desired: SavedTabPack[],
+): Promise<SavedTabPack[]> {
+  const normalizedDesired = normalizeSavedTabPacks(desired);
+  if (localChangeSilenceDepth > 0) {
+    await localforage.setItem(SAVED_TAB_PACKS_KEY, normalizedDesired);
+    return normalizedDesired;
+  }
+
+  const now = Date.now();
+  const desiredById = new Map(normalizedDesired.map((pack) => [pack.id, pack]));
+  for (const prior of previous) {
+    if (desiredById.has(prior.id)) continue;
+    desiredById.set(prior.id, { ...prior, deletedAt: now, updatedAt: now });
+  }
+  const next = normalizeSavedTabPacks([...desiredById.values()]);
+  const changedIds = new Set(changedItemIds(previous, next));
+  if (changedIds.size === 0) return previous;
+
+  const version = await markSyncPreferenceChanged(SAVED_TAB_PACKS_KEY);
+  const prepared = next.map((pack) => changedIds.has(pack.id) && version
+    ? { ...pack, ...version }
+    : pack);
+  await localforage.setItem(SAVED_TAB_PACKS_KEY, prepared);
+  await touchLocalSnapshot();
+  return prepared;
+}
+
+/** Replace the complete record set. Normal user deletions become tombstones. */
+export async function saveSavedTabPacks(packs: SavedTabPack[]): Promise<SavedTabPack[]> {
+  return withStorageLock("saved-tab-packs-rmw", async () => {
+    const previous = await getSavedTabPacks();
+    return persistSavedTabPacks(previous, packs);
+  });
+}
+
+/** Atomic user mutation so two open WebCollect tabs cannot overwrite each other. */
+export async function mutateSavedTabPacks(
+  mutate: (current: SavedTabPack[]) => SavedTabPack[],
+): Promise<SavedTabPack[]> {
+  return withStorageLock("saved-tab-packs-rmw", async () => {
+    const previous = await getSavedTabPacks();
+    return persistSavedTabPacks(previous, mutate(previous.map((pack) => ({
+      ...pack,
+      items: pack.items.map((item) => ({ ...item })),
+    }))));
+  });
+}
+
+export async function getTabPackOpenMode(): Promise<TabPackOpenMode> {
+  const value = await localforage.getItem<unknown>(TAB_PACK_OPEN_MODE_KEY);
+  return isTabPackOpenMode(value) ? value : DEFAULT_TAB_PACK_OPEN_MODE;
+}
+
+export async function saveTabPackOpenMode(mode: TabPackOpenMode): Promise<void> {
+  await saveTrackedPreference(
+    TAB_PACK_OPEN_MODE_KEY,
+    TAB_PACK_OPEN_MODE_KEY,
+    isTabPackOpenMode(mode) ? mode : DEFAULT_TAB_PACK_OPEN_MODE,
+  );
 }
 
 const CATEGORY_WIDTHS_KEY = "categoryWidths";

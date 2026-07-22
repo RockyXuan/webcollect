@@ -7,8 +7,10 @@ import type {
   LinkOpenMode,
   PinnedBookmarkItem,
   RecycleBinItem,
+  SavedTabPack,
   SyncPreferenceRevisions,
   SyncTombstone,
+  TabPackOpenMode,
   WebCard,
 } from "@/lib/types";
 import type { SearchEngineId } from "@/lib/search-engines";
@@ -26,6 +28,9 @@ export interface DriveWorkspacePayloadV1 {
   pinnedCategoryIds: string[];
   pinnedBookmarkItems: PinnedBookmarkItem[];
   pinnedBookmarkItemsUpdatedAt: number;
+  /** Added in V1.5.0. Absence means a legacy payload, not an empty cloud value. */
+  savedTabPacks?: SavedTabPack[];
+  tabPackOpenMode?: TabPackOpenMode;
   categoryWidths: Record<string, number>;
   categoryLayouts: Record<string, CategoryLayoutPreference>;
   visualScale: number;
@@ -86,4 +91,3 @@ export type DriveStoredDocument =
   | DriveWorkspaceEnvelopeV1
   | DriveSnapshotEnvelopeV1
   | DriveMigrationReceiptV1;
-

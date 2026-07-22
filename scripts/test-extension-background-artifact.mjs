@@ -33,6 +33,9 @@ assert.deepEqual(
   `built service worker has unresolved relative imports: ${missingImports.join(", ")}`
 );
 assert.deepEqual(builtManifest, sourceManifest, "built manifest must exactly match the release source manifest");
+assert.ok(sourceManifest.permissions.includes("favicon"), "extension must keep Chrome's private favicon renderer permission");
+assert.ok(!sourceManifest.permissions.includes("tabGroups"), "saved tag packs must not request Chrome tabGroups permission");
+assert.ok(!sourceManifest.permissions.includes("tabs"), "saved tag packs must keep the narrower existing tab access contract");
 
 const searchableArtifactText = listFiles(extensionDistPath)
   .filter((path) => statSync(path).size <= 8_000_000)

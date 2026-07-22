@@ -1,16 +1,14 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
-
 import React, { useMemo, useState } from "react";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, horizontalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Check, GripVertical, Pencil, Star } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ReadOnlySiteIcon } from "@/components/mindmap/read-only-site-icon";
 import { getPinnedBookmarkLabel, resolvePinnedBookmarkCards } from "@/lib/pinned-bookmarks";
 import { openWebCollectUrl } from "@/lib/platform";
-import { getSemanticSiteIcon, getSiteIconCandidates, shouldPersistSiteIcon } from "@/lib/site-icons";
 import { useAppStore } from "@/lib/store";
 import type { PinnedBookmarkDisplayMode, PinnedBookmarkItem, WebCard } from "@/lib/types";
 
@@ -101,7 +99,6 @@ interface SortableBookmarkProps {
 }
 
 function SortableBookmark({ item, card, editMode, onOpen, onUpdate, onUpdateCard, onRemove }: SortableBookmarkProps) {
-  const [imageCandidateIndex, setImageCandidateIndex] = useState(0);
   const [editorOpen, setEditorOpen] = useState(false);
   const [draftLabel, setDraftLabel] = useState(item.customLabel || "");
   const [draftMode, setDraftMode] = useState<PinnedBookmarkDisplayMode>(item.displayMode);
@@ -110,11 +107,6 @@ function SortableBookmark({ item, card, editMode, onOpen, onUpdate, onUpdateCard
     disabled: !editMode,
   });
   const label = getPinnedBookmarkLabel(item, card);
-  const iconCandidates = useMemo(() => getSiteIconCandidates(card), [card]);
-  const imageUrl = iconCandidates[imageCandidateIndex] || "";
-  const semanticIcon = useMemo(() => getSemanticSiteIcon(card), [card]);
-  const SemanticIcon = semanticIcon?.Icon;
-  const shouldUseSemanticIcon = Boolean(semanticIcon && (semanticIcon.prefer || !imageUrl));
   const showIcon = item.displayMode === "icon" || item.displayMode === "both";
   const showLabel = item.displayMode === "label" || item.displayMode === "both";
 
@@ -128,20 +120,6 @@ function SortableBookmark({ item, card, editMode, onOpen, onUpdate, onUpdateCard
     onUpdate({ ...item, customLabel: draftLabel.trim() || undefined, displayMode: draftMode });
     setEditorOpen(false);
   };
-
-  const handleImageError = () => {
-    setImageCandidateIndex((current) => current + 1);
-  };
-
-  const handleImageLoad = () => {
-    if (shouldPersistSiteIcon(card.imageUrl, imageUrl)) {
-      onUpdateCard({ ...card, imageUrl, updatedAt: Date.now() });
-    }
-  };
-
-  React.useEffect(() => {
-    setImageCandidateIndex(0);
-  }, [card.id, card.imageUrl, card.url]);
 
   React.useEffect(() => {
     if (!editorOpen) return;
@@ -170,24 +148,12 @@ function SortableBookmark({ item, card, editMode, onOpen, onUpdate, onUpdateCard
       </span>
       )}
       {showIcon && (
-        <span
-          className="wc-bookmark-icon"
-          style={shouldUseSemanticIcon && semanticIcon ? { background: semanticIcon.background, color: semanticIcon.color } : undefined}
-        >
-          {shouldUseSemanticIcon && SemanticIcon ? (
-            <SemanticIcon className="h-4 w-4" strokeWidth={2.35} />
-          ) : imageUrl ? (
-            <img
-              src={imageUrl}
-              alt=""
-              className="h-full w-full rounded-lg object-cover"
-              onError={handleImageError}
-              onLoad={handleImageLoad}
-            />
-          ) : (
-            <span>{label.slice(0, 2)}</span>
-          )}
-        </span>
+        <ReadOnlySiteIcon
+          card={card}
+          className="wc-bookmark-icon relative"
+          fallbackClassName="text-[10px] font-bold text-slate-500"
+          onUpdateCard={onUpdateCard}
+        />
       )}
       {showLabel && <span className="wc-bookmark-label">{label}</span>}
       {!showLabel && !showIcon && <span className="wc-bookmark-label">{label}</span>}

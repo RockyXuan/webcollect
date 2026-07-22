@@ -2,6 +2,7 @@ import { compareSyncVersions } from "@/lib/sync-revisions";
 import type { SyncPreferenceRevisions, SyncTombstone } from "@/lib/types";
 import type { DriveWorkspaceEnvelopeV1, DriveWorkspacePayloadV1 } from "@/lib/drive-types";
 import { stableJsonStringify } from "@/lib/content-hash";
+import { mergeSavedTabPackSets } from "@/lib/tab-packs";
 
 type SyncEntity = {
   id: string;
@@ -16,6 +17,7 @@ const PREFERENCE_KEYS = [
   "pinnedCategoryIds",
   "pinnedBookmarkItems",
   "pinnedBookmarkItemsUpdatedAt",
+  "tabPackOpenMode",
   "categoryWidths",
   "categoryLayouts",
   "visualScale",
@@ -33,12 +35,14 @@ const PREFERENCE_KEYS = [
 ] as const;
 
 type PreferenceKey = typeof PREFERENCE_KEYS[number];
+type SyncRevisionKey = PreferenceKey | "savedTabPacks";
 
 const PAYLOAD_PROPERTY_BY_PREFERENCE: Record<PreferenceKey, keyof DriveWorkspacePayloadV1> = {
   hiddenSites: "hiddenSites",
   pinnedCategoryIds: "pinnedCategoryIds",
   pinnedBookmarkItems: "pinnedBookmarkItems",
   pinnedBookmarkItemsUpdatedAt: "pinnedBookmarkItemsUpdatedAt",
+  tabPackOpenMode: "tabPackOpenMode",
   categoryWidths: "categoryWidths",
   categoryLayouts: "categoryLayouts",
   visualScale: "visualScale",
@@ -105,13 +109,19 @@ function mergeEntities<T extends SyncEntity>(
     });
 }
 
-function preferenceFallbackTime(payload: DriveWorkspacePayloadV1, key: PreferenceKey): number {
+function preferenceFallbackTime(payload: DriveWorkspacePayloadV1, key: SyncRevisionKey): number {
   switch (key) {
     case "hiddenSites":
       return Math.max(0, ...payload.hiddenSites.map((item) => item.hiddenAt));
     case "pinnedBookmarkItems":
     case "pinnedBookmarkItemsUpdatedAt":
       return payload.pinnedBookmarkItemsUpdatedAt;
+    case "savedTabPacks":
+      return Array.isArray(payload.savedTabPacks)
+        ? Math.max(0, ...payload.savedTabPacks.map((item) => item.updatedAt))
+        : 0;
+    case "tabPackOpenMode":
+      return payload.tabPackOpenMode ? payload.localSnapshotUpdatedAt : 0;
     case "categoryLayouts":
       return Math.max(0, ...Object.values(payload.categoryLayouts).map((item) => item.updatedAt));
     case "collectionSections":
@@ -134,8 +144,11 @@ function preferenceFallbackTime(payload: DriveWorkspacePayloadV1, key: Preferenc
 
 function preferenceVersion(
   envelope: DriveWorkspaceEnvelopeV1,
-  key: PreferenceKey
+  key: SyncRevisionKey
 ): { syncRevision: number; syncDeviceId: string; updatedAt: number } {
+  const fieldIsAbsent = (key === "savedTabPacks" && !Array.isArray(envelope.payload.savedTabPacks))
+    || (key === "tabPackOpenMode" && !envelope.payload.tabPackOpenMode);
+  if (fieldIsAbsent) return { syncRevision: 0, syncDeviceId: "", updatedAt: 0 };
   const revision = envelope.payload.syncPreferenceRevisions[key];
   return {
     syncRevision: revision?.syncRevision || 0,
@@ -148,7 +161,7 @@ function mergePreferenceRevisions(
   envelopes: readonly DriveWorkspaceEnvelopeV1[]
 ): SyncPreferenceRevisions {
   const merged: SyncPreferenceRevisions = {};
-  for (const key of PREFERENCE_KEYS) {
+  for (const key of [...PREFERENCE_KEYS, "savedTabPacks"] as const) {
     let winner: DriveWorkspaceEnvelopeV1 | null = null;
     for (const envelope of envelopes) {
       if (!winner || compareSyncVersions(preferenceVersion(envelope, key), preferenceVersion(winner, key)) > 0) {
@@ -211,6 +224,9 @@ export function mergeDriveWorkspaceEnvelopes(
   }
   const tombstones = newestTombstones(envelopes);
   const base = mergePreferences(envelopes, envelopes[0].payload);
+  const packSets = envelopes
+    .map((envelope) => envelope.payload.savedTabPacks)
+    .filter((packs): packs is NonNullable<DriveWorkspacePayloadV1["savedTabPacks"]> => Array.isArray(packs));
   const categories = mergeEntities(envelopes, (payload) => payload.categories, tombstones, "category");
   const cards = mergeEntities(envelopes, (payload) => payload.cards, tombstones, "card");
   const categoryIds = new Set(categories.map((item) => item.id));
@@ -225,6 +241,7 @@ export function mergeDriveWorkspaceEnvelopes(
   }
   return {
     ...base,
+    ...(packSets.length > 0 ? { savedTabPacks: mergeSavedTabPackSets(packSets) } : {}),
     categories,
     cards,
     syncTombstones: tombstones,

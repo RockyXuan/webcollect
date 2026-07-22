@@ -4,10 +4,15 @@ import { DEFAULT_MINDMAP_VIEW_STATE } from "@/components/mindmap/types";
 import {
   getCards,
   getOrCreateSyncDeviceId,
+  getSavedTabPacks,
+  getTabPackOpenMode,
   saveCards,
   saveCategories,
+  saveSavedTabPacks,
   saveSections,
+  saveTabPackOpenMode,
 } from "@/lib/db";
+import { sha256Hex } from "@/lib/content-hash";
 import { getLocalDataSnapshots } from "@/lib/local-snapshots";
 import {
   listMindmapViewStates,
@@ -25,7 +30,7 @@ import {
   validatePortableBackup,
 } from "@/lib/portable-backup";
 import { readCollectionViewMode, writeCollectionViewMode } from "@/lib/collection-view-mode";
-import type { Category, CollectionSection, WebCard } from "@/lib/types";
+import type { Category, CollectionSection, SavedTabPack, WebCard } from "@/lib/types";
 import type { CloudSnapshotRecord } from "@/lib/cloud-sync-types";
 
 const now = 1_777_500_000_000;
@@ -60,6 +65,25 @@ const card: WebCard = {
   createdAt: now,
   updatedAt: now,
 };
+const tabPack: SavedTabPack = {
+  id: "tab-pack-backup",
+  name: "工作台",
+  icon: "layers",
+  color: "#4A6FA5",
+  order: 0,
+  items: [{
+    id: "tab-pack-item-backup",
+    sourceCardId: card.id,
+    url: card.url,
+    title: card.title,
+    order: 0,
+    addedAt: now,
+  }],
+  createdAt: now,
+  updatedAt: now,
+  syncRevision: 3,
+  syncDeviceId: "device-backup",
+};
 
 beforeEach(async () => {
   window.localStorage.clear();
@@ -71,7 +95,7 @@ beforeEach(async () => {
   await saveCards([card]);
 });
 
-describe("PortableBackupV1", () => {
+describe("portable backup", () => {
   it("exports a readable, hashed package without credentials or derived knowledge data", async () => {
     writeCollectionViewMode("mindmap");
     await saveMindmapViewState(section.id, {
@@ -92,6 +116,49 @@ describe("PortableBackupV1", () => {
     expect(text).not.toContain("refreshToken");
     expect(text).not.toContain("knowledge_index");
     expect(text).not.toContain("syncDirtySets");
+  });
+
+  it("exports and restores V2 tag packs and their global open mode", async () => {
+    await saveSavedTabPacks([tabPack]);
+    await saveTabPackOpenMode("first-active");
+    const backup = await createPortableBackup({ cloudStatus: "not-connected" });
+
+    expect(backup.schemaVersion).toBe(2);
+    expect(backup.counts.tabPacks).toBe(1);
+    expect(backup.workspace.savedTabPacks).toHaveLength(1);
+    expect(backup.workspace.tabPackOpenMode).toBe("first-active");
+
+    await saveSavedTabPacks([{ ...tabPack, name: "临时修改", updatedAt: now + 1 }]);
+    await saveTabPackOpenMode("all-background");
+    await restorePortableBackup(backup, { confirmed: true });
+
+    expect((await getSavedTabPacks()).find((item) => item.id === tabPack.id)?.name).toBe("工作台");
+    expect(await getTabPackOpenMode()).toBe("first-active");
+  });
+
+  it("accepts a valid V1 backup and does not erase tag packs that V1 could not contain", async () => {
+    const current = await createPortableBackup({ cloudStatus: "not-connected" });
+    const legacyBody = structuredClone(current) as unknown as Record<string, unknown>;
+    delete legacyBody.contentHash;
+    legacyBody.schemaVersion = 1;
+    const workspace = legacyBody.workspace as Record<string, unknown>;
+    delete workspace.savedTabPacks;
+    delete workspace.tabPackOpenMode;
+    const counts = legacyBody.counts as Record<string, unknown>;
+    delete counts.tabPacks;
+    const legacy = {
+      ...legacyBody,
+      contentHash: await sha256Hex(legacyBody),
+    };
+
+    await saveSavedTabPacks([tabPack]);
+    await saveTabPackOpenMode("first-active");
+    const validated = await validatePortableBackup(legacy);
+    expect(validated.preview.counts.tabPacks).toBe(0);
+    await restorePortableBackup(validated.backup, { confirmed: true });
+
+    expect((await getSavedTabPacks()).map((item) => item.id)).toContain(tabPack.id);
+    expect(await getTabPackOpenMode()).toBe("first-active");
   });
 
   it("rejects a modified file before any restore write", async () => {

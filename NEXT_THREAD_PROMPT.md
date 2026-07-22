@@ -1,5 +1,15 @@
 # WebCollect 下一大型功能线程提示词
 
+## 2026-07-22 V1.5.0 标签组与 favicon 状态
+
+- 当前代码版本：`V1.5.0 / 2026年7月22日`；目标 tag `webcollect-2026-07-22-v1.5.0`；资产 `WebCollect-Chrome-Extension-v1.5.0-2026-07-22.zip`。
+- 最新 closeout：`docs/audit/webcollect-v1.5.0-tab-packs-favicon-closeout-2026-07-22.md`。
+- 标签组是全局固定 URL 模板：拖拽只复制，不修改收藏；导图通过管理器搜索添加；最多 50 个去重 URL，超过 10 个打开前确认。
+- 标签组按记录通过现有 Google Drive 工作区同步并使用软删除；旧设备 payload 缺失字段时不得把本地标签组当成空数据覆盖。
+- 完整 JSON 当前 Schema 为 V2，包含标签组和打开方式；仍接受 V1，恢复 V1 时保留现有标签组。
+- favicon 使用字母即时兜底、Chrome `_favicon`、元数据/直连候选和独立可重建缓存。缓存不属于业务数据、Drive、备份或 dirty set。
+- 扩展仅新增 `favicon` 权限；不得增加 `tabs`、`tabGroups` 或额外主机权限。
+
 ## 2026-07-21 V1.4.1 浮窗快捷键修复状态
 
 - 当前正式应用版本：`V1.4.1 / 2026年7月21日`；tag `webcollect-2026-07-21-v1.4.1`；资产 `WebCollect-Chrome-Extension-v1.4.1-2026-07-21.zip`。
@@ -16,7 +26,8 @@
 
 ## 先确认当前基线
 
-- 当前应用版本：`V1.4.1 / 2026年7月21日`；tag `webcollect-2026-07-21-v1.4.1`；正式资产 `WebCollect-Chrome-Extension-v1.4.1-2026-07-21.zip`。
+- 当前代码版本：`V1.5.0 / 2026年7月22日`；目标 tag `webcollect-2026-07-22-v1.5.0`；资产 `WebCollect-Chrome-Extension-v1.5.0-2026-07-22.zip`。
+- V1.5.0 closeout：`docs/audit/webcollect-v1.5.0-tab-packs-favicon-closeout-2026-07-22.md`。
 - V1.4.1 closeout：`docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md`。
 - V1.4.1 应用提交 `8af01d34bc5d095d7961e658558e8fa7c5c16ff0`，main CI `29842309751` 与 Release workflow `29842892835` 均成功；官方 zip 审计与现有已登录主 Chrome Profile 验收已经完成。
 - V1.4.0 closeout：`docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md`。它继续是 Google Drive、完整 JSON、真实迁移与 30 天 Supabase 保险期的数据基线。

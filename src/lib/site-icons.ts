@@ -256,6 +256,21 @@ const knownIconCandidates: Array<{ domains: string[]; terms?: string[]; urls: st
     terms: ["chatgpt", "openai"],
     urls: ["https://openai.com/favicon.ico"],
   },
+  {
+    domains: ["creator.douyin.com", "douyin.com"],
+    terms: ["抖音创作", "抖音创作者"],
+    urls: ["https://www.douyin.com/favicon.ico"],
+  },
+  {
+    domains: ["creator.xiaohongshu.com", "xiaohongshu.com"],
+    terms: ["小红书创作", "小红书创作者"],
+    urls: ["https://creator.xiaohongshu.com/favicon.ico"],
+  },
+  {
+    domains: ["book.douban.com", "movie.douban.com", "douban.com"],
+    terms: ["豆瓣读书", "豆瓣电影"],
+    urls: ["https://book.douban.com/favicon.ico", "https://movie.douban.com/favicon.ico"],
+  },
 ];
 
 function unique(values: string[]): string[] {
@@ -315,7 +330,7 @@ function hasSemanticTerm(text: string, tokens: string[], term: string) {
   return text.includes(normalizedTerm);
 }
 
-function isGenericFaviconProvider(url: string): boolean {
+export function isGenericFaviconProvider(url: string): boolean {
   const parsed = getUrl(url);
   if (!parsed) return false;
   return (
@@ -325,6 +340,18 @@ function isGenericFaviconProvider(url: string): boolean {
   );
 }
 
+export function getChromeFaviconUrl(pageUrl: string, size = 64): string {
+  try {
+    if (typeof chrome === "undefined" || !chrome.runtime?.getURL || !chrome.runtime.id) return "";
+    const parsed = getUrl(pageUrl);
+    if (!parsed || (parsed.protocol !== "http:" && parsed.protocol !== "https:")) return "";
+    const boundedSize = Math.max(16, Math.min(256, Math.round(size)));
+    return chrome.runtime.getURL(`/_favicon/?pageUrl=${encodeURIComponent(parsed.href)}&size=${boundedSize}`);
+  } catch {
+    return "";
+  }
+}
+
 export function getSiteIconCandidates(card: WebCard): string[] {
   const parsed = getUrl(card.url);
   const hostname = getHostname(card.url);
@@ -332,6 +359,7 @@ export function getSiteIconCandidates(card: WebCard): string[] {
   const haystack = getHaystack(card);
   const genericStored = card.imageUrl && isGenericFaviconProvider(card.imageUrl) ? card.imageUrl : "";
   const specificStored = card.imageUrl && !genericStored ? card.imageUrl : "";
+  const chromeFavicon = getChromeFaviconUrl(card.url);
   const known = knownIconCandidates
     .filter((entry) => {
       const domainMatch = hostname && entry.domains.some((domain) => matchesDomain(hostname, domain));
@@ -346,10 +374,11 @@ export function getSiteIconCandidates(card: WebCard): string[] {
 
   return unique([
     specificStored,
+    chromeFavicon,
     ...known,
-    genericStored,
     origin ? `${origin}/favicon.ico` : "",
     origin ? `${origin}/apple-touch-icon.png` : "",
+    genericStored,
     hostname ? `https://icons.duckduckgo.com/ip3/${hostname}.ico` : "",
     hostname ? `https://www.google.com/s2/favicons?domain=${hostname}&sz=128` : "",
   ]);
@@ -358,6 +387,8 @@ export function getSiteIconCandidates(card: WebCard): string[] {
 export function shouldPersistSiteIcon(currentImageUrl: string, loadedUrl: string): boolean {
   if (!loadedUrl || currentImageUrl === loadedUrl) return false;
   if (isGenericFaviconProvider(loadedUrl)) return false;
+  const loaded = getUrl(loadedUrl);
+  if (!loaded || (loaded.protocol !== "http:" && loaded.protocol !== "https:")) return false;
   return !currentImageUrl || isGenericFaviconProvider(currentImageUrl);
 }
 

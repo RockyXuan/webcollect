@@ -450,10 +450,12 @@ function buildContextDraft(info, tab) {
   if (!url) return null;
 
   const selection = String(info.selectionText || '').trim();
+  const currentPageUrl = normalizeCaptureUrl(info.pageUrl) || normalizeCaptureUrl(tab?.url);
   return {
     url,
     title: selection && selection.length <= 80 ? selection : (tab?.title || titleFromUrl(url)),
     description: selection && selection.length > 80 ? selection.slice(0, 240) : '',
+    favicon: currentPageUrl === url ? String(tab?.favIconUrl || '') : '',
     sourceType: 'context-menu',
     sourcePageUrl: info.pageUrl || tab?.url || '',
     sourcePageTitle: tab?.title || '',

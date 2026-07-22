@@ -5,6 +5,7 @@
 @import '../../src/styles/zoom-wallpaper.css';
 @import '../../src/styles/mindmap.css';
 @import '../../src/styles/search.css';
+@import '../../src/styles/tab-packs.css';
 
 /* Tell Tailwind to scan the shared source files for utility classes */
 @source '../../../src/components';

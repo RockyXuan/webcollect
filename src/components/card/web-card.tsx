@@ -1,7 +1,5 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
-
 import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
   ArrowUpFromLine,
@@ -15,10 +13,10 @@ import {
 } from "lucide-react";
 import type { WebCard } from "@/lib/types";
 import { openWebCollectUrl } from "@/lib/platform";
-import { getSemanticSiteIcon, getSiteIconCandidates, shouldPersistSiteIcon } from "@/lib/site-icons";
 import { useAppStore } from "@/lib/store";
 import { EditActionDock, type EditAction } from "@/components/ui/edit-action-dock";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { ReadOnlySiteIcon } from "@/components/mindmap/read-only-site-icon";
 
 interface WebCardItemProps {
   card: WebCard;
@@ -43,7 +41,6 @@ export function WebCardItem({
   dragListeners,
   onUpdateCard,
 }: WebCardItemProps) {
-  const [imageCandidateIndex, setImageCandidateIndex] = useState(0);
   const [editingField, setEditingField] = useState<"title" | "shortDesc" | null>(null);
   const [editValue, setEditValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -51,20 +48,10 @@ export function WebCardItem({
   const isPinnedBookmark = useAppStore((s) => s.pinnedBookmarkItems.some((item) => item.cardId === card.id));
   const togglePinBookmark = useAppStore((s) => s.togglePinBookmark);
 
-  const iconCandidates = React.useMemo(() => getSiteIconCandidates(card), [card]);
-  const displayImageUrl = iconCandidates[imageCandidateIndex] || "";
-  const semanticIcon = React.useMemo(() => getSemanticSiteIcon(card), [card]);
-  const shouldUseSemanticIcon = Boolean(
-    semanticIcon && (semanticIcon.prefer || !displayImageUrl),
-  );
-  const SemanticIcon = semanticIcon?.Icon;
-
   const handleClick = useCallback(() => {
     if (editMode) return;
     openWebCollectUrl(card.url, linkOpenMode);
   }, [editMode, card.url, linkOpenMode]);
-
-  const displayAbbr = card.abbreviation || card.title?.slice(0, 2) || "?";
 
   // Start inline editing
   const startEdit = useCallback((field: "title" | "shortDesc", e: React.MouseEvent) => {
@@ -100,19 +87,6 @@ export function WebCardItem({
       inputRef.current.select();
     }
   }, [editingField]);
-
-  useEffect(() => {
-    setImageCandidateIndex(0);
-  }, [card.id, card.imageUrl, card.url]);
-
-  const handleImageError = useCallback(() => {
-    setImageCandidateIndex((current) => current + 1);
-  }, []);
-
-  const handleImageLoad = useCallback(() => {
-    if (!onUpdateCard || !shouldPersistSiteIcon(card.imageUrl, displayImageUrl)) return;
-    onUpdateCard({ ...card, imageUrl: displayImageUrl, updatedAt: Date.now() });
-  }, [card, displayImageUrl, onUpdateCard]);
 
   // Handle key events in the inline input
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -161,25 +135,11 @@ export function WebCardItem({
       )}
 
       {/* Icon / Abbreviation - small 6x6 */}
-      <div
-        className="flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/70 bg-white/85 text-[10px] font-bold shadow-sm shadow-blue-100"
-        style={shouldUseSemanticIcon && semanticIcon ? { background: semanticIcon.background, color: semanticIcon.color } : undefined}
-      >
-        {shouldUseSemanticIcon && SemanticIcon ? (
-          <SemanticIcon className="h-[18px] w-[18px]" strokeWidth={2.3} />
-        ) : displayImageUrl ? (
-          <img
-            src={displayImageUrl}
-            alt={card.title}
-            className="h-full w-full rounded-xl object-cover"
-            onError={handleImageError}
-            onLoad={handleImageLoad}
-            loading="lazy"
-          />
-        ) : (
-          <span className="text-slate-500">{displayAbbr}</span>
-        )}
-      </div>
+      <ReadOnlySiteIcon
+        card={card}
+        className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/70 bg-white/85 text-[10px] font-bold text-slate-500 shadow-sm shadow-blue-100"
+        onUpdateCard={onUpdateCard}
+      />
 
       {/* Text content - two-line: name on line 1, shortDesc on line 2 */}
       <div className="min-w-0 flex-[1_1_0] overflow-hidden">

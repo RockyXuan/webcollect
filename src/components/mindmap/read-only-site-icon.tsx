@@ -3,13 +3,20 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import type { WebCard } from "@/lib/types";
-import { getSemanticSiteIcon, getSiteIconCandidates } from "@/lib/site-icons";
+import { cacheLoadedSiteIcon, getCachedSiteIcon } from "@/lib/site-icon-cache";
+import {
+  getSemanticSiteIcon,
+  getSiteIconCandidates,
+  isGenericFaviconProvider,
+  shouldPersistSiteIcon,
+} from "@/lib/site-icons";
 
 interface ReadOnlySiteIconProps {
   card: WebCard;
   className: string;
   fallbackClassName?: string;
   fallbackStyle?: CSSProperties;
+  onUpdateCard?: (card: WebCard) => void;
 }
 
 export function ReadOnlySiteIcon({
@@ -17,10 +24,16 @@ export function ReadOnlySiteIcon({
   className,
   fallbackClassName = "",
   fallbackStyle,
+  onUpdateCard,
 }: ReadOnlySiteIconProps) {
   const [candidateIndex, setCandidateIndex] = useState(0);
   const [loaded, setLoaded] = useState(false);
-  const candidates = useMemo(() => getSiteIconCandidates(card), [card]);
+  const [cachedIcon, setCachedIcon] = useState("");
+  const candidates = useMemo(() => {
+    const base = getSiteIconCandidates(card);
+    const specificStored = card.imageUrl && !isGenericFaviconProvider(card.imageUrl) ? card.imageUrl : "";
+    return [...new Set([specificStored, cachedIcon, ...base].filter(Boolean))];
+  }, [cachedIcon, card]);
   const candidatesKey = candidates.join("\u0000");
   const semantic = useMemo(() => getSemanticSiteIcon(card), [card]);
   const candidate = candidates[candidateIndex] || "";
@@ -32,6 +45,27 @@ export function ReadOnlySiteIcon({
     setCandidateIndex(0);
     setLoaded(false);
   }, [card.id, candidatesKey]);
+
+  useEffect(() => {
+    let active = true;
+    setCachedIcon("");
+    void getCachedSiteIcon(card.url).then((value) => {
+      if (active) setCachedIcon(value);
+    });
+    return () => {
+      active = false;
+    };
+  }, [card.url]);
+
+  const handleLoaded = () => {
+    setLoaded(true);
+    if (candidate !== card.imageUrl && !isGenericFaviconProvider(candidate)) {
+      void cacheLoadedSiteIcon(card.url, candidate);
+    }
+    if (onUpdateCard && shouldPersistSiteIcon(card.imageUrl, candidate)) {
+      onUpdateCard({ ...card, imageUrl: candidate, updatedAt: Date.now() });
+    }
+  };
 
   return (
     <span
@@ -55,7 +89,8 @@ export function ReadOnlySiteIcon({
           className={`wc-mindmap-icon-overlay${loaded ? " is-loaded" : ""}`}
           src={candidate}
           alt=""
-          onLoad={() => setLoaded(true)}
+          loading="lazy"
+          onLoad={handleLoaded}
           onError={() => {
             setLoaded(false);
             setCandidateIndex((index) => index + 1);

@@ -6,7 +6,7 @@
  * 2. Chrome Extension — uses chrome.runtime.sendMessage → background.js
  */
 
-import type { LinkOpenMode, SafetyCheckResult, SafetyStatus } from "./types";
+import type { LinkOpenMode, SafetyCheckResult, SafetyStatus, TabPackOpenMode } from "./types";
 
 // ── Platform Detection ──
 
@@ -35,6 +35,65 @@ export function openWebCollectUrl(url: string, mode: LinkOpenMode): void {
   }
 
   openBrowserWindow(url, mode);
+}
+
+export interface OpenTabPackResult {
+  requested: number;
+  opened: number;
+  blocked: number;
+}
+
+/** Open a fixed set of URLs without mutating the saved template. */
+export async function openTabPackUrls(
+  urls: readonly string[],
+  mode: TabPackOpenMode,
+): Promise<OpenTabPackResult> {
+  const safeUrls = urls.slice(0, 50);
+  if (safeUrls.length === 0) return { requested: 0, opened: 0, blocked: 0 };
+
+  if (isChromeExtension() && typeof chrome !== "undefined" && chrome.tabs?.create) {
+    const createdTabIds: number[] = [];
+    for (const url of safeUrls) {
+      const tabId = await new Promise<number | null>((resolve) => {
+        chrome.tabs.create({ url, active: false }, (tab) => {
+          if (chrome.runtime.lastError || typeof tab?.id !== "number") {
+            resolve(null);
+            return;
+          }
+          resolve(tab.id);
+        });
+      });
+      if (tabId !== null) createdTabIds.push(tabId);
+    }
+    if (mode === "first-active" && createdTabIds[0] !== undefined && chrome.tabs.update) {
+      await new Promise<void>((resolve) => {
+        chrome.tabs.update(createdTabIds[0], { active: true }, () => resolve());
+      });
+    }
+    return {
+      requested: safeUrls.length,
+      opened: createdTabIds.length,
+      blocked: safeUrls.length - createdTabIds.length,
+    };
+  }
+
+  const openedWindows: Window[] = [];
+  for (const url of safeUrls) {
+    const opened = window.open(url, "_blank");
+    if (!opened) continue;
+    try {
+      opened.opener = null;
+    } catch {
+      // The tab is still open when an older browser prevents clearing opener.
+    }
+    openedWindows.push(opened);
+  }
+  if (mode === "first-active") openedWindows[0]?.focus();
+  return {
+    requested: safeUrls.length,
+    opened: openedWindows.length,
+    blocked: safeUrls.length - openedWindows.length,
+  };
 }
 
 function openExtensionTab(url: string, mode: LinkOpenMode): void {

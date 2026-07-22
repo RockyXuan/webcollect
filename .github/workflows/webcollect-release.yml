@@ -80,12 +80,13 @@ jobs:
           notes=(
             "WebCollect Chrome extension ${VERSION_LABEL}."
             ""
-            "- Prevents keyboard events typed inside the WebCollect floating capture panel from triggering host-page shortcuts such as GitHub search."
-            "- Preserves Chinese IME input, uppercase/lowercase typing, Tab navigation, copy/paste, and ordinary page shortcuts outside the panel."
+            "- Adds synced saved tag packs: drag a collection card onto a compact top-shelf group, then reopen the fixed URL template in one click."
+            "- Keeps saved tag-pack snapshots independent from later collection edits, supports deduplication, ordering, soft deletion, and Portable Backup V2 with V1 import compatibility."
+            "- Repairs missing favicons with immediate letter fallbacks, Chrome's private favicon renderer, stronger metadata selection, direct site candidates, and a bounded rebuildable local icon cache."
             "- Stores optional cloud sync data in each user's own Google Drive appDataFolder with the minimal drive.appdata scope."
             "- Keeps IndexedDB local-first and fully usable when Drive is disconnected, unavailable, or unsupported."
-            "- Changes no storage key, permission, collection action, Drive contract, IndexedDB schema, snapshot, seed, or extension identity."
-            "- Verified by unit, legacy, Playwright, real-extension keyboard, Web build, extension artifact, size, data-isolation, and production dependency checks."
+            "- Adds only the Chrome favicon permission; it does not request tabs or tabGroups, and it keeps the stable extension identity, collection schema, and seed data."
+            "- Verified by unit, legacy, Playwright, Web build, extension artifact, size, data-isolation, and production dependency checks."
           )
           printf '%s\n' "${notes[@]}" > release-notes.md
 

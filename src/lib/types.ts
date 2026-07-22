@@ -27,6 +27,37 @@ export interface PinnedBookmarkItem {
   updatedAt: number;
 }
 
+export type TabPackOpenMode = "all-background" | "first-active";
+
+export interface SavedTabPackItem {
+  id: string;
+  sourceCardId?: string;
+  url: string;
+  title: string;
+  iconUrl?: string;
+  order: number;
+  addedAt: number;
+}
+
+/**
+ * A fixed tab-opening template. Items intentionally keep a snapshot of their
+ * title, URL and icon so later collection edits or deletions cannot rewrite a
+ * saved template. Deleted packs remain as soft tombstones for Drive merging.
+ */
+export interface SavedTabPack {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  order: number;
+  items: SavedTabPackItem[];
+  createdAt: number;
+  updatedAt: number;
+  deletedAt?: number;
+  syncRevision: number;
+  syncDeviceId: string;
+}
+
 export interface Category {
   id: string;
   name: string;

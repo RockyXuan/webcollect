@@ -79,4 +79,16 @@ describe("shared metadata extractor", () => {
     expect(result.metadata).toEqual(extractMetadataFromHtml(html, "https://example.com"));
     expect(result.knowledge.text).toContain("Detailed feature overview.");
   });
+
+  it("chooses the strongest declared favicon instead of the first low-resolution icon", () => {
+    const result = extractMetadataFromHtml(`
+      <html><head>
+        <link rel="icon" sizes="16x16" href="/tiny.png">
+        <link rel="apple-touch-icon" sizes="180x180" href="/touch.png">
+        <link rel="icon" type="image/svg+xml" href="/brand.svg">
+      </head><body></body></html>
+    `, "https://creator.example.com/page");
+
+    expect(result.favicon).toBe("https://creator.example.com/touch.png");
+  });
 });

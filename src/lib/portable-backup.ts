@@ -30,21 +30,22 @@ import { readCollectionViewMode, writeCollectionViewMode } from "@/lib/collectio
 import { readWallpaperStartupMode, writeWallpaperStartupMode } from "@/lib/wallpaper-startup-mode";
 import type { WallpaperMode } from "@/lib/wallpaper-types";
 
-export const PORTABLE_BACKUP_SCHEMA_VERSION = 1 as const;
+export const PORTABLE_BACKUP_SCHEMA_VERSION = 2 as const;
+export const LEGACY_PORTABLE_BACKUP_SCHEMA_VERSION = 1 as const;
 export const PORTABLE_BACKUP_KIND = "webcollect-portable-backup" as const;
 export const PORTABLE_BACKUP_LAST_EXPORT_KEY = "webcollect_portable_backup_last_export_at";
 export const PORTABLE_BACKUP_REMINDER_DAYS = 30;
 
 export type PortableBackupCloudStatus = "not-connected" | "included" | "local-only";
 
-export interface PortableBackupCounts extends LocalSnapshotCounts {
+export interface PortableBackupCounts extends Omit<LocalSnapshotCounts, "tabPacks"> {
+  tabPacks: number;
   localSnapshots: number;
   driveSnapshots: number;
   mindmapViewStates: number;
 }
 
-export interface PortableBackupV1 {
-  schemaVersion: typeof PORTABLE_BACKUP_SCHEMA_VERSION;
+interface PortableBackupBase {
   kind: typeof PORTABLE_BACKUP_KIND;
   appVersion: string;
   createdAt: number;
@@ -58,6 +59,16 @@ export interface PortableBackupV1 {
   counts: PortableBackupCounts;
   contentHash: string;
 }
+
+export interface PortableBackupV1 extends PortableBackupBase {
+  schemaVersion: typeof LEGACY_PORTABLE_BACKUP_SCHEMA_VERSION;
+}
+
+export interface PortableBackupV2 extends PortableBackupBase {
+  schemaVersion: typeof PORTABLE_BACKUP_SCHEMA_VERSION;
+}
+
+export type PortableBackup = PortableBackupV1 | PortableBackupV2;
 
 export interface PortableBackupPreview {
   appVersion: string;
@@ -85,10 +96,10 @@ export function isPortableBackupRestoreInProgress(): boolean {
   return restoreDepth > 0;
 }
 
-function backupBody(backup: PortableBackupV1): Omit<PortableBackupV1, "contentHash"> {
-  const body = { ...backup } as Partial<PortableBackupV1>;
+function backupBody(backup: PortableBackup): Omit<PortableBackup, "contentHash"> {
+  const body = { ...backup } as Partial<PortableBackup>;
   delete body.contentHash;
-  return body as Omit<PortableBackupV1, "contentHash">;
+  return body as Omit<PortableBackup, "contentHash">;
 }
 
 function countWorkspace(data: LocalSnapshotData): LocalSnapshotCounts {
@@ -100,6 +111,7 @@ function countWorkspace(data: LocalSnapshotData): LocalSnapshotCounts {
     warehouseCategories: data.warehouseCategories.length,
     warehouseCards: data.warehouseCards.length,
     warehouseBatches: data.warehouseImportBatches.length,
+    tabPacks: (data.savedTabPacks || []).filter((pack) => !pack.deletedAt).length,
   };
 }
 
@@ -109,8 +121,10 @@ function buildCounts(
   driveSnapshots: CloudSnapshotRecord[],
   mindmapViewStates: MindmapViewStateRecord[],
 ): PortableBackupCounts {
+  const workspaceCounts = countWorkspace(workspace);
   return {
-    ...countWorkspace(workspace),
+    ...workspaceCounts,
+    tabPacks: workspaceCounts.tabPacks || 0,
     localSnapshots: localSnapshots.length,
     driveSnapshots: driveSnapshots.length,
     mindmapViewStates: mindmapViewStates.length,
@@ -139,7 +153,7 @@ function assertArrayProperty(value: Record<string, unknown>, key: string): void 
   if (!Array.isArray(value[key])) throw new Error(`备份缺少有效的 ${key} 列表。`);
 }
 
-function assertWorkspaceShape(value: unknown): asserts value is LocalSnapshotData {
+function assertWorkspaceShape(value: unknown, requireTabPacks: boolean): asserts value is LocalSnapshotData {
   if (!isRecord(value)) throw new Error("备份中的工作区格式无效。");
   for (const key of [
     "cards",
@@ -154,6 +168,14 @@ function assertWorkspaceShape(value: unknown): asserts value is LocalSnapshotDat
     "warehouseImportBatches",
   ]) {
     assertArrayProperty(value, key);
+  }
+  if (requireTabPacks) {
+    assertArrayProperty(value, "savedTabPacks");
+    if (value.tabPackOpenMode !== "all-background" && value.tabPackOpenMode !== "first-active") {
+      throw new Error("备份中的标签组打开方式无效。");
+    }
+  } else if ("savedTabPacks" in value && !Array.isArray(value.savedTabPacks)) {
+    throw new Error("备份中的 savedTabPacks 格式无效。");
   }
   if (!isRecord(value.categoryWidths)) throw new Error("备份中的分类宽度格式无效。");
   if (typeof value.visualScale !== "number" || !Number.isFinite(value.visualScale)) {
@@ -222,14 +244,14 @@ function normalizeCloudStatus(value: unknown): PortableBackupCloudStatus {
 export async function createPortableBackup(options: {
   cloudStatus: PortableBackupCloudStatus;
   driveSnapshots?: CloudSnapshotRecord[];
-}): Promise<PortableBackupV1> {
+}): Promise<PortableBackupV2> {
   const [workspace, localSnapshots, mindmapViewStates] = await Promise.all([
     readCurrentSnapshotData(),
     getLocalDataSnapshots(),
     listMindmapViewStates(),
   ]);
   const driveSnapshots = options.driveSnapshots || [];
-  const backup: PortableBackupV1 = {
+  const backup: PortableBackupV2 = {
     schemaVersion: PORTABLE_BACKUP_SCHEMA_VERSION,
     kind: PORTABLE_BACKUP_KIND,
     appVersion: APP_VERSION,
@@ -249,12 +271,13 @@ export async function createPortableBackup(options: {
 }
 
 export async function validatePortableBackup(value: unknown): Promise<{
-  backup: PortableBackupV1;
+  backup: PortableBackup;
   preview: PortableBackupPreview;
 }> {
   if (!isRecord(value)) throw new Error("这不是有效的 WebCollect 完整备份。");
   if (value.kind !== PORTABLE_BACKUP_KIND) throw new Error("文件类型不是 WebCollect 完整备份。");
-  if (value.schemaVersion !== PORTABLE_BACKUP_SCHEMA_VERSION) {
+  if (value.schemaVersion !== LEGACY_PORTABLE_BACKUP_SCHEMA_VERSION
+    && value.schemaVersion !== PORTABLE_BACKUP_SCHEMA_VERSION) {
     throw new Error(`暂不支持这个备份版本（${String(value.schemaVersion)}）。`);
   }
   if (typeof value.appVersion !== "string" || !value.appVersion) throw new Error("备份缺少应用版本。");
@@ -264,7 +287,8 @@ export async function validatePortableBackup(value: unknown): Promise<{
   if (typeof value.contentHash !== "string" || !/^[a-f0-9]{64}$/.test(value.contentHash)) {
     throw new Error("备份缺少有效的 SHA-256 校验值。");
   }
-  assertWorkspaceShape(value.workspace);
+  const isV2 = value.schemaVersion === PORTABLE_BACKUP_SCHEMA_VERSION;
+  assertWorkspaceShape(value.workspace, isV2);
   assertArrayProperty(value, "localSnapshots");
   assertArrayProperty(value, "driveSnapshots");
   assertArrayProperty(value, "mindmapViewStates");
@@ -288,7 +312,7 @@ export async function validatePortableBackup(value: unknown): Promise<{
     throw new Error("备份中的壁纸启动模式无效。");
   }
 
-  const backup = value as unknown as PortableBackupV1;
+  const backup = value as unknown as PortableBackup;
   const actualHash = await sha256Hex(backupBody(backup));
   if (actualHash !== backup.contentHash) throw new Error("备份 SHA-256 校验失败，文件可能已损坏或被修改。");
 
@@ -298,7 +322,10 @@ export async function validatePortableBackup(value: unknown): Promise<{
     backup.driveSnapshots,
     backup.mindmapViewStates,
   );
-  if (stableJsonStringify(expectedCounts) !== stableJsonStringify(backup.counts)) {
+  const expectedStoredCounts = isV2
+    ? expectedCounts
+    : Object.fromEntries(Object.entries(expectedCounts).filter(([key]) => key !== "tabPacks"));
+  if (stableJsonStringify(expectedStoredCounts) !== stableJsonStringify(backup.counts)) {
     throw new Error("备份数量校验失败，文件可能不完整。");
   }
 
@@ -317,7 +344,7 @@ export async function validatePortableBackup(value: unknown): Promise<{
 }
 
 export async function parsePortableBackup(text: string): Promise<{
-  backup: PortableBackupV1;
+  backup: PortableBackup;
   preview: PortableBackupPreview;
 }> {
   let value: unknown;
@@ -329,7 +356,7 @@ export async function parsePortableBackup(text: string): Promise<{
   return validatePortableBackup(value);
 }
 
-export function serializePortableBackup(backup: PortableBackupV1): string {
+export function serializePortableBackup(backup: PortableBackup): string {
   return JSON.stringify(backup, null, 2);
 }
 
@@ -341,7 +368,7 @@ export function portableBackupFileName(createdAt: number): string {
   return `WebCollect-complete-backup-${stamp}.json`;
 }
 
-export function downloadPortableBackup(backup: PortableBackupV1): void {
+export function downloadPortableBackup(backup: PortableBackup): void {
   if (typeof document === "undefined") throw new Error("当前环境无法下载备份文件。");
   const blob = new Blob([serializePortableBackup(backup)], { type: "application/json;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -386,6 +413,7 @@ function maxObservedRevision(data: LocalSnapshotData): number {
     ...data.warehouseCards,
     ...data.warehouseCategories,
     ...data.recycleBin.flatMap((item) => [...item.cards, ...item.categories]),
+    ...(data.savedTabPacks || []),
   ].map((item) => item.syncRevision || 0);
   const tombstoneRevisions = (data.syncTombstones || []).map((item) => item.syncRevision);
   const preferenceRevisions = Object.values(data.syncPreferenceRevisions || {}).map((item) => item.syncRevision);
@@ -393,7 +421,7 @@ function maxObservedRevision(data: LocalSnapshotData): number {
 }
 
 export async function restorePortableBackup(
-  input: PortableBackupV1,
+  input: PortableBackup,
   options: { confirmed: true },
 ): Promise<RestorePortableBackupResult> {
   if (options.confirmed !== true) throw new Error("恢复已取消：需要明确确认后才能写入数据。");

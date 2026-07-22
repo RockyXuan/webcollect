@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { SyncStatusBadge, UserMenu } from "@/components/auth/user-menu";
 import { BookmarkBar } from "@/components/bookmark/bookmark-bar";
+import { TabPackShelf } from "@/components/tab-packs/tab-pack-shelf";
 import { ReadOnlySiteIcon } from "@/components/mindmap/read-only-site-icon";
 import { KnowledgeConsentAlert } from "@/components/search/knowledge-consent-alert";
 import { WallpaperQuickControl } from "@/components/wallpaper/wallpaper-quick-control";
@@ -1151,6 +1152,7 @@ export function TopNav({
       </div>
 
       <div className="wc-shell wc-header-tabs-shell">
+        <div className="wc-section-and-pack-row">
         <div className={`wc-section-tabs ${sectionEditMode ? "wc-section-tabs-editing" : ""}`}>
           <button
             type="button"
@@ -1213,6 +1215,8 @@ export function TopNav({
             <span>分项</span>
           </Button>
           )}
+        </div>
+        <TabPackShelf />
         </div>
       </div>
 
