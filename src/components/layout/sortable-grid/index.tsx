@@ -82,6 +82,7 @@ export function SortableGrid({
   const lockedHintTimerRef = useRef<number | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const tabPackDropTargetRef = useRef<HTMLElement | null>(null);
+  const dragPointerOriginRef = useRef<{ x: number; y: number } | null>(null);
   const searchFrameRef = useRef<number | null>(null);
   const searchHighlightTimerRef = useRef<number | null>(null);
   const highlightedSearchTargetRef = useRef<HTMLElement | null>(null);
@@ -246,12 +247,22 @@ export function SortableGrid({
   const handleDragStart = (event: DragStartEvent) => {
     const id = String(event.active.id);
     setActiveId(id);
-    if (id.startsWith("card:")) document.documentElement.classList.add("wc-card-dragging-to-pack");
+    if (id.startsWith("card:")) {
+      const activator = event.activatorEvent;
+      dragPointerOriginRef.current = "clientX" in activator
+        && "clientY" in activator
+        && typeof activator.clientX === "number"
+        && typeof activator.clientY === "number"
+        ? { x: activator.clientX, y: activator.clientY }
+        : null;
+      document.documentElement.classList.add("wc-card-dragging-to-pack");
+    }
   };
 
   const clearTabPackDropTarget = () => {
     tabPackDropTargetRef.current?.removeAttribute("data-drag-over");
     tabPackDropTargetRef.current = null;
+    dragPointerOriginRef.current = null;
     document.documentElement.classList.remove("wc-card-dragging-to-pack");
   };
 
@@ -260,12 +271,13 @@ export function SortableGrid({
     document.documentElement.classList.remove("wc-card-dragging-to-pack");
   }, []);
 
-  const findTabPackDropTarget = (event: Pick<DragMoveEvent, "active">): HTMLElement | null => {
+  const findTabPackDropTarget = (event: Pick<DragMoveEvent, "active" | "delta">): HTMLElement | null => {
     if (!String(event.active.id).startsWith("card:")) return null;
     const rect = event.active.rect.current.translated;
-    if (!rect) return null;
-    const x = rect.left + rect.width / 2;
-    const y = rect.top + rect.height / 2;
+    const pointerOrigin = dragPointerOriginRef.current;
+    const x = pointerOrigin ? pointerOrigin.x + event.delta.x : rect ? rect.left + rect.width / 2 : null;
+    const y = pointerOrigin ? pointerOrigin.y + event.delta.y : rect ? rect.top + rect.height / 2 : null;
+    if (x === null || y === null) return null;
     for (const element of document.elementsFromPoint(x, y)) {
       const target = element.closest<HTMLElement>("[data-tab-pack-drop-id]");
       if (target) return target;
