@@ -4,13 +4,15 @@
 
 ## 2026-07-23 V1.5.1 Next.js Security Patch
 
-This section supersedes the current release target below. V1.5.1 is the current code target; V1.5.0 remains the tab-pack/favicon feature baseline and V1.4.0 remains the cloud/data baseline.
+This section records the current published release. V1.5.0 remains the tab-pack/favicon feature baseline and V1.4.0 remains the cloud/data baseline.
 
-- Target identity: `V1.5.1 / 2026年7月23日`; tag `webcollect-2026-07-23-v1.5.1`; asset `WebCollect-Chrome-Extension-v1.5.1-2026-07-23.zip`.
+- Published identity: `V1.5.1 / 2026年7月23日`; tag `webcollect-2026-07-23-v1.5.1`; asset `WebCollect-Chrome-Extension-v1.5.1-2026-07-23.zip`.
 - Closeout: `docs/audit/webcollect-v1.5.1-next-security-closeout-2026-07-23.md`.
 - Nine new Next.js production advisories appeared after the V1.5.0 release and caused the later docs-only main run to fail its live audit. The patched line is 16.2.11.
 - Only `next` and `eslint-config-next` move from 16.2.10 to 16.2.11. No WebCollect feature, storage, Drive, backup, permission, extension identity, or user-data path changes.
 - Local gates pass with 413 Vitest, 31 legacy scripts, 45 Playwright tests, both production builds, artifact/size checks, and 204 production packages with zero audit findings.
+- Application commit `713cdc975801b0d98b9bc0a2891e7f95592da871`, main CI `29974438847`, and Release workflow `29974689750` passed. The single official asset is `17,065,370` bytes with SHA-256 `4667cfd57ede39676b89d87cd9055313bfe52290b134d461b5fa70396f10e29d`; its 41-file tree exactly matches the local release build.
+- The existing signed-in primary-profile extension was backed up append-only, updated from the official package, and reloaded in the dedicated auxiliary Chrome window. The real new tab retained the seven sections, collection wall, recycle count 15, account entry, bookmark bar, and tab-pack shelf. A Drive request timed out into the explicit local-data-preserved state; no retry or write was triggered during acceptance.
 
 ## 2026-07-22 V1.5.0 Saved Tab Packs and Favicon Recovery
 
@@ -146,7 +148,7 @@ This section supersedes older development status. The user explicitly waived the
 
 ## Next Major Feature Thread
 
-- V1.5.1 must finish its CI, Release, official-zip audit, and real Chrome read-only check before the next large feature starts.
+- V1.5.1 CI, Release, official-zip audit, and real Chrome read-only check are complete; the next large feature may start from this baseline.
 - Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, the V1.5.1 closeout, the V1.5.0 feature closeout, and the V1.4.0 data-baseline closeout before changing code.
 - Ask for or read the user's new feature description, then inspect only the relevant implementation paths before choosing scope, tests, version bump, and release plan.
 - Preserve the V1.4.0 local-first Drive, backup, data, and migration guarantees. Do not reset IndexedDB, old Supabase data, extension storage, categories, cards, preferences, snapshots, local view state, mode preference, knowledge consent/cache, derived vectors, or the two documented empty inbox artifacts.

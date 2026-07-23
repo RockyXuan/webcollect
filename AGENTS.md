@@ -2,7 +2,7 @@
 
 ## 2026-07-23 current V1.5.1 Next.js security patch entry
 
-Read `AGD.md` and `docs/audit/webcollect-v1.5.1-next-security-closeout-2026-07-23.md` first. V1.5.1 upgrades only the Web runtime and matching lint package from Next.js 16.2.10 to 16.2.11 after nine new production advisories were published after V1.5.0. It must not change saved tab packs, favicon behavior, Drive sync, Portable Backup, collection data, permissions, stable extension identity, Chrome storage, snapshots, or seed data. V1.5.0 remains the feature baseline and V1.4.0 remains the cloud/data baseline.
+Read `AGD.md` and `docs/audit/webcollect-v1.5.1-next-security-closeout-2026-07-23.md` first. V1.5.1 upgrades only the Web runtime and matching lint package from Next.js 16.2.10 to 16.2.11 after nine new production advisories were published after V1.5.0. It does not change saved tab packs, favicon behavior, Drive sync, Portable Backup, collection data, permissions, stable extension identity, Chrome storage, snapshots, or seed data. The published tag is `webcollect-2026-07-23-v1.5.1`, the official asset is `WebCollect-Chrome-Extension-v1.5.1-2026-07-23.zip`, and main CI, Release workflow, official-zip audit, and existing-primary-Chrome read-only acceptance passed. V1.5.0 remains the feature baseline and V1.4.0 remains the cloud/data baseline.
 
 ## 2026-07-22 current V1.5.0 tab-pack and favicon entry
 

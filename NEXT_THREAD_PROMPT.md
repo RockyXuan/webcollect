@@ -2,10 +2,12 @@
 
 ## 2026-07-23 V1.5.1 Next.js 安全补丁状态
 
-- 当前代码版本：`V1.5.1 / 2026年7月23日`；目标 tag `webcollect-2026-07-23-v1.5.1`；资产 `WebCollect-Chrome-Extension-v1.5.1-2026-07-23.zip`。
+- 当前正式应用版本：`V1.5.1 / 2026年7月23日`；tag `webcollect-2026-07-23-v1.5.1`；资产 `WebCollect-Chrome-Extension-v1.5.1-2026-07-23.zip`。
 - 最新 closeout：`docs/audit/webcollect-v1.5.1-next-security-closeout-2026-07-23.md`。
 - V1.5.1 只把 `next` 与 `eslint-config-next` 从 `16.2.10` 升级到官方安全修复版 `16.2.11`；不改变 V1.5.0 标签组/favicon 或 V1.4.0 Drive/完整备份契约。
-- 本地 413 Vitest、31 legacy、45 Playwright、类型、lint、Web/扩展构建、产物/体积和 204 个生产依赖零漏洞审计已经通过；正式发布证据完成后写回 closeout。
+- 本地 413 Vitest、31 legacy、45 Playwright、类型、lint、Web/扩展构建、产物/体积和 204 个生产依赖零漏洞审计已经通过；应用提交 `713cdc975801b0d98b9bc0a2891e7f95592da871`、main CI `29974438847` 与 Release workflow `29974689750` 均成功。
+- 正式 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-23-v1.5.1`；zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-23-v1.5.1/WebCollect-Chrome-Extension-v1.5.1-2026-07-23.zip`；单一资产 `17,065,370` bytes，SHA-256 `4667cfd57ede39676b89d87cd9055313bfe52290b134d461b5fa70396f10e29d`。
+- 现有主 Chrome Profile 的辅助窗口已原位重载；7 个分项、收藏墙、回收站 15、账户入口、书签栏和标签组入口完整。Drive 当时超时并安全降级到本机数据保留状态，验收没有点击重试或执行写入。
 
 ## 2026-07-22 V1.5.0 标签组与 favicon 状态
 
@@ -35,14 +37,14 @@
 
 ## 先确认当前基线
 
-- 当前代码版本：`V1.5.1 / 2026年7月23日`；目标 tag `webcollect-2026-07-23-v1.5.1`；资产 `WebCollect-Chrome-Extension-v1.5.1-2026-07-23.zip`。
+- 当前代码与正式版本：`V1.5.1 / 2026年7月23日`；tag `webcollect-2026-07-23-v1.5.1`；资产 `WebCollect-Chrome-Extension-v1.5.1-2026-07-23.zip`。
 - V1.5.1 closeout：`docs/audit/webcollect-v1.5.1-next-security-closeout-2026-07-23.md`。
 - V1.5.0 closeout：`docs/audit/webcollect-v1.5.0-tab-packs-favicon-closeout-2026-07-22.md`。
 - V1.5.0 应用提交 `fd3f9732ac448e46998a9660044b7175aa2c4fd1` 与 `2ad9375db057c9b5567ceaebce543f226b9eeef4`、main CI `29936934533`、Release workflow `29937491867`、官方 zip 审计和现有主 Chrome Profile 验收均已完成。
 - V1.4.1 closeout：`docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md`。
 - V1.4.1 应用提交 `8af01d34bc5d095d7961e658558e8fa7c5c16ff0`，main CI `29842309751` 与 Release workflow `29842892835` 均成功；官方 zip 审计与现有已登录主 Chrome Profile 验收已经完成。
 - V1.4.0 closeout：`docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md`。它继续是 Google Drive、完整 JSON、真实迁移与 30 天 Supabase 保险期的数据基线。
-- 当前正式 Release 仍是 V1.5.0；V1.5.1 安全补丁发布完成后，本行改为新的 Release 与 zip 直链。
+- 当前正式 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-23-v1.5.1`；zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-23-v1.5.1/WebCollect-Chrome-Extension-v1.5.1-2026-07-23.zip`。V1.5.0 继续作为标签组/favicon 功能基线。
 - V1.3.0 保留 Google / 百度 / Bing，新增纯本地模糊检索、拼音、错字容错、意图别名、加权全文排序和 opt-in 公开网页知识缓存；不调用 AI API，也不捆绑本地模型。348 unit、31 legacy、44 E2E、Web/扩展构建、17.4 MiB 门禁和 208 个生产依赖零漏洞审计已完成。
 - V1.4.0 将正式云同步切换为用户自己的 Google Drive 隐藏应用目录，并增加完整 JSON 备份/恢复；本地 IndexedDB 仍是第一写入目标，V1.3.1 顶栏与 V1.3.0 本地搜索行为保持不变。
 
