@@ -80,13 +80,17 @@ jobs:
           notes=(
             "WebCollect Chrome extension ${VERSION_LABEL}."
             ""
-            "- Updates the Web runtime to Next.js 16.2.11, resolving the nine production security advisories published after V1.5.0."
+            "- Adapts the header and classic collection wall to the width WebCollect actually owns, including Chrome top-tab and side-tab layouts."
+            "- Keeps the V1.5.2 wide desktop geometry at 1880px and above, applies bounded presentation-only density from 1600px to 1879px, and reflows the toolbar below 1600px."
+            "- Leaves mindmap node, edge, camera, preview, and drag coordinates unscaled while its stage continues to fit the available viewport."
+            "- Keeps responsive density in memory only; it does not rewrite visualScale, manual layout widths, columns, locks, collection data, Drive data, or snapshots."
+            "- Keeps the V1.5.2 GitHub repository title, bounded public README summary, local translation fallback, and confirmed duplicate-metadata update flow."
             "- Keeps the V1.5 saved tag packs: drag a collection card onto a compact top-shelf group, then reopen the fixed URL template in one click."
             "- Keeps saved tag-pack snapshots independent from later collection edits, supports deduplication, ordering, soft deletion, and Portable Backup V2 with V1 import compatibility."
             "- Repairs missing favicons with immediate letter fallbacks, Chrome's private favicon renderer, stronger metadata selection, direct site candidates, and a bounded rebuildable local icon cache."
             "- Stores optional cloud sync data in each user's own Google Drive appDataFolder with the minimal drive.appdata scope."
             "- Keeps IndexedDB local-first and fully usable when Drive is disconnected, unavailable, or unsupported."
-            "- Adds only the Chrome favicon permission; it does not request tabs or tabGroups, and it keeps the stable extension identity, collection schema, and seed data."
+            "- Adds no permission, dependency, storage key, Chrome API, Drive schema, or data migration; the existing favicon permission and stable extension identity are unchanged."
             "- Verified by unit, legacy, Playwright, Web build, extension artifact, size, data-isolation, and production dependency checks."
           )
           printf '%s\n' "${notes[@]}" > release-notes.md
