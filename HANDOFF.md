@@ -13,6 +13,7 @@ This section records the current published release. V1.5.0 remains the tab-pack/
 - Legacy/right-click duplicates still skip; multiple duplicates and version conflicts fail closed. No permission, dependency, storage key, Drive schema, migration, snapshot, seed, or unrelated collection behavior changes.
 - Application commit `3cd02b2bc7c85e655f98e6cea5619c3f9ac710e8`, main CI `29987210999`, and Release workflow `29987630172` passed. The single official asset is `17,069,709` bytes with SHA-256 `cc76c1c06bb707d3edceb974cc1d5a7d7b81b51d9dfee704bad2d7364c81a3e9`; its 41-file tree matches the local final build.
 - The existing signed-in primary-profile extension was reloaded from the official package in the auxiliary task window. Seven sections, recycle count 15, real collection data, account, tab packs, and the Drive-synced state all restored without any acceptance write.
+- A post-release evidence run exposed a test-fixture race that injected the duplicate card before fresh-extension initialization had fully settled. Test-only commit `2f164a64c5c8fe8fa21ed19561415106014e0d14` now waits for IndexedDB initialization and the published capture-destination cache, then observes the confirmed update for stability; follow-up main CI `29988897257` passed. Runtime code, tag, and official asset are unchanged.
 
 ## 2026-07-23 V1.5.1 Next.js Security Patch
 
