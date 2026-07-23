@@ -23,6 +23,7 @@ import { requestCreateTabPackFromCard } from "@/lib/tab-pack-events";
 import { useTabPackStore } from "@/lib/tab-pack-store";
 import type { Category, WebCard } from "@/lib/types";
 import { SortableCategoryBlock } from "./category-block";
+import { useAdaptiveLayoutMetrics } from "@/components/layout/adaptive-resolution-viewport";
 import {
   catId,
   collisionDetection,
@@ -75,6 +76,7 @@ export function SortableGrid({
     categoryLayouts,
     toggleEditMode,
   } = useAppStore();
+  const { density } = useAdaptiveLayoutMetrics();
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [hoveredParentId, setHoveredParentId] = useState<string | null>(null);
@@ -559,8 +561,8 @@ export function SortableGrid({
               const layoutPreference = categoryLayouts[sub.id];
               const widthPercent = categoryWidths[sub.id] ?? layoutPreference?.widthPercent ?? null;
               const columns = getStableLayoutColumns(layoutPreference, widthPercent, subCards.length);
-              return getChildBasisRemForColumns(columns);
-            }));
+              return getChildBasisRemForColumns(columns, density);
+            }), density);
 
             return (
               <SortableCategoryBlock

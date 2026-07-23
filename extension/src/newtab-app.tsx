@@ -20,6 +20,7 @@ import {
 import { drainFloatingCaptureQueue, publishCaptureDestinationCache } from "@/lib/floating-capture";
 import { isChromeExtension } from "@/lib/platform";
 import { SortableGrid } from "@/components/layout/sortable-grid";
+import { AdaptiveResolutionViewport } from "@/components/layout/adaptive-resolution-viewport";
 import { WarehouseGrid } from "@/components/layout/warehouse-grid";
 import { TopNav } from "@/components/nav/top-nav";
 import { HotRecommendation } from "@/components/hot-recommendation";
@@ -351,7 +352,7 @@ export function NewTabApp({ initialCollectionViewMode = "classic" }: NewTabAppPr
     >
     <div className="min-h-screen">
       {view === "main" ? (
-        <div className={`wc-resolution-viewport${collectionViewMode === "mindmap" ? " wc-resolution-viewport-mindmap" : ""}`}>
+        <AdaptiveResolutionViewport mindmap={collectionViewMode === "mindmap"}>
           <div className={`wc-resolution-canvas ${collectionViewMode === "classic" ? "min-h-screen" : "wc-resolution-canvas-header-only"}`}>
           <TopNav
             onAddCard={handleAddCard}
@@ -444,7 +445,7 @@ export function NewTabApp({ initialCollectionViewMode = "classic" }: NewTabAppPr
               item={sectionShipItem}
             />
           </ErrorBoundary>
-        </div>
+        </AdaptiveResolutionViewport>
       ) : (
         <>
           <nav className="sticky top-0 z-50 border-b border-white/60 bg-white/70 backdrop-blur-2xl">

@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { EditActionDock, type EditAction } from "@/components/ui/edit-action-dock";
 import { InlineEditableText } from "@/components/ui/inline-editable-text";
 import { useAppStore } from "@/lib/store";
+import { useAdaptiveLayoutMetrics } from "@/components/layout/adaptive-resolution-viewport";
 import type { Category, CategoryLayoutPreference } from "@/lib/types";
 import {
   catId,
@@ -64,6 +65,7 @@ export const SortableCategoryBlock = memo(function SortableCategoryBlock({
   children,
 }: SortableCategoryBlockProps) {
   const isLayoutLocked = layoutPreference?.locked === true;
+  const { density } = useAdaptiveLayoutMetrics();
   const {
     attributes,
     listeners,
@@ -90,7 +92,7 @@ export const SortableCategoryBlock = memo(function SortableCategoryBlock({
     opacity: isDragging ? 0.2 : 1,
     flex: `0 0 ${renderedWidth}`,
     width: renderedWidth,
-    minWidth: "20rem",
+    minWidth: formatRem(20 * density),
     maxWidth: renderedWidth,
     minHeight: isDraggingActive ? '60px' : undefined,
   };
@@ -111,8 +113,9 @@ export const SortableCategoryBlock = memo(function SortableCategoryBlock({
 
       const handleMouseMove = (ev: MouseEvent) => {
         const dx = ev.clientX - startX;
-        const newWidth = Math.max(180, startWidth + dx);
-        const newPercent = Math.max(8, Math.min(100, (newWidth / parentWidth) * 100));
+        const newWidth = Math.max(180 * density, startWidth + dx);
+        const logicalWidth = newWidth / density;
+        const newPercent = Math.max(8, Math.min(100, (logicalWidth / parentWidth) * 100));
         setLocalWidth(newPercent);
       };
 
@@ -128,7 +131,7 @@ export const SortableCategoryBlock = memo(function SortableCategoryBlock({
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
     },
-    [category.id, isLayoutLocked, setCategoryWidth]
+    [category.id, density, isLayoutLocked, setCategoryWidth]
   );
 
   const handleToggleLayoutLock = useCallback(

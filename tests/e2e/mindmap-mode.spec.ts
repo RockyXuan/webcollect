@@ -390,6 +390,69 @@ test("mindmap layouts match the Fable geometry at 1920x1080", async ({ page }) =
   expect(await readProtectedCollectionState(page)).toEqual(protectedFixture);
 });
 
+test("mindmap keeps logical node geometry while the adaptive header changes tiers", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/");
+  await openCollection(page);
+  await writeIsolatedMindmapFixture(page);
+  await page.reload();
+  await openCollection(page);
+  await enterMindmap(page);
+
+  const protectedFixture = await readProtectedCollectionState(page);
+  const viewport = page.locator(".wc-resolution-viewport");
+  const stage = page.getByTestId("mindmap-stage");
+  const nodeIds = ["sec:section-default", "cat:cat-work", "card:notion"];
+  const readLogicalGeometry = () => page.locator("[data-mindmap-node]").evaluateAll((nodes, ids) => (
+    Object.fromEntries(nodes
+      .filter((node) => ids.includes(node.getAttribute("data-mindmap-node") || ""))
+      .map((node) => {
+        const element = node as HTMLElement;
+        return [
+          element.getAttribute("data-mindmap-node"),
+          {
+            left: element.style.left,
+            top: element.style.top,
+            width: element.style.width,
+            height: element.style.height,
+          },
+        ];
+      }))
+  ), nodeIds);
+
+  await expect(viewport).toHaveAttribute("data-wc-layout-tier", "wide");
+  const initialGeometry = await readLogicalGeometry();
+  const initialStageBox = await stage.boundingBox();
+  expect(initialStageBox).not.toBeNull();
+
+  await page.setViewportSize({ width: 1680, height: 1080 });
+  await expect(viewport).toHaveAttribute("data-wc-layout-tier", "compressed");
+  await expect(stage).toHaveAttribute("data-mindmap-hydrated", "true");
+  await expect.poll(readLogicalGeometry).toEqual(initialGeometry);
+  const compressedStageBox = await stage.boundingBox();
+  expect(compressedStageBox).not.toBeNull();
+  expect((compressedStageBox?.width || 0)).toBeLessThan(initialStageBox?.width || 0);
+  await page.getByRole("button", { name: "适应画布" }).click();
+  await expect(page.getByTestId("mindmap-zoom-percent")).toBeVisible();
+
+  await page.setViewportSize({ width: 1536, height: 1080 });
+  await expect(viewport).toHaveAttribute("data-wc-layout-tier", "reflow");
+  await expect(stage).toHaveAttribute("data-mindmap-hydrated", "true");
+  await expect.poll(readLogicalGeometry).toEqual(initialGeometry);
+  await expect(page.getByRole("button", { name: "右侧逻辑图（默认）" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "双侧脑图" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "下行组织图" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "缩进树" })).toBeVisible();
+
+  const overflow = await page.evaluate(() => ({
+    html: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    body: document.body.scrollWidth - document.body.clientWidth,
+  }));
+  expect(overflow.html).toBeLessThanOrEqual(1);
+  expect(overflow.body).toBeLessThanOrEqual(1);
+  expect(await readProtectedCollectionState(page)).toEqual(protectedFixture);
+});
+
 test("mindmap drag, collapse, and hover preview preserve collection data", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto("/");

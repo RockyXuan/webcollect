@@ -77,6 +77,11 @@ export function formatRem(value: number): string {
   return `${rounded}rem`;
 }
 
+export function normalizeLayoutDensity(density = 1): number {
+  if (!Number.isFinite(density)) return 1;
+  return Math.max(0.5, Math.min(1, density));
+}
+
 export function getPracticalMaxColumns(cardCount: number): number {
   if (!Number.isFinite(cardCount)) return MAX_RENDERED_CARD_COLUMNS;
   if (cardCount <= 1) return 1;
@@ -89,23 +94,27 @@ export function normalizeRenderedColumns(columns: number, cardCount = Number.POS
   return Math.max(1, Math.min(getPracticalMaxColumns(cardCount), Math.round(columns)));
 }
 
-export function getChildBasisRemForColumns(columns: number): number {
+export function getChildBasisRemForColumns(columns: number, density = 1): number {
   const safeColumns = normalizeRenderedColumns(columns);
-  return safeColumns * SITE_TILE_WIDTH_REM
-    + Math.max(0, safeColumns - 1) * SITE_TILE_GAP_REM
-    + GROUP_HORIZONTAL_PADDING_REM;
+  const safeDensity = normalizeLayoutDensity(density);
+  return (
+    safeColumns * SITE_TILE_WIDTH_REM
+      + Math.max(0, safeColumns - 1) * SITE_TILE_GAP_REM
+      + GROUP_HORIZONTAL_PADDING_REM
+  ) * safeDensity;
 }
 
-export function getChildBasisForColumns(columns: number): string {
-  const width = getChildBasisRemForColumns(columns);
+export function getChildBasisForColumns(columns: number, density = 1): string {
+  const width = getChildBasisRemForColumns(columns, density);
   return formatRem(width);
 }
 
-export function getMaxChildWidth(cardCount: number): string {
-  if (cardCount <= 4) return "77.75rem";
-  if (cardCount <= 6) return "47.25rem";
-  if (cardCount <= 10) return "62.5rem";
-  return "77.75rem";
+export function getMaxChildWidth(cardCount: number, density = 1): string {
+  const safeDensity = normalizeLayoutDensity(density);
+  if (cardCount <= 4) return formatRem(77.75 * safeDensity);
+  if (cardCount <= 6) return formatRem(47.25 * safeDensity);
+  if (cardCount <= 10) return formatRem(62.5 * safeDensity);
+  return formatRem(77.75 * safeDensity);
 }
 
 export function inferLayoutColumns(widthPercent: number | null, cardCount: number): number {
@@ -136,13 +145,18 @@ export function getCardGridStyle(columns: number): React.CSSProperties {
 export function getSmartChildStyle(
   widthPercent: number | null,
   cardCount: number,
-  columns = inferLayoutColumns(widthPercent, cardCount)
+  columns = inferLayoutColumns(widthPercent, cardCount),
+  density = 1
 ): React.CSSProperties {
-  const columnBasis = getChildBasisForColumns(columns);
-  const maxWidth = getMaxChildWidth(cardCount);
+  const safeDensity = normalizeLayoutDensity(density);
+  const columnBasis = getChildBasisForColumns(columns, safeDensity);
+  const maxWidth = getMaxChildWidth(cardCount, safeDensity);
 
   if (widthPercent !== null) {
-    const contentMaxWidth = formatRem(Math.max(getChildBasisRemForColumns(columns), GROUP_HORIZONTAL_PADDING_REM + SITE_TILE_WIDTH_REM));
+    const contentMaxWidth = formatRem(Math.max(
+      getChildBasisRemForColumns(columns, safeDensity),
+      (GROUP_HORIZONTAL_PADDING_REM + SITE_TILE_WIDTH_REM) * safeDensity
+    ));
     return {
       flex: `0 0 ${contentMaxWidth}`,
       width: contentMaxWidth,
@@ -159,18 +173,19 @@ export function getSmartChildStyle(
   };
 }
 
-export function getParentLayoutRowWidthsRem(groupWidths: number[]): number[] {
+export function getParentLayoutRowWidthsRem(groupWidths: number[], density = 1): number[] {
+  const safeDensity = normalizeLayoutDensity(density);
   const widths = groupWidths.filter((width) => Number.isFinite(width) && width > 0);
-  if (widths.length === 0) return [30 - PARENT_HORIZONTAL_PADDING_REM];
+  if (widths.length === 0) return [(30 - PARENT_HORIZONTAL_PADDING_REM) * safeDensity];
   if (widths.length <= 2) {
     return [
       widths.reduce((sum, width) => sum + width, 0)
-        + Math.max(0, widths.length - 1) * GROUP_FLOW_GAP_REM,
+        + Math.max(0, widths.length - 1) * GROUP_FLOW_GAP_REM * safeDensity,
     ];
   }
 
   const sorted = [...widths].sort((a, b) => a - b);
-  const compactPairWidth = sorted[0] + sorted[1] + GROUP_FLOW_GAP_REM;
+  const compactPairWidth = sorted[0] + sorted[1] + GROUP_FLOW_GAP_REM * safeDensity;
   const targetRowWidth = Math.max(sorted[sorted.length - 1], compactPairWidth);
   const rows: number[] = [];
   let currentRowWidth = 0;
@@ -179,7 +194,7 @@ export function getParentLayoutRowWidthsRem(groupWidths: number[]): number[] {
   for (const width of widths) {
     const nextRowWidth = currentRowCount === 0
       ? width
-      : currentRowWidth + GROUP_FLOW_GAP_REM + width;
+      : currentRowWidth + GROUP_FLOW_GAP_REM * safeDensity + width;
 
     if (currentRowCount > 0 && nextRowWidth > targetRowWidth + 0.01) {
       rows.push(currentRowWidth);
@@ -195,7 +210,8 @@ export function getParentLayoutRowWidthsRem(groupWidths: number[]): number[] {
   return rows;
 }
 
-export function getParentContentWidthRem(groupWidths: number[]): number {
-  const rowWidths = getParentLayoutRowWidthsRem(groupWidths);
-  return Math.max(...rowWidths) + PARENT_HORIZONTAL_PADDING_REM;
+export function getParentContentWidthRem(groupWidths: number[], density = 1): number {
+  const safeDensity = normalizeLayoutDensity(density);
+  const rowWidths = getParentLayoutRowWidthsRem(groupWidths, safeDensity);
+  return Math.max(...rowWidths) + PARENT_HORIZONTAL_PADDING_REM * safeDensity;
 }

@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { EditActionDock, type EditAction } from "@/components/ui/edit-action-dock";
 import { InlineEditableText } from "@/components/ui/inline-editable-text";
 import { useAppStore } from "@/lib/store";
+import { useAdaptiveLayoutMetrics } from "@/components/layout/adaptive-resolution-viewport";
 import type { Category, WebCard } from "@/lib/types";
 import {
   cardId,
@@ -68,6 +69,7 @@ export const SortableUngroupedBlock = memo(function SortableUngroupedBlock({
     transition,
     isDragging,
   } = useSortable({ id: ungroupId(category.id) });
+  const { density } = useAdaptiveLayoutMetrics();
 
   const categoryWidths = useAppStore((s) => s.categoryWidths);
   const categoryLayouts = useAppStore((s) => s.categoryLayouts);
@@ -98,8 +100,9 @@ export const SortableUngroupedBlock = memo(function SortableUngroupedBlock({
 
       const handleMouseMove = (ev: MouseEvent) => {
         const dx = ev.clientX - startX;
-        const newWidth = Math.max(120, startWidth + dx);
-        const newPercent = Math.max(15, Math.min(100, (newWidth / parentWidth) * 100));
+        const newWidth = Math.max(120 * density, startWidth + dx);
+        const logicalWidth = newWidth / density;
+        const newPercent = Math.max(15, Math.min(100, (logicalWidth / parentWidth) * 100));
         setLocalWidth(newPercent);
       };
 
@@ -115,7 +118,7 @@ export const SortableUngroupedBlock = memo(function SortableUngroupedBlock({
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
     },
-    [cards.length, category.id, setCategoryWidth]
+    [cards.length, category.id, density, setCategoryWidth]
   );
 
   const setRef = useCallback(
@@ -158,7 +161,7 @@ export const SortableUngroupedBlock = memo(function SortableUngroupedBlock({
     transform: isDragging ? undefined : CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.2 : 1,
-    ...getSmartChildStyle(widthPercent, cards.length, cardColumns),
+    ...getSmartChildStyle(widthPercent, cards.length, cardColumns, density),
     ...getCardGridStyle(cardColumns),
   };
 

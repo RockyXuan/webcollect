@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { TopNav } from "@/components/nav/top-nav";
 import { SortableGrid } from "@/components/layout/sortable-grid";
+import { AdaptiveResolutionViewport } from "@/components/layout/adaptive-resolution-viewport";
 import { CardDialog } from "@/components/dialogs/card-dialog";
 import { CategoryDialog } from "@/components/dialogs/category-dialog";
 import { RecycleBinDialog } from "@/components/dialogs/recycle-bin-dialog";
@@ -281,7 +282,7 @@ export default function HomePage() {
       mode={wallpaperMode}
       onEnterCollection={handleEnterCollection}
     >
-    <div className={`wc-resolution-viewport${collectionViewModeReady && collectionViewMode === "mindmap" ? " wc-resolution-viewport-mindmap" : ""}`}>
+    <AdaptiveResolutionViewport mindmap={collectionViewModeReady && collectionViewMode === "mindmap"}>
     <div className={`wc-resolution-canvas ${!collectionViewModeReady || collectionViewMode === "classic" ? "min-h-screen" : "wc-resolution-canvas-header-only"}`}>
       <TopNav
         onAddCard={handleAddCard}
@@ -400,7 +401,7 @@ export default function HomePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </AdaptiveResolutionViewport>
     </WallpaperShell>
   );
 }

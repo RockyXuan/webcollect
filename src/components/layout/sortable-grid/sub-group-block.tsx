@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { EditActionDock, type EditAction } from "@/components/ui/edit-action-dock";
 import { InlineEditableText } from "@/components/ui/inline-editable-text";
 import { useAppStore } from "@/lib/store";
+import { useAdaptiveLayoutMetrics } from "@/components/layout/adaptive-resolution-viewport";
 import type { Category, WebCard } from "@/lib/types";
 import {
   cardId,
@@ -93,6 +94,7 @@ export const SortableSubGroupBlock = memo(function SortableSubGroupBlock({
     transition,
     isDragging,
   } = useSortable({ id: subId(category.id), disabled: parentLayoutLocked });
+  const { density } = useAdaptiveLayoutMetrics();
 
   const categoryWidths = useAppStore((s) => s.categoryWidths);
   const categoryLayouts = useAppStore((s) => s.categoryLayouts);
@@ -127,8 +129,9 @@ export const SortableSubGroupBlock = memo(function SortableSubGroupBlock({
 
       const handleMouseMove = (ev: MouseEvent) => {
         const dx = ev.clientX - startX;
-        const newWidth = Math.max(180, startWidth + dx);
-        const newPercent = Math.max(8, Math.min(100, (newWidth / parentWidth) * 100));
+        const newWidth = Math.max(180 * density, startWidth + dx);
+        const logicalWidth = newWidth / density;
+        const newPercent = Math.max(8, Math.min(100, (logicalWidth / parentWidth) * 100));
         setLocalWidth(newPercent);
       };
 
@@ -144,7 +147,7 @@ export const SortableSubGroupBlock = memo(function SortableSubGroupBlock({
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
     },
-    [cards.length, category.id, parentLayoutLocked, setCategoryWidth]
+    [cards.length, category.id, density, parentLayoutLocked, setCategoryWidth]
   );
 
   const setRef = useCallback(
@@ -187,7 +190,7 @@ export const SortableSubGroupBlock = memo(function SortableSubGroupBlock({
     transform: isDragging ? undefined : CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.2 : 1,
-    ...getSmartChildStyle(widthPercent, cards.length, cardColumns),
+    ...getSmartChildStyle(widthPercent, cards.length, cardColumns, density),
     ...getCardGridStyle(cardColumns),
   };
 

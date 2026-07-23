@@ -46,4 +46,20 @@ describe("header UI CSS parity", () => {
       expect(source).toMatch(/@import ['"][^'"]*search\.css['"]/);
     }
   });
+
+  it("keeps adaptive viewport rules identical in Web and extension styles", () => {
+    const adaptiveRules = (css: string) => {
+      const start = css.indexOf('@media (min-width: 1181px) {\n  .wc-resolution-viewport[data-wc-layout-tier="compressed"]');
+      const marker = css.indexOf("/* Category block resize handles */", start);
+      const end = marker >= 0 ? marker : css.length;
+      expect(start).toBeGreaterThanOrEqual(0);
+      expect(end).toBeGreaterThan(start);
+      return css.slice(start, end).replace(/\s+/g, " ").trim();
+    };
+
+    expect(adaptiveRules(extensionCss)).toBe(adaptiveRules(webCss));
+    for (const source of [webCss, extensionCss]) {
+      expect(source).not.toContain("@media (min-width: 1181px) and (max-width: 1799px)");
+    }
+  });
 });
