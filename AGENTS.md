@@ -1,5 +1,9 @@
 # WebCollect — 个人网页收藏墙
 
+## 2026-07-23 current V1.5.1 Next.js security patch entry
+
+Read `AGD.md` and `docs/audit/webcollect-v1.5.1-next-security-closeout-2026-07-23.md` first. V1.5.1 upgrades only the Web runtime and matching lint package from Next.js 16.2.10 to 16.2.11 after nine new production advisories were published after V1.5.0. It must not change saved tab packs, favicon behavior, Drive sync, Portable Backup, collection data, permissions, stable extension identity, Chrome storage, snapshots, or seed data. V1.5.0 remains the feature baseline and V1.4.0 remains the cloud/data baseline.
+
 ## 2026-07-22 current V1.5.0 tab-pack and favicon entry
 
 Read `AGD.md` and `docs/audit/webcollect-v1.5.0-tab-packs-favicon-closeout-2026-07-22.md` first. V1.5.0 adds globally visible saved tab packs: classic mode copies cards by dragging the existing card handle to a pack or the create target, mindmap mode uses the manager search, and opening a pack creates a normalized de-duplicated snapshot of up to 50 URLs without changing source cards. Packs use per-record revisions and soft tombstones in the existing Google Drive workspace payload; legacy payloads that omit the field preserve local packs. Portable Backup V2 includes packs and open mode while V1 remains accepted. Favicon rendering now has an immediate letter fallback, Chrome `_favicon` support, metadata/direct candidates, and a separate rebuildable `WebCollectIcons/site_icons` cache that is not business data, sync data, or backup data. The only new Chrome permission is `favicon`; do not add `tabs` or `tabGroups`. The published tag is `webcollect-2026-07-22-v1.5.0`, the official asset is `WebCollect-Chrome-Extension-v1.5.0-2026-07-22.zip`, and main CI, Release workflow, official-zip audit, and existing-primary-Chrome new-tab acceptance all passed. Never clear or overwrite real collection, Drive, Chrome storage, snapshots, or seed data.

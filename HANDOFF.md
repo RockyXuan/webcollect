@@ -2,9 +2,19 @@
 
 > **2026-07-15 current workflow rule:** this repository has retired Superpowers (including `superpowers:*` / `using-superpowers`), `goal-zzx` / `zzx-goal`, and `andrej-karpathy-coding`. Do not install, enable, invoke, or imitate them. Any older instruction below that requires `tasks/todo.md`, `tasks/lessons.md`, `CODEX_GO_MODE_STATUS.md`, fixed phase counts, strict TDD, worktrees, subagents, or duplicate reviews is historical and superseded by `AGENTS.md`.
 
+## 2026-07-23 V1.5.1 Next.js Security Patch
+
+This section supersedes the current release target below. V1.5.1 is the current code target; V1.5.0 remains the tab-pack/favicon feature baseline and V1.4.0 remains the cloud/data baseline.
+
+- Target identity: `V1.5.1 / 2026年7月23日`; tag `webcollect-2026-07-23-v1.5.1`; asset `WebCollect-Chrome-Extension-v1.5.1-2026-07-23.zip`.
+- Closeout: `docs/audit/webcollect-v1.5.1-next-security-closeout-2026-07-23.md`.
+- Nine new Next.js production advisories appeared after the V1.5.0 release and caused the later docs-only main run to fail its live audit. The patched line is 16.2.11.
+- Only `next` and `eslint-config-next` move from 16.2.10 to 16.2.11. No WebCollect feature, storage, Drive, backup, permission, extension identity, or user-data path changes.
+- Local gates pass with 413 Vitest, 31 legacy scripts, 45 Playwright tests, both production builds, artifact/size checks, and 204 production packages with zero audit findings.
+
 ## 2026-07-22 V1.5.0 Saved Tab Packs and Favicon Recovery
 
-This section supersedes the development state below. V1.5.0 is the current published application version; V1.4.0 remains the cloud migration baseline and V1.4.1 remains the previous published patch.
+This section records the V1.5.0 feature baseline; V1.4.0 remains the cloud migration baseline and V1.4.1 remains the previous published patch.
 
 - Published identity: `V1.5.0 / 2026年7月22日`; tag `webcollect-2026-07-22-v1.5.0`; asset `WebCollect-Chrome-Extension-v1.5.0-2026-07-22.zip`.
 - Closeout: `docs/audit/webcollect-v1.5.0-tab-packs-favicon-closeout-2026-07-22.md`.
@@ -136,8 +146,8 @@ This section supersedes older development status. The user explicitly waived the
 
 ## Next Major Feature Thread
 
-- V1.5.0 is fully published and its checklist is closed. Start the next large feature in a new thread after reading the current closeout and handoff.
-- Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, the V1.5.0 closeout, and the V1.4.0 data-baseline closeout before changing code.
+- V1.5.1 must finish its CI, Release, official-zip audit, and real Chrome read-only check before the next large feature starts.
+- Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, the V1.5.1 closeout, the V1.5.0 feature closeout, and the V1.4.0 data-baseline closeout before changing code.
 - Ask for or read the user's new feature description, then inspect only the relevant implementation paths before choosing scope, tests, version bump, and release plan.
 - Preserve the V1.4.0 local-first Drive, backup, data, and migration guarantees. Do not reset IndexedDB, old Supabase data, extension storage, categories, cards, preferences, snapshots, local view state, mode preference, knowledge consent/cache, derived vectors, or the two documented empty inbox artifacts.
 - Decide the next version only after understanding the feature's actual breadth. Use the real completion date and keep package, manifest, UI version, tag, Release, and zip identity aligned.

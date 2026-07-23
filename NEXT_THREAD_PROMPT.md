@@ -1,5 +1,12 @@
 # WebCollect 下一大型功能线程提示词
 
+## 2026-07-23 V1.5.1 Next.js 安全补丁状态
+
+- 当前代码版本：`V1.5.1 / 2026年7月23日`；目标 tag `webcollect-2026-07-23-v1.5.1`；资产 `WebCollect-Chrome-Extension-v1.5.1-2026-07-23.zip`。
+- 最新 closeout：`docs/audit/webcollect-v1.5.1-next-security-closeout-2026-07-23.md`。
+- V1.5.1 只把 `next` 与 `eslint-config-next` 从 `16.2.10` 升级到官方安全修复版 `16.2.11`；不改变 V1.5.0 标签组/favicon 或 V1.4.0 Drive/完整备份契约。
+- 本地 413 Vitest、31 legacy、45 Playwright、类型、lint、Web/扩展构建、产物/体积和 204 个生产依赖零漏洞审计已经通过；正式发布证据完成后写回 closeout。
+
 ## 2026-07-22 V1.5.0 标签组与 favicon 状态
 
 - 当前正式应用版本：`V1.5.0 / 2026年7月22日`；tag `webcollect-2026-07-22-v1.5.0`；资产 `WebCollect-Chrome-Extension-v1.5.0-2026-07-22.zip`。
@@ -28,13 +35,14 @@
 
 ## 先确认当前基线
 
-- 当前正式版本：`V1.5.0 / 2026年7月22日`；tag `webcollect-2026-07-22-v1.5.0`；资产 `WebCollect-Chrome-Extension-v1.5.0-2026-07-22.zip`。
+- 当前代码版本：`V1.5.1 / 2026年7月23日`；目标 tag `webcollect-2026-07-23-v1.5.1`；资产 `WebCollect-Chrome-Extension-v1.5.1-2026-07-23.zip`。
+- V1.5.1 closeout：`docs/audit/webcollect-v1.5.1-next-security-closeout-2026-07-23.md`。
 - V1.5.0 closeout：`docs/audit/webcollect-v1.5.0-tab-packs-favicon-closeout-2026-07-22.md`。
 - V1.5.0 应用提交 `fd3f9732ac448e46998a9660044b7175aa2c4fd1` 与 `2ad9375db057c9b5567ceaebce543f226b9eeef4`、main CI `29936934533`、Release workflow `29937491867`、官方 zip 审计和现有主 Chrome Profile 验收均已完成。
 - V1.4.1 closeout：`docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md`。
 - V1.4.1 应用提交 `8af01d34bc5d095d7961e658558e8fa7c5c16ff0`，main CI `29842309751` 与 Release workflow `29842892835` 均成功；官方 zip 审计与现有已登录主 Chrome Profile 验收已经完成。
 - V1.4.0 closeout：`docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md`。它继续是 Google Drive、完整 JSON、真实迁移与 30 天 Supabase 保险期的数据基线。
-- 正式 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-22-v1.5.0`；zip 直链：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-22-v1.5.0/WebCollect-Chrome-Extension-v1.5.0-2026-07-22.zip`。
+- 当前正式 Release 仍是 V1.5.0；V1.5.1 安全补丁发布完成后，本行改为新的 Release 与 zip 直链。
 - V1.3.0 保留 Google / 百度 / Bing，新增纯本地模糊检索、拼音、错字容错、意图别名、加权全文排序和 opt-in 公开网页知识缓存；不调用 AI API，也不捆绑本地模型。348 unit、31 legacy、44 E2E、Web/扩展构建、17.4 MiB 门禁和 208 个生产依赖零漏洞审计已完成。
 - V1.4.0 将正式云同步切换为用户自己的 Google Drive 隐藏应用目录，并增加完整 JSON 备份/恢复；本地 IndexedDB 仍是第一写入目标，V1.3.1 顶栏与 V1.3.0 本地搜索行为保持不变。
 
@@ -45,17 +53,18 @@
 1. `AGENTS.md`
 2. `AGD.md`
 3. `HANDOFF.md`
-4. `docs/audit/webcollect-v1.5.0-tab-packs-favicon-closeout-2026-07-22.md`
-5. `docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md`
-6. `docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md`
-7. `docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`
-8. `docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`
-9. `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`
-10. `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`
-11. `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md`
-12. `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`
-13. `PROJECT_SUMMARY.md`
-14. 本文件
+4. `docs/audit/webcollect-v1.5.1-next-security-closeout-2026-07-23.md`
+5. `docs/audit/webcollect-v1.5.0-tab-packs-favicon-closeout-2026-07-22.md`
+6. `docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md`
+7. `docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md`
+8. `docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`
+9. `docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`
+10. `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`
+11. `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`
+12. `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md`
+13. `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`
+14. `PROJECT_SUMMARY.md`
+15. 本文件
 
 然后运行并用中文简要汇报：
 
@@ -64,7 +73,7 @@ pwd
 git status -sb
 git log --oneline --decorate -8
 git remote -v
-git show-ref --tags 'refs/tags/webcollect-2026-07-22-v1.5.0'
+git tag --list 'webcollect-2026-07-23-v1.5.1' --points-at HEAD
 ```
 
 不要使用旧目录 `/Users/rockyx/Documents/webcollect`，也不要从旧分支、旧 RC 或旧交接目标继续开发。

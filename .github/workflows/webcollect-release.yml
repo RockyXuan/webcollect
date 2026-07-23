@@ -80,7 +80,8 @@ jobs:
           notes=(
             "WebCollect Chrome extension ${VERSION_LABEL}."
             ""
-            "- Adds synced saved tag packs: drag a collection card onto a compact top-shelf group, then reopen the fixed URL template in one click."
+            "- Updates the Web runtime to Next.js 16.2.11, resolving the nine production security advisories published after V1.5.0."
+            "- Keeps the V1.5 saved tag packs: drag a collection card onto a compact top-shelf group, then reopen the fixed URL template in one click."
             "- Keeps saved tag-pack snapshots independent from later collection edits, supports deduplication, ordering, soft deletion, and Portable Backup V2 with V1 import compatibility."
             "- Repairs missing favicons with immediate letter fallbacks, Chrome's private favicon renderer, stronger metadata selection, direct site candidates, and a bounded rebuildable local icon cache."
             "- Stores optional cloud sync data in each user's own Google Drive appDataFolder with the minimal drive.appdata scope."
