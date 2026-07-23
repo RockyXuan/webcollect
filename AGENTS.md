@@ -1,5 +1,9 @@
 # WebCollect — 个人网页收藏墙
 
+## 2026-07-23 current V1.5.3 adaptive viewport entry
+
+Read `AGD.md` and `docs/audit/webcollect-v1.5.3-adaptive-viewport-closeout-2026-07-23.md` first. V1.5.3 adapts WebCollect to the width the page actually owns, including Chrome's top-tab and side-tab layouts. At 1880px and wider it preserves the V1.5.2 geometry; from 1600–1879px it applies bounded presentation-only density so the top toolbar remains one row and representative classic panels remain filled; from 1181–1599px it uses an orderly two-row toolbar; compact/mobile behavior remains intact. Classic layout math and CSS use the same runtime density, while mindmap node/world coordinates remain unscaled. The density is never persisted or synced, and no permission, dependency, storage key, collection record, layout preference, Drive payload, snapshot, Chrome storage, seed, or extension identity changes.
+
 ## 2026-07-23 current V1.5.2 GitHub capture metadata entry
 
 Read `AGD.md` and `docs/audit/webcollect-v1.5.2-github-capture-metadata-closeout-2026-07-23.md` first. V1.5.2 makes GitHub repository captures use the repository name and a bounded public README summary, with a local-rule translation fallback that never calls AI or translation services. A duplicate URL is never silently replaced: the floating panel compares old/new metadata, requires explicit confirmation, and rechecks card ID, URL, and `updatedAt` before updating only non-empty title/description fields. It preserves section, category, order, note, abbreviation, icon, creation time, Drive schema, permissions, storage keys, snapshots, seed, and all unrelated user data. The published tag is `webcollect-2026-07-23-v1.5.2`, the official asset is `WebCollect-Chrome-Extension-v1.5.2-2026-07-23.zip`, and main CI, Release workflow, official-zip audit, and existing-primary-Chrome acceptance all passed.

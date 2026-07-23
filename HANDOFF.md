@@ -2,6 +2,16 @@
 
 > **2026-07-15 current workflow rule:** this repository has retired Superpowers (including `superpowers:*` / `using-superpowers`), `goal-zzx` / `zzx-goal`, and `andrej-karpathy-coding`. Do not install, enable, invoke, or imitate them. Any older instruction below that requires `tasks/todo.md`, `tasks/lessons.md`, `CODEX_GO_MODE_STATUS.md`, fixed phase counts, strict TDD, worktrees, subagents, or duplicate reviews is historical and superseded by `AGENTS.md`.
 
+## 2026-07-23 V1.5.3 Adaptive Viewport Candidate
+
+- Candidate identity: `V1.5.3 / 2026年7月23日`; planned tag `webcollect-2026-07-23-v1.5.3`; planned asset `WebCollect-Chrome-Extension-v1.5.3-2026-07-23.zip`.
+- Closeout: `docs/audit/webcollect-v1.5.3-adaptive-viewport-closeout-2026-07-23.md`.
+- A root `ResizeObserver` derives a non-persistent `wide / compressed / reflow / compact` tier from the width WebCollect actually owns and the existing visual scale.
+- The wide tier preserves V1.5.2. The compressed tier uses bounded runtime density for the header and classic wall. Reflow uses a two-row toolbar. Compact keeps the existing mobile contract.
+- Classic CSS and layout math share the same density, and resize interactions convert rendered dimensions back to logical dimensions before saving. Mindmap nodes and world coordinates remain outside this density path.
+- No permission, dependency, storage key, data migration, Drive/backup schema, collection record, layout preference, sync state, Chrome storage, snapshot, seed, or stable extension identity changes.
+- Local candidate gates pass with 436 Vitest, 31 legacy scripts, 58 Playwright tests, TypeScript, lint, both production builds, extension artifact checks, and the 17.3 MiB size gate. Formal CI, Release, official-zip audit, and real-primary-Chrome evidence remain to be appended after they actually complete.
+
 ## 2026-07-23 V1.5.2 GitHub Capture Metadata Fix
 
 This section records the current published release. V1.5.0 remains the tab-pack/favicon feature baseline and V1.4.0 remains the cloud/data baseline.
@@ -161,8 +171,8 @@ This section supersedes older development status. The user explicitly waived the
 
 ## Next Major Feature Thread
 
-- V1.5.2 is the current published release; its CI, Release, official-zip audit, and real Chrome read-only evidence are complete.
-- Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, the V1.5.2 closeout, the V1.5.1 closeout, the V1.5.0 feature closeout, and the V1.4.0 data-baseline closeout before changing code.
+- V1.5.3 is the current candidate; V1.5.2 remains the fully published fallback until V1.5.3 CI, Release, official-zip audit, and real Chrome evidence complete.
+- Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, the V1.5.3 closeout, the V1.5.2 closeout, the V1.5.0 feature closeout, and the V1.4.0 data-baseline closeout before changing code.
 - Ask for or read the user's new feature description, then inspect only the relevant implementation paths before choosing scope, tests, version bump, and release plan.
 - Preserve the V1.4.0 local-first Drive, backup, data, and migration guarantees. Do not reset IndexedDB, old Supabase data, extension storage, categories, cards, preferences, snapshots, local view state, mode preference, knowledge consent/cache, derived vectors, or the two documented empty inbox artifacts.
 - Decide the next version only after understanding the feature's actual breadth. Use the real completion date and keep package, manifest, UI version, tag, Release, and zip identity aligned.

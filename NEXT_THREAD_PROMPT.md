@@ -1,5 +1,15 @@
 # WebCollect 下一大型功能线程提示词
 
+## 2026-07-23 V1.5.3 动态视口适配候选状态
+
+- 当前候选版本：`V1.5.3 / 2026年7月23日`；计划 tag `webcollect-2026-07-23-v1.5.3`；计划资产 `WebCollect-Chrome-Extension-v1.5.3-2026-07-23.zip`。
+- 最新 closeout：`docs/audit/webcollect-v1.5.3-adaptive-viewport-closeout-2026-07-23.md`。
+- 根容器按实际可用宽度选择 `wide / compressed / reflow / compact`，因此 Chrome 顶部标签和侧边标签不需要专门识别。
+- 1680px 左右温和压缩顶部三行和经典收藏墙，1536px 左右切换两行工具栏，390px 保持紧凑无横向溢出。
+- 导图节点、连线、相机和世界坐标不进入页面密度缩放；响应式密度不持久化、不进入 Drive 或同步。
+- 本地候选门禁已通过；正式 CI、Release、官方 zip 和主 Chrome 验收证据需要等发布后写回。
+- V1.5.2 仍是发布完成前的稳定回退版本。
+
 ## 2026-07-23 V1.5.2 GitHub 收藏信息修复状态
 
 - 当前正式版本：`V1.5.2 / 2026年7月23日`；tag `webcollect-2026-07-23-v1.5.2`；资产 `WebCollect-Chrome-Extension-v1.5.2-2026-07-23.zip`。
@@ -48,7 +58,8 @@
 
 ## 先确认当前基线
 
-- 当前代码与正式发布版本：`V1.5.2 / 2026年7月23日`。
+- 当前候选代码版本：`V1.5.3 / 2026年7月23日`；正式发布完成前以 V1.5.2 为稳定回退版本。
+- V1.5.3 closeout：`docs/audit/webcollect-v1.5.3-adaptive-viewport-closeout-2026-07-23.md`。
 - V1.5.2 closeout：`docs/audit/webcollect-v1.5.2-github-capture-metadata-closeout-2026-07-23.md`。
 - V1.5.1 closeout：`docs/audit/webcollect-v1.5.1-next-security-closeout-2026-07-23.md`。
 - V1.5.0 closeout：`docs/audit/webcollect-v1.5.0-tab-packs-favicon-closeout-2026-07-22.md`。
@@ -67,19 +78,20 @@
 1. `AGENTS.md`
 2. `AGD.md`
 3. `HANDOFF.md`
-4. `docs/audit/webcollect-v1.5.2-github-capture-metadata-closeout-2026-07-23.md`
-5. `docs/audit/webcollect-v1.5.1-next-security-closeout-2026-07-23.md`
-6. `docs/audit/webcollect-v1.5.0-tab-packs-favicon-closeout-2026-07-22.md`
-7. `docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md`
-8. `docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md`
-9. `docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`
-10. `docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`
-11. `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`
-12. `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`
-13. `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md`
-14. `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`
-15. `PROJECT_SUMMARY.md`
-16. 本文件
+4. `docs/audit/webcollect-v1.5.3-adaptive-viewport-closeout-2026-07-23.md`
+5. `docs/audit/webcollect-v1.5.2-github-capture-metadata-closeout-2026-07-23.md`
+6. `docs/audit/webcollect-v1.5.1-next-security-closeout-2026-07-23.md`
+7. `docs/audit/webcollect-v1.5.0-tab-packs-favicon-closeout-2026-07-22.md`
+8. `docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md`
+9. `docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md`
+10. `docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`
+11. `docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`
+12. `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`
+13. `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`
+14. `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md`
+15. `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`
+16. `PROJECT_SUMMARY.md`
+17. 本文件
 
 然后运行并用中文简要汇报：
 
