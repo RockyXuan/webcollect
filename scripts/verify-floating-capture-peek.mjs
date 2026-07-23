@@ -264,6 +264,55 @@ async function readCardsFromExtensionPage(extensionPage) {
   });
 }
 
+async function readCaptureQueueFromExtensionPage(extensionPage) {
+  return extensionPage.evaluate(async () => new Promise((resolve, reject) => {
+    chrome.storage.local.get("webcollect.capture.queue", (result) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve(Array.isArray(result["webcollect.capture.queue"]) ? result["webcollect.capture.queue"] : []);
+    });
+  }));
+}
+
+async function waitForExtensionWorkspaceReady(extensionPage) {
+  await extensionPage.waitForFunction(async () => {
+    const destinationCache = await new Promise((resolve, reject) => {
+      chrome.storage.local.get("webcollect.capture.destinations", (result) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        resolve(result["webcollect.capture.destinations"]);
+      });
+    });
+    const database = await new Promise((resolve, reject) => {
+      const request = indexedDB.open("WebCollect");
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+    let initialized = false;
+    try {
+      if (!database.objectStoreNames.contains("webcollect_data")) return false;
+      initialized = await new Promise((resolve, reject) => {
+        const transaction = database.transaction("webcollect_data", "readonly");
+        const request = transaction.objectStore("webcollect_data").get("initialized");
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result === true);
+      });
+    } finally {
+      database.close();
+    }
+    return Boolean(
+      initialized
+      && destinationCache
+      && Array.isArray(destinationCache.categories)
+      && destinationCache.categories.length > 0
+    );
+  }, undefined, { timeout: 20_000 });
+}
+
 async function seedDuplicateCard(extensionPage, url) {
   await extensionPage.evaluate(async ({ targetUrl }) => {
     const database = await new Promise((resolve, reject) => {
@@ -364,10 +413,24 @@ async function verifyDuplicateConfirmation(page, extensionPage, targetUrl, scree
     }
   }, { id: "card-floating-duplicate-test", expectedTitle: "codex-slides" }, { timeout: 10_000 });
 
+  const persistenceTimeline = [];
+  for (let index = 0; index < 12; index += 1) {
+    cards = await readCardsFromExtensionPage(extensionPage);
+    targetCard = cards.find((card) => card.id === "card-floating-duplicate-test");
+    const queue = await readCaptureQueueFromExtensionPage(extensionPage);
+    persistenceTimeline.push({
+      index,
+      title: targetCard?.title,
+      updatedAt: targetCard?.updatedAt,
+      syncRevision: targetCard?.syncRevision,
+      queue: queue.map((item) => ({ status: item.status, error: item.error })),
+    });
+    await extensionPage.waitForTimeout(75);
+  }
   cards = await readCardsFromExtensionPage(extensionPage);
   targetCard = cards.find((card) => card.id === "card-floating-duplicate-test");
   nodeAssert.equal(targetCard.url, targetUrl);
-  nodeAssert.equal(targetCard.title, "codex-slides");
+  nodeAssert.equal(targetCard.title, "codex-slides", JSON.stringify(persistenceTimeline));
   nodeAssert.equal(targetCard.fullDesc, "开源 AI 幻灯片工作室，用于创建演示文稿。");
   nodeAssert.equal(targetCard.note, "必须保留的备注");
   nodeAssert.equal(targetCard.abbreviation, "KEEP");
@@ -402,9 +465,10 @@ try {
   const extensionOrigin = `chrome-extension://${extensionUrl.host}`;
   const extensionPage = context.pages()[0] || await context.newPage();
   await extensionPage.goto(`${extensionOrigin}/newtab.html`, { waitUntil: "domcontentloaded", timeout: 20_000 });
-  await extensionPage.waitForTimeout(900);
+  await waitForExtensionWorkspaceReady(extensionPage);
   await seedDuplicateCard(extensionPage, pageUrl);
   await extensionPage.reload({ waitUntil: "domcontentloaded" });
+  await waitForExtensionWorkspaceReady(extensionPage);
   await extensionPage.waitForTimeout(900);
 
   const page = await context.newPage();
