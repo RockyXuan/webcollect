@@ -2,11 +2,11 @@
 
 版本身份：`V1.5.0 / 2026年7月22日`
 
-目标标签：`webcollect-2026-07-22-v1.5.0`
+正式标签：`webcollect-2026-07-22-v1.5.0`
 
-目标资产：`WebCollect-Chrome-Extension-v1.5.0-2026-07-22.zip`
+正式资产：`WebCollect-Chrome-Extension-v1.5.0-2026-07-22.zip`
 
-发布状态：本文件随应用提交记录本地实施与验收；main CI、正式 Release、官方包和真实主 Chrome 证据将在完成后由纯文档提交追加，该提交不是新应用版本。
+发布状态：应用、main CI、正式 Release、官方包审计和现有主 Chrome Profile 只读验收均已完成。本次发布后追加的证据提交只修改文档，不是新应用版本。
 
 ## 功能结果
 
@@ -50,14 +50,28 @@
 - 第一轮 main CI 在 GitHub Linux 环境暴露了拖拽落点的跨平台几何差异：旧逻辑按整张卡片中心命中标签组，而用户实际从左侧手柄拖动。修复后改为按真实指针起点与拖动位移命中，保留卡片矩形作为无指针事件的降级路径；专项并发连续 5 次及完整 45 项 Playwright 均通过。
 - 发布前 npm 官方审计发现 `sharp 0.34.5` 受 libvips 高危公告 `GHSA-f88m-g3jw-g9cj` 影响（范围 `<0.35.0`）；锁定兼容的 `sharp 0.35.3` 后，Next.js 正式构建通过，204 个生产依赖重新审计为各级 0 项。
 - 最终本地门禁：55 个 Vitest 文件 / 413 项测试、31/31 legacy scripts、45/45 Playwright、TypeScript、lint、Web/扩展正式构建、17.3 MiB 体积与扩展产物检查全部通过。
-- 完整自动化门禁、CI、Release、官方 zip 与真实主 Chrome 证据见下方最终清单。
+
+## 正式发布证据
+
+- 应用提交 `fd3f9732ac448e46998a9660044b7175aa2c4fd1` 与跨平台拖拽修复提交 `2ad9375db057c9b5567ceaebce543f226b9eeef4` 已推送 `main`。最终 main CI `29936934533` 成功，其中 verify 与生产依赖审计均通过。
+- 正式 tag `webcollect-2026-07-22-v1.5.0` 已发布；Release workflow `29937491867` 成功。Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-22-v1.5.0`；zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-22-v1.5.0/WebCollect-Chrome-Extension-v1.5.0-2026-07-22.zip`。
+- Release 只有一个资产，大小 `17,065,370` bytes，SHA-256 `2b499aeaa0c6ec14d5454335deb69b6a0ae3561f0e5c750c3d5ec32a42e76749`；GitHub digest 与本地复算一致。
+- 官方 zip 内 manifest 为 V3 / `1.5.0`，稳定 key 与扩展 ID 不变；权限仅为 `storage`、`activeTab`、`identity`、`contextMenus`、`favicon`，没有 `tabs` 或 `tabGroups`；OAuth scope 仍只有 `drive.appdata`。
+- 官方 zip 文件名唯一，解包后的 41 个文件与已验证的 `extension/dist` 逐字节一致。
+
+## 真实 Chrome 验收
+
+- 在现有已登录主 Chrome Profile 的专用辅助窗口执行，未新建 Profile，未操作无关个人标签。实际启用的解压目录先追加式备份到 `/private/tmp/webcollect-installed-extension-backups/active-v1.4.1-before-v1.5.0-20260723-01`，再用官方 V1.5.0 解包树原位更新；曾误识别的旧停用目录已从其独立备份完整恢复为 V1.4.1。
+- Chrome 扩展详情页确认 WebCollect `1.5.0`、17.3 MB、稳定扩展 ID、Service Worker 正常、已启用，并显示新增的站点图标读取权限。
+- 同一辅助窗口新开真实新标签页后，原有 7 个分项、收藏墙和回收站计数 15 均可见；全局“+ 标签组”入口出现，favicon 在资源加载前立即显示字母兜底。同步控制仍在，未执行任何收藏、标签组或云端业务写入。
+- Chrome 的自动化安全策略不允许直接导航 `chrome-extension://` 内部页，因此没有用绕过手段补做脚本检查；版本、权限和真实新标签页由 Chrome UI 直接验收，数据边界由发布前备份与无写入操作共同保护。
 
 ## 最终清单
 
 - [x] TypeScript、lint、413 Vitest、31 项 legacy tests、Web/扩展构建、扩展产物/大小、45 项 Playwright 和生产依赖审计。
 - [x] seed SHA 与完整 V1 备份重新验证；V1.5.0 验证器读取出 7/135/372/15/4/69/2 和 0 个旧标签组，原内容哈希保持一致。
-- [ ] 应用提交推送 `main`，main CI 全绿。
-- [ ] 正式 tag 与 Release workflow 全绿。
-- [ ] 下载官方单一 zip，复核 manifest、稳定 ID、权限、唯一文件、大小和 SHA-256。
-- [ ] 现有已登录主 Chrome Profile 原位重载并完成只读验收，不新建 Profile、不操作无关标签。
-- [ ] 追加纯文档发布证据；它不是新应用版本。
+- [x] 应用提交推送 `main`，main CI 全绿。
+- [x] 正式 tag 与 Release workflow 全绿。
+- [x] 下载官方单一 zip，复核 manifest、稳定 ID、权限、唯一文件、大小和 SHA-256。
+- [x] 现有已登录主 Chrome Profile 原位重载并完成只读验收，不新建 Profile、不操作无关标签。
+- [x] 追加纯文档发布证据；它不是新应用版本。

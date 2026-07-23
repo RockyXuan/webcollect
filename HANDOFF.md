@@ -4,19 +4,21 @@
 
 ## 2026-07-22 V1.5.0 Saved Tab Packs and Favicon Recovery
 
-This section supersedes the development state below. V1.5.0 is the current code target; V1.4.0 remains the cloud migration baseline and V1.4.1 remains the previous published patch.
+This section supersedes the development state below. V1.5.0 is the current published application version; V1.4.0 remains the cloud migration baseline and V1.4.1 remains the previous published patch.
 
-- Target identity: `V1.5.0 / 2026年7月22日`; tag `webcollect-2026-07-22-v1.5.0`; asset `WebCollect-Chrome-Extension-v1.5.0-2026-07-22.zip`.
+- Published identity: `V1.5.0 / 2026年7月22日`; tag `webcollect-2026-07-22-v1.5.0`; asset `WebCollect-Chrome-Extension-v1.5.0-2026-07-22.zip`.
 - Closeout: `docs/audit/webcollect-v1.5.0-tab-packs-favicon-closeout-2026-07-22.md`.
 - Saved tab packs are global fixed URL snapshots, visible beside section tabs. Dragging copies a card; source cards, order, hierarchy, dirty sets, recycle bin, and snapshots are not changed. Mindmap uses the same manager through search.
 - Each pack is independently revisioned and soft-deleted in the existing Drive payload. Missing fields in legacy device files mean “unknown”, not “empty”, so they cannot erase packs.
 - Portable Backup V2 includes packs and open mode; Portable Backup V1 remains accepted. V1 restore keeps the current packs because the old format could not express them.
 - Favicon repair is render-first and non-destructive: immediate letter fallback, extension `_favicon`, metadata/site candidates, then a bounded rebuildable `WebCollectIcons/site_icons` cache. It does not write generic fallback URLs back to cards.
 - The only permission addition is Chrome `favicon`; there is no `tabs`, `tabGroups`, host-access expansion, dependency, OAuth-scope, seed, Supabase, or collection-schema change.
+- Application commits `fd3f9732ac448e46998a9660044b7175aa2c4fd1` and `2ad9375db057c9b5567ceaebce543f226b9eeef4`, main CI `29936934533`, and Release workflow `29937491867` all passed. The single official zip is `17,065,370` bytes with SHA-256 `2b499aeaa0c6ec14d5454335deb69b6a0ae3561f0e5c750c3d5ec32a42e76749`; its 41-file unpacked tree exactly matches `extension/dist`.
+- The actual active unpacked source in the existing signed-in primary Chrome profile was backed up append-only and reloaded in place. Chrome showed WebCollect `1.5.0`, the stable ID, active service worker, and favicon permission. A fresh new tab preserved the seven sections, existing wall, recycle count 15, and showed the tab-pack shelf plus immediate favicon fallback. No user-triggered collection, tab-pack, or Drive write action was performed.
 
 ## 2026-07-21 V1.4.1 Floating Capture Keyboard Fix
 
-This section supersedes the development state below. V1.4.1 is the current published application version; V1.4.0 remains the cloud/data contract baseline.
+This section records the previous V1.4.1 published patch; V1.4.0 remains the cloud/data contract baseline.
 
 - Published version/date: `V1.4.1 / 2026年7月21日`; tag `webcollect-2026-07-21-v1.4.1`; asset `WebCollect-Chrome-Extension-v1.4.1-2026-07-21.zip`.
 - Closeout: `docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md`.
@@ -134,8 +136,8 @@ This section supersedes older development status. The user explicitly waived the
 
 ## Next Major Feature Thread
 
-- V1.4.1 is fully published and its checklist is closed. Start the next large feature in a new thread after reading the current closeout and handoff.
-- Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, the V1.4.1 closeout, and the V1.4.0 data-baseline closeout before changing code.
+- V1.5.0 is fully published and its checklist is closed. Start the next large feature in a new thread after reading the current closeout and handoff.
+- Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, the V1.5.0 closeout, and the V1.4.0 data-baseline closeout before changing code.
 - Ask for or read the user's new feature description, then inspect only the relevant implementation paths before choosing scope, tests, version bump, and release plan.
 - Preserve the V1.4.0 local-first Drive, backup, data, and migration guarantees. Do not reset IndexedDB, old Supabase data, extension storage, categories, cards, preferences, snapshots, local view state, mode preference, knowledge consent/cache, derived vectors, or the two documented empty inbox artifacts.
 - Decide the next version only after understanding the feature's actual breadth. Use the real completion date and keep package, manifest, UI version, tag, Release, and zip identity aligned.
