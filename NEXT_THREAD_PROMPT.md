@@ -1,5 +1,13 @@
 # WebCollect 下一大型功能线程提示词
 
+## 2026-07-23 V1.5.2 GitHub 收藏信息修复状态
+
+- 当前代码版本：`V1.5.2 / 2026年7月23日`；目标 tag `webcollect-2026-07-23-v1.5.2`；目标资产 `WebCollect-Chrome-Extension-v1.5.2-2026-07-23.zip`。
+- 最新 closeout：`docs/audit/webcollect-v1.5.2-github-capture-metadata-closeout-2026-07-23.md`。
+- GitHub 仓库标题统一为仓库名，公开 README 的首段实质介绍优先进入简介；本地粗译不可靠时保留英文，不调用 AI、翻译 API、GitHub Token 或本地模型。
+- 重复网址只在浮窗明确确认后更新，且入库前复核 ID、网址和版本；只改非空标题/简介，保留分项、分类、位置、备注、简称、图标和创建时间。
+- 不新增权限、依赖、存储 key、Drive Schema 或迁移；不批量改写历史收藏。V1.5.1 仍是正式 Release，直到 V1.5.2 发布证据补齐。
+
 ## 2026-07-23 V1.5.1 Next.js 安全补丁状态
 
 - 当前正式应用版本：`V1.5.1 / 2026年7月23日`；tag `webcollect-2026-07-23-v1.5.1`；资产 `WebCollect-Chrome-Extension-v1.5.1-2026-07-23.zip`。
@@ -37,7 +45,8 @@
 
 ## 先确认当前基线
 
-- 当前代码与正式版本：`V1.5.1 / 2026年7月23日`；tag `webcollect-2026-07-23-v1.5.1`；资产 `WebCollect-Chrome-Extension-v1.5.1-2026-07-23.zip`。
+- 当前代码版本：`V1.5.2 / 2026年7月23日`；V1.5.1 在 V1.5.2 发布完成前仍是最新正式 Release。
+- V1.5.2 closeout：`docs/audit/webcollect-v1.5.2-github-capture-metadata-closeout-2026-07-23.md`。
 - V1.5.1 closeout：`docs/audit/webcollect-v1.5.1-next-security-closeout-2026-07-23.md`。
 - V1.5.0 closeout：`docs/audit/webcollect-v1.5.0-tab-packs-favicon-closeout-2026-07-22.md`。
 - V1.5.0 应用提交 `fd3f9732ac448e46998a9660044b7175aa2c4fd1` 与 `2ad9375db057c9b5567ceaebce543f226b9eeef4`、main CI `29936934533`、Release workflow `29937491867`、官方 zip 审计和现有主 Chrome Profile 验收均已完成。
@@ -55,18 +64,19 @@
 1. `AGENTS.md`
 2. `AGD.md`
 3. `HANDOFF.md`
-4. `docs/audit/webcollect-v1.5.1-next-security-closeout-2026-07-23.md`
-5. `docs/audit/webcollect-v1.5.0-tab-packs-favicon-closeout-2026-07-22.md`
-6. `docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md`
-7. `docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md`
-8. `docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`
-9. `docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`
-10. `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`
-11. `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`
-12. `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md`
-13. `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`
-14. `PROJECT_SUMMARY.md`
-15. 本文件
+4. `docs/audit/webcollect-v1.5.2-github-capture-metadata-closeout-2026-07-23.md`
+5. `docs/audit/webcollect-v1.5.1-next-security-closeout-2026-07-23.md`
+6. `docs/audit/webcollect-v1.5.0-tab-packs-favicon-closeout-2026-07-22.md`
+7. `docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md`
+8. `docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md`
+9. `docs/audit/webcollect-v1.3.1-header-ui-closeout-2026-07-19.md`
+10. `docs/audit/webcollect-v1.3.0-smart-search-closeout-2026-07-18.md`
+11. `docs/audit/webcollect-v1.2.2-header-layout-closeout-2026-07-17.md`
+12. `docs/audit/webcollect-v1.2.1-mindmap-polish-closeout-2026-07-17.md`
+13. `docs/audit/webcollect-v1.2.0-mindmap-closeout-2026-07-16.md`
+14. `docs/audit/webcollect-v1.1.2-account-sync-closeout-2026-07-13.md`
+15. `PROJECT_SUMMARY.md`
+16. 本文件
 
 然后运行并用中文简要汇报：
 
@@ -75,7 +85,7 @@ pwd
 git status -sb
 git log --oneline --decorate -8
 git remote -v
-git tag --list 'webcollect-2026-07-23-v1.5.1' --points-at HEAD
+git tag --list 'webcollect-2026-07-23-v1.5.2' --points-at HEAD
 ```
 
 不要使用旧目录 `/Users/rockyx/Documents/webcollect`，也不要从旧分支、旧 RC 或旧交接目标继续开发。

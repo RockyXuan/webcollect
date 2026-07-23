@@ -135,4 +135,148 @@ const repaired = repairVerifiedCaptureMisfiledCardsFromQueue(
 assert.equal(repaired.repaired, 1);
 assert.equal(repaired.cards[0]?.categoryId, "home-group-world");
 
+const existingCard: WebCard = {
+  id: "card-existing",
+  url: "https://github.com/nexu-io/codex-slides",
+  title: "Old long GitHub title",
+  shortDesc: "Old summary",
+  fullDesc: "Old detailed summary",
+  note: "Keep this personal note",
+  abbreviation: "Slides",
+  imageUrl: "https://example.com/custom-icon.png",
+  categoryId: "home-inbox",
+  order: 7,
+  createdAt: now - 100,
+  updatedAt: now,
+};
+
+const confirmedUpdate = pending(
+  "confirmed-update",
+  existingCard.url,
+  {
+    sectionId: "section-home",
+    groupId: "home-group-world",
+  }
+);
+confirmedUpdate.draft.title = "codex-slides";
+confirmedUpdate.draft.description = "开源 AI 幻灯片工作室，用于创建和导出演示文稿。";
+confirmedUpdate.draft.favicon = "https://example.com/new-icon.png";
+confirmedUpdate.draft.duplicateResolution = {
+  action: "update-metadata",
+  cardId: existingCard.id,
+  expectedUpdatedAt: existingCard.updatedAt,
+};
+
+const updatedExisting = drainCaptureQueueItemsForWorkspace(
+  [confirmedUpdate],
+  { cards: [existingCard], categories, sections, activeSectionId: "section-home" },
+  { now: () => now + 5 }
+);
+
+assert.equal(updatedExisting.imported, 0);
+assert.equal(updatedExisting.updated, 1);
+assert.equal(updatedExisting.workspaceChanged, true);
+assert.equal(updatedExisting.cards[0]?.title, "codex-slides");
+assert.equal(updatedExisting.cards[0]?.fullDesc, confirmedUpdate.draft.description);
+assert.equal(updatedExisting.cards[0]?.shortDesc, confirmedUpdate.draft.description?.slice(0, 48));
+assert.equal(updatedExisting.cards[0]?.categoryId, existingCard.categoryId);
+assert.equal(updatedExisting.cards[0]?.order, existingCard.order);
+assert.equal(updatedExisting.cards[0]?.note, existingCard.note);
+assert.equal(updatedExisting.cards[0]?.abbreviation, existingCard.abbreviation);
+assert.equal(updatedExisting.cards[0]?.imageUrl, existingCard.imageUrl);
+assert.equal(updatedExisting.cards[0]?.createdAt, existingCard.createdAt);
+
+const emptyIconCard: WebCard = { ...existingCard, id: "card-empty-icon", imageUrl: "" };
+const emptyIconDraft = structuredClone(confirmedUpdate);
+emptyIconDraft.id = "confirmed-update-empty-icon";
+emptyIconDraft.draft.duplicateResolution = {
+  action: "update-metadata",
+  cardId: emptyIconCard.id,
+  expectedUpdatedAt: emptyIconCard.updatedAt,
+};
+const updatedEmptyIcon = drainCaptureQueueItemsForWorkspace(
+  [emptyIconDraft],
+  { cards: [emptyIconCard], categories, sections, activeSectionId: "section-home" },
+  { now: () => now + 6 }
+);
+assert.equal(updatedEmptyIcon.updated, 1);
+assert.equal(updatedEmptyIcon.cards[0]?.imageUrl, "");
+
+const unchangedDraft = pending("unchanged-update", existingCard.url, undefined);
+unchangedDraft.draft.title = existingCard.title;
+unchangedDraft.draft.description = "";
+unchangedDraft.draft.duplicateResolution = {
+  action: "update-metadata",
+  cardId: existingCard.id,
+  expectedUpdatedAt: existingCard.updatedAt,
+};
+const unchangedExisting = drainCaptureQueueItemsForWorkspace(
+  [unchangedDraft],
+  { cards: [existingCard], categories, sections, activeSectionId: "section-home" },
+  { now: () => now + 7 }
+);
+assert.equal(unchangedExisting.updated, 0);
+assert.equal(unchangedExisting.skipped, 1);
+assert.equal(unchangedExisting.workspaceChanged, false);
+assert.deepEqual(unchangedExisting.cards, [existingCard]);
+
+const staleDraft = structuredClone(confirmedUpdate);
+staleDraft.id = "stale-update";
+staleDraft.draft.duplicateResolution = {
+  action: "update-metadata",
+  cardId: existingCard.id,
+  expectedUpdatedAt: existingCard.updatedAt - 1,
+};
+const staleUpdate = drainCaptureQueueItemsForWorkspace(
+  [staleDraft],
+  { cards: [existingCard], categories, sections, activeSectionId: "section-home" },
+  { now: () => now + 8 }
+);
+assert.equal(staleUpdate.failed, 1);
+assert.equal(staleUpdate.workspaceChanged, false);
+assert.deepEqual(staleUpdate.cards, [existingCard]);
+
+const ambiguousUpdate = drainCaptureQueueItemsForWorkspace(
+  [confirmedUpdate],
+  {
+    cards: [
+      existingCard,
+      { ...existingCard, id: "card-existing-copy", categoryId: "home-group-world" },
+    ],
+    categories,
+    sections,
+    activeSectionId: "section-home",
+  },
+  { now: () => now + 9 }
+);
+assert.equal(ambiguousUpdate.failed, 1);
+assert.equal(ambiguousUpdate.updated, 0);
+assert.equal(ambiguousUpdate.workspaceChanged, false);
+
+const legacyDuplicate = pending("legacy-duplicate", existingCard.url, undefined);
+legacyDuplicate.draft.title = "Should not overwrite";
+legacyDuplicate.draft.description = "Should not overwrite either";
+const skippedLegacy = drainCaptureQueueItemsForWorkspace(
+  [legacyDuplicate],
+  { cards: [existingCard], categories, sections, activeSectionId: "section-home" },
+  { now: () => now + 10 }
+);
+assert.equal(skippedLegacy.skipped, 1);
+assert.equal(skippedLegacy.updated, 0);
+assert.equal(skippedLegacy.workspaceChanged, false);
+assert.deepEqual(skippedLegacy.cards, [existingCard]);
+
+const noRelocationRepair = repairVerifiedCaptureMisfiledCardsFromQueue(
+  updatedExisting.queue,
+  {
+    cards: updatedExisting.cards,
+    categories,
+    sections,
+    activeSectionId: "section-home",
+  },
+  { now: () => now + 11 }
+);
+assert.equal(noRelocationRepair.repaired, 0);
+assert.equal(noRelocationRepair.cards[0]?.categoryId, existingCard.categoryId);
+
 console.log("floating capture drain tests passed");

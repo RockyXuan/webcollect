@@ -11,12 +11,20 @@
  */
 
 import { extractKnowledgeText, extractMetadataFromHtml } from '../shared/metadata-extractor.js';
+import {
+  buildGitHubReadmeCandidateUrls,
+  extractGitHubReadmeSummary,
+  parseGitHubRepositoryUrl,
+} from '../shared/github-repository.js';
 import { assertSafeRemoteUrl } from '../shared/remote-url-policy.js';
 
 const CAPTURE_QUEUE_KEY = 'webcollect.capture.queue';
 const CAPTURE_PREFS_KEY = 'webcollect.capture.prefs';
 const CAPTURE_DESTINATIONS_KEY = 'webcollect.capture.destinations';
 const CAPTURE_CONTEXT_MENU_ID = 'webcollect-capture-link';
+const WEBCOLLECT_DB_NAME = 'WebCollect';
+const WEBCOLLECT_STORE_NAME = 'webcollect_data';
+const WEBCOLLECT_CARDS_KEY = 'cards';
 let captureQueueMutationTail = Promise.resolve();
 
 const DEFAULT_CAPTURE_PREFS = {
@@ -108,6 +116,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === 'CAPTURE_CHECK_DUPLICATE') {
+    findCaptureDuplicates(message.url)
+      .then(result => sendResponse({ success: true, ...result }))
+      .catch(err => sendResponse({ success: false, available: false, matches: [], error: err.message }));
+    return true;
+  }
+
   if (message.type === 'CAPTURE_QUEUE_ADD') {
     addCaptureQueueItem(message.draft)
       .then(item => sendResponse({ success: true, item }))
@@ -134,8 +149,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  * Fetch OG metadata from a URL (no CORS restrictions in extension context)
  */
 async function handleFetchMeta(url) {
+  let resolvedUrl = url;
+  let metadata = { title: '', description: '', image: '', favicon: '' };
   try {
-    const { response, text: html, url: resolvedUrl } = await fetchExtensionRemoteText(url, {
+    const result = await fetchExtensionRemoteText(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml;q=0.9',
@@ -144,15 +161,49 @@ async function handleFetchMeta(url) {
       maxRedirects: 4,
       maxBytes: 1500000,
     });
-
-    if (!response.ok) {
-      return { title: '', description: '', image: '', favicon: '' };
+    resolvedUrl = result.url;
+    if (result.response.ok) {
+      metadata = extractMetadataFromHtml(result.text, resolvedUrl);
     }
-
-    return extractMetadataFromHtml(html, resolvedUrl);
   } catch (e) {
-    return { title: '', description: '', image: '', favicon: '' };
+    // GitHub README fallback below can still provide useful public metadata.
   }
+
+  const repository = parseGitHubRepositoryUrl(resolvedUrl) || parseGitHubRepositoryUrl(url);
+  if (!repository) return { ...metadata, descriptionSource: 'page' };
+
+  const readmeDescription = await fetchGitHubReadmeSummary(repository);
+  return {
+    ...metadata,
+    title: repository.repository,
+    description: readmeDescription || metadata.description,
+    descriptionSource: readmeDescription ? 'github-readme' : 'page',
+  };
+}
+
+async function fetchGitHubReadmeSummary(repository) {
+  const deadline = Date.now() + 6000;
+  for (const candidate of buildGitHubReadmeCandidateUrls(repository)) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    try {
+      const result = await fetchExtensionRemoteText(candidate, {
+        headers: {
+          'Accept': 'text/plain,text/markdown,text/x-rst,text/asciidoc;q=0.9',
+        },
+        timeoutMs: Math.min(2500, remaining),
+        maxRedirects: 2,
+        maxBytes: 262144,
+        allowedContentTypes: ['text/plain', 'text/markdown', 'text/x-rst', 'text/asciidoc'],
+      });
+      if (!result.response.ok) continue;
+      const summary = extractGitHubReadmeSummary(result.text, { maxLength: 280 });
+      if (summary) return summary;
+    } catch {
+      // Try the next common README filename, then fall back to page metadata.
+    }
+  }
+  return '';
 }
 
 /**
@@ -211,13 +262,16 @@ async function fetchExtensionRemoteText(input, options = {}) {
       headers: options.headers,
       signal: AbortSignal.timeout(timeoutMs),
       redirect: 'manual',
+      credentials: 'omit',
+      cache: 'no-store',
     });
     if (![301, 302, 303, 307, 308].includes(response.status)) {
       if (response.status === 0 || response.type === 'opaqueredirect') {
         throw new Error('Redirect target cannot be verified safely');
       }
       const contentType = (response.headers.get('content-type') || '').toLowerCase();
-      if (!contentType.startsWith('text/html') && !contentType.startsWith('application/xhtml+xml')) {
+      const allowedContentTypes = options.allowedContentTypes || ['text/html', 'application/xhtml+xml'];
+      if (!allowedContentTypes.some(type => contentType.startsWith(type))) {
         await response.body?.cancel();
         throw new Error('Unsupported remote content type');
       }
@@ -391,6 +445,73 @@ function normalizeCaptureUrl(input) {
   return null;
 }
 
+function normalizeDuplicateResolution(value) {
+  if (!value || value.action !== 'update-metadata') return undefined;
+  const cardId = String(value.cardId || '').trim();
+  const expectedUpdatedAt = Number(value.expectedUpdatedAt);
+  if (!cardId || cardId.length > 256 || !Number.isFinite(expectedUpdatedAt) || expectedUpdatedAt < 0) {
+    return undefined;
+  }
+  return { action: 'update-metadata', cardId, expectedUpdatedAt };
+}
+
+async function webCollectDatabaseExists() {
+  if (!globalThis.indexedDB) return false;
+  if (typeof globalThis.indexedDB.databases !== 'function') return true;
+  const databases = await globalThis.indexedDB.databases();
+  return databases.some(database => database.name === WEBCOLLECT_DB_NAME);
+}
+
+async function openExistingWebCollectDatabase() {
+  if (!(await webCollectDatabaseExists())) return null;
+  return new Promise((resolve, reject) => {
+    const request = globalThis.indexedDB.open(WEBCOLLECT_DB_NAME);
+    request.onupgradeneeded = () => {
+      request.transaction?.abort();
+      reject(new Error('WebCollect database is not initialized'));
+    };
+    request.onerror = () => reject(request.error || new Error('Unable to open WebCollect database'));
+    request.onsuccess = () => resolve(request.result);
+  });
+}
+
+async function readExistingCaptureCards() {
+  const database = await openExistingWebCollectDatabase();
+  if (!database) return { available: true, cards: [] };
+  try {
+    if (!database.objectStoreNames.contains(WEBCOLLECT_STORE_NAME)) {
+      return { available: false, cards: [] };
+    }
+    const cards = await new Promise((resolve, reject) => {
+      const transaction = database.transaction(WEBCOLLECT_STORE_NAME, 'readonly');
+      const request = transaction.objectStore(WEBCOLLECT_STORE_NAME).get(WEBCOLLECT_CARDS_KEY);
+      request.onerror = () => reject(request.error || new Error('Unable to read WebCollect cards'));
+      request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result : []);
+    });
+    return { available: true, cards };
+  } finally {
+    database.close();
+  }
+}
+
+async function findCaptureDuplicates(inputUrl) {
+  const normalizedUrl = normalizeCaptureUrl(inputUrl);
+  if (!normalizedUrl) return { available: true, matches: [] };
+  const result = await readExistingCaptureCards();
+  if (!result.available) return { available: false, matches: [] };
+  const matches = result.cards
+    .filter(card => normalizeCaptureUrl(card?.url || '') === normalizedUrl)
+    .map(card => ({
+      id: String(card.id || ''),
+      title: String(card.title || ''),
+      description: String(card.fullDesc || card.shortDesc || ''),
+      updatedAt: Number.isFinite(Number(card.updatedAt)) ? Number(card.updatedAt) : 0,
+      categoryId: String(card.categoryId || ''),
+    }))
+    .filter(card => card.id);
+  return { available: true, matches };
+}
+
 function extractFirstUrl(text) {
   const match = String(text || '').match(/((?:https?:\/\/|chrome:\/\/|edge:\/\/|about:)[^\s<>"']+|(?:www\.)?[\w.-]+\.[a-z]{2,}(?:\/[^\s<>"']*)?)/i);
   return match ? normalizeCaptureUrl(match[1]) : null;
@@ -414,12 +535,29 @@ async function addCaptureQueueItemUnlocked(draft) {
   if (!normalizedUrl) throw new Error('Invalid URL');
   const title = String(draft.title || '').trim() || titleFromUrl(normalizedUrl);
   if (!title) throw new Error('Missing title');
+  const duplicateResolution = normalizeDuplicateResolution(draft.duplicateResolution);
 
   const queue = await getStorageValue(CAPTURE_QUEUE_KEY, []);
   const existing = queue.find((item) =>
     item.status === 'pending' && normalizeCaptureUrl(item.draft?.url || '') === normalizedUrl
   );
-  if (existing) return existing;
+  if (existing) {
+    if (!duplicateResolution) return existing;
+    existing.draft = {
+      ...draft,
+      url: normalizedUrl,
+      title,
+      description: String(draft.description || ''),
+      duplicateResolution,
+    };
+    existing.updatedAt = Date.now();
+    existing.error = undefined;
+    await setStorageValue(CAPTURE_QUEUE_KEY, queue);
+    chrome.runtime.sendMessage({ type: 'CAPTURE_QUEUE_UPDATED' }, () => {
+      void chrome.runtime.lastError;
+    });
+    return existing;
+  }
 
   const now = Date.now();
   const item = {
@@ -429,6 +567,7 @@ async function addCaptureQueueItemUnlocked(draft) {
       url: normalizedUrl,
       title,
       description: String(draft.description || ''),
+      duplicateResolution,
     },
     createdAt: now,
     updatedAt: now,

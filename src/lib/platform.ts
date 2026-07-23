@@ -147,6 +147,7 @@ export interface FetchMetaResult {
   description: string;
   image: string;
   favicon: string;
+  descriptionSource?: "page" | "github-readme";
 }
 
 /** Internal format from extension background.js */

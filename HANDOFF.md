@@ -2,6 +2,16 @@
 
 > **2026-07-15 current workflow rule:** this repository has retired Superpowers (including `superpowers:*` / `using-superpowers`), `goal-zzx` / `zzx-goal`, and `andrej-karpathy-coding`. Do not install, enable, invoke, or imitate them. Any older instruction below that requires `tasks/todo.md`, `tasks/lessons.md`, `CODEX_GO_MODE_STATUS.md`, fixed phase counts, strict TDD, worktrees, subagents, or duplicate reviews is historical and superseded by `AGENTS.md`.
 
+## 2026-07-23 V1.5.2 GitHub Capture Metadata Fix
+
+This section records the current code target. V1.5.1 remains the latest published release until V1.5.2 release evidence is appended.
+
+- Code identity: `V1.5.2 / 2026年7月23日`; target tag `webcollect-2026-07-23-v1.5.2`; target asset `WebCollect-Chrome-Extension-v1.5.2-2026-07-23.zip`.
+- Closeout: `docs/audit/webcollect-v1.5.2-github-capture-metadata-closeout-2026-07-23.md`.
+- GitHub repository captures use a shared repository parser and bounded public README extraction. No Cookie, GitHub Token, AI API, translation API, or local model is used.
+- Duplicate URLs require a comparison and explicit in-panel confirmation. The queue rechecks card ID, normalized URL, and `updatedAt`, then updates only non-empty title/description fields while preserving all placement and user-authored fields.
+- Legacy/right-click duplicates still skip; multiple duplicates and version conflicts fail closed. No permission, dependency, storage key, Drive schema, migration, snapshot, seed, or unrelated collection behavior changes.
+
 ## 2026-07-23 V1.5.1 Next.js Security Patch
 
 This section records the current published release. V1.5.0 remains the tab-pack/favicon feature baseline and V1.4.0 remains the cloud/data baseline.
@@ -148,8 +158,8 @@ This section supersedes older development status. The user explicitly waived the
 
 ## Next Major Feature Thread
 
-- V1.5.1 CI, Release, official-zip audit, and real Chrome read-only check are complete; the next large feature may start from this baseline.
-- Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, the V1.5.1 closeout, the V1.5.0 feature closeout, and the V1.4.0 data-baseline closeout before changing code.
+- V1.5.2 is the current code target; its CI, Release, official-zip audit, and real Chrome read-only evidence must be completed before starting another feature.
+- Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, the V1.5.2 closeout, the V1.5.1 closeout, the V1.5.0 feature closeout, and the V1.4.0 data-baseline closeout before changing code.
 - Ask for or read the user's new feature description, then inspect only the relevant implementation paths before choosing scope, tests, version bump, and release plan.
 - Preserve the V1.4.0 local-first Drive, backup, data, and migration guarantees. Do not reset IndexedDB, old Supabase data, extension storage, categories, cards, preferences, snapshots, local view state, mode preference, knowledge consent/cache, derived vectors, or the two documented empty inbox artifacts.
 - Decide the next version only after understanding the feature's actual breadth. Use the real completion date and keep package, manifest, UI version, tag, Release, and zip identity aligned.

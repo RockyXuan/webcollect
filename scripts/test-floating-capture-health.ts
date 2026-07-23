@@ -109,9 +109,34 @@ assert.match(
   "floating capture actions should put save on the left and cancel on the right"
 );
 assert.match(
+  contentScript,
+  /data-action="confirm-duplicate-update">更新原卡片<\/button>[\s\S]*data-action="keep-duplicate">保留原内容<\/button>/,
+  "duplicate URLs should require an explicit update-or-keep decision inside the floating panel"
+);
+assert.match(
+  contentScript,
+  /duplicateConfirm\.dataset\.open = "true";[\s\S]*saveButton\.hidden = true;/,
+  "the generic save action should hide while the duplicate decision is open"
+);
+assert.match(
+  contentScript,
+  /type:\s*DUPLICATE_CHECK_MESSAGE,[\s\S]*url:\s*normalizedUrl/,
+  "floating capture should check the existing IndexedDB collection before enqueueing a save"
+);
+assert.match(
   backgroundScript,
   /normalizeCapturePrefs/,
   "background worker should normalize floating capture prefs before returning them"
+);
+assert.match(
+  backgroundScript,
+  /database\.transaction\(WEBCOLLECT_STORE_NAME,\s*'readonly'\)/,
+  "duplicate lookup must read the WebCollect database through a read-only transaction"
+);
+assert.match(
+  backgroundScript,
+  /if \(!duplicateResolution\) return existing;[\s\S]*existing\.draft\s*=/,
+  "confirmed metadata updates should replace a pending duplicate queue item"
 );
 
 if (existsSync(builtContentScriptPath)) {

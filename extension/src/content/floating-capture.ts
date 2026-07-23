@@ -1,10 +1,12 @@
 import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/description-translation";
+import { githubRepositoryTitleFromUrl } from "../../../shared/github-repository.js";
 
 (() => {
   const QUEUE_MESSAGE = "CAPTURE_QUEUE_ADD";
   const PREFS_GET_MESSAGE = "CAPTURE_GET_PREFS";
   const PREFS_SET_MESSAGE = "CAPTURE_SET_PREFS";
   const DESTINATIONS_GET_MESSAGE = "CAPTURE_GET_DESTINATIONS";
+  const DUPLICATE_CHECK_MESSAGE = "CAPTURE_CHECK_DUPLICATE";
   const META_MESSAGE = "FETCH_META";
   const OPEN_PANEL_MESSAGE = "CAPTURE_OPEN_PANEL";
   const CAPTURE_PREFS_STORAGE_KEY = "webcollect.capture.prefs";
@@ -33,6 +35,19 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
     sourcePageUrl?: string;
     sourcePageTitle?: string;
     destination?: CaptureDestination;
+    duplicateResolution?: {
+      action: "update-metadata";
+      cardId: string;
+      expectedUpdatedAt: number;
+    };
+  }
+
+  interface CaptureDuplicateMatch {
+    id: string;
+    title: string;
+    description: string;
+    updatedAt: number;
+    categoryId: string;
   }
 
   interface FloatingCapturePrefs {
@@ -132,6 +147,8 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
   let hoverHideTimer: number | null = null;
   let scheduledHover: { link: HTMLAnchorElement; x: number; y: number } | null = null;
   let panelOpen = false;
+  let saveInFlight = false;
+  let pendingDuplicate: { draft: CaptureDraft; match: CaptureDuplicateMatch } | null = null;
   let dragState: { pointerId: number; startX: number; startY: number; moved: boolean } | null = null;
   let panelDragState: { pointerId: number; startX: number; startY: number; startLeft: number; startTop: number; moved: boolean } | null = null;
   let suppressNextButtonClick = false;
@@ -551,6 +568,10 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
         background: rgba(255, 255, 255, 0.68);
         color: #334155;
       }
+      .wc-primary:disabled, .wc-secondary:disabled, .wc-small:disabled {
+        cursor: wait;
+        opacity: 0.56;
+      }
       .wc-secondary:hover, .wc-small:hover { background: rgba(255, 255, 255, 0.92); color: #1d4ed8; }
       .wc-small { padding: 6px 7px; font-size: 12px; }
       .wc-translate {
@@ -563,6 +584,33 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
       .wc-status { min-height: 18px; margin-top: 8px; font-size: 12px; color: #64748b; }
       .wc-status[data-tone="error"] { color: #e11d48; }
       .wc-status[data-tone="ok"] { color: #059669; }
+      .wc-duplicate-confirm {
+        display: none;
+        margin-top: 12px;
+        border: 1px solid rgba(96, 165, 250, 0.34);
+        border-radius: 16px;
+        background: rgba(239, 246, 255, 0.82);
+        padding: 12px;
+      }
+      .wc-duplicate-confirm[data-open="true"] { display: grid; gap: 10px; }
+      .wc-duplicate-title { font-weight: 800; color: #1e3a8a; }
+      .wc-duplicate-note { color: #475569; font-size: 12px; line-height: 1.5; }
+      .wc-duplicate-grid { display: grid; gap: 8px; }
+      .wc-duplicate-row {
+        display: grid;
+        grid-template-columns: 72px minmax(0, 1fr);
+        gap: 8px;
+        align-items: start;
+        color: #475569;
+        font-size: 12px;
+      }
+      .wc-duplicate-row strong { color: #334155; }
+      .wc-duplicate-value {
+        min-width: 0;
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
+      }
+      .wc-duplicate-actions { display: flex; flex-wrap: wrap; gap: 8px; }
       .wc-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
       .wc-quick-note {
         margin-top: 10px;
@@ -641,6 +689,20 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
           <button class="wc-small" type="button" data-action="disable-site" title="只在当前网站永久隐藏浮窗，可在 WebCollect 账户设置里恢复">永久不显示</button>
         </div>
         <p class="wc-quick-help">选择永久不显示后，只会影响当前网站；后续可在 WebCollect 主页账户设置里重新开启。</p>
+        <section class="wc-duplicate-confirm" data-open="false" aria-live="polite" aria-label="重复收藏确认">
+          <div class="wc-duplicate-title">这个网页已经收藏过</div>
+          <div class="wc-duplicate-note">确认后只更新标题和非空简介；分类位置、顺序、备注、简称和现有图标都会保留。</div>
+          <div class="wc-duplicate-grid">
+            <div class="wc-duplicate-row"><strong>原标题</strong><span class="wc-duplicate-value" data-duplicate-field="old-title"></span></div>
+            <div class="wc-duplicate-row"><strong>新标题</strong><span class="wc-duplicate-value" data-duplicate-field="new-title"></span></div>
+            <div class="wc-duplicate-row"><strong>原简介</strong><span class="wc-duplicate-value" data-duplicate-field="old-description"></span></div>
+            <div class="wc-duplicate-row"><strong>新简介</strong><span class="wc-duplicate-value" data-duplicate-field="new-description"></span></div>
+          </div>
+          <div class="wc-duplicate-actions">
+            <button class="wc-primary" type="button" data-action="confirm-duplicate-update">更新原卡片</button>
+            <button class="wc-secondary" type="button" data-action="keep-duplicate">保留原内容</button>
+          </div>
+        </section>
         <div class="wc-status"></div>
         <div class="wc-actions">
           <button class="wc-primary" type="button" data-action="save">保存</button>
@@ -655,6 +717,13 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
   const panel = shadow.querySelector<HTMLElement>(".wc-panel")!;
   const panelHead = shadow.querySelector<HTMLElement>(".wc-head")!;
   const statusEl = shadow.querySelector<HTMLElement>(".wc-status")!;
+  const duplicateConfirm = shadow.querySelector<HTMLElement>(".wc-duplicate-confirm")!;
+  const duplicateOldTitle = shadow.querySelector<HTMLElement>('[data-duplicate-field="old-title"]')!;
+  const duplicateNewTitle = shadow.querySelector<HTMLElement>('[data-duplicate-field="new-title"]')!;
+  const duplicateOldDescription = shadow.querySelector<HTMLElement>('[data-duplicate-field="old-description"]')!;
+  const duplicateNewDescription = shadow.querySelector<HTMLElement>('[data-duplicate-field="new-description"]')!;
+  const duplicateUpdateButton = shadow.querySelector<HTMLButtonElement>('[data-action="confirm-duplicate-update"]')!;
+  const saveButton = shadow.querySelector<HTMLButtonElement>('[data-action="save"]')!;
   const titleInput = shadow.querySelector<HTMLInputElement>('[data-field="title"]')!;
   const urlInput = shadow.querySelector<HTMLInputElement>('[data-field="url"]')!;
   const descriptionInput = shadow.querySelector<HTMLTextAreaElement>('[data-field="description"]')!;
@@ -887,7 +956,9 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
     return Boolean(fallbackRoot && normalizedPart === fallbackRoot);
   }
 
-  function compactCaptureTitle(text: string, fallback: string): string {
+  function compactCaptureTitle(text: string, fallback: string, url?: string): string {
+    const repositoryTitle = githubRepositoryTitleFromUrl(url || "");
+    if (repositoryTitle) return repositoryTitle;
     const candidates = text
       .split(/\n+/)
       .map((line) => normalizeCaptureText(line))
@@ -1018,13 +1089,45 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
     statusEl.dataset.tone = tone;
   }
 
+  function setSaveBusy(busy: boolean) {
+    saveInFlight = busy;
+    saveButton.disabled = busy;
+    duplicateUpdateButton.disabled = busy;
+  }
+
+  function duplicateValue(value: string): string {
+    return value.trim() || "（空）";
+  }
+
+  function resetDuplicateConfirmation() {
+    pendingDuplicate = null;
+    duplicateConfirm.dataset.open = "false";
+    saveButton.hidden = false;
+    duplicateOldTitle.textContent = "";
+    duplicateNewTitle.textContent = "";
+    duplicateOldDescription.textContent = "";
+    duplicateNewDescription.textContent = "";
+  }
+
+  function showDuplicateConfirmation(draft: CaptureDraft, match: CaptureDuplicateMatch) {
+    pendingDuplicate = { draft, match };
+    duplicateOldTitle.textContent = duplicateValue(match.title);
+    duplicateNewTitle.textContent = duplicateValue(draft.title);
+    duplicateOldDescription.textContent = duplicateValue(match.description);
+    duplicateNewDescription.textContent = duplicateValue(draft.description || "");
+    duplicateConfirm.dataset.open = "true";
+    saveButton.hidden = true;
+    setStatus("请确认是否更新这张已收藏的卡片。");
+    window.requestAnimationFrame(() => duplicateUpdateButton.focus());
+  }
+
   function buildCurrentPageDraft(sourceType: CaptureSourceType = "current-page"): CaptureDraft {
     const pageUrl = window.location.href;
     const metaTitle = textFromMeta("og:title") || document.title || titleFromUrl(pageUrl);
     const metaDescription = textFromMeta("og:description") || textFromMeta("description") || "";
     return {
       url: pageUrl,
-      title: compactCaptureTitle(metaTitle, titleFromUrl(pageUrl)),
+      title: compactCaptureTitle(metaTitle, titleFromUrl(pageUrl), pageUrl),
       description: metaDescription,
       sourceType,
       sourcePageUrl: pageUrl,
@@ -1040,7 +1143,7 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
     const description = rawDescription;
     return {
       url: selectedUrl,
-      title: compactCaptureTitle(selectedText, titleFromUrl(selectedUrl)),
+      title: compactCaptureTitle(selectedText, titleFromUrl(selectedUrl), selectedUrl),
       description,
       sourceType: "selection",
       sourcePageUrl: window.location.href,
@@ -1197,24 +1300,46 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
 
   async function enrichDraft(draft: CaptureDraft) {
     if (!/^https?:\/\//i.test(draft.url)) return;
-    const response = await runtimeMessage<{ success?: boolean; data?: { title?: string; description?: string; image?: string; favicon?: string } }>({
+    const response = await runtimeMessage<{
+      success?: boolean;
+      data?: {
+        title?: string;
+        description?: string;
+        image?: string;
+        favicon?: string;
+        descriptionSource?: "page" | "github-readme";
+      };
+    }>({
       type: META_MESSAGE,
       url: draft.url,
     });
     if (!response?.success || !response.data) return;
     const fetchedTitle = response.data.title
-      ? compactCaptureTitle(response.data.title, titleFromUrl(draft.url))
+      ? compactCaptureTitle(response.data.title, titleFromUrl(draft.url), draft.url)
       : "";
+    let enrichedVisibleFields = false;
     if (shouldReplaceCaptureTitle(titleInput.value, fetchedTitle, draft)) {
       titleInput.value = fetchedTitle;
+      enrichedVisibleFields = true;
     }
     if (response.data.description) {
-      if (shouldReplaceCaptureDescription(descriptionInput.value, response.data.description, draft, fetchedTitle)) {
-        descriptionInput.value = response.data.description;
+      const fetchedDescription = response.data.descriptionSource === "github-readme"
+        ? localizeDescriptionText(response.data.description, {
+            title: fetchedTitle || titleInput.value,
+            url: draft.url,
+          })
+        : response.data.description;
+      if (shouldReplaceCaptureDescription(descriptionInput.value, fetchedDescription, draft, fetchedTitle)) {
+        descriptionInput.value = fetchedDescription;
+        enrichedVisibleFields = true;
       }
     }
     if (response.data.image) panel.dataset.imageUrl = response.data.image;
     if (response.data.favicon) panel.dataset.favicon = response.data.favicon;
+    if (enrichedVisibleFields && pendingDuplicate) {
+      resetDuplicateConfirmation();
+      setStatus("网页信息已自动更新，请重新点击保存进行确认。");
+    }
   }
 
   async function openPanel(draft: CaptureDraft) {
@@ -1230,7 +1355,7 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
     button.dataset.open = "true";
     applyDockState();
     window.requestAnimationFrame(applyPanelPosition);
-    titleInput.value = compactCaptureTitle(draft.title || "", titleFromUrl(draft.url));
+    titleInput.value = compactCaptureTitle(draft.title || "", titleFromUrl(draft.url), draft.url);
     urlInput.value = draft.url || "";
     descriptionInput.value = draft.description || "";
     panel.dataset.sourceType = draft.sourceType;
@@ -1238,6 +1363,8 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
     panel.dataset.sourcePageTitle = draft.sourcePageTitle || document.title || "";
     panel.dataset.imageUrl = draft.imageUrl || "";
     panel.dataset.favicon = draft.favicon || "";
+    resetDuplicateConfirmation();
+    setSaveBusy(false);
     renderDestinationSelects(draft.destination);
     setStatus("");
     void enrichDraft(draft);
@@ -1249,6 +1376,8 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
     panelOpen = false;
     panel.dataset.open = "false";
     button.dataset.open = "false";
+    resetDuplicateConfirmation();
+    setSaveBusy(false);
   }
 
   function getSelectedDestination(): CaptureDestination | undefined {
@@ -1299,7 +1428,35 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
       : undefined;
   }
 
+  function currentFormDraft(normalizedUrl: string, title: string): CaptureDraft {
+    return {
+      url: normalizedUrl,
+      title,
+      description: descriptionInput.value.trim(),
+      imageUrl: panel.dataset.imageUrl || "",
+      favicon: panel.dataset.favicon || "",
+      sourceType: (panel.dataset.sourceType as CaptureSourceType) || "floating-button",
+      sourcePageUrl: panel.dataset.sourcePageUrl || window.location.href,
+      sourcePageTitle: panel.dataset.sourcePageTitle || document.title,
+      destination: getSelectedDestination(),
+    };
+  }
+
+  async function enqueueDraft(draft: CaptureDraft) {
+    setStatus("已保存到本地队列，打开 WebCollect 后会自动入库。");
+    const response = await runtimeMessage<{ success?: boolean; error?: string }>({ type: QUEUE_MESSAGE, draft });
+    if (!response?.success) {
+      setStatus(response?.error || "保存失败。", "error");
+      setSaveBusy(false);
+      return;
+    }
+    setStatus(draft.duplicateResolution ? "已确认更新，等待 WebCollect 安全入库。" : "已加入 WebCollect。", "ok");
+    setSaveBusy(false);
+    window.setTimeout(closePanel, 650);
+  }
+
   async function saveDraft() {
+    if (saveInFlight) return;
     const normalizedUrl = normalizeUrl(urlInput.value);
     const title = titleInput.value.trim();
     if (!normalizedUrl) {
@@ -1327,25 +1484,58 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
       return;
     }
 
-    const draft: CaptureDraft = {
+    const draft = currentFormDraft(normalizedUrl, title);
+    resetDuplicateConfirmation();
+    setSaveBusy(true);
+    setStatus("正在核对是否已经收藏...");
+    const duplicateResponse = await runtimeMessage<{
+      success?: boolean;
+      available?: boolean;
+      matches?: CaptureDuplicateMatch[];
+      error?: string;
+    }>({
+      type: DUPLICATE_CHECK_MESSAGE,
       url: normalizedUrl,
-      title,
-      description: descriptionInput.value.trim(),
-      imageUrl: panel.dataset.imageUrl || "",
-      favicon: panel.dataset.favicon || "",
-      sourceType: (panel.dataset.sourceType as CaptureSourceType) || "floating-button",
-      sourcePageUrl: panel.dataset.sourcePageUrl || window.location.href,
-      sourcePageTitle: panel.dataset.sourcePageTitle || document.title,
-      destination: getSelectedDestination(),
-    };
-    setStatus("已保存到本地队列，打开 WebCollect 后会自动入库。");
-    const response = await runtimeMessage<{ success?: boolean; error?: string }>({ type: QUEUE_MESSAGE, draft });
-    if (!response?.success) {
-      setStatus(response?.error || "保存失败。", "error");
+    });
+    const matches = Array.isArray(duplicateResponse?.matches) ? duplicateResponse.matches : [];
+    if (!duplicateResponse?.success || duplicateResponse.available === false) {
+      setStatus("暂时无法核对重复项；已按安全模式加入，若已存在将保留原内容。");
+      await enqueueDraft(draft);
       return;
     }
-    setStatus("已加入 WebCollect。", "ok");
-    setTimeout(closePanel, 650);
+    if (matches.length > 1) {
+      setSaveBusy(false);
+      setStatus(`这个网址已收藏 ${matches.length} 次，请进入 WebCollect 选择要编辑的卡片。`, "error");
+      return;
+    }
+    if (matches.length === 1) {
+      setSaveBusy(false);
+      showDuplicateConfirmation(draft, matches[0]);
+      return;
+    }
+    await enqueueDraft(draft);
+  }
+
+  async function confirmDuplicateUpdate() {
+    if (!pendingDuplicate || saveInFlight) return;
+    const { draft, match } = pendingDuplicate;
+    resetDuplicateConfirmation();
+    setSaveBusy(true);
+    await enqueueDraft({
+      ...draft,
+      duplicateResolution: {
+        action: "update-metadata",
+        cardId: match.id,
+        expectedUpdatedAt: match.updatedAt,
+      },
+    });
+  }
+
+  function keepDuplicateContent() {
+    if (!pendingDuplicate || saveInFlight) return;
+    resetDuplicateConfirmation();
+    setStatus("已保留原卡片内容，本次没有写入。", "ok");
+    window.setTimeout(closePanel, 650);
   }
 
   async function updatePrefs(next: FloatingCapturePrefs) {
@@ -1430,7 +1620,11 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
     const description = normalizeCaptureText(contextText || visibleText);
     hoveredDraft = {
       url: href,
-      title: compactCaptureTitle(contextText || visibleText || link.getAttribute("aria-label") || "", fallbackTitle),
+      title: compactCaptureTitle(
+        contextText || visibleText || link.getAttribute("aria-label") || "",
+        fallbackTitle,
+        href
+      ),
       description: description.length > 240 ? `${description.slice(0, 240)}...` : description,
       sourceType: "hover-link",
       sourcePageUrl: window.location.href,
@@ -1463,6 +1657,13 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
     updateCreateInputs();
   });
   groupSelect.addEventListener("change", updateCreateInputs);
+  for (const field of [titleInput, urlInput, descriptionInput]) {
+    field.addEventListener("input", () => {
+      if (!pendingDuplicate) return;
+      resetDuplicateConfirmation();
+      setStatus("内容已经变化，请重新点击保存进行确认。");
+    });
+  }
 
   function isPanelDragBlockedTarget(target: EventTarget | null): boolean {
     return target instanceof Element && !!target.closest("button, input, textarea, select, a");
@@ -1574,6 +1775,8 @@ import { isMismatchedKnownSiteSummary, localizeDescriptionText } from "@/lib/des
     if (!action) return;
     if (action === "close") closePanel();
     if (action === "save") void saveDraft();
+    if (action === "confirm-duplicate-update") void confirmDuplicateUpdate();
+    if (action === "keep-duplicate") keepDuplicateContent();
     if (action === "translate-description") translateDescription();
     if (action === "pause-hour") void updatePrefs({ ...prefs, pauseUntil: Date.now() + 60 * 60 * 1000 });
     if (action === "pause-today") void updatePrefs({ ...prefs, pauseUntil: pauseUntilTodayEnd() });

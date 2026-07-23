@@ -44,6 +44,11 @@ export interface CaptureDraft {
   sourcePageUrl?: string;
   sourcePageTitle?: string;
   destination?: CaptureDestination;
+  duplicateResolution?: {
+    action: "update-metadata";
+    cardId: string;
+    expectedUpdatedAt: number;
+  };
 }
 
 export interface CaptureQueueItem {
@@ -477,9 +482,11 @@ export interface CaptureQueueDrainOptions {
 export interface CaptureQueueDrainResult extends CaptureQueueWorkspace {
   queue: CaptureQueueItem[];
   imported: number;
+  updated: number;
   skipped: number;
   failed: number;
   changed: boolean;
+  workspaceChanged: boolean;
 }
 
 export interface CaptureQueueRepairResult extends CaptureQueueWorkspace {
@@ -729,9 +736,11 @@ export function drainCaptureQueueItemsForWorkspace(
   let categories = workspace.categories.map((category) => ({ ...category }));
   let sections = workspace.sections.map((section) => ({ ...section }));
   let imported = 0;
+  let updated = 0;
   let skipped = 0;
   let failed = 0;
   let changed = false;
+  let workspaceChanged = false;
 
   for (const item of queue.filter((queueItem) => queueItem.status === "pending")) {
     const normalizedUrl = normalizeCaptureUrl(item.draft.url);
@@ -745,8 +754,60 @@ export function drainCaptureQueueItemsForWorkspace(
       continue;
     }
 
-    const alreadyExists = cards.some((card) => normalizeCaptureUrl(card.url) === normalizedUrl);
-    if (alreadyExists) {
+    const existingCards = cards.filter((card) => normalizeCaptureUrl(card.url) === normalizedUrl);
+    if (existingCards.length > 0) {
+      const resolution = item.draft.duplicateResolution;
+      if (resolution?.action === "update-metadata") {
+        if (existingCards.length !== 1) {
+          item.status = "failed";
+          item.error = "Multiple matching cards require manual selection";
+          item.updatedAt = nextCaptureTimestamp(options);
+          failed += 1;
+          changed = true;
+          continue;
+        }
+        const existingCard = existingCards[0];
+        if (
+          resolution.cardId !== existingCard.id
+          || resolution.expectedUpdatedAt !== existingCard.updatedAt
+        ) {
+          item.status = "failed";
+          item.error = "Existing card changed after duplicate confirmation";
+          item.updatedAt = nextCaptureTimestamp(options);
+          failed += 1;
+          changed = true;
+          continue;
+        }
+        const description = item.draft.description?.trim() || "";
+        const nextCard: WebCard = {
+          ...existingCard,
+          title,
+          shortDesc: description ? description.slice(0, 48) : existingCard.shortDesc,
+          fullDesc: description || existingCard.fullDesc,
+          imageUrl: existingCard.imageUrl,
+          updatedAt: nextCaptureTimestamp(options),
+        };
+        const cardChanged = (
+          nextCard.title !== existingCard.title
+          || nextCard.shortDesc !== existingCard.shortDesc
+          || nextCard.fullDesc !== existingCard.fullDesc
+        );
+        if (cardChanged) {
+          const cardIndex = cards.findIndex((card) => card.id === existingCard.id);
+          cards[cardIndex] = nextCard;
+          updated += 1;
+          workspaceChanged = true;
+          item.error = undefined;
+        } else {
+          skipped += 1;
+          item.error = "Duplicate URL unchanged";
+        }
+        item.status = "imported";
+        item.destinationError = undefined;
+        item.updatedAt = nextCaptureTimestamp(options);
+        changed = true;
+        continue;
+      }
       item.status = "imported";
       item.error = "Duplicate URL skipped";
       item.updatedAt = nextCaptureTimestamp(options);
@@ -777,6 +838,7 @@ export function drainCaptureQueueItemsForWorkspace(
       categories = target.categories;
       sections = target.sections;
       changed = true;
+      workspaceChanged = true;
     }
 
     const categoryCards = cards.filter((card) => card.categoryId === categoryId);
@@ -805,6 +867,7 @@ export function drainCaptureQueueItemsForWorkspace(
     item.updatedAt = nextCaptureTimestamp(options);
     imported += 1;
     changed = true;
+    workspaceChanged = true;
   }
 
   return {
@@ -814,9 +877,11 @@ export function drainCaptureQueueItemsForWorkspace(
     activeSectionId: workspace.activeSectionId,
     queue,
     imported,
+    updated,
     skipped,
     failed,
     changed,
+    workspaceChanged,
   };
 }
 
@@ -833,6 +898,7 @@ export function repairVerifiedCaptureMisfiledCardsFromQueue(
   let changed = false;
 
   for (const item of queue) {
+    if (item.draft.duplicateResolution) continue;
     if (item.status !== "imported" || item.destinationError || !item.draft.destination) continue;
     const normalizedUrl = normalizeCaptureUrl(item.draft.url);
     if (!normalizedUrl) continue;
@@ -894,13 +960,13 @@ export function repairVerifiedCaptureMisfiledCardsFromQueue(
   };
 }
 
-async function drainFloatingCaptureQueueUnsafe(): Promise<{ imported: number; skipped: number; failed: number; repaired: number }> {
-  if (!hasExtensionStorage()) return { imported: 0, skipped: 0, failed: 0, repaired: 0 };
+async function drainFloatingCaptureQueueUnsafe(): Promise<{ imported: number; updated: number; skipped: number; failed: number; repaired: number }> {
+  if (!hasExtensionStorage()) return { imported: 0, updated: 0, skipped: 0, failed: 0, repaired: 0 };
 
   const queue = await getChromeStorage<CaptureQueueItem[]>(CAPTURE_QUEUE_KEY, []);
   const app = useAppStore.getState();
   if (app.isLoading || app.categories.length === 0) {
-    return { imported: 0, skipped: 0, failed: 0, repaired: 0 };
+    return { imported: 0, updated: 0, skipped: 0, failed: 0, repaired: 0 };
   }
 
   const drained = drainCaptureQueueItemsForWorkspace(queue, {
@@ -925,7 +991,7 @@ async function drainFloatingCaptureQueueUnsafe(): Promise<{ imported: number; sk
     );
   }
 
-  if (drained.changed || repaired.changed) {
+  if (drained.workspaceChanged || repaired.changed) {
     const [sections, categories, cards] = await Promise.all([
       saveSectionsRebased(app.sections, repaired.sections),
       saveCategoriesRebased(app.categories, repaired.categories),
@@ -936,6 +1002,8 @@ async function drainFloatingCaptureQueueUnsafe(): Promise<{ imported: number; sk
       categories,
       cards,
     });
+  }
+  if (drained.changed || repaired.changed) {
     await replaceCaptureQueueThroughBackground(queue, repaired.queue);
   }
 
@@ -944,6 +1012,7 @@ async function drainFloatingCaptureQueueUnsafe(): Promise<{ imported: number; sk
   }
   return {
     imported: drained.imported,
+    updated: drained.updated,
     skipped: drained.skipped,
     failed: drained.failed,
     repaired: repaired.repaired,
@@ -954,6 +1023,6 @@ export function withFloatingCaptureDrainLock<T>(operation: () => Promise<T>): Pr
   return withStorageLock("floating-capture-drain", operation);
 }
 
-export function drainFloatingCaptureQueue(): Promise<{ imported: number; skipped: number; failed: number; repaired: number }> {
+export function drainFloatingCaptureQueue(): Promise<{ imported: number; updated: number; skipped: number; failed: number; repaired: number }> {
   return withFloatingCaptureDrainLock(drainFloatingCaptureQueueUnsafe);
 }

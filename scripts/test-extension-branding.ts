@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 
-const EXPECTED_VERSION = "1.5.1";
+const EXPECTED_VERSION = "1.5.2";
 const EXPECTED_RELEASE_DATE = "2026-07-23";
 const EXPECTED_RELEASE_DATE_DISPLAY = "2026年7月23日";
 

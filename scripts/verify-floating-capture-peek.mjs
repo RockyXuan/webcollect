@@ -10,6 +10,7 @@ const extensionPath = resolve(projectRoot, "extension", "dist");
 const profileDir = await mkdtemp(resolve(tmpdir(), "webcollect-floating-peek-"));
 const restScreenshot = resolve(tmpdir(), "webcollect-floating-peek-rest.png");
 const hoverScreenshot = resolve(tmpdir(), "webcollect-floating-peek-hover.png");
+const duplicateScreenshot = resolve(tmpdir(), "webcollect-floating-duplicate-confirmation.png");
 
 const server = createServer((_request, response) => {
   response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
@@ -243,6 +244,143 @@ async function verifyKeyboardIsolation(page) {
   };
 }
 
+async function readCardsFromExtensionPage(extensionPage) {
+  return extensionPage.evaluate(async () => {
+    const database = await new Promise((resolve, reject) => {
+      const request = indexedDB.open("WebCollect");
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+    try {
+      return await new Promise((resolve, reject) => {
+        const transaction = database.transaction("webcollect_data", "readonly");
+        const request = transaction.objectStore("webcollect_data").get("cards");
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result : []);
+      });
+    } finally {
+      database.close();
+    }
+  });
+}
+
+async function seedDuplicateCard(extensionPage, url) {
+  await extensionPage.evaluate(async ({ targetUrl }) => {
+    const database = await new Promise((resolve, reject) => {
+      const request = indexedDB.open("WebCollect");
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+    try {
+      await new Promise((resolve, reject) => {
+        const transaction = database.transaction("webcollect_data", "readwrite");
+        const store = transaction.objectStore("webcollect_data");
+        const request = store.get("cards");
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const cards = Array.isArray(request.result) ? request.result : [];
+          store.put([
+            ...cards.filter((card) => card?.id !== "card-floating-duplicate-test"),
+            {
+              id: "card-floating-duplicate-test",
+              url: targetUrl,
+              title: "原始收藏标题",
+              shortDesc: "原始简介",
+              fullDesc: "原始详细简介",
+              note: "必须保留的备注",
+              abbreviation: "KEEP",
+              imageUrl: "https://example.com/original-icon.png",
+              categoryId: cards[0]?.categoryId || "cat-inbox",
+              order: 999,
+              createdAt: 1000,
+              updatedAt: 2000,
+            },
+          ], "cards");
+        };
+        transaction.onerror = () => reject(transaction.error);
+        transaction.oncomplete = () => resolve();
+      });
+    } finally {
+      database.close();
+    }
+  }, { targetUrl: url });
+}
+
+async function verifyDuplicateConfirmation(page, extensionPage, targetUrl, screenshotPath) {
+  const host = page.locator("#webcollect-floating-capture-host");
+  const floatingButton = host.locator(".wc-button");
+  const titleInput = host.locator('[data-field="title"]');
+  const descriptionInput = host.locator('[data-field="description"]');
+  const saveButton = host.locator('[data-action="save"]');
+  const confirmation = host.locator(".wc-duplicate-confirm");
+  const updateButton = host.locator('[data-action="confirm-duplicate-update"]');
+  const keepButton = host.locator('[data-action="keep-duplicate"]');
+
+  await floatingButton.hover();
+  await page.waitForTimeout(220);
+  await floatingButton.click();
+  await titleInput.fill("新的收藏标题");
+  await descriptionInput.fill("新的项目简介");
+  await saveButton.click();
+  await confirmation.waitFor({ state: "visible" });
+  nodeAssert.match(await confirmation.innerText(), /原始收藏标题/);
+  nodeAssert.match(await confirmation.innerText(), /新的收藏标题/);
+  nodeAssert.match(await confirmation.innerText(), /原始详细简介/);
+  nodeAssert.match(await confirmation.innerText(), /新的项目简介/);
+  await page.screenshot({ path: screenshotPath, fullPage: false });
+  await keepButton.click();
+  await page.waitForTimeout(750);
+
+  let cards = await readCardsFromExtensionPage(extensionPage);
+  let targetCard = cards.find((card) => card.id === "card-floating-duplicate-test");
+  nodeAssert.equal(targetCard.title, "原始收藏标题", "keeping existing content must not write the draft");
+  nodeAssert.equal(targetCard.fullDesc, "原始详细简介");
+
+  await floatingButton.hover();
+  await page.waitForTimeout(220);
+  await floatingButton.click();
+  await titleInput.fill("codex-slides");
+  await descriptionInput.fill("开源 AI 幻灯片工作室，用于创建演示文稿。");
+  await saveButton.click();
+  await confirmation.waitFor({ state: "visible" });
+  await updateButton.click();
+
+  await extensionPage.waitForFunction(async ({ id, expectedTitle }) => {
+    const database = await new Promise((resolve, reject) => {
+      const request = indexedDB.open("WebCollect");
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+    try {
+      const cards = await new Promise((resolve, reject) => {
+        const transaction = database.transaction("webcollect_data", "readonly");
+        const request = transaction.objectStore("webcollect_data").get("cards");
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result : []);
+      });
+      return cards.some((card) => card?.id === id && card?.title === expectedTitle);
+    } finally {
+      database.close();
+    }
+  }, { id: "card-floating-duplicate-test", expectedTitle: "codex-slides" }, { timeout: 10_000 });
+
+  cards = await readCardsFromExtensionPage(extensionPage);
+  targetCard = cards.find((card) => card.id === "card-floating-duplicate-test");
+  nodeAssert.equal(targetCard.url, targetUrl);
+  nodeAssert.equal(targetCard.title, "codex-slides");
+  nodeAssert.equal(targetCard.fullDesc, "开源 AI 幻灯片工作室，用于创建演示文稿。");
+  nodeAssert.equal(targetCard.note, "必须保留的备注");
+  nodeAssert.equal(targetCard.abbreviation, "KEEP");
+  nodeAssert.equal(targetCard.imageUrl, "https://example.com/original-icon.png");
+  nodeAssert.equal(targetCard.order, 999);
+  nodeAssert.equal(targetCard.createdAt, 1000);
+
+  return {
+    confirmationText: "新旧标题和简介均可见",
+    preservedFields: ["url", "note", "abbreviation", "imageUrl", "order", "createdAt"],
+  };
+}
+
 const context = await chromium.launchPersistentContext(profileDir, {
   channel: "chromium",
   headless: false,
@@ -259,7 +397,17 @@ const context = await chromium.launchPersistentContext(profileDir, {
 const consoleErrors = [];
 
 try {
-  const page = context.pages()[0] || await context.newPage();
+  const serviceWorker = context.serviceWorkers()[0] || await context.waitForEvent("serviceworker");
+  const extensionUrl = new URL(serviceWorker.url());
+  const extensionOrigin = `chrome-extension://${extensionUrl.host}`;
+  const extensionPage = context.pages()[0] || await context.newPage();
+  await extensionPage.goto(`${extensionOrigin}/newtab.html`, { waitUntil: "domcontentloaded", timeout: 20_000 });
+  await extensionPage.waitForTimeout(900);
+  await seedDuplicateCard(extensionPage, pageUrl);
+  await extensionPage.reload({ waitUntil: "domcontentloaded" });
+  await extensionPage.waitForTimeout(900);
+
+  const page = await context.newPage();
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
@@ -291,6 +439,7 @@ try {
   const clicked = await readFloatingState(page);
   assert(clicked?.panelOpen, "Clicking the revealed mascot should still open the capture panel");
   const keyboardIsolation = await verifyKeyboardIsolation(page);
+  const duplicateConfirmation = await verifyDuplicateConfirmation(page, extensionPage, pageUrl, duplicateScreenshot);
 
   await page.evaluate(() => {
     localStorage.setItem("webcollect.capture.dock", JSON.stringify({ side: "left", topRatio: 0.55 }));
@@ -311,9 +460,10 @@ try {
     hover,
     clicked: { panelOpen: clicked.panelOpen },
     keyboardIsolation,
+    duplicateConfirmation,
     leftRest,
     consoleErrors,
-    screenshots: [restScreenshot, hoverScreenshot],
+    screenshots: [restScreenshot, hoverScreenshot, duplicateScreenshot],
     profileDir,
   }, null, 2));
 } finally {

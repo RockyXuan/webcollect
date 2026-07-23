@@ -26,6 +26,44 @@ assert.equal(
   "代码托管与协作平台，用于管理项目、阅读代码和跟踪开发进度。"
 );
 
+assert.equal(
+  localizeDescriptionText("GitHub is where people build software.", {
+    title: "codex-slides",
+    url: "https://github.com/nexu-io/codex-slides",
+  }),
+  "GitHub 是开发者托管代码、协作开发和管理项目的平台。"
+);
+
+const localizedReadme = localizeDescriptionText(
+  "Open-source AI slide studio for creating image-native presentations and exporting finished decks.",
+  {
+    title: "codex-slides",
+    url: "https://github.com/nexu-io/codex-slides",
+  }
+);
+assert.match(localizedReadme, /开源/);
+assert.match(localizedReadme, /幻灯片工作室/);
+assert.match(localizedReadme, /演示文稿/);
+assert.doesNotMatch(localizedReadme, /代码托管与协作平台/);
+
+assert.match(
+  localizeDescriptionText("The open-source AI slide studio that lives inside Codex.", {
+    title: "codex-slides",
+    url: "https://github.com/nexu-io/codex-slides",
+  }),
+  /开源 AI 幻灯片工作室.*Codex/,
+  "the real codex-slides README lead should become a recognizable local summary"
+);
+
+assert.equal(
+  localizeDescriptionText("Zero copy rendering primitives", {
+    title: "render-primitives",
+    url: "https://github.com/example/render-primitives",
+  }),
+  "Zero copy rendering primitives",
+  "low-confidence local translation must preserve the accurate README source text"
+);
+
 assert.match(
   localizeDescriptionText("A social media analytics dashboard for creators.", {
     title: "TweetMesh",
@@ -89,10 +127,10 @@ assert.match(
   /descriptionInput\.value\s*=\s*localizeDescriptionText\(descriptionInput\.value\.trim\(\),\s*{\s*title:\s*titleInput\.value\.trim\(\),\s*url:\s*urlInput\.value\.trim\(\),\s*}\s*\)/,
   "manual translate should localize the current description using the current title and url"
 );
-assert.equal(
-  (contentSource.match(/localizeDescriptionText\(/g) || []).length,
-  1,
-  "floating capture should only translate after the explicit translate action"
+assert.match(
+  contentSource,
+  /descriptionSource\s*===\s*"github-readme"[\s\S]*localizeDescriptionText\(/,
+  "README descriptions should enter the local translation pipeline automatically"
 );
 
 const queueSource = readFileSync("src/lib/floating-capture.ts", "utf8");

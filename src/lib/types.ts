@@ -103,6 +103,7 @@ export interface FetchMetaResult {
   description: string;
   image: string;
   favicon: string;
+  descriptionSource?: "page" | "github-readme";
 }
 
 export interface HotSite {

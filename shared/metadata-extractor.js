@@ -1,4 +1,5 @@
 import { DomUtils, parseDocument } from "htmlparser2";
+import { githubRepositoryTitleFromUrl } from "./github-repository.js";
 
 const MAX_TITLE_LENGTH = 70;
 const MAX_DESCRIPTION_LENGTH = 280;
@@ -68,18 +69,6 @@ function fallbackTitleFromUrl(url) {
   return hostname.charAt(0).toUpperCase() + hostname.slice(1);
 }
 
-function repositoryTitleFromUrl(url) {
-  try {
-    const parsed = new URL(url);
-    if (parsed.hostname.replace(/^www\./i, "").toLowerCase() !== "github.com") return "";
-    const segments = parsed.pathname.split("/").filter(Boolean);
-    if (segments.length < 2) return "";
-    return decodeURIComponent(segments[1]).replace(/\.git$/i, "");
-  } catch {
-    return "";
-  }
-}
-
 function titlePartMatchesSite(part, url) {
   const normalized = normalizeText(part).toLowerCase().replace(/^www\./, "");
   const hostname = normalizedHostname(url);
@@ -88,7 +77,7 @@ function titlePartMatchesSite(part, url) {
 }
 
 function compactTitle(value, url) {
-  const repository = repositoryTitleFromUrl(url);
+  const repository = githubRepositoryTitleFromUrl(url);
   if (repository) return truncateAtWord(repository, MAX_TITLE_LENGTH);
 
   const title = normalizeText(value);

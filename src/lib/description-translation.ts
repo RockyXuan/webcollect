@@ -1,4 +1,5 @@
 import type { WebCard } from "./types";
+import { parseGitHubRepositoryUrl } from "../../shared/github-repository.js";
 
 interface DescriptionContext {
   title?: string;
@@ -41,12 +42,27 @@ const PHRASE_TRANSLATIONS: Array<[RegExp, string]> = [
 ];
 
 const WORD_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/\bopen[- ]source\b/gi, "开源"],
+  [/\bthat lives inside\b/gi, "位于"],
+  [/\blives inside\b/gi, "位于"],
+  [/\bslide studio\b/gi, "幻灯片工作室"],
+  [/\bslides?\b/gi, "幻灯片"],
+  [/\bpresentations?\b/gi, "演示文稿"],
+  [/\bimage generation\b/gi, "图像生成"],
   [/\bAI assistant\b/gi, "AI 助手"],
   [/\bAI tool\b/gi, "AI 工具"],
   [/\bofficial website\b/gi, "官方网站"],
   [/\bdeveloper platform\b/gi, "开发者平台"],
   [/\bdesign tool\b/gi, "设计工具"],
   [/\bproject management\b/gi, "项目管理"],
+  [/\bprojects?\b/gi, "项目"],
+  [/\brepositor(?:y|ies)\b/gi, "代码仓库"],
+  [/\bworkflows?\b/gi, "工作流程"],
+  [/\bcontent\b/gi, "内容"],
+  [/\beditable\b/gi, "可编辑"],
+  [/\bbrowser[- ]first\b/gi, "浏览器优先"],
+  [/\bbrowser\b/gi, "浏览器"],
+  [/\blocal\b/gi, "本地"],
   [/\bknowledge base\b/gi, "知识库"],
   [/\bsocial media\b/gi, "社交媒体"],
   [/\bvideo platform\b/gi, "视频平台"],
@@ -64,6 +80,9 @@ const WORD_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bapp\b/gi, "应用"],
   [/\bmanage\b/gi, "管理"],
   [/\bcreate\b/gi, "创建"],
+  [/\bcreating\b/gi, "创建"],
+  [/\bbuilt\b/gi, "构建"],
+  [/\bexport\b/gi, "导出"],
   [/\bsearch\b/gi, "搜索"],
   [/\bdiscover\b/gi, "发现"],
   [/\btrack\b/gi, "追踪"],
@@ -122,8 +141,10 @@ export function isEnglishOnlyDescription(value?: string): boolean {
 
 function summaryFromKnownSite(context: DescriptionContext): string | null {
   const hostname = hostnameFromUrl(context.url);
+  const githubRepository = parseGitHubRepositoryUrl(context.url || "");
 
   for (const item of DOMAIN_SUMMARIES) {
+    if (githubRepository && item.domains.includes("github.com")) continue;
     if (item.domains.some((domain) => matchesDomain(hostname, domain))) return item.summary;
     if (!hostname && item.titleTerms?.some((term) => matchesTitleTerm(context.title, term))) return item.summary;
   }
@@ -136,6 +157,7 @@ export function isMismatchedKnownSiteSummary(value?: string, context: Descriptio
   const hostname = hostnameFromUrl(context.url);
   const known = DOMAIN_SUMMARIES.find((item) => normalizeDescriptionText(item.summary) === text);
   if (!known) return false;
+  if (parseGitHubRepositoryUrl(context.url || "") && known.domains.includes("github.com")) return true;
   if (known.domains.some((domain) => matchesDomain(hostname, domain))) return false;
   if (!hostname && known.titleTerms?.some((term) => matchesTitleTerm(context.title, term))) return false;
   return true;
@@ -168,9 +190,19 @@ function softTranslate(text: string): string | null {
   return translated.replace(/\s+([，。；：])/g, "$1");
 }
 
+function isUsefulLocalTranslation(source: string, translated: string): boolean {
+  if (!translated || translated === source) return false;
+  const cjkCount = (translated.match(/[\u3400-\u9fff]/g) || []).length;
+  const latinWords = translated.match(/[A-Za-z]{3,}/g) || [];
+  const sourceWords = source.match(/[A-Za-z]{3,}/g) || [];
+  if (cjkCount < 4) return false;
+  return sourceWords.length < 4 || latinWords.length <= Math.max(3, Math.ceil(sourceWords.length * 0.55));
+}
+
 export function localizeDescriptionText(value?: string, context: DescriptionContext = {}): string {
   const text = normalizeDescriptionText(value || "");
   if (!text || !isEnglishOnlyDescription(text)) return text;
+  const githubRepository = parseGitHubRepositoryUrl(context.url || "");
 
   const known = summaryFromKnownSite(context);
   if (known) return known;
@@ -179,7 +211,9 @@ export function localizeDescriptionText(value?: string, context: DescriptionCont
   if (phrase) return phrase;
 
   const soft = softTranslate(text);
-  if (soft) return soft;
+  if (soft && (!githubRepository || isUsefulLocalTranslation(text, soft))) return soft;
+
+  if (githubRepository) return text;
 
   const title = normalizeDescriptionText(context.title || "");
   if (title) return `${title} 的网页说明，适合收藏后快速识别和访问。`;
