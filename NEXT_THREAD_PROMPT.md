@@ -1,14 +1,14 @@
 # WebCollect 下一大型功能线程提示词
 
-## 2026-07-23 V1.5.3 动态视口适配候选状态
+## 2026-07-23 V1.5.3 动态视口适配正式状态
 
-- 当前候选版本：`V1.5.3 / 2026年7月23日`；计划 tag `webcollect-2026-07-23-v1.5.3`；计划资产 `WebCollect-Chrome-Extension-v1.5.3-2026-07-23.zip`。
+- 当前正式版本：`V1.5.3 / 2026年7月23日`；tag `webcollect-2026-07-23-v1.5.3`；资产 `WebCollect-Chrome-Extension-v1.5.3-2026-07-23.zip`。
 - 最新 closeout：`docs/audit/webcollect-v1.5.3-adaptive-viewport-closeout-2026-07-23.md`。
 - 根容器按实际可用宽度选择 `wide / compressed / reflow / compact`，因此 Chrome 顶部标签和侧边标签不需要专门识别。
 - 1680px 左右温和压缩顶部三行和经典收藏墙，1536px 左右切换两行工具栏，390px 保持紧凑无横向溢出。
 - 导图节点、连线、相机和世界坐标不进入页面密度缩放；响应式密度不持久化、不进入 Drive 或同步。
-- 本地候选门禁已通过；正式 CI、Release、官方 zip 和主 Chrome 验收证据需要等发布后写回。
-- V1.5.2 仍是发布完成前的稳定回退版本。
+- 本地门禁、main CI `29994891634`、Release workflow `29995423399` 和官方 zip 审计均已通过；官方 zip SHA-256 为 `4d41b3e721463446bbde515d470ea6dc8079c85039fd4929c02c8f819c7074e4`。
+- V1.5.2 保留为稳定回退版本。
 
 ## 2026-07-23 V1.5.2 GitHub 收藏信息修复状态
 
@@ -58,7 +58,7 @@
 
 ## 先确认当前基线
 
-- 当前候选代码版本：`V1.5.3 / 2026年7月23日`；正式发布完成前以 V1.5.2 为稳定回退版本。
+- 当前正式版本：`V1.5.3 / 2026年7月23日`；V1.5.2 为稳定回退版本。
 - V1.5.3 closeout：`docs/audit/webcollect-v1.5.3-adaptive-viewport-closeout-2026-07-23.md`。
 - V1.5.2 closeout：`docs/audit/webcollect-v1.5.2-github-capture-metadata-closeout-2026-07-23.md`。
 - V1.5.1 closeout：`docs/audit/webcollect-v1.5.1-next-security-closeout-2026-07-23.md`。
@@ -67,7 +67,7 @@
 - V1.4.1 closeout：`docs/audit/webcollect-v1.4.1-floating-capture-keyboard-closeout-2026-07-21.md`。
 - V1.4.1 应用提交 `8af01d34bc5d095d7961e658558e8fa7c5c16ff0`，main CI `29842309751` 与 Release workflow `29842892835` 均成功；官方 zip 审计与现有已登录主 Chrome Profile 验收已经完成。
 - V1.4.0 closeout：`docs/audit/webcollect-v1.4.0-google-drive-migration-closeout-2026-07-21.md`。它继续是 Google Drive、完整 JSON、真实迁移与 30 天 Supabase 保险期的数据基线。
-- 当前正式 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-23-v1.5.2`；zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-23-v1.5.2/WebCollect-Chrome-Extension-v1.5.2-2026-07-23.zip`。V1.5.0 继续作为标签组/favicon 功能基线。
+- 当前正式 Release：`https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-23-v1.5.3`；zip：`https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-23-v1.5.3/WebCollect-Chrome-Extension-v1.5.3-2026-07-23.zip`。V1.5.0 继续作为标签组/favicon 功能基线。
 - V1.3.0 保留 Google / 百度 / Bing，新增纯本地模糊检索、拼音、错字容错、意图别名、加权全文排序和 opt-in 公开网页知识缓存；不调用 AI API，也不捆绑本地模型。348 unit、31 legacy、44 E2E、Web/扩展构建、17.4 MiB 门禁和 208 个生产依赖零漏洞审计已完成。
 - V1.4.0 将正式云同步切换为用户自己的 Google Drive 隐藏应用目录，并增加完整 JSON 备份/恢复；本地 IndexedDB 仍是第一写入目标，V1.3.1 顶栏与 V1.3.0 本地搜索行为保持不变。
 

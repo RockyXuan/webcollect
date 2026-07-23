@@ -4,9 +4,9 @@
 
 版本：`V1.5.3`
 
-计划 tag：`webcollect-2026-07-23-v1.5.3`
+正式 tag：`webcollect-2026-07-23-v1.5.3`
 
-计划资产：`WebCollect-Chrome-Extension-v1.5.3-2026-07-23.zip`
+正式资产：`WebCollect-Chrome-Extension-v1.5.3-2026-07-23.zip`
 
 ## 结论
 
@@ -53,12 +53,21 @@ V1.5.3 修复 Chrome 侧边标签页压缩网页可用宽度后，WebCollect 顶
 - 本地门禁通过：436 项 Vitest、31 组 legacy scripts、58 项 Playwright、TypeScript、lint、Web/扩展生产构建、扩展产物检查与 17.3 MiB 体积门禁。
 - in-app Browser 在同一稳定本机页面完成 `1920 / 1680 / 1536 / 390px` 经典模式检查，控制台错误为 0。
 
-## 待正式发布补证
+## 正式发布证据
 
-- 应用提交、main CI 和正式 tag workflow。
-- 现有已登录主 Chrome Profile 辅助窗口的顶部/侧边标签真实只读验收。
-- 官方 Release 单一 zip 的大小、SHA-256、manifest、稳定扩展 ID、权限和解包树复核。
+- 应用提交：`5cf6280e33213571e4133e5a412ff8d45f8ed919`。
+- main CI：[`29994891634`](https://github.com/RockyXuan/webcollect/actions/runs/29994891634)，`audit-production` 与 `verify` 全部成功。
+- 正式 tag workflow：[`29995423399`](https://github.com/RockyXuan/webcollect/actions/runs/29995423399)，`verify-tag`、扩展重建、产物检查、体积检查、打包与 Release 发布全部成功。
+- 正式 Release：[`webcollect-2026-07-23-v1.5.3`](https://github.com/RockyXuan/webcollect/releases/tag/webcollect-2026-07-23-v1.5.3)，不是 draft 或 prerelease。
+- 官方 zip：[`WebCollect-Chrome-Extension-v1.5.3-2026-07-23.zip`](https://github.com/RockyXuan/webcollect/releases/download/webcollect-2026-07-23-v1.5.3/WebCollect-Chrome-Extension-v1.5.3-2026-07-23.zip)；Release 只有这一份资产，大小 `17,071,576` bytes，SHA-256 `4d41b3e721463446bbde515d470ea6dc8079c85039fd4929c02c8f819c7074e4`，与 GitHub digest 一致。
+- 官方 zip 可无错误解包，共 46 个 zip entry、41 个实际文件、0 个重复 entry；解包树与正式 tag 的最终本地 `extension/dist` 逐文件一致。
+- 官方 manifest 为 MV3、版本 `1.5.3`，稳定扩展 ID 为 `immpcmhmabobllnopedaoflcjneigbko`；权限仍只有 `storage`、`activeTab`、`identity`、`contextMenus`、`favicon`，没有 `tabs` / `tabGroups`，Google OAuth scope 仍只有 `drive.appdata`，包内没有 Client Secret。
+
+## 真实 Chrome 状态
+
+- Chrome 控制接口已识别现有已登录主 Profile 中的 WebCollect 新标签页和扩展详情页，但安全策略禁止控制 `chrome-extension://` 内部页，未使用 Computer Use 或其他方式绕过。
+- 已只请求一次人工原位重载；最终的顶部/侧边标签真实只读结果在用户确认后追加。其余发布证据已经闭合。
 
 ## 当前状态
 
-V1.5.3 的功能实现和本地自动化/浏览器候选验证已经完成。正式发布证据将在 CI、Release、官方包复核与真实扩展只读验收实际完成后追加；在此之前 V1.5.2 仍是稳定回退版本。
+V1.5.3 已正式发布，V1.5.2 保留为稳定回退版本。本次发布证据提交只更新文档，不是新的应用版本。
