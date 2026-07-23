@@ -4,13 +4,15 @@
 
 ## 2026-07-23 V1.5.2 GitHub Capture Metadata Fix
 
-This section records the current code target. V1.5.1 remains the latest published release until V1.5.2 release evidence is appended.
+This section records the current published release. V1.5.0 remains the tab-pack/favicon feature baseline and V1.4.0 remains the cloud/data baseline.
 
-- Code identity: `V1.5.2 / 2026年7月23日`; target tag `webcollect-2026-07-23-v1.5.2`; target asset `WebCollect-Chrome-Extension-v1.5.2-2026-07-23.zip`.
+- Published identity: `V1.5.2 / 2026年7月23日`; tag `webcollect-2026-07-23-v1.5.2`; asset `WebCollect-Chrome-Extension-v1.5.2-2026-07-23.zip`.
 - Closeout: `docs/audit/webcollect-v1.5.2-github-capture-metadata-closeout-2026-07-23.md`.
 - GitHub repository captures use a shared repository parser and bounded public README extraction. No Cookie, GitHub Token, AI API, translation API, or local model is used.
 - Duplicate URLs require a comparison and explicit in-panel confirmation. The queue rechecks card ID, normalized URL, and `updatedAt`, then updates only non-empty title/description fields while preserving all placement and user-authored fields.
 - Legacy/right-click duplicates still skip; multiple duplicates and version conflicts fail closed. No permission, dependency, storage key, Drive schema, migration, snapshot, seed, or unrelated collection behavior changes.
+- Application commit `3cd02b2bc7c85e655f98e6cea5619c3f9ac710e8`, main CI `29987210999`, and Release workflow `29987630172` passed. The single official asset is `17,069,709` bytes with SHA-256 `cc76c1c06bb707d3edceb974cc1d5a7d7b81b51d9dfee704bad2d7364c81a3e9`; its 41-file tree matches the local final build.
+- The existing signed-in primary-profile extension was reloaded from the official package in the auxiliary task window. Seven sections, recycle count 15, real collection data, account, tab packs, and the Drive-synced state all restored without any acceptance write.
 
 ## 2026-07-23 V1.5.1 Next.js Security Patch
 
@@ -158,7 +160,7 @@ This section supersedes older development status. The user explicitly waived the
 
 ## Next Major Feature Thread
 
-- V1.5.2 is the current code target; its CI, Release, official-zip audit, and real Chrome read-only evidence must be completed before starting another feature.
+- V1.5.2 is the current published release; its CI, Release, official-zip audit, and real Chrome read-only evidence are complete.
 - Read `AGENTS.md`, `AGD.md`, this file, `NEXT_THREAD_PROMPT.md`, the V1.5.2 closeout, the V1.5.1 closeout, the V1.5.0 feature closeout, and the V1.4.0 data-baseline closeout before changing code.
 - Ask for or read the user's new feature description, then inspect only the relevant implementation paths before choosing scope, tests, version bump, and release plan.
 - Preserve the V1.4.0 local-first Drive, backup, data, and migration guarantees. Do not reset IndexedDB, old Supabase data, extension storage, categories, cards, preferences, snapshots, local view state, mode preference, knowledge consent/cache, derived vectors, or the two documented empty inbox artifacts.
